@@ -44,6 +44,4 @@ Thumbs.db
 
 # Mantener esta configuración en el repositorio.
 !.gitignore
-
-# Landing page que se va a desplegar.
-frontend-saas/
+!frontend/.gitignore
