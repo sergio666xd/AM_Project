@@ -1,0 +1,22 @@
+{
+    "builds": [
+      {
+        "src": "frontend-saas/package.json",
+        "use": "@vercel/next"
+      },
+      {
+        "src": "app/main.py",
+        "use": "@vercel/python"
+      }
+    ],
+    "routes": [
+      {
+        "src": "/api/(.*)",
+        "dest": "app/main.py"
+      },
+      {
+        "src": "/(.*)",
+        "dest": "frontend-saas/$1"
+      }
+    ]
+  }
