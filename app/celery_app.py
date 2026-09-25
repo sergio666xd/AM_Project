@@ -1,0 +1,34 @@
+import os
+from celery import Celery
+from celery.schedules import crontab
+
+REDIS_URL = os.getenv("REDIS_URL", "redis://localhost:6379/0")
+
+celery_app = Celery(
+    "saas_tasks",
+    broker=REDIS_URL,
+    backend=REDIS_URL,
+    include=["app.tasks"]
+)
+
+celery_app.conf.update(
+    task_serializer="json",
+    accept_content=["json"],
+    result_serializer="json",
+    timezone="America/Bogota",
+    enable_utc=True,
+)
+
+# --- PROGRAMACIÓN DE TAREAS PERIÓDICAS (CELERY BEAT) ---
+celery_app.conf.beat_schedule = {
+    # Barridos diarios de lunes a viernes a las 12:00 PM y 6:00 PM
+    "barrido-lunes-a-viernes-12-y-18": {
+        "task": "tareas.consultar_todos_los_radicados",
+        "schedule": crontab(hour="12,18", minute=0, day_of_week="mon-fri"),
+    },
+    # Informe consolidado de fin de mes (Ejecuta el día 28, 29, 30 o 31 a las 17:00 según el mes)
+    "informe-fin-de-mes-5pm": {
+        "task": "tareas.enviar_resumen_mensual_usuarios",
+        "schedule": crontab(hour=17, minute=0, day_of_month="28-31"),
+    },
+}

@@ -1,0 +1,49 @@
+# Este repositorio se publica exclusivamente como la landing de portafolio.
+
+# Secretos y configuración local.
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.p12
+*.pfx
+
+# Entornos, dependencias y artefactos generados.
+venv/
+.venv/
+env/
+ENV/
+node_modules/
+.next/
+out/
+build/
+dist/
+coverage/
+__pycache__/
+*.py[cod]
+*.tsbuildinfo
+
+# Datos locales, sesiones y tareas de ejecución.
+whatsapp_session/
+uploads/
+celerybeat-schedule*
+*.db
+*.sqlite*
+
+# Configuración de editor y sistema operativo.
+.vscode/
+.idea/
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
+
+# Además de las exclusiones anteriores, nada del proyecto raíz se versiona.
+# Esto evita subir accidentalmente el backend u otros archivos locales.
+
+# Mantener esta configuración en el repositorio.
+!.gitignore
+
+# Landing page que se va a desplegar.
+frontend-saas/
