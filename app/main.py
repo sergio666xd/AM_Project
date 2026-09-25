@@ -1,5 +1,6 @@
 import os
 import shutil
+import redis
 from pathlib import Path
 from fastapi import FastAPI, Depends, HTTPException, status, UploadFile, File, Form
 from fastapi.security import OAuth2PasswordRequestForm
@@ -41,6 +42,30 @@ app.add_middleware(
 # Servir archivos estáticos subidos (solo para ver documentos en desarrollo local)
 app.mount("/uploads", StaticFiles(directory="uploads"), name="uploads")
 
+@app.get("/api/test-redis")
+def test_redis():
+    redis_url = os.getenv("REDIS_URL")
+
+    if not redis_url:
+        return {
+            "ok": False,
+            "error": "REDIS_URL no está configurada"
+        }
+
+    try:
+        r = redis.from_url(redis_url)
+        r.ping()
+
+        return {
+            "ok": True,
+            "redis": "conectado"
+        }
+
+    except Exception as e:
+        return {
+            "ok": False,
+            "error": str(e)
+        }
 
 @app.on_event("startup")
 def crear_datos_iniciales():
