@@ -1,22 +1,40 @@
 {
-    "builds": [
-      {
-        "src": "frontend-saas/package.json",
-        "use": "@vercel/next"
+    "$schema": "https://openapi.vercel.sh/vercel.json",
+    "services": {
+      "frontend": {
+        "root": "frontend-saas/",
+        "framework": "nextjs"
       },
-      {
-        "src": "app/main.py",
-        "use": "@vercel/python"
+      "backend": {
+        "root": "./",
+        "entrypoint": "app.main:app",
+        "framework": "fastapi"
       }
-    ],
-    "routes": [
+    },
+    "rewrites": [
       {
-        "src": "/api/(.*)",
-        "dest": "app/main.py"
+        "source": "/api/(.*)",
+        "destination": {
+          "service": "backend"
+        }
       },
       {
-        "src": "/(.*)",
-        "dest": "frontend-saas/$1"
+        "source": "/docs",
+        "destination": {
+          "service": "backend"
+        }
+      },
+      {
+        "source": "/openapi.json",
+        "destination": {
+          "service": "backend"
+        }
+      },
+      {
+        "source": "/(.*)",
+        "destination": {
+          "service": "frontend"
+        }
       }
     ]
   }
