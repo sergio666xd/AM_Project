@@ -387,6 +387,98 @@ def obtener_dashboard(
         "ultimas_consultas": consultas,
     }
 # --- ENDPOINTS DE ADMINISTRACIÓN ---
+@app.post("/api/admin/usuarios", status_code=status.HTTP_201_CREATED)
+def crear_usuario_admin(
+    email: str,
+    password: str,
+    nombre_completo: str,
+    whatsapp_numero: str,
+    rol: models.RolUsuario = models.RolUsuario.ABOGADO,
+    plan_id: int = 1,
+    usuario_actual: models.Usuario = Depends(security.obtener_usuario_actual),
+    db: Session = Depends(get_db),
+):
+    """
+    Crea directamente un usuario desde administración.
+
+    Este endpoint no requiere tarjeta profesional y está destinado
+    exclusivamente a la creación administrativa de usuarios.
+    """
+
+    # 1. Verificar que quien realiza la petición sea ADMIN
+    if usuario_actual.rol != models.RolUsuario.ADMIN:
+        raise HTTPException(
+            status_code=403,
+            detail="Acceso denegado: requiere rol de Admin."
+        )
+
+    # 2. Verificar que el correo no esté registrado
+    usuario_existente = (
+        db.query(models.Usuario)
+        .filter(models.Usuario.email == email)
+        .first()
+    )
+
+    if usuario_existente:
+        raise HTTPException(
+            status_code=400,
+            detail="El correo ya está registrado."
+        )
+
+    # 3. Verificar que el plan exista y esté activo
+    plan = (
+        db.query(models.Plan)
+        .filter(
+            models.Plan.id == plan_id,
+            models.Plan.activo == True
+        )
+        .first()
+    )
+
+    if not plan:
+        raise HTTPException(
+            status_code=400,
+            detail="El plan especificado no existe o está inactivo."
+        )
+
+    # 4. Crear usuario
+    nuevo_usuario = models.Usuario(
+        email=email,
+        password_hash=security.hash_password(password),
+        nombre_completo=nombre_completo,
+        whatsapp_numero=whatsapp_numero,
+        rol=rol,
+        estado=models.EstadoUsuario.ACTIVO,
+        plan_id=plan.id,
+    )
+
+    db.add(nuevo_usuario)
+    db.commit()
+    db.refresh(nuevo_usuario)
+
+    return {
+        "mensaje": "Usuario creado correctamente.",
+        "usuario": {
+            "id": nuevo_usuario.id,
+            "email": nuevo_usuario.email,
+            "nombre_completo": nuevo_usuario.nombre_completo,
+            "whatsapp_numero": nuevo_usuario.whatsapp_numero,
+            "rol": (
+                nuevo_usuario.rol.value
+                if hasattr(nuevo_usuario.rol, "value")
+                else nuevo_usuario.rol
+            ),
+            "estado": (
+                nuevo_usuario.estado.value
+                if hasattr(nuevo_usuario.estado, "value")
+                else nuevo_usuario.estado
+            ),
+            "plan": {
+                "id": plan.id,
+                "nombre": plan.nombre,
+            },
+        },
+    }
 
 @app.get("/api/admin/solicitudes", response_model=list[schemas.SolicitudRegistroOut])
 def listar_solicitudes_pendientes(
