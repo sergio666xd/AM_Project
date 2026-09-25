@@ -8,8 +8,6 @@ from fastapi.staticfiles import StaticFiles
 from sqlalchemy.orm import Session
 from fastapi.middleware.cors import CORSMiddleware
 from datetime import datetime
-from pathlib import Path
-
 from app.database import engine, Base, get_db
 from app import models, schemas, security
 from app.routers import admin
@@ -22,9 +20,6 @@ models.Base.metadata.create_all(bind=engine)
 # Carpeta para almacenar tarjetas profesionales cargadas
 # UPLOADS_DIR = Path("uploads/tarjetas_profesionales")
 # UPLOADS_DIR.mkdir(parents=True, exist_ok=True)
-
-UPLOADS_DIR = Path("/tmp/uploads/tarjetas_profesionales")
-UPLOADS_DIR.mkdir(parents=True, exist_ok=True)
 
 app = FastAPI(
     title="Plataforma SaaS de Seguimiento Judicial",
@@ -44,7 +39,7 @@ app.add_middleware(
 )
 
 # Servir archivos estáticos subidos (solo para ver documentos en desarrollo local)
-app.mount("/uploads", StaticFiles(directory="uploads"), name="uploads")
+# app.mount("/uploads", StaticFiles(directory="uploads"), name="uploads")
 
 @app.get("/api/test-redis")
 def test_redis():
