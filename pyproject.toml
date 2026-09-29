@@ -20,8 +20,4 @@ dependencies = [
     "requests",
     "boto3",
     "qstash",
-    "vercel-workflow==0.11.0",
 ]
-
-[[tool.vercel.workflows]]
-entrypoint = "app.workflow_spike:wf"

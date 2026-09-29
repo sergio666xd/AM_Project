@@ -15,4 +15,3 @@ redis
 requests
 boto3
 qstash
-vercel-workflow==0.11.0
