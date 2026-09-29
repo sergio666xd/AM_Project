@@ -1,6 +1,6 @@
-from pydantic import BaseModel, EmailStr
-from typing import Optional
-from datetime import datetime
+from pydantic import BaseModel, EmailStr, field_serializer
+from typing import Any, Literal, Optional
+from datetime import datetime, timezone
 from app.models import EstadoUsuario, RolUsuario
 from typing import Optional
 from datetime import datetime
@@ -19,6 +19,9 @@ class PlanOut(BaseModel):
     limite_radicados: int
     precio_mensual: int
     activo: bool
+    limite_ultimas_actuaciones: Optional[int] = None
+    notificaciones_whatsapp_procesos: bool = False
+    notificaciones_whatsapp_tareas: bool = False
 
     class Config:
         from_attributes = True
@@ -27,6 +30,10 @@ class PlanCreate(BaseModel):
     nombre: str
     limite_radicados: int
     precio_mensual: int
+    # null = todas las actuaciones
+    limite_ultimas_actuaciones: Optional[int] = 5
+    notificaciones_whatsapp_procesos: bool = False
+    notificaciones_whatsapp_tareas: bool = False
 
 
 class PlanUpdate(BaseModel):
@@ -34,6 +41,83 @@ class PlanUpdate(BaseModel):
     limite_radicados: int | None = None
     precio_mensual: int | None = None
     activo: bool | None = None
+    limite_ultimas_actuaciones: Optional[int] = None
+    notificaciones_whatsapp_procesos: Optional[bool] = None
+    notificaciones_whatsapp_tareas: Optional[bool] = None
+
+
+class ConfiguracionSaasOut(BaseModel):
+    mostrar_planes: bool
+
+    class Config:
+        from_attributes = True
+
+
+class ConfiguracionSaasUpdate(BaseModel):
+    mostrar_planes: bool
+
+class ContenidoPaginaUpdate(BaseModel):
+    contenido: dict[str, Any]
+
+
+class AdminResourceCreate(BaseModel):
+    owner_id: int
+    nombre: Optional[str] = None
+    descripcion: Optional[str] = None
+    numero: Optional[str] = None
+    titulo: Optional[str] = None
+    instrucciones: Optional[str] = None
+    estado: Optional[EstadoTarea] = None
+    prioridad: Optional[PrioridadTarea] = None
+    fecha_limite: Optional[datetime] = None
+    proceso_id: Optional[int] = None
+    radicado_id: Optional[int] = None
+    cliente_id: Optional[int] = None
+
+
+class AdminResourceUpdate(BaseModel):
+    owner_id: Optional[int] = None
+    nombre: Optional[str] = None
+    descripcion: Optional[str] = None
+    numero: Optional[str] = None
+    titulo: Optional[str] = None
+    estado: Optional[EstadoTarea] = None
+    prioridad: Optional[PrioridadTarea] = None
+    fecha_limite: Optional[datetime] = None
+    nombre_archivo: Optional[str] = None
+
+
+class AccionMasivaUsuarios(BaseModel):
+    usuario_ids: list[int]
+    estado: EstadoUsuario
+
+
+class AccionMasivaPlanes(BaseModel):
+    plan_ids: list[int]
+    activo: bool
+
+
+class AccionMasivaSolicitudes(BaseModel):
+    solicitud_ids: list[int]
+    accion: str
+    plan_id: Optional[int] = None
+
+
+class UsuarioAdminCreate(BaseModel):
+    email: EmailStr
+    nombre_completo: str
+    whatsapp_numero: str = ""
+    password_temporal: str
+    rol: RolUsuario
+    plan_id: Optional[int] = None
+    creado_por_abogado_id: Optional[int] = None
+
+
+class UsuarioAdminUpdate(BaseModel):
+    nombre_completo: Optional[str] = None
+    whatsapp_numero: Optional[str] = None
+    plan_id: Optional[int] = None
+    creado_por_abogado_id: Optional[int] = None
 
 class UsuarioOut(BaseModel):
     id: int
@@ -43,6 +127,9 @@ class UsuarioOut(BaseModel):
     rol: RolUsuario
     estado: EstadoUsuario
     plan: Optional[PlanOut] = None
+    creado_por_abogado_id: Optional[int] = None
+    debe_cambiar_password: bool = False
+    created_at: Optional[datetime] = None
 
     class Config:
         from_attributes = True
@@ -62,6 +149,98 @@ class SolicitudRegistroOut(BaseModel):
 class Token(BaseModel):
     access_token: str
     token_type: str = "bearer"
+    debe_cambiar_password: bool = False
+
+
+class CambiarPasswordIn(BaseModel):
+    password_actual: str
+    password_nueva: str
+
+
+class SolicitudRecuperacionPassword(BaseModel):
+    email: EmailStr
+
+
+class ConfirmacionRecuperacionPassword(BaseModel):
+    token: str
+    password_nueva: str
+
+
+class PreferenciasNotificacionUpdate(BaseModel):
+    notificaciones_email: Optional[bool] = None
+    notificaciones_whatsapp: Optional[bool] = None
+
+
+class PerfilUpdate(BaseModel):
+    email: Optional[EmailStr] = None
+    nombre_completo: Optional[str] = None
+    whatsapp_numero: Optional[str] = None
+
+
+class SolicitudEdicionPerfilClienteCreate(BaseModel):
+    email: EmailStr
+    nombre_completo: str
+    whatsapp_numero: str = ""
+
+
+class SolicitudEdicionPerfilClienteRevision(BaseModel):
+    decision: Literal["APROBAR", "RECHAZAR"]
+    comentario: Optional[str] = None
+
+
+class ClienteCreate(BaseModel):
+    email: EmailStr
+    nombre_completo: str
+    whatsapp_numero: str = ""
+    password_temporal: str
+
+
+class ClienteUpdate(BaseModel):
+    nombre_completo: str
+    whatsapp_numero: str = ""
+
+
+class AbogadoAdminCreate(BaseModel):
+    email: EmailStr
+    nombre_completo: str
+    whatsapp_numero: str = ""
+    password_temporal: str
+
+
+class ProcesoCreate(BaseModel):
+    nombre: str
+    descripcion: Optional[str] = None
+
+
+class ProcesoUpdate(BaseModel):
+    nombre: Optional[str] = None
+    descripcion: Optional[str] = None
+
+
+class ProcesoColaboradorCreate(BaseModel):
+    abogado_id: int
+
+
+class SolicitudDocumentoCreate(BaseModel):
+    cliente_id: int
+    titulo: str
+    instrucciones: Optional[str] = None
+
+
+class NotificacionActuacionCreate(BaseModel):
+    cliente_id: int
+    comentarios: str = ""
+
+
+class InteresSaasCreate(BaseModel):
+    email: EmailStr
+    autorizacion_datos: bool = True
+    # Campo trampa: los usuarios reales nunca lo ven ni lo completan.
+    website: str = ""
+
+
+class InteresSaasOut(BaseModel):
+    mensaje: str
 
 class RadicadoCreate(BaseModel):
     numero: str  # Los 23 dígitos del radicado judicial
@@ -100,12 +279,36 @@ class RadicadoOut(BaseModel):
 class SubtareaCreate(BaseModel):
     titulo: str
     orden: int = 0
+    asignada_cliente: bool = False
+    cliente_id: Optional[int] = None
+    proceso_id: Optional[int] = None
+    radicado_id: Optional[int] = None
+    actuacion_id: Optional[int] = None
+    notificar_email: bool = True
+    notificar_whatsapp: bool = True
+    proceso_id: Optional[int] = None
+    radicado_id: Optional[int] = None
+    actuacion_id: Optional[int] = None
+    notificar_email: bool = True
+    notificar_whatsapp: bool = True
 
 
 class SubtareaUpdate(BaseModel):
     titulo: Optional[str] = None
     completada: Optional[bool] = None
     orden: Optional[int] = None
+    asignada_cliente: Optional[bool] = None
+    cliente_id: Optional[int] = None
+    proceso_id: Optional[int] = None
+    radicado_id: Optional[int] = None
+    actuacion_id: Optional[int] = None
+    notificar_email: Optional[bool] = None
+    notificar_whatsapp: Optional[bool] = None
+    proceso_id: Optional[int] = None
+    radicado_id: Optional[int] = None
+    actuacion_id: Optional[int] = None
+    notificar_email: Optional[bool] = None
+    notificar_whatsapp: Optional[bool] = None
 
 
 class SubtareaOut(BaseModel):
@@ -115,6 +318,18 @@ class SubtareaOut(BaseModel):
     completada: bool
     orden: int
     completada_en: Optional[datetime] = None
+    asignada_cliente: bool = False
+    cliente_id: Optional[int] = None
+    proceso_id: Optional[int] = None
+    radicado_id: Optional[int] = None
+    actuacion_id: Optional[int] = None
+    notificar_email: bool = True
+    notificar_whatsapp: bool = True
+    proceso_id: Optional[int] = None
+    radicado_id: Optional[int] = None
+    actuacion_id: Optional[int] = None
+    notificar_email: bool = True
+    notificar_whatsapp: bool = True
 
     class Config:
         from_attributes = True
@@ -142,6 +357,12 @@ class RecordatorioTareaOut(BaseModel):
     anticipacion_minutos: Optional[int] = None
     enviado_en: Optional[datetime] = None
 
+    @field_serializer("fecha_hora", "enviado_en")
+    def serialize_utc_datetime(self, value: Optional[datetime]) -> Optional[datetime]:
+        if value is not None and value.tzinfo is None:
+            return value.replace(tzinfo=timezone.utc)
+        return value
+
     class Config:
         from_attributes = True
 
@@ -158,6 +379,8 @@ class TareaCreate(BaseModel):
     # Ambos NULL = tarea general
     radicado_id: Optional[int] = None
     actuacion_id: Optional[int] = None
+    proceso_id: Optional[int] = None
+    cliente_id: Optional[int] = None
 
 
 class TareaUpdate(BaseModel):
@@ -171,6 +394,8 @@ class TareaUpdate(BaseModel):
 
     radicado_id: Optional[int] = None
     actuacion_id: Optional[int] = None
+    proceso_id: Optional[int] = None
+    cliente_id: Optional[int] = None
 
 
 class TareaOut(BaseModel):
@@ -179,6 +404,8 @@ class TareaOut(BaseModel):
 
     radicado_id: Optional[int] = None
     actuacion_id: Optional[int] = None
+    proceso_id: Optional[int] = None
+    cliente_id: Optional[int] = None
 
     titulo: str
     descripcion: Optional[str] = None

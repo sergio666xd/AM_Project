@@ -1,9 +1,52 @@
 import type { Metadata } from "next";
-import { BellRing, CalendarCheck2, CheckCircle2, ClipboardCheck, MessageCircle, Sparkles } from "lucide-react";
+import { Activity, BellRing, BriefcaseBusiness, ClipboardCheck, ShieldCheck } from "lucide-react";
 
-export const metadata: Metadata = { title: "Gestión de Procesos | Próximamente", description: "La plataforma de gestión y seguimiento judicial para abogados." };
-const waitlist = "mailto:alejandramunozabg@outlook.com?subject=Lista%20de%20espera%20-%20Gesti%C3%B3n%20de%20Procesos";
+import { MarketingLayout } from "@/components/marketing/MarketingLayout";
+import { PlansAvailability } from "@/components/marketing/PlansAvailability";
+
+export const metadata: Metadata = {
+  title: "Gestión de Procesos para abogados",
+  description: "Consulta radicados y organiza tareas de tu práctica jurídica.",
+};
+
+const benefits = [
+  { icon: BriefcaseBusiness, title: "Radicados bajo control", detail: "Consulta actuaciones judiciales desde un solo lugar." },
+  { icon: Activity, title: "Historial de actuaciones", detail: "Revisa novedades disponibles según tu plan." },
+  { icon: ClipboardCheck, title: "Tareas conectadas", detail: "Organiza vencimientos, subtareas y recordatorios." },
+  { icon: BellRing, title: "Notificaciones", detail: "Recibe avisos en los canales habilitados para tu cuenta." },
+];
 
 export default function GestionProcesosPage() {
-  return <main className="min-h-screen bg-[#f8f5ef] px-6 py-6 text-[#193931] lg:px-8"><header className="mx-auto flex max-w-6xl items-center justify-between"><a href="/" className="font-serif text-xl">Alejandra Muñoz <span className="text-[#a37a22]">|</span> Abogada y Asociados</a><a href="/" className="text-sm font-semibold text-[#52625c] hover:text-[#20453e]">← Volver al portafolio</a></header><section className="mx-auto grid max-w-6xl gap-12 py-20 lg:grid-cols-[1.1fr_.9fr] lg:py-28"><div><p className="flex items-center gap-2 text-xs font-bold uppercase tracking-[.2em] text-[#a37a22]"><Sparkles size={15} /> Próximamente</p><h1 className="mt-5 font-serif text-5xl leading-none sm:text-6xl">Gestión de Procesos, para abogados que quieren anticiparse.</h1><p className="mt-7 max-w-2xl text-lg leading-8 text-[#5c6c65]">Una plataforma para dejar atrás el control manual: centralice sus radicados, detecte nuevas actuaciones y convierta cada novedad en una acción concreta.</p><div className="mt-9 flex flex-col gap-3 sm:flex-row"><a className="inline-flex items-center justify-center gap-2 rounded-full bg-[#20453e] px-6 py-3.5 font-semibold text-white" href={waitlist}><MessageCircle size={18} /> Unirme a la lista de espera</a><a className="inline-flex items-center justify-center rounded-full border border-[#98a49e] px-6 py-3.5 font-semibold" href="/gestion-procesos/auth/login">Ingresar al aplicativo</a></div></div><aside className="rounded-[2rem] bg-[#20453e] p-8 text-white shadow-xl shadow-[#20453e]/20 sm:p-10"><p className="text-sm font-bold uppercase tracking-[.18em] text-[#e7c36d]">De procesos a decisiones</p><p className="mt-5 font-serif text-3xl leading-tight">Su práctica, organizada. Sus novedades, visibles. Su tiempo, mejor aprovechado.</p><div className="mt-10 space-y-4 border-t border-[#5c7970] pt-6 text-sm text-[#dce7e2]"><p className="flex gap-3"><CheckCircle2 className="shrink-0 text-[#e7c36d]" size={19} /> Diseñado para el trabajo jurídico real.</p><p className="flex gap-3"><CheckCircle2 className="shrink-0 text-[#e7c36d]" size={19} /> Automatización con información pública judicial.</p></div></aside></section><section className="mx-auto max-w-6xl border-t border-[#d9d6cb] py-16"><p className="text-xs font-bold uppercase tracking-[.2em] text-[#a37a22]">Lo que encontrará</p><div className="mt-8 grid gap-5 md:grid-cols-2 lg:grid-cols-4">{[[ClipboardCheck,"Procesos centralizados","Radicados y actuaciones en un solo lugar."],[BellRing,"Novedades y alertas","Consulta automática de información judicial y notificaciones."],[CalendarCheck2,"Tareas conectadas","Recordatorios, fechas límite y seguimiento por actuación."],[MessageCircle,"Informes y WhatsApp","Reportes mensuales y automatizaciones para Plan Pro."]].map(([Icon,title,text])=>{const LucideIcon=Icon as typeof ClipboardCheck;return <article key={title as string} className="rounded-3xl bg-white p-6"><LucideIcon className="text-[#a37a22]" size={25}/><h2 className="mt-5 font-serif text-2xl">{title as string}</h2><p className="mt-2 text-sm leading-6 text-[#63716b]">{text as string}</p></article>})}</div><div className="mt-12 rounded-3xl border border-[#d9c482] bg-[#f0eadc] p-7 sm:flex sm:items-center sm:justify-between"><div><h2 className="font-serif text-2xl">Planes pensados para crecer con su práctica</h2><p className="mt-2 text-[#5c6c65]">Plan Básico para lo esencial. Plan Pro para automatizaciones y WhatsApp.</p></div><a href={waitlist} className="mt-5 inline-block font-semibold text-[#20453e] underline underline-offset-4 sm:mt-0">Quiero recibir novedades →</a></div></section></main>;
+  return (
+    <MarketingLayout>
+      <main>
+        <section className="bg-[#002060] px-5 py-16 text-white lg:px-8 lg:py-20">
+          <div className="mx-auto grid max-w-7xl gap-12 lg:grid-cols-[1fr_1fr] lg:items-center">
+            <div>
+              <p className="text-sm font-bold uppercase text-[#ccb56b]">Servicio SaaS para abogados externos</p>
+              <h1 className="mt-4 text-4xl font-semibold leading-tight sm:text-5xl">Gestión de Procesos</h1>
+              <p className="mt-5 max-w-xl text-lg leading-8 text-white/80">Consulta radicados, detecta nuevas actuaciones y organiza el trabajo asociado a tu práctica.</p>
+              <a href="/gestion-procesos/auth/login" className="mt-7 inline-flex rounded-lg border border-white/50 px-5 py-3 font-semibold hover:bg-white/10">Ingresar a mi cuenta</a>
+            </div>
+            <div className="rounded-2xl border border-[#ccb56b]/60 bg-white/10 p-6 sm:p-8">
+              <h2 className="text-xl font-semibold">Planes disponibles</h2>
+              <PlansAvailability />
+            </div>
+          </div>
+        </section>
+        <section className="mx-auto max-w-7xl px-5 py-14 lg:px-8">
+          <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
+            {benefits.map(({ icon: Icon, title, detail }) => (
+              <article key={title} className="rounded-xl border border-[#ccb56b]/40 bg-white p-6">
+                <Icon className="text-[#92792e]" size={22} />
+                <h2 className="mt-4 text-lg font-semibold text-[#002060]">{title}</h2>
+                <p className="mt-2 text-sm leading-6 text-[#002060]/70">{detail}</p>
+              </article>
+            ))}
+          </div>
+          <p className="mt-8 flex items-center gap-2 text-sm text-[#002060]/65"><ShieldCheck size={17} /> Cada cuenta SaaS conserva sus radicados y tareas aislados por usuario.</p>
+        </section>
+      </main>
+    </MarketingLayout>
+  );
 }

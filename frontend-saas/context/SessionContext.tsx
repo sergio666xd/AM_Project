@@ -17,6 +17,9 @@ export interface UsuarioActual {
   whatsapp_numero?: string | null;
   rol: string;
   estado: string;
+  debe_cambiar_password?: boolean;
+  notificaciones_email?: boolean;
+  notificaciones_whatsapp?: boolean;
   plan?: {
     id: number;
     nombre: string;

@@ -103,14 +103,19 @@ def _obtener_proceso(numero_radicado: str) -> dict | None:
         pagina += 1
 
 
-def _obtener_actuaciones(id_proceso: int) -> list[dict]:
-    """Descarga todas las páginas de actuaciones de un proceso."""
+def _obtener_actuaciones(id_proceso: int, limite: int | None = None) -> list[dict]:
+    """Descarga el historial de actuaciones, con límite opcional de seguridad."""
     actuaciones: list[dict] = []
     pagina = 1
 
     while True:
         respuesta = _obtener_json(f"/Proceso/Actuaciones/{id_proceso}", {"pagina": pagina})
         actuaciones.extend(respuesta.get("actuaciones") or [])
+
+        # La API entrega las actuaciones más recientes primero. No seguimos
+        # descargando páginas cuando el plan ya alcanzó su capacidad.
+        if limite is not None and len(actuaciones) >= limite:
+            return actuaciones[:limite]
 
         paginacion = respuesta.get("paginacion") or {}
         total_paginas = paginacion.get("cantidadPaginas") or 1
@@ -164,8 +169,19 @@ def ejecutar_consulta_api_radicado(db: Session, radicado_obj: models.Radicado) -
         if not id_proceso:
             raise RamaJudicialAPIError("La respuesta no contiene el identificador del proceso")
 
+        usuario_propietario = radicado_obj.usuario
+        if usuario_propietario and usuario_propietario.rol == models.RolUsuario.ABOGADO:
+            limite_actuaciones = (
+                usuario_propietario.plan.limite_ultimas_actuaciones
+                if usuario_propietario.plan
+                else 5
+            )
+        else:
+            limite_actuaciones = None
         actuaciones_capturadas = []
-        for orden, actuacion in enumerate(_obtener_actuaciones(int(id_proceso)), start=1):
+        for orden, actuacion in enumerate(
+            _obtener_actuaciones(int(id_proceso), limite_actuaciones), start=1
+        ):
             actuacion_texto = (actuacion.get("actuacion") or "").strip()
             actuaciones_capturadas.append(
                 {
@@ -189,8 +205,7 @@ def ejecutar_consulta_api_radicado(db: Session, radicado_obj: models.Radicado) -
         return {"estado": radicado_obj.estado_consulta}
 
     actuaciones_nuevas = []
-    if actuaciones_capturadas:
-        actuaciones_existentes = Counter(
+    actuaciones_existentes = Counter(
             (
                 act.fecha_actuacion,
                 act.actuacion,
@@ -202,7 +217,21 @@ def ejecutar_consulta_api_radicado(db: Session, radicado_obj: models.Radicado) -
             for act in db.query(models.Actuacion)
             .filter(models.Actuacion.radicado_id == radicado_obj.id)
             .all()
+    )
+    claves_existentes = [
+        (
+            act.fecha_actuacion, act.actuacion, act.anotacion,
+            act.fecha_inicia_termino, act.fecha_finaliza_termino, act.fecha_registro,
         )
+        for act in db.query(models.Actuacion)
+        .filter(models.Actuacion.radicado_id == radicado_obj.id)
+        .order_by(models.Actuacion.orden.asc())
+        .all()
+    ]
+    claves_capturadas = [_clave_actuacion(act) for act in actuaciones_capturadas]
+
+    # No se reescribe el historial cuando la Rama devuelve exactamente lo mismo.
+    if claves_existentes != claves_capturadas:
         db.query(models.Actuacion).filter(models.Actuacion.radicado_id == radicado_obj.id).delete()
 
         for act in actuaciones_capturadas:

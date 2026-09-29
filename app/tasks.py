@@ -1,17 +1,22 @@
 from calendar import monthrange
-from datetime import datetime
+from datetime import datetime, timedelta
+import logging
 
 from app.celery_app import celery_app
 from app.database import SessionLocal
 from app import models
 from app.rama_judicial_api import ejecutar_consulta_api_radicado
-from app.whatsapp_web import enviar_mensaje_whatsapp_web
+from app.notification_policy import plan_whatsapp_habilitado, whatsapp_habilitado
+from app.whatsapp import enviar_mensaje_whatsapp
+from app.email_service import enviar_correo
+
+logger = logging.getLogger(__name__)
 
 
 # =============================================================
 # ENVIAR MENSAJE POR WHATSAPP
 # =============================================================
-WHATSAPP_ACTIVO = False
+WHATSAPP_ACTIVO = True
 
 
 @celery_app.task(
@@ -42,7 +47,7 @@ def tarea_enviar_whatsapp(
                 "motivo": "Usuario sin número de WhatsApp",
             }
 
-        enviado = enviar_mensaje_whatsapp_web(
+        enviado = enviar_mensaje_whatsapp(
             numero_destino,
             mensaje,
         )
@@ -66,6 +71,68 @@ def tarea_enviar_whatsapp(
         raise self.retry(
             exc=exc
         )
+
+
+@celery_app.task(name="tareas.enviar_email", bind=True, max_retries=3, default_retry_delay=60)
+def tarea_enviar_email(self, destinatario: str, asunto: str, cuerpo: str):
+    try:
+        return {"estado": "enviado" if enviar_correo(destinatario, asunto, cuerpo) else "omitido"}
+    except Exception as exc:
+        raise self.retry(exc=exc)
+
+
+@celery_app.task(name="tareas.enviar_recordatorios_tareas")
+def tarea_enviar_recordatorios_tareas():
+    """Celery entry point; QStash can invoke the shared processor on Vercel."""
+    return procesar_recordatorios_tareas()
+
+
+def procesar_recordatorios_tareas():
+    """Send due WhatsApp reminders directly and persist successful deliveries."""
+    db = SessionLocal()
+    enviados = 0
+    errores = 0
+    try:
+        ahora = datetime.utcnow()
+        recordatorios = (
+            db.query(models.RecordatorioTarea)
+            .join(models.Tarea)
+            .join(models.Usuario, models.Usuario.id == models.Tarea.usuario_id)
+            .filter(
+                models.RecordatorioTarea.activo == True,
+                models.RecordatorioTarea.enviado_en == None,
+                models.Usuario.estado == models.EstadoUsuario.ACTIVO,
+            )
+            .with_for_update(skip_locked=True, of=models.RecordatorioTarea)
+            .all()
+        )
+        for recordatorio in recordatorios:
+            tarea = recordatorio.tarea
+            usuario = tarea.usuario
+            if not whatsapp_habilitado(usuario) or not plan_whatsapp_habilitado(usuario, "notificaciones_whatsapp_tareas"):
+                continue
+            momento = recordatorio.fecha_hora
+            if momento is None and recordatorio.anticipacion_minutos is not None and tarea.fecha_limite:
+                momento = tarea.fecha_limite - timedelta(minutes=recordatorio.anticipacion_minutos)
+            if momento is None or momento > ahora:
+                continue
+            mensaje = f"📌 *Recordatorio de tarea*\n\n*{tarea.titulo}*"
+            if tarea.fecha_limite:
+                mensaje += f"\nFecha límite: {tarea.fecha_limite.strftime('%d/%m/%Y %H:%M')}"
+            try:
+                enviado = enviar_mensaje_whatsapp(usuario.whatsapp_numero, mensaje)
+            except Exception:
+                logger.exception("No se pudo enviar un recordatorio de tarea.")
+                enviado = False
+            if not enviado:
+                errores += 1
+                continue
+            recordatorio.enviado_en = ahora
+            db.commit()
+            enviados += 1
+        return {"estado": "ok", "recordatorios_enviados": enviados, "errores": errores}
+    finally:
+        db.close()
 
 
 # =============================================================
@@ -189,7 +256,7 @@ def tarea_consultar_radicado(
 
             usuario = radicado.usuario
 
-            if usuario.whatsapp_numero:
+            if whatsapp_habilitado(usuario) and plan_whatsapp_habilitado(usuario, "notificaciones_whatsapp_procesos"):
 
                 mensaje = (
                     f"⚖️ *Novedad Judicial Detectada*\n\n"
@@ -218,11 +285,10 @@ def tarea_consultar_radicado(
                     )
 
                 # Enviar WhatsApp como tarea independiente
-                # DESACTIVADO TEMPORALMENTE
-                # tarea_enviar_whatsapp.delay(
-                #     usuario.whatsapp_numero,
-                #     mensaje,
-                # )
+                tarea_enviar_whatsapp.delay(
+                    usuario.whatsapp_numero,
+                    mensaje,
+                )
 
         # ---------------------------------------------------------
         # CONSULTA COMPLETADA
@@ -285,13 +351,11 @@ def tarea_consultar_radicado(
 
                 db.commit()
 
+            retry_consulta_id = consulta.id if consulta else consulta_id
             raise self.retry(
                 exc=exc,
-                kwargs={
-                    "radicado_id": radicado_id,
-                    "tipo": tipo,
-                    "consulta_id": consulta_id,
-                },
+                args=(radicado_id, tipo, retry_consulta_id),
+                kwargs={},
             )
 
         # ---------------------------------------------------------
@@ -488,7 +552,7 @@ def tarea_enviar_resumen_mensual():
         usuarios = (
             db.query(models.Usuario)
             .filter(
-                models.Usuario.es_activo == True
+                models.Usuario.estado == models.EstadoUsuario.ACTIVO
             )
             .all()
         )
@@ -593,7 +657,7 @@ def tarea_enviar_resumen_mensual():
             # ENVIAR WHATSAPP
             # -----------------------------------------------------
 
-            if usuario.whatsapp_numero:
+            if whatsapp_habilitado(usuario) and plan_whatsapp_habilitado(usuario, "notificaciones_whatsapp_procesos"):
 
                 tarea_enviar_whatsapp.delay(
                     usuario.whatsapp_numero,

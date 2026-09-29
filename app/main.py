@@ -1,25 +1,69 @@
 import os
-import shutil
 import redis
-from pathlib import Path
-from fastapi import FastAPI, Depends, HTTPException, status, UploadFile, File, Form
+import time
+import hashlib
+import logging
+from uuid import uuid4
+from collections import defaultdict, deque
+from fastapi import FastAPI, BackgroundTasks, Depends, HTTPException, Request, status, UploadFile, File, Form
+from starlette.background import BackgroundTask
 from fastapi.security import OAuth2PasswordRequestForm
-from fastapi.staticfiles import StaticFiles
+from fastapi.responses import StreamingResponse
+from sqlalchemy import or_, text
 from sqlalchemy.orm import Session
 from fastapi.middleware.cors import CORSMiddleware
+from qstash import Receiver as QStashReceiver
 from datetime import datetime
+from urllib.parse import quote
+from botocore.exceptions import BotoCoreError, ClientError
 from app.database import engine, Base, get_db
-from app import models, schemas, security
+from app import models, schemas, security, storage
+from app.email_service import enviar_correo
+from app.site_content import PUBLIC_CONTENT_PAGES
 from app.routers import admin
 from app.security import obtener_usuario_actual
-from app.routers import admin, tareas
+from app.routers import admin, tareas, expedientes
+from app.tasks import procesar_recordatorios_tareas
+from app.firm_access import require_roles
+from app.audit import registrar_evento_auditoria
+from app.firm_access import has_firm_wide_access, lawyer_process_ids, lawyer_scope_id
 
 # Crear las tablas en la BD
 models.Base.metadata.create_all(bind=engine)
 
-# Carpeta para almacenar tarjetas profesionales cargadas
-# UPLOADS_DIR = Path("uploads/tarjetas_profesionales")
-# UPLOADS_DIR.mkdir(parents=True, exist_ok=True)
+
+def actualizar_esquema_planes() -> None:
+    """Aplica columnas nuevas a instalaciones PostgreSQL ya existentes."""
+    with engine.begin() as conexion:
+        conexion.execute(text("ALTER TYPE rolusuario ADD VALUE IF NOT EXISTS 'ABOGADO_ADMIN'"))
+        conexion.execute(text("ALTER TYPE rolusuario ADD VALUE IF NOT EXISTS 'CLIENTE'"))
+        conexion.execute(text("ALTER TABLE planes ADD COLUMN IF NOT EXISTS limite_ultimas_actuaciones INTEGER DEFAULT 5"))
+        conexion.execute(text("ALTER TABLE planes ADD COLUMN IF NOT EXISTS notificaciones_whatsapp_procesos BOOLEAN NOT NULL DEFAULT FALSE"))
+        conexion.execute(text("ALTER TABLE planes ADD COLUMN IF NOT EXISTS notificaciones_whatsapp_tareas BOOLEAN NOT NULL DEFAULT FALSE"))
+        conexion.execute(text("ALTER TABLE usuarios ADD COLUMN IF NOT EXISTS creado_por_abogado_id INTEGER"))
+        conexion.execute(text("ALTER TABLE usuarios ADD COLUMN IF NOT EXISTS debe_cambiar_password BOOLEAN NOT NULL DEFAULT FALSE"))
+        conexion.execute(text("ALTER TABLE usuarios ADD COLUMN IF NOT EXISTS notificaciones_email BOOLEAN NOT NULL DEFAULT TRUE"))
+        conexion.execute(text("ALTER TABLE usuarios ADD COLUMN IF NOT EXISTS notificaciones_whatsapp BOOLEAN NOT NULL DEFAULT FALSE"))
+        conexion.execute(text("ALTER TABLE tareas ADD COLUMN IF NOT EXISTS proceso_id INTEGER"))
+        conexion.execute(text("ALTER TABLE tareas ADD COLUMN IF NOT EXISTS cliente_id INTEGER"))
+        conexion.execute(text("ALTER TABLE subtareas ADD COLUMN IF NOT EXISTS cliente_id INTEGER"))
+        conexion.execute(text("ALTER TABLE subtareas ADD COLUMN IF NOT EXISTS asignada_cliente BOOLEAN NOT NULL DEFAULT FALSE"))
+        conexion.execute(text("ALTER TABLE subtareas ADD COLUMN IF NOT EXISTS proceso_id INTEGER REFERENCES procesos(id)"))
+        conexion.execute(text("ALTER TABLE subtareas ADD COLUMN IF NOT EXISTS radicado_id INTEGER REFERENCES radicados(id)"))
+        conexion.execute(text("ALTER TABLE subtareas ADD COLUMN IF NOT EXISTS actuacion_id INTEGER REFERENCES actuaciones(id)"))
+        conexion.execute(text("ALTER TABLE subtareas ADD COLUMN IF NOT EXISTS notificar_email BOOLEAN NOT NULL DEFAULT TRUE"))
+        conexion.execute(text("ALTER TABLE subtareas ADD COLUMN IF NOT EXISTS notificar_whatsapp BOOLEAN NOT NULL DEFAULT TRUE"))
+        conexion.execute(text("ALTER TABLE procesos ADD COLUMN IF NOT EXISTS archivado_en TIMESTAMP WITH TIME ZONE"))
+
+ALLOWED_CARD_TYPES = {"application/pdf", "image/jpeg", "image/png"}
+ALLOWED_CARD_EXTENSIONS = {".pdf", ".jpg", ".jpeg", ".png"}
+CARD_TYPE_BY_EXTENSION = {
+    ".pdf": "application/pdf",
+    ".jpg": "image/jpeg",
+    ".jpeg": "image/jpeg",
+    ".png": "image/png",
+}
+MAX_CARD_SIZE_BYTES = 10 * 1024 * 1024
 
 app = FastAPI(
     title="Plataforma SaaS de Seguimiento Judicial",
@@ -29,27 +73,110 @@ app = FastAPI(
 
 app.include_router(admin.router)
 app.include_router(tareas.router)
+app.include_router(expedientes.router)
+
+
+def get_cors_origins() -> list[str]:
+    configured = os.getenv("CORS_ORIGINS", "")
+    if configured.strip():
+        return [origin.strip().rstrip("/") for origin in configured.split(",") if origin.strip()]
+    return ["http://localhost:3000", "http://127.0.0.1:3000"]
+
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
+    allow_origins=get_cors_origins(),
+    allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-# Servir archivos estáticos subidos (solo para ver documentos en desarrollo local)
-# app.mount("/uploads", StaticFiles(directory="uploads"), name="uploads")
+
+@app.post("/api/cron/recordatorios-tareas")
+async def ejecutar_recordatorios_qstash(request: Request):
+    current_signing_key = os.getenv("QSTASH_CURRENT_SIGNING_KEY", "")
+    next_signing_key = os.getenv("QSTASH_NEXT_SIGNING_KEY", "")
+    endpoint_url = os.getenv("QSTASH_ENDPOINT_URL", "")
+    signature = request.headers.get("Upstash-Signature")
+    if not all((current_signing_key, next_signing_key, endpoint_url)):
+        raise HTTPException(status_code=503, detail="El endpoint de QStash no está configurado.")
+    if not signature:
+        raise HTTPException(status_code=401, detail="Firma de QStash requerida.")
+    raw_body = await request.body()
+    try:
+        QStashReceiver(
+            current_signing_key=current_signing_key,
+            next_signing_key=next_signing_key,
+        ).verify(
+            signature=signature,
+            body=raw_body.decode("utf-8"),
+            url=endpoint_url,
+        )
+    except Exception as exc:
+        raise HTTPException(status_code=401, detail="Firma de QStash inválida.") from exc
+    return procesar_recordatorios_tareas()
+
+# Protección ligera para el único endpoint público de captación. Para una
+# instalación con varias réplicas, conviene mover este contador a Redis/WAF.
+_interest_attempts: dict[str, deque[float]] = defaultdict(deque)
+
+
+def _check_interest_rate_limit(client_ip: str) -> None:
+    now = time.monotonic()
+    attempts = _interest_attempts[client_ip]
+    while attempts and now - attempts[0] > 3600:
+        attempts.popleft()
+    if len(attempts) >= 5:
+        raise HTTPException(status_code=429, detail="Demasiados intentos. Intenta nuevamente más tarde.")
+    attempts.append(now)
+
+
+_password_reset_attempts: dict[str, deque[float]] = defaultdict(deque)
+PASSWORD_RESET_MESSAGE = "Si existe una cuenta activa con ese correo, enviaremos un enlace para restablecer la contraseña."
+
+
+def _allow_password_reset_request(client_ip: str, email: str) -> bool:
+    now = time.monotonic()
+    email_key = hashlib.sha256(email.encode("utf-8")).hexdigest()
+    limits = ((f"ip:{client_ip}", 8), (f"email:{email_key}", 3))
+
+    for key, limit in limits:
+        attempts = _password_reset_attempts[key]
+        while attempts and now - attempts[0] > 3600:
+            attempts.popleft()
+        if len(attempts) >= limit:
+            return False
+
+    for key, _ in limits:
+        _password_reset_attempts[key].append(now)
+    if len(_password_reset_attempts) > 10000:
+        for key, attempts in list(_password_reset_attempts.items()):
+            if not attempts or now - attempts[-1] > 3600:
+                _password_reset_attempts.pop(key, None)
+                if len(_password_reset_attempts) <= 8000:
+                    break
+    return True
+
+
+def _send_password_reset_email(email: str, reset_url: str) -> None:
+    try:
+        sent = enviar_correo(
+            email,
+            "Restablece tu contraseña",
+            f"Usa este enlace para elegir una nueva contraseña. El enlace vence en 20 minutos:\n\n{reset_url}\n\nSi no solicitaste el cambio, ignora este mensaje.",
+        )
+        if not sent:
+            logging.getLogger(__name__).warning("Password reset email skipped because SMTP is not configured.")
+    except Exception:
+        logging.getLogger(__name__).exception("Password reset email delivery failed.")
 
 @app.get("/api/test-redis")
-def test_redis():
+def test_redis(usuario_actual: models.Usuario = Depends(security.obtener_usuario_actual)):
+    require_roles(usuario_actual, ["ADMIN"], action="consultar el estado de Redis")
     redis_url = os.getenv("REDIS_URL")
 
     if not redis_url:
-        return {
-            "ok": False,
-            "error": "REDIS_URL no está configurada"
-        }
+        return {"ok": False, "redis": "no configurado"}
 
     try:
         r = redis.from_url(redis_url)
@@ -60,38 +187,81 @@ def test_redis():
             "redis": "conectado"
         }
 
-    except Exception as e:
-        return {
-            "ok": False,
-            "error": str(e)
-        }
+    except Exception:
+        return {"ok": False, "redis": "desconectado"}
 
 @app.on_event("startup")
 def crear_datos_iniciales():
-    """Crea un plan por defecto y una cuenta Administrador si no existen."""
+    """Aplica compatibilidad y siembra planes SaaS solo si aún no existen."""
+    actualizar_esquema_planes()
     db = next(get_db())
-    # Crear plan básico inicial
-    if not db.query(models.Plan).first():
-        plan_basico = models.Plan(nombre="Básico", limite_radicados=10, precio_mensual=0)
-        plan_pro = models.Plan(nombre="Pro", limite_radicados=50, precio_mensual=50000)
-        db.add_all([plan_basico, plan_pro])
-        db.commit()
-
-    # Crear admin por defecto
-    if not db.query(models.Usuario).filter(models.Usuario.rol == models.RolUsuario.ADMIN).first():
-        admin = models.Usuario(
-            email="admin@sistema.com",
-            password_hash=security.hash_password("admin123"),
-            nombre_completo="Administrador General",
-            whatsapp_numero="573000000000",
-            rol=models.RolUsuario.ADMIN,
-            estado=models.EstadoUsuario.ACTIVO,
-        )
-        db.add(admin)
-        db.commit()
+    try:
+        if not db.query(models.Plan).first():
+            db.add_all([
+                models.Plan(nombre="Básico", limite_radicados=10, precio_mensual=0, limite_ultimas_actuaciones=5),
+                models.Plan(nombre="Pro", limite_radicados=50, precio_mensual=50000, limite_ultimas_actuaciones=None, notificaciones_whatsapp_procesos=True, notificaciones_whatsapp_tareas=True),
+            ])
+            db.commit()
+        if not db.query(models.ConfiguracionSaas).filter_by(id=1).first():
+            db.add(models.ConfiguracionSaas(id=1, mostrar_planes=True))
+            db.commit()
+        admin_email = os.getenv("ADMIN_EMAIL", "admin@sistema.local")
+        admin_password = os.getenv("ADMIN_PASSWORD")
+        if admin_password and not db.query(models.Usuario).filter(models.Usuario.rol == models.RolUsuario.ADMIN).first():
+            admin = models.Usuario(
+                email=admin_email,
+                password_hash=security.hash_password(admin_password),
+                nombre_completo="Administrador de firma",
+                whatsapp_numero="573000000000",
+                rol=models.RolUsuario.ADMIN,
+                estado=models.EstadoUsuario.ACTIVO,
+            )
+            db.add(admin)
+            db.commit()
+    finally:
+        db.close()
 
 
 # --- ENDPOINTS PÚBLICOS ---
+
+@app.get("/api/configuracion-publica", response_model=schemas.ConfiguracionSaasOut)
+def obtener_configuracion_publica(db: Session = Depends(get_db)):
+    configuracion = db.query(models.ConfiguracionSaas).filter_by(id=1).first()
+    return {"mostrar_planes": configuracion.mostrar_planes if configuracion else True}
+
+@app.get("/api/contenido-publico/{slug}")
+def obtener_contenido_publico(slug: str, db: Session = Depends(get_db)):
+    if slug not in PUBLIC_CONTENT_PAGES:
+        raise HTTPException(status_code=404, detail="Página pública no encontrada.")
+    page = db.query(models.ContenidoPagina).filter_by(slug=slug).first()
+    if page is None:
+        raise HTTPException(status_code=404, detail="La página usa su contenido base.")
+    return {"slug": page.slug, "contenido": page.contenido, "updated_at": page.updated_at}
+
+
+@app.get("/api/planes-publicos", response_model=list[schemas.PlanOut])
+def listar_planes_publicos(db: Session = Depends(get_db)):
+    """Retorna planes SaaS disponibles para abogados externos."""
+    return db.query(models.Plan).filter(models.Plan.activo == True).order_by(models.Plan.precio_mensual.asc(), models.Plan.id.asc()).all()
+
+
+@app.post("/api/intereses-saas", response_model=schemas.InteresSaasOut, status_code=status.HTTP_201_CREATED)
+def registrar_interes_saas(
+    interes: schemas.InteresSaasCreate,
+    request: Request,
+    db: Session = Depends(get_db),
+):
+    client_ip = request.client.host if request.client else "unknown"
+    _check_interest_rate_limit(client_ip)
+    if interes.website.strip():
+        raise HTTPException(status_code=400, detail="No fue posible procesar la solicitud.")
+    if not interes.autorizacion_datos:
+        raise HTTPException(status_code=400, detail="Debe autorizar el tratamiento de sus datos.")
+    email = str(interes.email).strip().lower()
+    if not db.query(models.InteresSaas).filter(models.InteresSaas.email == email).first():
+        db.add(models.InteresSaas(email=email))
+        db.commit()
+    return {"mensaje": "Gracias. Le avisaremos sobre los planes para abogados externos."}
 
 @app.post("/api/auth/registro", status_code=status.HTTP_201_CREATED)
 def registrar_abogado(
@@ -100,19 +270,55 @@ def registrar_abogado(
     nombre_completo: str = Form(...),
     whatsapp_numero: str = Form(...),
     tarjeta_profesional: UploadFile = File(...),
+    plan_id: int = Form(...),
     db: Session = Depends(get_db),
 ):
-    """Permite a un abogado solicitar registro cargando su Tarjeta Profesional."""
+    """Registra un abogado externo SaaS y lo deja pendiente de aprobación."""
+    email = email.strip().lower()
+    if len(password) < 8:
+        raise HTTPException(status_code=400, detail="La contraseña debe tener al menos 8 caracteres.")
     if db.query(models.Usuario).filter(models.Usuario.email == email).first():
         raise HTTPException(status_code=400, detail="El correo ya está registrado.")
 
-    # Guardar archivo físicamente en la carpeta uploads
-    extension = os.path.splitext(tarjeta_profesional.filename)[1]
-    nombre_archivo = f"{email.replace('@', '_at_')}_tarjeta{extension}"
-    ruta_archivo = UPLOADS_DIR / nombre_archivo
+    original_name = tarjeta_profesional.filename or ""
+    extension = os.path.splitext(original_name)[1].lower()
+    content_type = tarjeta_profesional.content_type or ""
+    if (
+        extension not in ALLOWED_CARD_EXTENSIONS
+        or content_type not in ALLOWED_CARD_TYPES
+        or CARD_TYPE_BY_EXTENSION.get(extension) != content_type
+    ):
+        raise HTTPException(
+            status_code=400,
+            detail="La tarjeta profesional debe ser un PDF, JPG o PNG.",
+        )
 
-    with open(ruta_archivo, "wb") as buffer:
-        shutil.copyfileobj(tarjeta_profesional.file, buffer)
+    tarjeta_profesional.file.seek(0, os.SEEK_END)
+    file_size = tarjeta_profesional.file.tell()
+    tarjeta_profesional.file.seek(0)
+    if file_size == 0 or file_size > MAX_CARD_SIZE_BYTES:
+        raise HTTPException(status_code=400, detail="El archivo debe tener máximo 10 MB.")
+
+    plan = db.query(models.Plan).filter(
+        models.Plan.id == plan_id, models.Plan.activo == True
+    ).first()
+    if not plan:
+        raise HTTPException(status_code=400, detail="El plan seleccionado no está disponible.")
+
+    # La clave no contiene el correo ni datos personales. R2 permanece privado.
+    object_key = f"registros/tarjetas-profesionales/{uuid4().hex}{extension}"
+    try:
+        storage.get_r2_client().upload_fileobj(
+            tarjeta_profesional.file,
+            storage.get_r2_bucket(),
+            object_key,
+            ExtraArgs={"ContentType": content_type},
+        )
+    except (BotoCoreError, ClientError) as exc:
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail="No fue posible guardar el documento. Intenta nuevamente.",
+        ) from exc
 
     # Crear el usuario en estado PENDIENTE_APROBACION
     nuevo_usuario = models.Usuario(
@@ -122,18 +328,31 @@ def registrar_abogado(
         whatsapp_numero=whatsapp_numero,
         rol=models.RolUsuario.ABOGADO,
         estado=models.EstadoUsuario.PENDIENTE_APROBACION,
+        plan_id=plan.id,
     )
     db.add(nuevo_usuario)
-    db.commit()
-    db.refresh(nuevo_usuario)
+    db.flush()
 
     # Guardar registro de la solicitud
     solicitud = models.SolicitudRegistro(
         usuario_id=nuevo_usuario.id,
-        ruta_tarjeta_profesional=str(ruta_archivo),
+        ruta_tarjeta_profesional=object_key,
     )
     db.add(solicitud)
-    db.commit()
+    db.flush()
+    registrar_evento_auditoria(
+        db, nuevo_usuario, "auth.registro.solicitar", "solicitud_registro", solicitud.id
+    )
+    try:
+        db.commit()
+    except Exception as exc:
+        db.rollback()
+        # Evita dejar un documento huérfano si falla el registro en la base de datos.
+        try:
+            storage.get_r2_client().delete_object(Bucket=storage.get_r2_bucket(), Key=object_key)
+        except (BotoCoreError, ClientError):
+            pass
+        raise HTTPException(status_code=500, detail="No fue posible completar el registro.") from exc
 
     return {
         "mensaje": "Registro recibido con éxito. Tu cuenta se activará tras revisar la tarjeta profesional.",
@@ -161,7 +380,107 @@ def login(
         raise HTTPException(status_code=403, detail="Tu solicitud de registro fue rechazada.")
 
     access_token = security.create_access_token(data={"sub": str(usuario.id)})
-    return {"access_token": access_token, "token_type": "bearer"}
+    return {"access_token": access_token, "token_type": "bearer", "debe_cambiar_password": usuario.debe_cambiar_password}
+
+
+@app.post("/api/auth/cambiar-password")
+def cambiar_password(datos: schemas.CambiarPasswordIn, usuario_actual: models.Usuario = Depends(security.obtener_usuario_para_cambio_password), db: Session = Depends(get_db)):
+    if not security.verify_password(datos.password_actual, usuario_actual.password_hash):
+        raise HTTPException(status_code=400, detail="La contraseña actual no es correcta.")
+    if len(datos.password_nueva) < 8:
+        raise HTTPException(status_code=400, detail="La nueva contraseña debe tener al menos 8 caracteres.")
+    usuario_actual.password_hash = security.hash_password(datos.password_nueva)
+    usuario_actual.debe_cambiar_password = False
+    registrar_evento_auditoria(db, usuario_actual, "auth.password.cambiar", "usuario", usuario_actual.id)
+    db.commit()
+    return {"mensaje": "Contraseña actualizada."}
+
+
+@app.post("/api/auth/recuperar-password")
+def solicitar_recuperacion_password(
+    datos: schemas.SolicitudRecuperacionPassword,
+    request: Request,
+    background_tasks: BackgroundTasks,
+    db: Session = Depends(get_db),
+):
+    email = str(datos.email).strip().lower()
+    client_ip = request.client.host if request.client else "unknown"
+    if not _allow_password_reset_request(client_ip, email):
+        return {"mensaje": PASSWORD_RESET_MESSAGE}
+
+    usuario = db.query(models.Usuario).filter(models.Usuario.email == email).first()
+    if usuario and usuario.estado == models.EstadoUsuario.ACTIVO:
+        token = security.create_password_reset_token(usuario.id, usuario.password_hash)
+        frontend_url = (os.getenv("FRONTEND_URL") or get_cors_origins()[0]).rstrip("/")
+        reset_url = f"{frontend_url}/gestion-procesos/auth/restablecer-password?token={quote(token, safe='')}"
+        background_tasks.add_task(_send_password_reset_email, email, reset_url)
+    return {"mensaje": PASSWORD_RESET_MESSAGE}
+
+
+@app.post("/api/auth/restablecer-password")
+def restablecer_password(
+    datos: schemas.ConfirmacionRecuperacionPassword,
+    db: Session = Depends(get_db),
+):
+    if len(datos.password_nueva) < 8:
+        raise HTTPException(status_code=400, detail="La nueva contraseña debe tener al menos 8 caracteres.")
+    usuario_id = security.password_reset_token_user_id(datos.token)
+    if usuario_id is None:
+        raise HTTPException(status_code=400, detail="El enlace de recuperación no es válido o ha expirado.")
+    usuario = db.query(models.Usuario).filter(models.Usuario.id == usuario_id).first()
+    if (
+        not usuario
+        or usuario.estado != models.EstadoUsuario.ACTIVO
+        or security.verify_password_reset_token(datos.token, usuario.password_hash) != usuario.id
+    ):
+        raise HTTPException(status_code=400, detail="El enlace de recuperación no es válido o ha expirado.")
+
+    usuario.password_hash = security.hash_password(datos.password_nueva)
+    usuario.debe_cambiar_password = False
+    registrar_evento_auditoria(db, usuario, "auth.password.restablecer", "usuario", usuario.id)
+    db.commit()
+    return {"mensaje": "Contraseña restablecida. Ya puedes iniciar sesión."}
+
+
+@app.patch("/api/auth/preferencias-notificaciones")
+def actualizar_preferencias_notificaciones(datos: schemas.PreferenciasNotificacionUpdate, usuario_actual: models.Usuario = Depends(obtener_usuario_actual), db: Session = Depends(get_db)):
+    if datos.notificaciones_email is not None: usuario_actual.notificaciones_email = datos.notificaciones_email
+    if datos.notificaciones_whatsapp is not None: usuario_actual.notificaciones_whatsapp = datos.notificaciones_whatsapp
+    registrar_evento_auditoria(db, usuario_actual, "auth.notificaciones.actualizar", "usuario", usuario_actual.id)
+    db.commit()
+    return {"notificaciones_email": usuario_actual.notificaciones_email, "notificaciones_whatsapp": usuario_actual.notificaciones_whatsapp}
+
+
+@app.patch("/api/auth/perfil")
+def actualizar_mi_perfil(datos: schemas.PerfilUpdate, usuario_actual: models.Usuario = Depends(obtener_usuario_actual), db: Session = Depends(get_db)):
+    if usuario_actual.rol == models.RolUsuario.CLIENTE and any(
+        value is not None
+        for value in (datos.email, datos.nombre_completo, datos.whatsapp_numero)
+    ):
+        raise HTTPException(
+            status_code=403,
+            detail="Los clientes deben solicitar la edición de sus datos para aprobación.",
+        )
+    if datos.email is not None:
+        email = str(datos.email).strip().lower()
+        existing = db.query(models.Usuario).filter(
+            models.Usuario.email == email,
+            models.Usuario.id != usuario_actual.id,
+        ).first()
+        if existing:
+            raise HTTPException(status_code=409, detail="Este correo ya está asociado a otra cuenta.")
+        usuario_actual.email = email
+    if datos.nombre_completo is not None:
+        nombre = datos.nombre_completo.strip()
+        if not nombre:
+            raise HTTPException(status_code=400, detail="El nombre completo es obligatorio.")
+        usuario_actual.nombre_completo = nombre
+    if datos.whatsapp_numero is not None:
+        usuario_actual.whatsapp_numero = datos.whatsapp_numero.strip()
+    registrar_evento_auditoria(db, usuario_actual, "auth.perfil.actualizar", "usuario", usuario_actual.id)
+    db.commit()
+    db.refresh(usuario_actual)
+    return {"email": usuario_actual.email, "nombre_completo": usuario_actual.nombre_completo, "whatsapp_numero": usuario_actual.whatsapp_numero}
 
 @app.get("/api/auth/me")
 def obtener_mi_usuario(
@@ -191,12 +510,18 @@ def obtener_mi_usuario(
         "estado": usuario.estado.value
         if hasattr(usuario.estado, "value")
         else usuario.estado,
+        "debe_cambiar_password": usuario.debe_cambiar_password,
+        "notificaciones_email": usuario.notificaciones_email,
+        "notificaciones_whatsapp": usuario.notificaciones_whatsapp,
         "plan": (
             {
                 "id": usuario.plan.id,
                 "nombre": usuario.plan.nombre,
                 "limite_radicados": usuario.plan.limite_radicados,
                 "precio_mensual": usuario.plan.precio_mensual,
+                "limite_ultimas_actuaciones": usuario.plan.limite_ultimas_actuaciones,
+                "notificaciones_whatsapp_procesos": usuario.plan.notificaciones_whatsapp_procesos,
+                "notificaciones_whatsapp_tareas": usuario.plan.notificaciones_whatsapp_tareas,
             }
             if usuario.plan
             else None
@@ -372,6 +697,9 @@ def obtener_dashboard(
                 "nombre": usuario_actual.plan.nombre,
                 "limite_radicados": usuario_actual.plan.limite_radicados,
                 "precio_mensual": usuario_actual.plan.precio_mensual,
+                "limite_ultimas_actuaciones": usuario_actual.plan.limite_ultimas_actuaciones,
+                "notificaciones_whatsapp_procesos": usuario_actual.plan.notificaciones_whatsapp_procesos,
+                "notificaciones_whatsapp_tareas": usuario_actual.plan.notificaciones_whatsapp_tareas,
             }
             if usuario_actual.plan
             else None
@@ -387,113 +715,58 @@ def obtener_dashboard(
         "ultimas_consultas": consultas,
     }
 # --- ENDPOINTS DE ADMINISTRACIÓN ---
-@app.post("/api/admin/usuarios", status_code=status.HTTP_201_CREATED)
-def crear_usuario_admin(
-    email: str,
-    password: str,
-    nombre_completo: str,
-    whatsapp_numero: str,
-    rol: models.RolUsuario = models.RolUsuario.ABOGADO,
-    plan_id: int = 1,
-    usuario_actual: models.Usuario = Depends(security.obtener_usuario_actual),
-    db: Session = Depends(get_db),
-):
-    """
-    Crea directamente un usuario desde administración.
-
-    Este endpoint no requiere tarjeta profesional y está destinado
-    exclusivamente a la creación administrativa de usuarios.
-    """
-
-    # 1. Verificar que quien realiza la petición sea ADMIN
-    if usuario_actual.rol != models.RolUsuario.ADMIN:
-        raise HTTPException(
-            status_code=403,
-            detail="Acceso denegado: requiere rol de Admin."
-        )
-
-    # 2. Verificar que el correo no esté registrado
-    usuario_existente = (
-        db.query(models.Usuario)
-        .filter(models.Usuario.email == email)
-        .first()
-    )
-
-    if usuario_existente:
-        raise HTTPException(
-            status_code=400,
-            detail="El correo ya está registrado."
-        )
-
-    # 3. Verificar que el plan exista y esté activo
-    plan = (
-        db.query(models.Plan)
-        .filter(
-            models.Plan.id == plan_id,
-            models.Plan.activo == True
-        )
-        .first()
-    )
-
-    if not plan:
-        raise HTTPException(
-            status_code=400,
-            detail="El plan especificado no existe o está inactivo."
-        )
-
-    # 4. Crear usuario
-    nuevo_usuario = models.Usuario(
-        email=email,
-        password_hash=security.hash_password(password),
-        nombre_completo=nombre_completo,
-        whatsapp_numero=whatsapp_numero,
-        rol=rol,
-        estado=models.EstadoUsuario.ACTIVO,
-        plan_id=plan.id,
-    )
-
-    db.add(nuevo_usuario)
-    db.commit()
-    db.refresh(nuevo_usuario)
-
-    return {
-        "mensaje": "Usuario creado correctamente.",
-        "usuario": {
-            "id": nuevo_usuario.id,
-            "email": nuevo_usuario.email,
-            "nombre_completo": nuevo_usuario.nombre_completo,
-            "whatsapp_numero": nuevo_usuario.whatsapp_numero,
-            "rol": (
-                nuevo_usuario.rol.value
-                if hasattr(nuevo_usuario.rol, "value")
-                else nuevo_usuario.rol
-            ),
-            "estado": (
-                nuevo_usuario.estado.value
-                if hasattr(nuevo_usuario.estado, "value")
-                else nuevo_usuario.estado
-            ),
-            "plan": {
-                "id": plan.id,
-                "nombre": plan.nombre,
-            },
-        },
-    }
-
 @app.get("/api/admin/solicitudes", response_model=list[schemas.SolicitudRegistroOut])
 def listar_solicitudes_pendientes(
     usuario_actual: models.Usuario = Depends(security.obtener_usuario_actual),
     db: Session = Depends(get_db),
 ):
     """Retorna las solicitudes pendientes de abogados para revisión manual."""
-    if usuario_actual.rol != models.RolUsuario.ADMIN:
-        raise HTTPException(status_code=403, detail="Acceso denegado: requiere rol de Admin.")
+    require_roles(usuario_actual, ["ADMIN"], action="listar solicitudes pendientes")
 
     return (
         db.query(models.SolicitudRegistro)
         .join(models.Usuario)
         .filter(models.Usuario.estado == models.EstadoUsuario.PENDIENTE_APROBACION)
         .all()
+    )
+
+
+@app.get("/api/admin/solicitudes/{solicitud_id}/tarjeta")
+def descargar_tarjeta_profesional(
+    solicitud_id: int,
+    usuario_actual: models.Usuario = Depends(security.obtener_usuario_actual),
+    db: Session = Depends(get_db),
+):
+    """Entrega una tarjeta privada de R2 solamente a administradores autenticados."""
+    require_roles(usuario_actual, ["ADMIN"], action="descargar la tarjeta profesional")
+
+    solicitud = db.query(models.SolicitudRegistro).filter(models.SolicitudRegistro.id == solicitud_id).first()
+    if not solicitud:
+        raise HTTPException(status_code=404, detail="Solicitud no encontrada.")
+
+    try:
+        response = storage.get_r2_client().get_object(
+            Bucket=storage.get_r2_bucket(), Key=solicitud.ruta_tarjeta_profesional
+        )
+    except ClientError as exc:
+        error_code = exc.response.get("Error", {}).get("Code")
+        if error_code in {"NoSuchKey", "404"}:
+            raise HTTPException(status_code=404, detail="Documento no encontrado.") from exc
+        raise HTTPException(status_code=502, detail="No fue posible obtener el documento.") from exc
+    except BotoCoreError as exc:
+        raise HTTPException(status_code=502, detail="No fue posible obtener el documento.") from exc
+
+    registrar_evento_auditoria(
+        db, usuario_actual, "admin.solicitud.tarjeta.descargar", "solicitud_registro", solicitud.id
+    )
+    db.commit()
+    content_type = response.get("ContentType") or "application/octet-stream"
+    extension = ".pdf" if content_type == "application/pdf" else ".jpg" if content_type == "image/jpeg" else ".png"
+    return StreamingResponse(
+        response["Body"].iter_chunks(chunk_size=64 * 1024),
+        media_type=content_type,
+        headers={"Content-Disposition": f'inline; filename="tarjeta-profesional{extension}"'},
+        background=BackgroundTask(response["Body"].close),
     )
 
 
@@ -505,8 +778,7 @@ def aprobar_solicitud(
     db: Session = Depends(get_db),
 ):
     """Aprueba la cuenta del abogado y le asigna un plan con límite de radicados."""
-    if usuario_actual.rol != models.RolUsuario.ADMIN:
-        raise HTTPException(status_code=403, detail="Acceso denegado: requiere rol de Admin.")
+    require_roles(usuario_actual, ["ADMIN"], action="aprobar la solicitud del abogado")
 
     solicitud = db.query(models.SolicitudRegistro).filter(models.SolicitudRegistro.id == solicitud_id).first()
     if not solicitud:
@@ -531,6 +803,7 @@ def aprobar_solicitud(
     usuario.estado = models.EstadoUsuario.ACTIVO
     usuario.plan_id = plan.id
 
+    registrar_evento_auditoria(db, usuario_actual, "admin.solicitud.aprobar", "solicitud_registro", solicitud.id)
     db.commit()
     return {
         "mensaje": f"Cuenta de {usuario.nombre_completo} aprobada exitosamente con el plan {plan.nombre}."
@@ -544,11 +817,7 @@ def rechazar_solicitud(
 ):
     """Rechaza la solicitud de registro de un abogado."""
 
-    if usuario_actual.rol != models.RolUsuario.ADMIN:
-        raise HTTPException(
-            status_code=403,
-            detail="Acceso denegado: requiere rol de Admin."
-        )
+    require_roles(usuario_actual, ["ADMIN"], action="rechazar la solicitud del abogado")
 
     solicitud = (
         db.query(models.SolicitudRegistro)
@@ -566,6 +835,7 @@ def rechazar_solicitud(
 
     usuario.estado = models.EstadoUsuario.RECHAZADO
 
+    registrar_evento_auditoria(db, usuario_actual, "admin.solicitud.rechazar", "solicitud_registro", solicitud.id)
     db.commit()
 
     return {
@@ -574,38 +844,44 @@ def rechazar_solicitud(
 
 # --- ENDPOINTS PARA GESTIÓN DE RADICADOS (ABOGADO) ---
 
+def radicados_visibles(usuario: models.Usuario, db: Session):
+    query = db.query(models.Radicado)
+    if has_firm_wide_access(usuario):
+        return query
+    responsible_lawyer_id = lawyer_scope_id(usuario)
+    if responsible_lawyer_id is None:
+        return query.filter(models.Radicado.id == -1)
+    assigned_radicados = db.query(models.ProcesoRadicado.radicado_id).filter(
+        models.ProcesoRadicado.proceso_id.in_(lawyer_process_ids(db, usuario))
+    )
+    return query.filter(
+        or_(
+            models.Radicado.usuario_id == responsible_lawyer_id,
+            models.Radicado.id.in_(assigned_radicados),
+        )
+    )
+
 @app.post("/api/radicados", response_model=schemas.RadicadoOut, status_code=status.HTTP_201_CREATED)
 def agregar_radicado(
     radicado_in: schemas.RadicadoCreate,
     usuario_actual: models.Usuario = Depends(security.obtener_usuario_actual),
     db: Session = Depends(get_db),
 ):
-    """
-    Agrega un nuevo radicado a la cuenta del abogado validando
-    previamente los límites de su plan contratado.
-    """
+    """Agrega un radicado a la firma, conservando al creador como responsable."""
+    require_roles(usuario_actual, ["ABOGADO", "ABOGADO_ADMIN", "ADMIN"], action="gestionar radicados")
     if usuario_actual.estado != models.EstadoUsuario.ACTIVO:
         raise HTTPException(
             status_code=403, 
             detail="Tu cuenta aún no está activa para agregar radicados."
         )
 
-    # 1. Contar radicados actuales del usuario
-    total_registrados = (
-        db.query(models.Radicado)
-        .filter(models.Radicado.usuario_id == usuario_actual.id)
-        .count()
-    )
+    if usuario_actual.rol == models.RolUsuario.ABOGADO and usuario_actual.plan is None:
+        raise HTTPException(status_code=403, detail="Tu cuenta SaaS necesita un plan activo para agregar radicados.")
+    if usuario_actual.rol == models.RolUsuario.ABOGADO:
+        total_registrados = db.query(models.Radicado).filter(models.Radicado.usuario_id == usuario_actual.id).count()
+        if total_registrados >= usuario_actual.plan.limite_radicados:
+            raise HTTPException(status_code=400, detail="Has alcanzado el límite de radicados de tu plan.")
 
-    # 2. Validar contra el límite del plan asignado
-    limite_plan = usuario_actual.plan.limite_radicados if usuario_actual.plan else 10
-    if total_registrados >= limite_plan:
-        raise HTTPException(
-            status_code=400,
-            detail=f"Has alcanzado el límite de {limite_plan} radicados permitido por tu plan ({usuario_actual.plan.nombre}). Actualiza tu plan para agregar más.",
-        )
-
-    # 3. Validar duplicado en la cuenta del mismo abogado
     existente = (
         db.query(models.Radicado)
         .filter(
@@ -615,7 +891,7 @@ def agregar_radicado(
         .first()
     )
     if existente:
-        raise HTTPException(status_code=400, detail="Ya tienes registrado este radicado en tu cuenta.")
+        raise HTTPException(status_code=400, detail="Este radicado ya está registrado en la firma.")
 
     # 4. Guardar el nuevo radicado
     nuevo_radicado = models.Radicado(
@@ -624,6 +900,8 @@ def agregar_radicado(
         estado_consulta="sin consultar",
     )
     db.add(nuevo_radicado)
+    db.flush()
+    registrar_evento_auditoria(db, usuario_actual, "radicado.crear", "radicado", nuevo_radicado.id)
     db.commit()
     db.refresh(nuevo_radicado)
 
@@ -635,12 +913,40 @@ def listar_mis_radicados(
     usuario_actual: models.Usuario = Depends(security.obtener_usuario_actual),
     db: Session = Depends(get_db),
 ):
-    """Retorna únicamente los radicados pertenecientes al abogado autenticado (Multi-tenant isolation)."""
-    return (
-        db.query(models.Radicado)
-        .filter(models.Radicado.usuario_id == usuario_actual.id)
-        .all()
-    )
+    """Retorna radicados dentro del alcance del rol en la firma."""
+    require_roles(usuario_actual, ["ABOGADO", "ABOGADO_ADMIN", "ADMIN"], action="consultar radicados")
+    if usuario_actual.rol == models.RolUsuario.ABOGADO and usuario_actual.plan is None:
+        raise HTTPException(status_code=403, detail="Tu cuenta SaaS no tiene un plan asignado.")
+    radicados = radicados_visibles(usuario_actual, db).all()
+    limite = usuario_actual.plan.limite_ultimas_actuaciones if usuario_actual.rol == models.RolUsuario.ABOGADO else None
+    return [serializar_radicado(radicado, limite) for radicado in radicados]
+
+
+def serializar_radicado(radicado: models.Radicado, limite_actuaciones: int | None) -> dict:
+    """Serializa el historial de actuaciones autorizado."""
+    actuaciones = sorted(radicado.actuaciones, key=lambda actuacion: actuacion.orden)
+    if limite_actuaciones is not None:
+        actuaciones = actuaciones[:limite_actuaciones]
+    return {
+        "id": radicado.id, "numero": radicado.numero,
+        "estado_consulta": radicado.estado_consulta,
+        "despacho_departamento": radicado.despacho_departamento,
+        "demandante": radicado.demandante, "demandado": radicado.demandado,
+        "consultado_en": radicado.consultado_en,
+        "alerta_enviada": radicado.alerta_enviada,
+        "detalle_pendiente": radicado.detalle_pendiente,
+        "actuaciones": [
+            {
+                "id": actuacion.id, "orden": actuacion.orden,
+                "fecha_actuacion": actuacion.fecha_actuacion,
+                "actuacion": actuacion.actuacion, "anotacion": actuacion.anotacion,
+                "fecha_inicia_termino": actuacion.fecha_inicia_termino,
+                "fecha_finaliza_termino": actuacion.fecha_finaliza_termino,
+                "fecha_registro": actuacion.fecha_registro,
+                "es_fijacion": actuacion.es_fijacion,
+            } for actuacion in actuaciones
+        ],
+    }
 
 
 @app.delete("/api/radicados/{radicado_id}")
@@ -649,19 +955,16 @@ def eliminar_radicado(
     usuario_actual: models.Usuario = Depends(security.obtener_usuario_actual),
     db: Session = Depends(get_db),
 ):
-    """Elimina un radicado de la cuenta del abogado liberando cupo en su plan."""
-    radicado = (
-        db.query(models.Radicado)
-        .filter(
-            models.Radicado.id == radicado_id,
-            models.Radicado.usuario_id == usuario_actual.id,
-        )
-        .first()
-    )
+    """Elimina un radicado visible para el usuario dentro de la firma."""
+    require_roles(usuario_actual, ["ABOGADO", "ABOGADO_ADMIN", "ADMIN"], action="eliminar radicados")
+    radicado = radicados_visibles(usuario_actual, db).filter(models.Radicado.id == radicado_id).first()
 
     if not radicado:
-        raise HTTPException(status_code=404, detail="Radicado no encontrado en tu cuenta.")
+        raise HTTPException(status_code=404, detail="Radicado no encontrado en tu alcance.")
+    if usuario_actual.rol == models.RolUsuario.ABOGADO and radicado.usuario_id != usuario_actual.id:
+        raise HTTPException(status_code=403, detail="Solo puedes eliminar radicados bajo tu responsabilidad.")
 
+    registrar_evento_auditoria(db, usuario_actual, "radicado.eliminar", "radicado", radicado.id)
     db.delete(radicado)
     db.commit()
     return {"mensaje": f"Radicado {radicado.numero} eliminado correctamente."}
@@ -675,17 +978,11 @@ def consultar_radicado_manual(
     db: Session = Depends(get_db),
 ):
     """Encola la consulta del radicado en segundo plano sin congelar la API."""
-    radicado = (
-        db.query(models.Radicado)
-        .filter(
-            models.Radicado.id == radicado_id,
-            models.Radicado.usuario_id == usuario_actual.id,
-        )
-        .first()
-    )
+    require_roles(usuario_actual, ["ABOGADO", "ABOGADO_ADMIN", "ADMIN"], action="consultar radicados")
+    radicado = radicados_visibles(usuario_actual, db).filter(models.Radicado.id == radicado_id).first()
 
     if not radicado:
-        raise HTTPException(status_code=404, detail="Radicado no encontrado en tu cuenta.")
+        raise HTTPException(status_code=404, detail="Radicado no encontrado en tu alcance.")
 
     # Enviar tarea a Redis/Celery
     consulta = models.ConsultaRadicado(
@@ -707,12 +1004,18 @@ def consultar_radicado_manual(
         )
 
         consulta.task_id = task.id
+        registrar_evento_auditoria(
+            db, usuario_actual, "radicado.consulta.iniciar", "consulta_radicado", consulta.id
+        )
         db.commit()
 
     except Exception as exc:
         consulta.estado = "ERROR"
         consulta.finalizacion = datetime.utcnow()
         consulta.error = str(exc)
+        registrar_evento_auditoria(
+            db, usuario_actual, "radicado.consulta.error", "consulta_radicado", consulta.id
+        )
         db.commit()
 
         raise HTTPException(

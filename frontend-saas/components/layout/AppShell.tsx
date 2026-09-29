@@ -5,12 +5,12 @@ import Sidebar from "./Sidebar";
 
 interface AppShellProps {
   children: ReactNode;
-  variant?: "user" | "admin";
+  variant?: "saas" | "platform-admin" | "lawyer" | "client";
 }
 
 export default function AppShell({
   children,
-  variant = "user",
+  variant = "saas",
 }: AppShellProps) {
   return (
     <div

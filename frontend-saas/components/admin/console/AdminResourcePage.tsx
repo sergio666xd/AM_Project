@@ -1,0 +1,1387 @@
+"use client";
+
+import { FormEvent, useEffect, useMemo, useState } from "react";
+import { usePathname } from "next/navigation";
+import {
+  ArchiveRestore,
+  Copy,
+  Download,
+  Link2,
+  Mail,
+  Pencil,
+  Plus,
+  RefreshCw,
+  Search,
+  Trash2,
+  Users,
+  X,
+} from "lucide-react";
+import { useSession } from "@/context/SessionContext";
+import { API_URL, apiRequest } from "@/lib/api";
+
+type Sector = "FIRMA" | "SAAS" | "GLOBAL";
+type Resource = "procesos" | "radicados" | "tareas" | "documentos";
+type Row = Record<string, unknown> & {
+  id: number;
+  owner_id?: number;
+  owner_rol?: string;
+  nombre?: string;
+  numero?: string;
+  titulo?: string;
+  nombre_archivo?: string;
+  estado?: string;
+  fecha_limite?: string | null;
+  archivado_en?: string | null;
+};
+type User = { id: number; nombre_completo: string; rol: string };
+type FormState = {
+  owner_id: string;
+  nombre: string;
+  descripcion: string;
+  numero: string;
+  titulo: string;
+  estado: string;
+  prioridad: string;
+  fecha_limite: string;
+  proceso_id: string;
+  radicado_id: string;
+  cliente_id: string;
+  nombre_archivo: string;
+};
+type TemporaryLink = {
+  url: string;
+  expires_at: string;
+  expires_in: number;
+  nombre_archivo: string;
+};
+const emptyForm: FormState = {
+  owner_id: "",
+  nombre: "",
+  descripcion: "",
+  numero: "",
+  titulo: "",
+  estado: "PENDIENTE",
+  prioridad: "MEDIA",
+  fecha_limite: "",
+  proceso_id: "",
+  radicado_id: "",
+  cliente_id: "",
+  nombre_archivo: "",
+};
+const resourceNames: Record<Resource, string> = {
+  procesos: "Procesos",
+  radicados: "Radicados",
+  tareas: "Tareas",
+  documentos: "Documentos",
+};
+const roleNames: Record<string, string> = {
+  ABOGADO_ADMIN: "Firma",
+  ADMIN: "Firma · Admin",
+  ABOGADO: "SaaS",
+};
+
+async function adminFetch(url: string, options?: RequestInit) {
+  return apiRequest(url, options);
+}
+
+async function loadRows(
+  resource: Resource,
+  sector: Sector,
+  archived: boolean,
+  token: string,
+): Promise<Row[]> {
+  const query = new URLSearchParams({ sector });
+  if (resource === "procesos") query.set("archivados", String(archived));
+  const response = await adminFetch(
+    `${API_URL}/api/admin/inventario/${resource}?${query}`,
+    { headers: { Authorization: `Bearer ${token}` } },
+  );
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok)
+    throw new Error(data.detail || "No fue posible cargar este inventario.");
+  return data;
+}
+
+async function loadOptions(sector: Sector, token: string) {
+  const [userResponse, processResponse, radicadoResponse] = await Promise.all([
+    adminFetch(`${API_URL}/api/admin/usuarios`, {
+      headers: { Authorization: `Bearer ${token}` },
+    }),
+    adminFetch(`${API_URL}/api/admin/inventario/procesos?sector=${sector}`, {
+      headers: { Authorization: `Bearer ${token}` },
+    }),
+    adminFetch(`${API_URL}/api/admin/inventario/radicados?sector=${sector}`, {
+      headers: { Authorization: `Bearer ${token}` },
+    }),
+  ]);
+  if (!userResponse.ok || !processResponse.ok || !radicadoResponse.ok)
+    throw new Error("No fue posible cargar las opciones del sector.");
+  const [userData, processData, radicadoData] = await Promise.all([
+    userResponse.json(),
+    processResponse.json(),
+    radicadoResponse.json(),
+  ]);
+  const validRoles =
+    sector === "SAAS"
+      ? ["ABOGADO"]
+      : sector === "FIRMA"
+        ? ["ABOGADO_ADMIN", "ADMIN"]
+        : ["ABOGADO", "ABOGADO_ADMIN", "ADMIN"];
+  return {
+    owners: (userData as User[]).filter((user) =>
+      validRoles.includes(user.rol),
+    ),
+    clients: (userData as User[]).filter((user) => user.rol === "CLIENTE"),
+    processes: processData as {
+      id: number;
+      nombre: string;
+      owner_id: number;
+    }[],
+    radicados: radicadoData as { id: number; numero: string }[],
+  };
+}
+
+function display(value: unknown) {
+  if (value === null || value === undefined || value === "") return "—";
+  if (typeof value === "boolean") return value ? "Sí" : "No";
+  if (
+    typeof value === "string" &&
+    value.includes("T") &&
+    !Number.isNaN(Date.parse(value))
+  )
+    return new Intl.DateTimeFormat("es-CO", {
+      dateStyle: "medium",
+      timeStyle: "short",
+    }).format(new Date(value));
+  return String(value);
+}
+
+export default function AdminResourcePage({ sector }: { sector: Sector }) {
+  const pathname = usePathname();
+  const resource = pathname.split("/").filter(Boolean).pop() as Resource;
+  const validResource =
+    typeof resource === "string" && Object.hasOwn(resourceNames, resource);
+  const { token } = useSession();
+  const [rows, setRows] = useState<Row[]>([]);
+  const [owners, setOwners] = useState<User[]>([]);
+  const [processes, setProcesses] = useState<
+    { id: number; nombre: string; owner_id: number }[]
+  >([]);
+  const [clients, setClients] = useState<
+    { id: number; nombre_completo: string }[]
+  >([]);
+  const [radicados, setRadicados] = useState<{ id: number; numero: string }[]>(
+    [],
+  );
+  const [archived, setArchived] = useState(false);
+  const [query, setQuery] = useState("");
+  const [state, setState] = useState("TODOS");
+  const [loading, setLoading] = useState(true);
+  const [working, setWorking] = useState(false);
+  const [error, setError] = useState("");
+  const [notice, setNotice] = useState("");
+  const [editing, setEditing] = useState<Row | null>(null);
+  const [formOpen, setFormOpen] = useState(false);
+  const [form, setForm] = useState<FormState>(emptyForm);
+  const [documentFile, setDocumentFile] = useState<File | null>(null);
+  const [temporaryLink, setTemporaryLink] = useState<TemporaryLink | null>(null);
+  const [copyMessage, setCopyMessage] = useState("");
+  const [teamProcess, setTeamProcess] = useState<{
+    id: number;
+    nombre: string;
+    responsable: { id: number; nombre_completo: string };
+    colaboradores: { id: number; nombre_completo: string }[];
+    abogados_disponibles: { id: number; nombre_completo: string }[];
+  } | null>(null);
+  const [teamSelection, setTeamSelection] = useState("");
+
+  async function reload() {
+    if (!token || !validResource) return;
+    setLoading(true);
+    setError("");
+    try {
+      const data = await loadRows(resource, sector, archived, token);
+      setRows(data);
+    } catch (cause) {
+      setError(
+        cause instanceof Error
+          ? cause.message
+          : "No fue posible cargar el inventario.",
+      );
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  useEffect(() => {
+    if (!token || !validResource) return;
+    let active = true;
+    Promise.all([
+      loadRows(resource, sector, archived, token),
+      loadOptions(sector, token),
+    ])
+      .then(([data, options]) => {
+        if (!active) return;
+        setRows(data);
+        setOwners(options.owners);
+        setClients(options.clients);
+        setProcesses(options.processes);
+        setRadicados(options.radicados);
+      })
+      .catch((cause: unknown) => {
+        if (active)
+          setError(
+            cause instanceof Error
+              ? cause.message
+              : "No fue posible cargar el sector.",
+          );
+      })
+      .finally(() => {
+        if (active) setLoading(false);
+      });
+    return () => {
+      active = false;
+    };
+  }, [token, resource, sector, archived, validResource]);
+
+  const filtered = useMemo(
+    () =>
+      rows.filter((row) => {
+        const matchesState =
+          state === "TODOS" ||
+          String(row.estado ?? row.estado_consulta ?? "") === state;
+        const matchesQuery =
+          !query ||
+          Object.values(row).some((value) =>
+            String(value ?? "")
+              .toLowerCase()
+              .includes(query.toLowerCase()),
+          );
+        return matchesState && matchesQuery;
+      }),
+    [rows, state, query],
+  );
+  const states = [
+    ...new Set(
+      rows
+        .map((row) => String(row.estado ?? row.estado_consulta ?? ""))
+        .filter(Boolean),
+    ),
+  ];
+
+  function openCreate() {
+    setEditing(null);
+    setForm({ ...emptyForm, owner_id: owners[0] ? String(owners[0].id) : "" });
+    setDocumentFile(null);
+    setError("");
+    setFormOpen(true);
+  }
+  function openEdit(row: Row) {
+    setEditing(row);
+    setFormOpen(true);
+    setForm({
+      ...emptyForm,
+      owner_id: String(row.owner_id ?? ""),
+      nombre: row.nombre ?? "",
+      descripcion: String(row.descripcion ?? ""),
+      numero: row.numero ?? "",
+      titulo: row.titulo ?? "",
+      estado: String(row.estado ?? "PENDIENTE"),
+      prioridad: String(row.prioridad ?? "MEDIA"),
+      fecha_limite: row.fecha_limite
+        ? new Date(String(row.fecha_limite)).toISOString().slice(0, 16)
+        : "",
+      proceso_id: String(row.proceso_id ?? ""),
+      radicado_id: String(row.radicado_id ?? ""),
+      cliente_id: String(row.cliente_id ?? ""),
+      nombre_archivo: String(row.nombre_archivo ?? ""),
+    });
+  }
+
+  async function save(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!token) return;
+    setWorking(true);
+    setError("");
+    setNotice("");
+    const owner_id = Number(form.owner_id);
+    let payload: Record<string, unknown>;
+    if (resource === "procesos")
+      payload = {
+        owner_id,
+        nombre: form.nombre,
+        descripcion: form.descripcion || null,
+      };
+    else if (resource === "radicados")
+      payload = { owner_id, numero: form.numero };
+    else if (resource === "tareas")
+      payload = {
+        owner_id,
+        titulo: form.titulo,
+        descripcion: form.descripcion || null,
+        estado: form.estado,
+        prioridad: form.prioridad,
+        fecha_limite: form.fecha_limite
+          ? new Date(form.fecha_limite).toISOString()
+          : null,
+        proceso_id: form.proceso_id ? Number(form.proceso_id) : null,
+        radicado_id: form.radicado_id ? Number(form.radicado_id) : null,
+        cliente_id: form.cliente_id ? Number(form.cliente_id) : null,
+      };
+    else if (editing) payload = { nombre_archivo: form.nombre_archivo.trim() };
+    else {
+      if (!documentFile) {
+        setError("Selecciona el archivo que deseas cargar.");
+        setWorking(false);
+        return;
+      }
+      const upload = new FormData();
+      upload.set("sector", sector);
+      upload.set("owner_id", form.owner_id);
+      upload.set("proceso_id", form.proceso_id);
+      upload.set("cliente_id", form.cliente_id);
+      upload.set("archivo", documentFile);
+      try {
+        const response = await adminFetch(
+          `${API_URL}/api/admin/inventario/documentos/cargar`,
+          {
+            method: "POST",
+            headers: { Authorization: `Bearer ${token}` },
+            body: upload,
+          },
+        );
+        const result = await response.json().catch(() => ({}));
+        if (!response.ok)
+          throw new Error(
+            result.detail || "No fue posible cargar el documento.",
+          );
+        setNotice(result.mensaje || "Documento cargado.");
+        setDocumentFile(null);
+        setEditing(null);
+        setFormOpen(false);
+        await reload();
+      } catch (cause) {
+        setError(
+          cause instanceof Error
+            ? cause.message
+            : "No fue posible cargar el documento.",
+        );
+      } finally {
+        setWorking(false);
+      }
+      return;
+    }
+    if (editing && resource === "procesos")
+      payload = {
+        owner_id,
+        nombre: form.nombre,
+        descripcion: form.descripcion || null,
+      };
+    if (editing && resource === "radicados") payload = { numero: form.numero };
+    if (editing && resource === "tareas")
+      payload = {
+        titulo: form.titulo,
+        descripcion: form.descripcion || null,
+        estado: form.estado,
+        prioridad: form.prioridad,
+        fecha_limite: form.fecha_limite
+          ? new Date(form.fecha_limite).toISOString()
+          : null,
+      };
+    try {
+      const endpoint = `${API_URL}/api/admin/inventario/${resource}${editing ? `/${editing.id}` : ""}?sector=${sector}`;
+      const response = await adminFetch(endpoint, {
+        method: editing ? "PATCH" : "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(payload),
+      });
+      const result = await response.json().catch(() => ({}));
+      if (!response.ok)
+        throw new Error(result.detail || "No fue posible guardar el registro.");
+      setNotice(result.mensaje || "Cambios guardados.");
+      setEditing(null);
+      setFormOpen(false);
+      await reload();
+    } catch (cause) {
+      setError(
+        cause instanceof Error
+          ? cause.message
+          : "No fue posible guardar el registro.",
+      );
+    } finally {
+      setWorking(false);
+    }
+  }
+
+  async function remove(row: Row) {
+    const description = resource === "procesos" ? "archivar" : "eliminar";
+    const confirmation =
+      resource === "radicados"
+        ? `El borrado es irreversible: eliminará el radicado, sus actuaciones, consultas y tareas vinculadas. Los documentos del proceso se conservarán. ¿Continuar?`
+        : `¿Deseas ${description} este registro del ámbito ${sector}?`;
+    if (!window.confirm(confirmation)) return;
+    if (!token) return;
+    setWorking(true);
+    setError("");
+    setNotice("");
+    try {
+      const response = await adminFetch(
+        `${API_URL}/api/admin/inventario/${resource}/${row.id}?sector=${sector}`,
+        { method: "DELETE", headers: { Authorization: `Bearer ${token}` } },
+      );
+      const result = await response.json().catch(() => ({}));
+      if (!response.ok)
+        throw new Error(result.detail || "No fue posible completar la acción.");
+      setNotice(result.mensaje || "Acción completada.");
+      await reload();
+    } catch (cause) {
+      setError(
+        cause instanceof Error
+          ? cause.message
+          : "No fue posible completar la acción.",
+      );
+    } finally {
+      setWorking(false);
+    }
+  }
+
+  async function restore(row: Row) {
+    if (!token) return;
+    setWorking(true);
+    setError("");
+    try {
+      const response = await adminFetch(
+        `${API_URL}/api/admin/inventario/procesos/${row.id}/restaurar?sector=${sector}`,
+        { method: "PATCH", headers: { Authorization: `Bearer ${token}` } },
+      );
+      const result = await response.json().catch(() => ({}));
+      if (!response.ok)
+        throw new Error(
+          result.detail || "No fue posible restaurar el proceso.",
+        );
+      setNotice(result.mensaje);
+      await reload();
+    } catch (cause) {
+      setError(
+        cause instanceof Error
+          ? cause.message
+          : "No fue posible restaurar el proceso.",
+      );
+    } finally {
+      setWorking(false);
+    }
+  }
+
+  async function download(row: Row) {
+    if (!token) return;
+    setError("");
+    try {
+      const response = await adminFetch(
+        `${API_URL}/api/expedientes/documentos/${row.id}/archivo`,
+        { headers: { Authorization: `Bearer ${token}` } },
+      );
+      if (!response.ok) {
+        const result = await response.json().catch(() => ({}));
+        throw new Error(
+          result.detail || "No fue posible descargar el archivo.",
+        );
+      }
+      const url = URL.createObjectURL(await response.blob());
+      const anchor = window.document.createElement("a");
+      anchor.href = url;
+      anchor.download = String(row.nombre_archivo || "documento");
+      anchor.click();
+      window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+    } catch (cause) {
+      setError(
+        cause instanceof Error
+          ? cause.message
+          : "No fue posible descargar el archivo.",
+      );
+    }
+  }
+
+  async function issueTemporaryLink(row: Row) {
+    if (!token) return;
+    setWorking(true);
+    setError("");
+    setNotice("");
+    setCopyMessage("");
+    try {
+      const response = await adminFetch(
+        `${API_URL}/api/admin/inventario/documentos/${row.id}/url-temporal?sector=${sector}`,
+        { method: "POST", headers: { Authorization: `Bearer ${token}` } },
+      );
+      const result = await response.json().catch(() => ({}));
+      if (!response.ok)
+        throw new Error(result.detail || "No fue posible generar el enlace temporal.");
+      setTemporaryLink(result as TemporaryLink);
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "No fue posible generar el enlace temporal.");
+    } finally {
+      setWorking(false);
+    }
+  }
+
+  async function copyTemporaryLink() {
+    if (!temporaryLink) return;
+    try {
+      await navigator.clipboard.writeText(temporaryLink.url);
+      setCopyMessage("Enlace copiado.");
+    } catch {
+      setCopyMessage("No se pudo copiar automáticamente. Selecciona y copia la URL.");
+    }
+  }
+
+  async function openTeam(row: Row) {
+    if (!token) return;
+    setError("");
+    try {
+      const response = await adminFetch(
+        `${API_URL}/api/expedientes/procesos/${row.id}`,
+        { headers: { Authorization: `Bearer ${token}` } },
+      );
+      const result = await response.json().catch(() => ({}));
+      if (!response.ok)
+        throw new Error(result.detail || "No fue posible cargar el equipo.");
+      setTeamProcess({
+        id: row.id,
+        nombre: String(row.nombre ?? "Proceso"),
+        responsable: result.responsable,
+        colaboradores: result.colaboradores ?? [],
+        abogados_disponibles: result.abogados_disponibles ?? [],
+      });
+      setTeamSelection("");
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "No fue posible cargar el equipo.");
+    }
+  }
+
+  async function addTeamMember(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!token || !teamProcess || !teamSelection) return;
+    setWorking(true);
+    setError("");
+    try {
+      const response = await adminFetch(
+        `${API_URL}/api/expedientes/procesos/${teamProcess.id}/colaboradores`,
+        {
+          method: "POST",
+          headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+          body: JSON.stringify({ abogado_id: Number(teamSelection) }),
+        },
+      );
+      const result = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(result.detail || "No fue posible asignar el colaborador.");
+      await openTeam({ id: teamProcess.id, nombre: teamProcess.nombre });
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "No fue posible asignar el colaborador.");
+    } finally {
+      setWorking(false);
+    }
+  }
+
+  async function removeTeamMember(colleagueId: number) {
+    if (!token || !teamProcess) return;
+    setWorking(true);
+    setError("");
+    try {
+      const response = await adminFetch(
+        `${API_URL}/api/expedientes/procesos/${teamProcess.id}/colaboradores/${colleagueId}`,
+        { method: "DELETE", headers: { Authorization: `Bearer ${token}` } },
+      );
+      const result = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(result.detail || "No fue posible retirar el colaborador.");
+      await openTeam({ id: teamProcess.id, nombre: teamProcess.nombre });
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "No fue posible retirar el colaborador.");
+    } finally {
+      setWorking(false);
+    }
+  }
+
+  async function consult(row: Row) {
+    if (!token) return;
+    setWorking(true);
+    setError("");
+    setNotice("");
+    try {
+      const response = await adminFetch(
+        `${API_URL}/api/admin/radicados/${row.id}/consultar?sector=${sector}`,
+        { method: "POST", headers: { Authorization: `Bearer ${token}` } },
+      );
+      const result = await response.json().catch(() => ({}));
+      if (!response.ok)
+        throw new Error(result.detail || "No fue posible encolar la consulta.");
+      setNotice(result.mensaje || "Consulta encolada.");
+      await reload();
+    } catch (cause) {
+      setError(
+        cause instanceof Error
+          ? cause.message
+          : "No fue posible encolar la consulta.",
+      );
+    } finally {
+      setWorking(false);
+    }
+  }
+
+  async function consultAll() {
+    if (!token) return;
+    setWorking(true);
+    setError("");
+    setNotice("");
+    try {
+      const response = await adminFetch(
+        `${API_URL}/api/admin/radicados/consultar?sector=${sector}`,
+        { method: "POST", headers: { Authorization: `Bearer ${token}` } },
+      );
+      const result = await response.json().catch(() => ({}));
+      if (!response.ok)
+        throw new Error(
+          result.detail || "No fue posible encolar las consultas.",
+        );
+      setNotice(result.mensaje || "Consultas encoladas.");
+      await reload();
+    } catch (cause) {
+      setError(
+        cause instanceof Error
+          ? cause.message
+          : "No fue posible encolar las consultas.",
+      );
+    } finally {
+      setWorking(false);
+    }
+  }
+
+  if (!validResource)
+    return (
+      <p role="alert" className="p-6 text-sm text-red-700">
+        Tipo de recurso no disponible.
+      </p>
+    );
+  const sectorLabel =
+    sector === "FIRMA"
+      ? "Firma"
+      : sector === "SAAS"
+        ? "SaaS individual"
+        : "Global";
+  const canCreate = true;
+  const columns: { key: string; label: string }[] =
+    resource === "procesos"
+      ? [
+          { key: "nombre", label: "Proceso" },
+          { key: "abogado", label: "Responsable" },
+          { key: "radicados", label: "Radicados" },
+          { key: "clientes", label: "Clientes" },
+          { key: "created_at", label: "Creado" },
+        ]
+      : resource === "radicados"
+        ? [
+            { key: "numero", label: "Radicado" },
+            { key: "abogado", label: "Responsable" },
+            { key: "estado_consulta", label: "Estado" },
+            { key: "actuaciones", label: "Actuaciones" },
+            { key: "consultado_en", label: "Última consulta" },
+          ]
+        : resource === "tareas"
+          ? [
+              { key: "titulo", label: "Tarea" },
+              { key: "estado", label: "Estado" },
+              { key: "abogado", label: "Responsable" },
+              { key: "cliente", label: "Cliente" },
+              { key: "proceso", label: "Proceso" },
+              { key: "fecha_limite", label: "Vence" },
+            ]
+          : [
+              { key: "nombre_archivo", label: "Documento" },
+              { key: "proceso", label: "Proceso" },
+              { key: "cliente", label: "Cliente" },
+              { key: "mime_type", label: "Tipo" },
+              { key: "created_at", label: "Cargado" },
+            ];
+
+  return (
+    <section className="mx-auto max-w-6xl space-y-5">
+      <header className="flex flex-wrap items-end justify-between gap-4">
+        <div>
+          <p className="text-xs font-semibold uppercase tracking-wide text-primary">
+            Panel Administrativo · {sectorLabel}
+          </p>
+          <h1 className="mt-1 text-2xl font-semibold text-foreground">
+            {resourceNames[resource]}
+          </h1>
+          <p className="mt-1 text-sm text-foreground-muted">
+            Registros restringidos a este ámbito administrativo.
+          </p>
+        </div>
+        <div className="flex gap-2">
+          {resource === "radicados" && (
+            <button
+              type="button"
+              disabled={working || rows.length === 0}
+              onClick={() => void consultAll()}
+              className="inline-flex items-center gap-2 rounded-lg border border-border bg-surface px-3 py-2 text-sm font-semibold hover:bg-surface-hover disabled:opacity-50"
+            >
+              <RefreshCw className="size-4" />
+              Consultar todos
+            </button>
+          )}
+          <button
+            type="button"
+            onClick={() => void reload()}
+            aria-label="Actualizar inventario"
+            className="grid size-10 place-items-center rounded-lg border border-border bg-surface hover:bg-surface-hover"
+          >
+            <RefreshCw className={`size-4 ${loading ? "animate-spin" : ""}`} />
+          </button>
+          {canCreate && (
+            <button
+              type="button"
+              onClick={openCreate}
+              className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground"
+            >
+              <Plus className="size-4" />
+              Nuevo
+            </button>
+          )}
+        </div>
+      </header>
+      {error && (
+        <p
+          role="alert"
+          className="rounded-lg border border-danger/30 bg-danger-light p-3 text-sm text-danger"
+        >
+          {error}
+        </p>
+      )}
+      {notice && (
+        <p
+          role="status"
+          className="rounded-lg border border-success/30 bg-success-light p-3 text-sm text-success"
+        >
+          {notice}
+        </p>
+      )}
+      {resource === "procesos" && (
+        <div
+          role="group"
+          aria-label="Estado de procesos"
+          className="inline-flex gap-1 rounded-lg border border-border p-1"
+        >
+          <button
+            type="button"
+            aria-pressed={!archived}
+            onClick={() => setArchived(false)}
+            className={`rounded-md px-3 py-1.5 text-sm ${!archived ? "bg-primary text-white" : "text-foreground-muted"}`}
+          >
+            Activos
+          </button>
+          <button
+            type="button"
+            aria-pressed={archived}
+            onClick={() => setArchived(true)}
+            className={`rounded-md px-3 py-1.5 text-sm ${archived ? "bg-primary text-white" : "text-foreground-muted"}`}
+          >
+            Archivados
+          </button>
+        </div>
+      )}
+      <div className="flex flex-wrap gap-3 rounded-lg border border-border bg-surface p-3">
+        <label className="relative min-w-55 flex-1">
+          <span className="sr-only">Buscar {resourceNames[resource]}</span>
+          <Search className="absolute left-3 top-2.5 size-4 text-foreground-muted" />
+          <input
+            value={query}
+            onChange={(event) => setQuery(event.target.value)}
+            placeholder={`Buscar ${resourceNames[resource].toLowerCase()}`}
+            className="w-full rounded-md border border-border bg-background py-2 pl-9 pr-3 text-sm"
+          />
+        </label>
+        <select
+          aria-label="Filtrar estado"
+          value={state}
+          onChange={(event) => setState(event.target.value)}
+          className="rounded-md border border-border bg-background px-3 py-2 text-sm"
+        >
+          <option value="TODOS">Todos los estados</option>
+          {states.map((value) => (
+            <option key={value}>{value}</option>
+          ))}
+        </select>
+      </div>
+      <div className="overflow-x-auto rounded-lg border border-border bg-surface">
+        <table className="w-full min-w-195 text-left text-sm">
+          <thead className="border-b border-border bg-surface-secondary text-xs uppercase text-foreground-muted">
+            <tr>
+              <th className="px-4 py-3">ID</th>
+              {columns.map((column) => (
+                <th key={column.key} className="px-4 py-3">
+                  {column.label}
+                </th>
+              ))}
+              <th className="px-4 py-3 text-right">Acciones</th>
+            </tr>
+          </thead>
+          <tbody>
+            {loading ? (
+              <tr>
+                <td
+                  colSpan={columns.length + 2}
+                  className="px-4 py-10 text-center text-foreground-muted"
+                >
+                  Cargando registros...
+                </td>
+              </tr>
+            ) : filtered.length ? (
+              filtered.map((row) => (
+                <tr
+                  key={row.id}
+                  className="border-b border-border last:border-0"
+                >
+                  <td className="px-4 py-3 font-mono text-xs text-foreground-muted">
+                    {row.id}
+                  </td>
+                  {columns.map((column) => (
+                    <td
+                      key={column.key}
+                      className="max-w-60 truncate px-4 py-3 text-foreground-secondary"
+                    >
+                      {display(row[column.key])}
+                    </td>
+                  ))}
+                  <td className="px-4 py-3">
+                    <div className="flex justify-end gap-1">
+                      {resource === "documentos" ? (
+                        <>
+                          <button
+                            type="button"
+                            disabled={working}
+                            onClick={() => void issueTemporaryLink(row)}
+                            aria-label={`Generar enlace temporal para ${String(row.nombre_archivo)}`}
+                            title="Generar enlace temporal (15 minutos)"
+                            className="grid size-9 place-items-center rounded-md border border-border hover:bg-surface-hover disabled:opacity-50"
+                          >
+                            <Link2 className="size-4" />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => openEdit(row)}
+                            aria-label={`Editar ${String(row.nombre_archivo)}`}
+                            className="grid size-9 place-items-center rounded-md border border-border hover:bg-surface-hover"
+                          >
+                            <Pencil className="size-4" />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => void download(row)}
+                            aria-label={`Descargar ${String(row.nombre_archivo)}`}
+                            className="grid size-9 place-items-center rounded-md border border-border hover:bg-surface-hover"
+                          >
+                            <Download className="size-4" />
+                          </button>
+                          <button
+                            type="button"
+                            disabled={working}
+                            onClick={() => void remove(row)}
+                            aria-label={`Eliminar ${String(row.nombre_archivo)}`}
+                            className="grid size-9 place-items-center rounded-md border border-danger/30 text-danger hover:bg-danger-light"
+                          >
+                            <Trash2 className="size-4" />
+                          </button>
+                        </>
+                      ) : resource === "radicados" ? (
+                        <>
+                          <button
+                            type="button"
+                            disabled={working}
+                            onClick={() => void consult(row)}
+                            aria-label={`Consultar radicado ${row.numero}`}
+                            className="grid size-9 place-items-center rounded-md border border-border hover:bg-surface-hover disabled:opacity-50"
+                          >
+                            <RefreshCw className="size-4" />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => openEdit(row)}
+                            aria-label={`Editar radicado ${row.numero}`}
+                            className="grid size-9 place-items-center rounded-md border border-border hover:bg-surface-hover"
+                          >
+                            <Pencil className="size-4" />
+                          </button>
+                          <button
+                            type="button"
+                            disabled={working}
+                            onClick={() => void remove(row)}
+                            aria-label={`Eliminar radicado ${row.numero}`}
+                            className="grid size-9 place-items-center rounded-md border border-danger/30 text-danger hover:bg-danger-light disabled:opacity-50"
+                          >
+                            <Trash2 className="size-4" />
+                          </button>
+                        </>
+                      ) : resource === "procesos" && archived ? (
+                        <button
+                          type="button"
+                          disabled={working}
+                          onClick={() => void restore(row)}
+                          aria-label={`Restaurar proceso ${row.id}`}
+                          className="grid size-9 place-items-center rounded-md border border-border hover:bg-surface-hover"
+                        >
+                          <ArchiveRestore className="size-4" />
+                        </button>
+                      ) : (
+                        <>
+                          {resource === "procesos" && row.owner_rol === "ABOGADO_ADMIN" && !archived && (
+                            <button
+                              type="button"
+                              onClick={() => void openTeam(row)}
+                              aria-label={`Gestionar equipo de ${String(row.nombre ?? `proceso ${row.id}`)}`}
+                              title="Gestionar equipo"
+                              className="grid size-9 place-items-center rounded-md border border-border hover:bg-surface-hover"
+                            >
+                              <Users className="size-4" />
+                            </button>
+                          )}
+                          <button
+                            type="button"
+                            onClick={() => openEdit(row)}
+                            aria-label={`Editar registro ${row.id}`}
+                            className="grid size-9 place-items-center rounded-md border border-border hover:bg-surface-hover"
+                          >
+                            <Pencil className="size-4" />
+                          </button>
+                          <button
+                            type="button"
+                            disabled={working}
+                            onClick={() => void remove(row)}
+                            aria-label={`${resource === "procesos" ? "Archivar" : "Eliminar"} registro ${row.id}`}
+                            className="grid size-9 place-items-center rounded-md border border-danger/30 text-danger hover:bg-danger-light"
+                          >
+                            <Trash2 className="size-4" />
+                          </button>
+                        </>
+                      )}
+                    </div>
+                  </td>
+                </tr>
+              ))
+            ) : (
+              <tr>
+                <td
+                  colSpan={columns.length + 2}
+                  className="px-4 py-12 text-center text-sm text-foreground-muted"
+                >
+                  No hay registros para este filtro.
+                </td>
+              </tr>
+            )}
+          </tbody>
+        </table>
+      </div>
+
+      {formOpen && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-label={
+            editing?.id
+              ? `Editar ${resourceNames[resource]}`
+              : `Crear ${resourceNames[resource]}`
+          }
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+        >
+          <form
+            onSubmit={save}
+            className="max-h-[90vh] w-full max-w-2xl space-y-4 overflow-y-auto rounded-xl border border-border bg-surface p-5 shadow-2xl"
+          >
+            <header className="flex items-center justify-between gap-3">
+              <div>
+                <p className="text-xs font-semibold uppercase text-primary">
+                  Ámbito: {sectorLabel}
+                </p>
+                <h2 className="mt-1 text-lg font-semibold">
+                  {editing?.id
+                    ? `Editar ${resourceNames[resource]}`
+                    : `Nuevo ${resourceNames[resource]}`}
+                </h2>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setFormOpen(false);
+                  setEditing(null);
+                }}
+                aria-label="Cerrar"
+                className="grid size-9 place-items-center rounded-md hover:bg-surface-hover"
+              >
+                <X className="size-4" />
+              </button>
+            </header>
+            {(!editing?.id || resource === "procesos") && (
+              <label className="block text-sm font-medium">
+                Responsable
+                <select
+                  required
+                  value={form.owner_id}
+                  onChange={(event) =>
+                    setForm({ ...form, owner_id: event.target.value })
+                  }
+                  className="mt-1 w-full rounded-md border border-border bg-background px-3 py-2.5"
+                >
+                  <option value="">Seleccionar responsable</option>
+                  {owners
+                    .filter((owner) => !editing || resource !== "procesos" || owner.rol === editing.owner_rol)
+                    .map((owner) => (
+                    <option key={owner.id} value={owner.id}>
+                      {owner.nombre_completo} ·{" "}
+                      {roleNames[owner.rol] || owner.rol}
+                    </option>
+                    ))}
+                </select>
+              </label>
+            )}
+            {resource === "procesos" && (
+              <>
+                <label className="block text-sm font-medium">
+                  Nombre
+                  <input
+                    required
+                    maxLength={255}
+                    value={form.nombre}
+                    onChange={(event) =>
+                      setForm({ ...form, nombre: event.target.value })
+                    }
+                    className="mt-1 w-full rounded-md border border-border bg-background px-3 py-2.5"
+                  />
+                </label>
+                <label className="block text-sm font-medium">
+                  Descripción
+                  <textarea
+                    rows={3}
+                    value={form.descripcion}
+                    onChange={(event) =>
+                      setForm({ ...form, descripcion: event.target.value })
+                    }
+                    className="mt-1 w-full resize-y rounded-md border border-border bg-background px-3 py-2.5"
+                  />
+                </label>
+              </>
+            )}
+            {resource === "radicados" && (
+              <label className="block text-sm font-medium">
+                Número de radicado
+                <input
+                  required
+                  inputMode="numeric"
+                  pattern="[0-9]{23}"
+                  maxLength={23}
+                  value={form.numero}
+                  onChange={(event) =>
+                    setForm({
+                      ...form,
+                      numero: event.target.value
+                        .replace(/\D/g, "")
+                        .slice(0, 23),
+                    })
+                  }
+                  className="mt-1 w-full rounded-md border border-border bg-background px-3 py-2.5 font-mono"
+                />
+              </label>
+            )}
+            {resource === "tareas" && (
+              <>
+                <label className="block text-sm font-medium">
+                  Título
+                  <input
+                    required
+                    value={form.titulo}
+                    onChange={(event) =>
+                      setForm({ ...form, titulo: event.target.value })
+                    }
+                    className="mt-1 w-full rounded-md border border-border bg-background px-3 py-2.5"
+                  />
+                </label>
+                <label className="block text-sm font-medium">
+                  Descripción
+                  <textarea
+                    rows={3}
+                    value={form.descripcion}
+                    onChange={(event) =>
+                      setForm({ ...form, descripcion: event.target.value })
+                    }
+                    className="mt-1 w-full resize-y rounded-md border border-border bg-background px-3 py-2.5"
+                  />
+                </label>
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <label className="text-sm font-medium">
+                    Estado
+                    <select
+                      value={form.estado}
+                      onChange={(event) =>
+                        setForm({ ...form, estado: event.target.value })
+                      }
+                      className="mt-1 w-full rounded-md border border-border bg-background px-3 py-2.5"
+                    >
+                      {["PENDIENTE", "EN_CURSO", "COMPLETADA", "CANCELADA"].map(
+                        (value) => (
+                          <option key={value}>{value}</option>
+                        ),
+                      )}
+                    </select>
+                  </label>
+                  <label className="text-sm font-medium">
+                    Prioridad
+                    <select
+                      value={form.prioridad}
+                      onChange={(event) =>
+                        setForm({ ...form, prioridad: event.target.value })
+                      }
+                      className="mt-1 w-full rounded-md border border-border bg-background px-3 py-2.5"
+                    >
+                      {["BAJA", "MEDIA", "ALTA", "URGENTE"].map((value) => (
+                        <option key={value}>{value}</option>
+                      ))}
+                    </select>
+                  </label>
+                </div>
+                <div className="grid gap-3 sm:grid-cols-3">
+                  <label className="text-sm font-medium">
+                    Proceso
+                    <select
+                      value={form.proceso_id}
+                      onChange={(event) =>
+                        setForm({ ...form, proceso_id: event.target.value })
+                      }
+                      className="mt-1 w-full rounded-md border border-border bg-background px-3 py-2.5"
+                    >
+                      <option value="">Sin proceso</option>
+                      {processes.map((process) => (
+                        <option key={process.id} value={process.id}>
+                          {process.nombre}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  <label className="text-sm font-medium">
+                    Radicado
+                    <select
+                      value={form.radicado_id}
+                      onChange={(event) =>
+                        setForm({ ...form, radicado_id: event.target.value })
+                      }
+                      className="mt-1 w-full rounded-md border border-border bg-background px-3 py-2.5"
+                    >
+                      <option value="">Sin radicado</option>
+                      {radicados.map((radicado) => (
+                        <option key={radicado.id} value={radicado.id}>
+                          {radicado.numero}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  <label className="text-sm font-medium">
+                    Cliente
+                    <select
+                      value={form.cliente_id}
+                      onChange={(event) =>
+                        setForm({ ...form, cliente_id: event.target.value })
+                      }
+                      className="mt-1 w-full rounded-md border border-border bg-background px-3 py-2.5"
+                    >
+                      <option value="">Sin cliente</option>
+                      {clients.map((client) => (
+                        <option key={client.id} value={client.id}>
+                          {client.nombre_completo}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                </div>
+                <label className="block text-sm font-medium">
+                  Fecha límite
+                  <input
+                    type="datetime-local"
+                    value={form.fecha_limite}
+                    onChange={(event) =>
+                      setForm({ ...form, fecha_limite: event.target.value })
+                    }
+                    className="mt-1 w-full rounded-md border border-border bg-background px-3 py-2.5"
+                  />
+                </label>
+              </>
+            )}
+            {resource === "documentos" &&
+              (editing ? (
+                <label className="block text-sm font-medium">
+                  Nombre del archivo
+                  <input
+                    required
+                    maxLength={255}
+                    value={form.nombre_archivo}
+                    onChange={(event) =>
+                      setForm({ ...form, nombre_archivo: event.target.value })
+                    }
+                    className="mt-1 w-full rounded-md border border-border bg-background px-3 py-2.5"
+                  />
+                </label>
+              ) : (
+                <>
+                  <label className="block text-sm font-medium">
+                    Proceso
+                    <select
+                      required
+                      value={form.proceso_id}
+                      onChange={(event) =>
+                        setForm({
+                          ...form,
+                          proceso_id: event.target.value,
+                          cliente_id: "",
+                        })
+                      }
+                      className="mt-1 w-full rounded-md border border-border bg-background px-3 py-2.5"
+                    >
+                      <option value="">Seleccionar proceso</option>
+                      {processes
+                        .filter(
+                          (process) =>
+                            !form.owner_id ||
+                            process.owner_id === Number(form.owner_id),
+                        )
+                        .map((process) => (
+                          <option key={process.id} value={process.id}>
+                            {process.nombre}
+                          </option>
+                        ))}
+                    </select>
+                  </label>
+                  <label className="block text-sm font-medium">
+                    Cliente relacionado
+                    <select
+                      required
+                      value={form.cliente_id}
+                      onChange={(event) =>
+                        setForm({ ...form, cliente_id: event.target.value })
+                      }
+                      className="mt-1 w-full rounded-md border border-border bg-background px-3 py-2.5"
+                    >
+                      <option value="">Seleccionar cliente</option>
+                      {clients.map((client) => (
+                        <option key={client.id} value={client.id}>
+                          {client.nombre_completo}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  <label className="block text-sm font-medium">
+                    Archivo (PDF, JPEG, PNG o DOCX; máximo 15 MB)
+                    <input
+                      required
+                      type="file"
+                      accept="application/pdf,image/jpeg,image/png,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+                      onChange={(event) =>
+                        setDocumentFile(event.target.files?.[0] || null)
+                      }
+                      className="mt-1 block w-full rounded-md border border-border bg-background px-3 py-2.5 text-sm"
+                    />
+                  </label>
+                </>
+              ))}
+            <footer className="flex justify-end gap-2 border-t border-border pt-4">
+              <button
+                type="button"
+                onClick={() => {
+                  setFormOpen(false);
+                  setEditing(null);
+                }}
+                className="rounded-md border border-border px-3 py-2 text-sm"
+              >
+                Cancelar
+              </button>
+              <button
+                type="submit"
+                disabled={working}
+                className="rounded-md bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground disabled:opacity-50"
+              >
+                {working ? "Guardando…" : "Guardar"}
+              </button>
+            </footer>
+          </form>
+        </div>
+      )}
+      {temporaryLink && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-label="Enlace temporal del documento"
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4"
+        >
+          <section className="w-full max-w-2xl space-y-4 rounded-lg border border-border bg-surface p-5 shadow-2xl">
+            <header className="flex items-start justify-between gap-4">
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-wide text-primary">Acceso público temporal · {sectorLabel}</p>
+                <h2 className="mt-1 text-lg font-semibold">{temporaryLink.nombre_archivo}</h2>
+              </div>
+              <button type="button" onClick={() => setTemporaryLink(null)} aria-label="Cerrar enlace temporal" className="grid size-9 place-items-center rounded-md hover:bg-surface-hover">
+                <X className="size-4" />
+              </button>
+            </header>
+            <p className="text-sm text-foreground-muted">Cualquier persona con este enlace podrá descargar el archivo hasta su vencimiento. No lo compartas en canales públicos.</p>
+            <label className="block text-sm font-medium">URL temporal<input readOnly value={temporaryLink.url} onFocus={(event) => event.currentTarget.select()} className="mt-1 w-full rounded-md border border-border bg-background px-3 py-2.5 font-mono text-xs" /></label>
+            <p className="text-xs text-foreground-muted">Vence: {new Intl.DateTimeFormat("es-CO", { dateStyle: "medium", timeStyle: "short" }).format(new Date(temporaryLink.expires_at))} · 15 minutos</p>
+            {copyMessage && <p role="status" className="text-sm text-success">{copyMessage}</p>}
+            <footer className="flex flex-wrap justify-end gap-2 border-t border-border pt-4">
+              <a href={`mailto:?subject=${encodeURIComponent(`Documento: ${temporaryLink.nombre_archivo}`)}&body=${encodeURIComponent(temporaryLink.url)}`} className="inline-flex items-center gap-2 rounded-md border border-border px-3 py-2 text-sm hover:bg-surface-hover"><Mail className="size-4" />Correo</a>
+              <a href={`https://wa.me/?text=${encodeURIComponent(temporaryLink.url)}`} target="_blank" rel="noreferrer" className="rounded-md border border-border px-3 py-2 text-sm hover:bg-surface-hover">WhatsApp</a>
+              <button type="button" onClick={() => void copyTemporaryLink()} className="inline-flex items-center gap-2 rounded-md bg-primary px-3 py-2 text-sm font-semibold text-primary-foreground"><Copy className="size-4" />Copiar enlace</button>
+            </footer>
+          </section>
+        </div>
+      )}
+      {teamProcess && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-label={`Equipo del proceso ${teamProcess.nombre}`}
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+        >
+          <section className="w-full max-w-xl space-y-4 rounded-xl border border-border bg-surface p-5 shadow-2xl">
+            <header className="flex items-start justify-between gap-3">
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-wide text-primary">Firma · {sectorLabel}</p>
+                <h2 className="mt-1 text-lg font-semibold">Equipo · {teamProcess.nombre}</h2>
+                <p className="mt-1 text-sm text-foreground-muted">Responsable: {teamProcess.responsable.nombre_completo}</p>
+              </div>
+              <button type="button" onClick={() => setTeamProcess(null)} aria-label="Cerrar equipo" className="grid size-9 place-items-center rounded-md hover:bg-surface-hover"><X className="size-4" /></button>
+            </header>
+            {teamProcess.colaboradores.length ? (
+              <ul className="divide-y divide-border border-y border-border">
+                {teamProcess.colaboradores.map((member) => (
+                  <li key={member.id} className="flex items-center justify-between gap-3 py-3 text-sm">
+                    <span>{member.nombre_completo}</span>
+                    <button type="button" disabled={working} onClick={() => void removeTeamMember(member.id)} className="text-xs font-medium text-danger hover:underline disabled:opacity-50">Retirar acceso</button>
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p className="rounded-md border border-dashed border-border p-4 text-sm text-foreground-muted">No hay colaboradores internos asignados.</p>
+            )}
+            {teamProcess.abogados_disponibles.length > 0 ? (
+              <form onSubmit={addTeamMember} className="flex flex-wrap gap-2">
+                <select required value={teamSelection} onChange={(event) => setTeamSelection(event.target.value)} aria-label="Abogado interno a asignar" className="min-w-56 flex-1 rounded-md border border-border bg-background px-3 py-2 text-sm">
+                  <option value="">Seleccionar abogado interno</option>
+                  {teamProcess.abogados_disponibles.map((member) => <option key={member.id} value={member.id}>{member.nombre_completo}</option>)}
+                </select>
+                <button type="submit" disabled={working || !teamSelection} className="inline-flex items-center gap-2 rounded-md bg-primary px-3 py-2 text-sm font-semibold text-primary-foreground disabled:opacity-50"><Users className="size-4" />Asignar</button>
+              </form>
+            ) : (
+              <p className="text-xs text-foreground-muted">No hay otros abogados internos activos para asignar.</p>
+            )}
+          </section>
+        </div>
+      )}
+    </section>
+  );
+}

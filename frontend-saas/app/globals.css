@@ -136,6 +136,99 @@ a {
   text-decoration: none;
 }
 
+@keyframes marketing-fade-up {
+  from {
+    opacity: 0;
+    transform: translateY(18px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes marketing-float {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-7px); }
+}
+
+@keyframes marketing-glow {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(204, 181, 107, 0); }
+  50% { box-shadow: 0 0 0 8px rgba(204, 181, 107, 0.18); }
+}
+
+@keyframes marketing-menu-open {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.marketing-reveal {
+  animation: marketing-fade-up 0.65s ease-out both;
+}
+
+.marketing-reveal-delay-1 { animation-delay: 0.12s; }
+.marketing-reveal-delay-2 { animation-delay: 0.24s; }
+
+.marketing-float { animation: marketing-float 4s ease-in-out infinite; }
+.marketing-cta { animation: marketing-glow 2.8s ease-in-out infinite; }
+.marketing-menu-enter { animation: marketing-menu-open 0.22s ease-out both; }
+
+.marketing-nav-link {
+  position: relative;
+}
+
+.marketing-nav-link::after {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  height: 2px;
+  content: "";
+  background: #ccb56b;
+  opacity: 0;
+  transform: scaleX(0);
+  transform-origin: center;
+  transition: transform 0.24s ease, opacity 0.2s ease;
+}
+
+.marketing-nav-link:hover::after,
+.marketing-nav-link[aria-current="page"]::after {
+  opacity: 1;
+  transform: scaleX(1);
+}
+
+.marketing-card {
+  transition: transform 0.25s ease, box-shadow 0.25s ease, border-color 0.25s ease;
+}
+
+.marketing-card:hover {
+  transform: translateY(-5px);
+  box-shadow: 0 14px 28px rgba(0, 32, 96, 0.12);
+  border-color: #ccb56b;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .marketing-reveal,
+  .marketing-float,
+  .marketing-cta,
+  .marketing-menu-enter {
+    animation: none;
+  }
+
+  .marketing-card,
+  .marketing-card:hover,
+  .marketing-nav-link::after {
+    transform: none;
+    transition: none;
+  }
+}
+
 ::-webkit-scrollbar {
   width: 8px;
   height: 8px;

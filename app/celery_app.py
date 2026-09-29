@@ -21,6 +21,10 @@ celery_app.conf.update(
 
 # --- PROGRAMACIÓN DE TAREAS PERIÓDICAS (CELERY BEAT) ---
 celery_app.conf.beat_schedule = {
+    "recordatorios-de-tareas-cada-minuto": {
+        "task": "tareas.enviar_recordatorios_tareas",
+        "schedule": crontab(minute="*"),
+    },
     # Barridos diarios de lunes a viernes a las 12:00 PM y 6:00 PM
     "barrido-lunes-a-viernes-12-y-18": {
         "task": "tareas.consultar_todos_los_radicados",

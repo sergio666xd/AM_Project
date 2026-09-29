@@ -5,10 +5,13 @@ psycopg[binary]
 pydantic
 pydantic-settings
 email-validator
+python-dotenv
 python-multipart
 passlib[bcrypt]
 bcrypt==4.0.1
 python-jose[cryptography]
 celery
 redis
-playwright
+requests
+boto3
+qstash
