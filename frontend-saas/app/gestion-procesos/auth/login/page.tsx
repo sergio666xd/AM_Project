@@ -7,8 +7,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useSession } from "@/context/SessionContext";
 import GuestOnly from "@/components/auth/GuestOnly";
-
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://192.168.78.226:8000";
+import { API_URL } from "@/lib/api";
 
 function LoginForm() {
   const [email, setEmail] = useState("");

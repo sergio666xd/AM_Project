@@ -3,8 +3,7 @@
 import Link from "next/link";
 import { CheckCircle2, CircleAlert, LoaderCircle } from "lucide-react";
 import { FormEvent, useState } from "react";
-
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+import { API_URL } from "@/lib/api";
 const validEmail = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 export function InterestForm() {

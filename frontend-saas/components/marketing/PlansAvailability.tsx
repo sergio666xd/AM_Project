@@ -2,14 +2,13 @@
 
 import { useEffect, useState } from "react";
 import { InterestForm } from "./InterestForm";
+import { API_URL } from "@/lib/api";
 
 type Plan = {
   id: number; nombre: string; limite_radicados: number; precio_mensual: number;
   limite_ultimas_actuaciones: number | null;
   notificaciones_whatsapp_procesos: boolean; notificaciones_whatsapp_tareas: boolean;
 };
-
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
 export function PlansAvailability() {
   const [mostrarPlanes, setMostrarPlanes] = useState(false);

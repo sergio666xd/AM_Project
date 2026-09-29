@@ -4,8 +4,7 @@ import { FormEvent, Suspense, useState } from "react";
 import Link from "next/link";
 import { ArrowLeft, KeyRound } from "lucide-react";
 import { useSearchParams } from "next/navigation";
-
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://192.168.78.226:8000";
+import { API_URL } from "@/lib/api";
 
 function ResetPasswordForm() {
   const token = useSearchParams().get("token") || "";

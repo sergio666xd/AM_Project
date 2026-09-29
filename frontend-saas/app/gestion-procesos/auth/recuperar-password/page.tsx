@@ -3,8 +3,7 @@
 import { FormEvent, useState } from "react";
 import Link from "next/link";
 import { ArrowLeft, Mail, Send } from "lucide-react";
-
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://192.168.78.226:8000";
+import { API_URL } from "@/lib/api";
 
 export default function RecuperarPasswordPage() {
   const [email, setEmail] = useState("");
