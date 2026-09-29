@@ -1,0 +1,27 @@
+[project]
+name = "gestion-procesos-saas"
+version = "0.1.0"
+requires-python = ">=3.12"
+dependencies = [
+    "fastapi",
+    "uvicorn[standard]",
+    "sqlalchemy",
+    "psycopg[binary]",
+    "pydantic>=2.12,<3",
+    "pydantic-settings",
+    "email-validator",
+    "python-dotenv",
+    "python-multipart",
+    "passlib[bcrypt]",
+    "bcrypt==4.0.1",
+    "python-jose[cryptography]",
+    "celery",
+    "redis",
+    "requests",
+    "boto3",
+    "qstash",
+    "vercel-workflow==0.11.0",
+]
+
+[[tool.vercel.workflows]]
+entrypoint = "app.workflow_spike:wf"

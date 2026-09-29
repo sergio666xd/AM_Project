@@ -27,6 +27,8 @@ from app.tasks import procesar_recordatorios_tareas
 from app.firm_access import require_roles
 from app.audit import registrar_evento_auditoria
 from app.firm_access import has_firm_wide_access, lawyer_process_ids, lawyer_scope_id
+from app.workflow_spike import workflow_spike_ping
+from vercel import workflow
 
 # Crear las tablas en la BD
 models.Base.metadata.create_all(bind=engine)
@@ -115,6 +117,27 @@ async def ejecutar_recordatorios_qstash(request: Request):
     except Exception as exc:
         raise HTTPException(status_code=401, detail="Firma de QStash inválida.") from exc
     return procesar_recordatorios_tareas()
+
+
+@app.post("/api/admin/workflow-probe")
+async def iniciar_prueba_workflow(
+    usuario_actual: models.Usuario = Depends(security.obtener_usuario_actual),
+):
+    require_roles(usuario_actual, ["ADMIN"], action="iniciar una prueba de Workflow")
+    run = await workflow.start(workflow_spike_ping)
+    return {"run_id": run.run_id, "status": await run.status()}
+
+
+@app.get("/api/admin/workflow-probe/{run_id}")
+async def consultar_prueba_workflow(
+    run_id: str,
+    usuario_actual: models.Usuario = Depends(security.obtener_usuario_actual),
+):
+    require_roles(usuario_actual, ["ADMIN"], action="consultar una prueba de Workflow")
+    run = workflow.Run(run_id)
+    estado = await run.status()
+    resultado = await run.return_value() if estado == "completed" else None
+    return {"run_id": run_id, "status": estado, "result": resultado}
 
 # Protección ligera para el único endpoint público de captación. Para una
 # instalación con varias réplicas, conviene mover este contador a Redis/WAF.

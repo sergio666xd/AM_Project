@@ -16,6 +16,7 @@ env/
 ENV/
 node_modules/
 .next/
+.workflow-data/
 out/
 build/
 dist/
