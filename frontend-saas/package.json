@@ -9,10 +9,16 @@
     "lint": "eslint"
   },
   "dependencies": {
+    "@workflow/core": "4.8.9",
+    "@workflow/next": "4.1.13",
     "lucide-react": "^1.47.0",
     "next": "16.3.6",
     "react": "19.2.8",
     "react-dom": "19.2.8"
+  },
+  "overrides": {
+    "nanoid": "^5.1.16",
+    "undici": "^7.30.0"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
