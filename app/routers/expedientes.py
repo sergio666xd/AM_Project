@@ -21,6 +21,7 @@ from app.document_validation import (
     document_content_matches_type as _document_content_matches_type,
 )
 from app.tasks import tarea_enviar_email, tarea_enviar_whatsapp
+from app.radicados import ambito_radicado_usuario, obtener_o_vincular_radicado
 from app.firm_access import (
     has_firm_wide_access,
     is_process_manager,
@@ -823,18 +824,20 @@ def asignar_radicado(proceso_id: int, radicado_id: int, db: Session = Depends(ge
     _abogado(usuario); proceso = _proceso_abogado(proceso_id, usuario, db)
     if not proceso.abogado:
         raise HTTPException(status_code=404, detail="Proceso no encontrado.")
-    radicado_query = db.query(models.Radicado).filter(models.Radicado.id == radicado_id)
-    if proceso.abogado.rol == models.RolUsuario.ABOGADO:
-        radicado_query = radicado_query.filter(models.Radicado.usuario_id == proceso.abogado_id)
-    elif proceso.abogado.rol in (models.RolUsuario.ABOGADO_ADMIN, models.RolUsuario.ADMIN):
-        radicado_query = radicado_query.join(
-            models.Usuario, models.Usuario.id == models.Radicado.usuario_id
-        ).filter(models.Usuario.rol.in_((models.RolUsuario.ABOGADO_ADMIN, models.RolUsuario.ADMIN)))
-    else:
+    try:
+        scope_key = ambito_radicado_usuario(proceso.abogado)
+    except ValueError:
         raise HTTPException(status_code=404, detail="Proceso no encontrado.")
-    radicado = radicado_query.first()
+    radicado = db.query(models.Radicado).filter(
+        models.Radicado.id == radicado_id,
+        models.Radicado.ambito_key == scope_key,
+    ).first()
     if not radicado: raise HTTPException(status_code=404, detail="Radicado no encontrado en la firma.")
     if not db.query(models.ProcesoRadicado).filter_by(proceso_id=proceso.id, radicado_id=radicado.id).first():
+        try:
+            obtener_o_vincular_radicado(db, proceso.abogado, radicado.numero)
+        except ValueError as exc:
+            raise HTTPException(status_code=404, detail="Radicado no disponible en el ámbito del proceso.") from exc
         db.add(models.ProcesoRadicado(proceso_id=proceso.id, radicado_id=radicado.id))
         registrar_evento_auditoria(db, usuario, "proceso.radicado.asignar", "proceso_radicado", f"{proceso.id}:{radicado.id}")
         db.commit()
@@ -852,14 +855,18 @@ def crear_y_asignar_radicado(
     _abogado(usuario)
     proceso = _proceso_abogado(proceso_id, usuario, db)
     numero = datos.numero.strip()
-    if not numero.isdigit() or len(numero) != 23:
-        raise HTTPException(status_code=400, detail="El radicado debe tener exactamente 23 dígitos.")
-    if db.query(models.Radicado).filter(models.Radicado.numero == numero).first():
-        raise HTTPException(status_code=400, detail="Este radicado ya existe en la firma.")
-    radicado = models.Radicado(numero=numero, usuario_id=proceso.abogado_id, estado_consulta="sin consultar")
-    db.add(radicado); db.flush()
-    db.add(models.ProcesoRadicado(proceso_id=proceso.id, radicado_id=radicado.id))
-    registrar_evento_auditoria(db, usuario, "radicado.crear_en_proceso", "radicado", radicado.id)
+    try:
+        radicado, created = obtener_o_vincular_radicado(db, proceso.abogado, numero)
+        if usuario.id != proceso.abogado_id:
+            obtener_o_vincular_radicado(db, usuario, numero)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    if not db.query(models.ProcesoRadicado).filter_by(
+        proceso_id=proceso.id, radicado_id=radicado.id
+    ).first():
+        db.add(models.ProcesoRadicado(proceso_id=proceso.id, radicado_id=radicado.id))
+    action = "radicado.crear_en_proceso" if created else "radicado.vincular_en_proceso"
+    registrar_evento_auditoria(db, usuario, action, "radicado", radicado.id)
     db.commit(); db.refresh(radicado)
     return {"id": radicado.id, "numero": radicado.numero, "mensaje": "Radicado creado y asociado al proceso."}
 

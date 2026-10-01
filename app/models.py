@@ -1,8 +1,16 @@
 import enum
 from datetime import datetime
-from sqlalchemy import Column, Integer, String, Boolean, DateTime, ForeignKey, Enum, Text, JSON
-from sqlalchemy.orm import relationship
+from sqlalchemy import Boolean, Column, DateTime, Enum, ForeignKey, Index, Integer, JSON, String, Table, Text, event, select
+from sqlalchemy.orm import relationship, synonym
 from app.database import Base
+
+
+radicados_usuarios = Table(
+    "radicados_usuarios",
+    Base.metadata,
+    Column("usuario_id", Integer, ForeignKey("usuarios.id", ondelete="CASCADE"), primary_key=True),
+    Column("radicado_id", Integer, ForeignKey("radicados.id", ondelete="CASCADE"), primary_key=True),
+)
 
 
 class EstadoUsuario(str, enum.Enum):
@@ -77,7 +85,16 @@ class Usuario(Base):
     )
     plan = relationship("Plan", back_populates="users")
     solicitud_registro = relationship("SolicitudRegistro", back_populates="usuario", uselist=False)
-    radicados = relationship("Radicado", back_populates="usuario", cascade="all, delete-orphan")
+    radicados = relationship(
+        "Radicado",
+        secondary=radicados_usuarios,
+        back_populates="usuarios_vinculados",
+    )
+    radicados_creados = relationship(
+        "Radicado",
+        back_populates="creador",
+        foreign_keys="Radicado.creado_por_id",
+    )
     creado_por_abogado = relationship("Usuario", remote_side=[id], foreign_keys=[creado_por_abogado_id])
     procesos = relationship("Proceso", back_populates="abogado", cascade="all, delete-orphan")
 
@@ -123,10 +140,24 @@ class InteresSaas(Base):
 
 class Radicado(Base):
     __tablename__ = "radicados"
+    __table_args__ = (
+        Index(
+            "uq_radicados_fuente_ambito_numero",
+            "fuente",
+            "ambito_key",
+            "numero_normalizado",
+            unique=True,
+        ),
+    )
 
     id = Column(Integer, primary_key=True, index=True)
     numero = Column(String(23), index=True, nullable=False)
-    usuario_id = Column(Integer, ForeignKey("usuarios.id"), nullable=False)
+    creado_por_id = Column(Integer, ForeignKey("usuarios.id"), nullable=False)
+    usuario_id = synonym("creado_por_id")
+    fuente = Column(String(50), nullable=False, default="RAMA_JUDICIAL_COLOMBIA")
+    ambito_key = Column(String(64), nullable=False, index=True)
+    numero_normalizado = Column(String(23), nullable=False)
+    id_proceso_rama = Column(String(64), nullable=True)
     
     estado_consulta = Column(String(50), default="sin consultar")
     despacho_departamento = Column(String(255), default="")
@@ -144,7 +175,13 @@ class Radicado(Base):
     cascade="all, delete-orphan",
 )
 
-    usuario = relationship("Usuario", back_populates="radicados")
+    creador = relationship("Usuario", back_populates="radicados_creados", foreign_keys=[creado_por_id])
+    usuario = synonym("creador")
+    usuarios_vinculados = relationship(
+        "Usuario",
+        secondary=radicados_usuarios,
+        back_populates="radicados",
+    )
     actuaciones = relationship(
         "Actuacion",
         back_populates="radicado_rel",
@@ -156,6 +193,31 @@ class Radicado(Base):
         cascade="all, delete-orphan"
     )
     procesos = relationship("ProcesoRadicado", back_populates="radicado", cascade="all, delete-orphan")
+
+
+@event.listens_for(Radicado, "before_insert")
+def establecer_identidad_radicado(mapper, connection, radicado: Radicado) -> None:
+    radicado.numero_normalizado = "".join(caracter for caracter in radicado.numero if caracter.isdigit())
+    role = connection.execute(
+        select(Usuario.rol).where(Usuario.id == radicado.creado_por_id)
+    ).scalar_one()
+    role_name = role.value if hasattr(role, "value") else str(role)
+    if role_name == RolUsuario.ABOGADO.value:
+        radicado.ambito_key = f"SAAS:{radicado.creado_por_id}"
+    elif role_name in (RolUsuario.ABOGADO_ADMIN.value, RolUsuario.ADMIN.value):
+        radicado.ambito_key = "FIRMA"
+    else:
+        raise ValueError("Solo abogados y administradores pueden crear radicados.")
+
+
+@event.listens_for(Radicado, "after_insert")
+def vincular_creador_radicado(mapper, connection, radicado: Radicado) -> None:
+    connection.execute(
+        radicados_usuarios.insert().values(
+            usuario_id=radicado.creado_por_id,
+            radicado_id=radicado.id,
+        )
+    )
 
 
 class Proceso(Base):

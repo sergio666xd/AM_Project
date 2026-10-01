@@ -9,7 +9,7 @@ from sqlalchemy.orm import Session
 
 from app import models, schemas, security, storage
 from app.audit import registrar_evento_auditoria
-from app.database import get_db
+from app.database import engine, get_db
 from app.document_validation import (
     ALLOWED_DOCUMENT_TYPES,
     MAX_DOCUMENT_BYTES,
@@ -19,6 +19,9 @@ from app.security import obtener_usuario_actual
 from app.firm_access import require_roles
 from app.site_content import PUBLIC_CONTENT_PAGES
 from app.tasks import tarea_consultar_radicado
+from app.radicados import ambito_radicado_usuario, obtener_o_vincular_radicado, normalizar_numero_radicado
+from app.migrate_radicados_canonicos import migrar as migrar_radicados_canonicos
+from app.migrate_radicados_canonicos import previsualizar as previsualizar_migracion_radicados
 import json
 
 
@@ -48,6 +51,17 @@ def _roles_para_sector(sector: str) -> tuple[models.RolUsuario, ...]:
     return roles
 
 
+def _filtrar_radicados_por_sector(query, sector: str):
+    sector = sector.upper()
+    if sector == "FIRMA":
+        return query.filter(models.Radicado.ambito_key == "FIRMA")
+    if sector == "SAAS":
+        return query.filter(models.Radicado.ambito_key.like("SAAS:%"))
+    if sector == "GLOBAL":
+        return query
+    raise HTTPException(status_code=400, detail="Selecciona un ámbito válido: FIRMA, SAAS o GLOBAL.")
+
+
 def _owner_admin(db: Session, owner_id: int, sector: str) -> models.Usuario:
     roles = _roles_para_sector(sector)
     owner = db.query(models.Usuario).filter(
@@ -64,7 +78,7 @@ def _query_inventario_admin(db: Session, recurso: str, sector: str):
     if recurso == "procesos":
         return db.query(models.Proceso).join(models.Usuario, models.Usuario.id == models.Proceso.abogado_id).filter(models.Usuario.rol.in_(roles))
     if recurso == "radicados":
-        return db.query(models.Radicado).join(models.Usuario, models.Usuario.id == models.Radicado.usuario_id).filter(models.Usuario.rol.in_(roles))
+        return _filtrar_radicados_por_sector(db.query(models.Radicado), sector)
     if recurso == "tareas":
         return db.query(models.Tarea).join(models.Usuario, models.Usuario.id == models.Tarea.usuario_id).filter(models.Usuario.rol.in_(roles))
     if recurso == "documentos":
@@ -94,6 +108,60 @@ def verificar_admin(
 ):
     require_roles(usuario_actual, ["ADMIN"], action="acceder al panel administrativo")
     return usuario_actual
+
+
+@router.get("/migraciones/radicados/preview")
+def previsualizar_migracion_radicados_admin(
+    admin: models.Usuario = Depends(verificar_admin),
+):
+    """Read-only counts and blockers before the explicit schema migration."""
+    try:
+        with engine.connect() as connection:
+            return previsualizar_migracion_radicados(connection)
+    except Exception as exc:
+        raise HTTPException(
+            status_code=503,
+            detail="No fue posible revisar la migración de radicados en esta base de datos.",
+        ) from exc
+
+
+@router.post("/migraciones/radicados/aplicar")
+def aplicar_migracion_radicados_admin(
+    datos: schemas.AplicarMigracionRadicados,
+    admin: models.Usuario = Depends(verificar_admin),
+):
+    """Apply the migration only when explicitly enabled and backup-confirmed."""
+    enabled = os.getenv("RADICADO_MIGRATION_API_ENABLED", "").strip().lower() == "true"
+    if not enabled:
+        raise HTTPException(
+            status_code=404,
+            detail="La ejecución de migraciones desde API está deshabilitada.",
+        )
+    if datos.confirmacion != "CONFIRMO_BACKUP_VERIFICADO":
+        raise HTTPException(status_code=400, detail="Se requiere confirmar el backup verificado.")
+
+    try:
+        with engine.begin() as connection:
+            reporte = migrar_radicados_canonicos(connection)
+            connection.execute(
+                models.EventoAuditoria.__table__.insert().values(
+                    actor_id=admin.id,
+                    accion="admin.migracion.radicados.aplicar",
+                    tipo_recurso="migracion",
+                    recurso_id="radicados_canonicos",
+                )
+            )
+        return {"aplicada": True, "reporte": reporte}
+    except RuntimeError as exc:
+        raise HTTPException(
+            status_code=409,
+            detail="El preflight bloqueó la migración; revisa conflictos y referencias.",
+        ) from exc
+    except Exception as exc:
+        raise HTTPException(
+            status_code=503,
+            detail="No fue posible aplicar la migración; la transacción se revirtió.",
+        ) from exc
 
 @router.get("/contenido")
 def listar_contenido_publico_admin(
@@ -323,8 +391,8 @@ def listar_inventario_global(
         query = query.filter(models.Proceso.archivado_en.is_not(None) if archivados else models.Proceso.archivado_en.is_(None))
         return [{"id": p.id, "owner_id": p.abogado_id, "owner_rol": p.abogado.rol.value, "nombre": p.nombre, "descripcion": p.descripcion, "archivado_en": p.archivado_en, "abogado": p.abogado.nombre_completo, "radicados": len(p.radicados), "clientes": len(p.clientes), "created_at": p.created_at} for p in query.order_by(models.Proceso.created_at.desc()).limit(limite).all()]
     if recurso == "radicados":
-        query = db.query(models.Radicado).join(models.Usuario, models.Usuario.id == models.Radicado.usuario_id).filter(models.Usuario.rol.in_(roles))
-        return [{"id": r.id, "owner_id": r.usuario_id, "numero": r.numero, "abogado": r.usuario.nombre_completo, "estado_consulta": r.estado_consulta, "actuaciones": len(r.actuaciones), "consultado_en": r.consultado_en} for r in query.order_by(models.Radicado.created_at.desc()).limit(limite).all()]
+        query = _filtrar_radicados_por_sector(db.query(models.Radicado), sector)
+        return [{"id": r.id, "owner_id": r.creado_por_id, "numero": r.numero, "abogado": r.creador.nombre_completo, "estado_consulta": r.estado_consulta, "actuaciones": len(r.actuaciones), "consultado_en": r.consultado_en} for r in query.order_by(models.Radicado.created_at.desc()).limit(limite).all()]
     if recurso == "tareas":
         query = db.query(models.Tarea).join(models.Usuario, models.Usuario.id == models.Tarea.usuario_id).filter(models.Usuario.rol.in_(roles))
         query = query.filter(or_(models.Tarea.proceso_id.is_(None), models.Tarea.proceso.has(models.Proceso.archivado_en.is_(None))))
@@ -351,13 +419,11 @@ def crear_recurso_admin(
         item = models.Proceso(abogado_id=owner.id, nombre=datos.nombre.strip(), descripcion=datos.descripcion)
         action = "crear_proceso"
     elif recurso == "radicados":
-        numero = (datos.numero or "").strip()
-        if not numero.isdigit() or len(numero) != 23:
-            raise HTTPException(status_code=400, detail="El radicado debe tener exactamente 23 dígitos.")
-        if db.query(models.Radicado).filter(models.Radicado.numero == numero).first():
-            raise HTTPException(status_code=409, detail="El radicado ya existe.")
-        item = models.Radicado(usuario_id=owner.id, numero=numero, estado_consulta="sin consultar")
-        action = "crear_radicado"
+        try:
+            item, created = obtener_o_vincular_radicado(db, owner, datos.numero or "")
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+        action = "crear_radicado" if created else "vincular_radicado"
     elif recurso == "tareas":
         title = (datos.titulo or "").strip()
         if not title:
@@ -375,7 +441,7 @@ def crear_recurso_admin(
         if datos.radicado_id is not None:
             radicado = db.query(models.Radicado).filter(
                 models.Radicado.id == datos.radicado_id,
-                models.Radicado.usuario_id == owner.id,
+                models.Radicado.ambito_key == ambito_radicado_usuario(owner),
             ).first()
             if not radicado:
                 raise HTTPException(status_code=400, detail="El radicado no pertenece al responsable seleccionado.")
@@ -532,15 +598,19 @@ def actualizar_recurso_admin(
             item.descripcion = values["descripcion"]
     elif recurso == "radicados":
         if "numero" in values:
-            numero = (values["numero"] or "").strip()
-            if not numero.isdigit() or len(numero) != 23:
+            numero = normalizar_numero_radicado(values["numero"] or "")
+            if len(numero) != 23:
                 raise HTTPException(status_code=400, detail="El radicado debe tener exactamente 23 dígitos.")
             duplicate = db.query(models.Radicado).filter(
-                models.Radicado.numero == numero, models.Radicado.id != item.id
+                models.Radicado.fuente == item.fuente,
+                models.Radicado.ambito_key == item.ambito_key,
+                models.Radicado.numero_normalizado == numero,
+                models.Radicado.id != item.id,
             ).first()
             if duplicate:
-                raise HTTPException(status_code=409, detail="El radicado ya existe.")
+                raise HTTPException(status_code=409, detail="Ya existe una ficha de este radicado en el ámbito seleccionado; vincula esa ficha en lugar de duplicarla.")
             item.numero = numero
+            item.numero_normalizado = numero
     elif recurso == "tareas":
         if "titulo" in values:
             if not values["titulo"] or not values["titulo"].strip():
@@ -1238,10 +1308,11 @@ def obtener_usuario_admin(
         )
 
     radicados = (
-    db.query(models.Radicado)
-    .filter(models.Radicado.usuario_id == usuario.id)
-    .order_by(models.Radicado.created_at.desc())
-    .all()
+        db.query(models.Radicado)
+        .join(models.Radicado.usuarios_vinculados)
+        .filter(models.Usuario.id == usuario.id)
+        .order_by(models.Radicado.created_at.desc())
+        .all()
     )
 
     return {

@@ -6,7 +6,8 @@ import zipfile
 import pytest
 from fastapi import HTTPException, UploadFile
 from starlette.datastructures import Headers
-from sqlalchemy import create_engine
+from sqlalchemy import Boolean, Column, ForeignKey, Integer, MetaData, String, Table, create_engine, delete, insert, inspect, select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, sessionmaker
 
 from app import security
@@ -16,6 +17,9 @@ from app import whatsapp
 from app.audit import registrar_evento_auditoria
 from app.firm_access import has_firm_wide_access, lawyer_scope_id, require_process_access
 from app.notification_policy import plan_whatsapp_habilitado, whatsapp_habilitado
+from app.radicados import obtener_o_vincular_radicado
+from app.migrate_radicados_canonicos import migrar as migrar_radicados_canonicos, previsualizar as previsualizar_migracion_radicados
+from app.routers import admin as admin_router
 from app.routers.admin import (
     actualizar_recurso_admin,
     crear_recurso_admin,
@@ -29,6 +33,7 @@ from app.routers.admin import (
     consultar_todos_radicados_admin,
     restaurar_proceso_admin,
     restaurar_contenido_publico_admin,
+    aplicar_migracion_radicados_admin,
 )
 from app.routers.expedientes import (
     _cliente_asignado,
@@ -61,6 +66,40 @@ from app.routers.tareas import (
     validar_actualizacion_tarea,
 )
 from app.firm_access import require_roles
+
+
+def test_radicados_migration_api_routes_are_registered_in_admin_router():
+    route_methods = {
+        (route.path, method)
+        for route in admin_router.router.routes
+        for method in getattr(route, "methods", set())
+    }
+
+    assert ("/api/admin/migraciones/radicados/preview", "GET") in route_methods
+    assert ("/api/admin/migraciones/radicados/aplicar", "POST") in route_methods
+
+
+def test_radicados_migration_api_apply_is_disabled_unless_explicitly_enabled(monkeypatch):
+    monkeypatch.delenv("RADICADO_MIGRATION_API_ENABLED", raising=False)
+    admin = models.Usuario(
+        id=1,
+        email="migration-admin@example.test",
+        password_hash="hash",
+        nombre_completo="Migration admin",
+        whatsapp_numero="0000000001",
+        rol=models.RolUsuario.ADMIN,
+        estado=models.EstadoUsuario.ACTIVO,
+    )
+
+    with pytest.raises(HTTPException) as error:
+        aplicar_migracion_radicados_admin(
+            schemas.AplicarMigracionRadicados(
+                confirmacion="CONFIRMO_BACKUP_VERIFICADO"
+            ),
+            admin=admin,
+        )
+
+    assert error.value.status_code == 404
 
 
 def test_process_associations_cannot_cross_saas_or_firm_boundary():
@@ -171,6 +210,294 @@ def test_process_associations_cannot_cross_saas_or_firm_boundary():
         assert db.query(models.ProcesoRadicado).filter_by(
             proceso_id=firm_process.id, radicado_id=firm_radicado.id
         ).first()
+
+
+def test_canonical_radicado_is_shared_in_firm_but_isolated_per_saas_owner():
+    engine = create_engine("sqlite:///:memory:")
+    models.Base.metadata.create_all(engine)
+
+    with Session(engine) as db:
+        firm_owner = models.Usuario(
+            email="canonical-firm-owner@example.test",
+            password_hash="hash",
+            nombre_completo="Firm owner",
+            whatsapp_numero="0000000111",
+            rol=models.RolUsuario.ABOGADO_ADMIN,
+            estado=models.EstadoUsuario.ACTIVO,
+        )
+        firm_colleague = models.Usuario(
+            email="canonical-firm-colleague@example.test",
+            password_hash="hash",
+            nombre_completo="Firm colleague",
+            whatsapp_numero="0000000112",
+            rol=models.RolUsuario.ABOGADO_ADMIN,
+            estado=models.EstadoUsuario.ACTIVO,
+        )
+        saas_owner = models.Usuario(
+            email="canonical-saas-owner@example.test",
+            password_hash="hash",
+            nombre_completo="SaaS owner",
+            whatsapp_numero="0000000113",
+            rol=models.RolUsuario.ABOGADO,
+            estado=models.EstadoUsuario.ACTIVO,
+        )
+        other_saas_owner = models.Usuario(
+            email="canonical-other-saas-owner@example.test",
+            password_hash="hash",
+            nombre_completo="Other SaaS owner",
+            whatsapp_numero="0000000114",
+            rol=models.RolUsuario.ABOGADO,
+            estado=models.EstadoUsuario.ACTIVO,
+        )
+        db.add_all([firm_owner, firm_colleague, saas_owner, other_saas_owner])
+        db.flush()
+
+        number = "12345678901234567890123"
+        firm_radicado = models.Radicado(numero=number, usuario_id=firm_owner.id)
+        saas_radicado = models.Radicado(numero=number, usuario_id=saas_owner.id)
+        other_saas_radicado = models.Radicado(numero=number, usuario_id=other_saas_owner.id)
+        db.add_all([firm_radicado, saas_radicado, other_saas_radicado])
+        db.flush()
+
+        firm_radicado.usuarios_vinculados.append(firm_colleague)
+        db.flush()
+
+        assert firm_radicado.ambito_key == "FIRMA"
+        assert firm_radicado.numero_normalizado == number
+        assert {user.id for user in firm_radicado.usuarios_vinculados} == {
+            firm_owner.id,
+            firm_colleague.id,
+        }
+        assert saas_radicado.ambito_key == f"SAAS:{saas_owner.id}"
+        assert other_saas_radicado.ambito_key == f"SAAS:{other_saas_owner.id}"
+
+        db.add(models.Radicado(numero=number, usuario_id=saas_owner.id))
+        with pytest.raises(IntegrityError):
+            db.flush()
+
+
+def test_obtener_o_vincular_radicado_reuses_only_within_scope():
+    engine = create_engine("sqlite:///:memory:")
+    models.Base.metadata.create_all(engine)
+
+    with Session(engine) as db:
+        firm_owner = models.Usuario(
+            email="linked-firm-owner@example.test",
+            password_hash="hash",
+            nombre_completo="Firm owner",
+            whatsapp_numero="0000000121",
+            rol=models.RolUsuario.ABOGADO_ADMIN,
+            estado=models.EstadoUsuario.ACTIVO,
+        )
+        firm_colleague = models.Usuario(
+            email="linked-firm-colleague@example.test",
+            password_hash="hash",
+            nombre_completo="Firm colleague",
+            whatsapp_numero="0000000122",
+            rol=models.RolUsuario.ABOGADO_ADMIN,
+            estado=models.EstadoUsuario.ACTIVO,
+        )
+        saas_owner = models.Usuario(
+            email="linked-saas-owner@example.test",
+            password_hash="hash",
+            nombre_completo="SaaS owner",
+            whatsapp_numero="0000000123",
+            rol=models.RolUsuario.ABOGADO,
+            estado=models.EstadoUsuario.ACTIVO,
+        )
+        db.add_all([firm_owner, firm_colleague, saas_owner])
+        db.flush()
+
+        number = "12345678901234567890123"
+        firm_radicado, created = obtener_o_vincular_radicado(db, firm_owner, number)
+        same_firm_radicado, created_again = obtener_o_vincular_radicado(
+            db, firm_colleague, number
+        )
+        saas_radicado, created_saas = obtener_o_vincular_radicado(db, saas_owner, number)
+        db.commit()
+
+        assert created is True
+        assert created_again is False
+        assert same_firm_radicado.id == firm_radicado.id
+        assert created_saas is True
+        assert saas_radicado.id != firm_radicado.id
+        assert {user.id for user in firm_radicado.usuarios_vinculados} == {
+            firm_owner.id,
+            firm_colleague.id,
+        }
+
+
+def test_canonical_radicado_migration_merges_firm_duplicates_and_preserves_references():
+    engine = create_engine("sqlite:///:memory:")
+    legacy_metadata = MetaData()
+    users = Table(
+        "usuarios",
+        legacy_metadata,
+        Column("id", Integer, primary_key=True),
+        Column("rol", String(30), nullable=False),
+    )
+    legacy_radicados = Table(
+        "radicados",
+        legacy_metadata,
+        Column("id", Integer, primary_key=True),
+        Column("numero", String(40), nullable=False),
+        Column("usuario_id", Integer, ForeignKey("usuarios.id"), nullable=False),
+        Column("estado_consulta", String(50)),
+        Column("despacho_departamento", String(255)),
+        Column("demandante", String(255)),
+        Column("demandado", String(255)),
+        Column("consultado_en", String(50)),
+        Column("alerta_enviada", Boolean),
+        Column("detalle_pendiente", String),
+        Column("created_at", String(50)),
+    )
+    procesos = Table(
+        "procesos",
+        legacy_metadata,
+        Column("id", Integer, primary_key=True),
+        Column("abogado_id", Integer, ForeignKey("usuarios.id"), nullable=False),
+    )
+    proceso_radicados = Table(
+        "procesos_radicados",
+        legacy_metadata,
+        Column("proceso_id", Integer, ForeignKey("procesos.id"), primary_key=True),
+        Column("radicado_id", Integer, ForeignKey("radicados.id"), primary_key=True),
+    )
+    actuaciones = Table(
+        "actuaciones",
+        legacy_metadata,
+        Column("id", Integer, primary_key=True),
+        Column("radicado_id", Integer, ForeignKey("radicados.id"), nullable=False),
+        Column("orden", Integer, nullable=False),
+        Column("fecha_actuacion", String(20)),
+        Column("actuacion", String),
+        Column("anotacion", String),
+        Column("fecha_inicia_termino", String(20)),
+        Column("fecha_finaliza_termino", String(20)),
+        Column("fecha_registro", String(20)),
+        Column("es_fijacion", Boolean),
+    )
+    consultas = Table(
+        "consultas_radicados",
+        legacy_metadata,
+        Column("id", Integer, primary_key=True),
+        Column("radicado_id", Integer, ForeignKey("radicados.id"), nullable=False),
+    )
+    tareas = Table(
+        "tareas",
+        legacy_metadata,
+        Column("id", Integer, primary_key=True),
+        Column("radicado_id", Integer, ForeignKey("radicados.id")),
+        Column("actuacion_id", Integer, ForeignKey("actuaciones.id")),
+    )
+    subtareas = Table(
+        "subtareas",
+        legacy_metadata,
+        Column("id", Integer, primary_key=True),
+        Column("radicado_id", Integer, ForeignKey("radicados.id")),
+        Column("actuacion_id", Integer, ForeignKey("actuaciones.id")),
+    )
+    legacy_metadata.create_all(engine)
+
+    number = "12345678901234567890123"
+    with engine.begin() as connection:
+        connection.execute(
+            insert(users),
+            [
+                {"id": 1, "rol": "ABOGADO_ADMIN"},
+                {"id": 2, "rol": "ABOGADO_ADMIN"},
+                {"id": 3, "rol": "ABOGADO"},
+                {"id": 4, "rol": "ABOGADO"},
+            ],
+        )
+        connection.execute(
+            insert(procesos),
+            [{"id": 50, "abogado_id": 1}, {"id": 51, "abogado_id": 2}],
+        )
+        connection.execute(
+            insert(legacy_radicados),
+            [
+                {"id": 10, "numero": number, "usuario_id": 1, "alerta_enviada": True},
+                {"id": 11, "numero": "123.456.789.012.345.678.901.23", "usuario_id": 2, "alerta_enviada": True},
+                {"id": 12, "numero": number, "usuario_id": 3, "alerta_enviada": True},
+                {"id": 13, "numero": number, "usuario_id": 4, "alerta_enviada": True},
+            ],
+        )
+        connection.execute(
+            insert(proceso_radicados),
+            [
+                {"proceso_id": 50, "radicado_id": 10},
+                {"proceso_id": 50, "radicado_id": 11},
+                {"proceso_id": 51, "radicado_id": 11},
+            ],
+        )
+        connection.execute(
+            insert(actuaciones),
+            [
+                {"id": 100, "radicado_id": 10, "orden": 1, "fecha_actuacion": "02/10/2026", "actuacion": "Publicación", "anotacion": "", "fecha_inicia_termino": "", "fecha_finaliza_termino": "", "fecha_registro": "02/10/2026", "es_fijacion": False},
+                {"id": 200, "radicado_id": 11, "orden": 1, "fecha_actuacion": "02/10/2026", "actuacion": "Publicación", "anotacion": "", "fecha_inicia_termino": "", "fecha_finaliza_termino": "", "fecha_registro": "02/10/2026", "es_fijacion": False},
+                {"id": 201, "radicado_id": 11, "orden": 2, "fecha_actuacion": "01/10/2026", "actuacion": "Auto", "anotacion": "", "fecha_inicia_termino": "", "fecha_finaliza_termino": "", "fecha_registro": "01/10/2026", "es_fijacion": False},
+            ],
+        )
+        connection.execute(insert(consultas), [{"id": 300, "radicado_id": 11}])
+        connection.execute(insert(tareas), [{"id": 400, "radicado_id": 11, "actuacion_id": 200}])
+        connection.execute(insert(subtareas), [{"id": 500, "radicado_id": 11, "actuacion_id": 200}])
+
+        preview = previsualizar_migracion_radicados(connection)
+        assert preview["duplicate_groups"] == 1
+        assert preview["rows_to_merge"] == 1
+        assert preview["invalid_rows"] == 0
+        assert preview["cross_scope_references"] == 0
+
+        connection.execute(insert(procesos), [{"id": 52, "abogado_id": 3}])
+        connection.execute(
+            insert(proceso_radicados),
+            [{"proceso_id": 52, "radicado_id": 10}],
+        )
+        unsafe_preview = previsualizar_migracion_radicados(connection)
+        assert unsafe_preview["cross_scope_references"] == 1
+        with pytest.raises(RuntimeError):
+            migrar_radicados_canonicos(connection)
+        assert "usuario_id" in {column["name"] for column in inspect(connection).get_columns("radicados")}
+
+        connection.execute(
+            delete(proceso_radicados).where(proceso_radicados.c.proceso_id == 52)
+        )
+        connection.execute(delete(procesos).where(procesos.c.id == 52))
+        report = migrar_radicados_canonicos(connection)
+
+        columns = {column["name"] for column in inspect(connection).get_columns("radicados")}
+        assert "usuario_id" not in columns
+        assert "creado_por_id" in columns
+        migrated = Table("radicados", MetaData(), autoload_with=connection)
+        cases = connection.execute(select(migrated)).mappings().all()
+        assert len(cases) == 3
+        firm_case = next(case for case in cases if case["ambito_key"] == "FIRMA")
+        assert firm_case["id"] == 10
+        assert firm_case["numero_normalizado"] == number
+
+        links = models.radicados_usuarios
+        firm_user_ids = set(
+            connection.execute(
+                select(links.c.usuario_id).where(links.c.radicado_id == firm_case["id"])
+            ).scalars()
+        )
+        assert firm_user_ids == {1, 2}
+        assert set(connection.execute(select(proceso_radicados)).all()) == {
+            (50, 10),
+            (51, 10),
+        }
+        assert connection.execute(select(consultas.c.radicado_id)).scalar_one() == 10
+        assert connection.execute(select(tareas.c.radicado_id, tareas.c.actuacion_id)).one() == (10, 100)
+        assert connection.execute(select(subtareas.c.radicado_id, subtareas.c.actuacion_id)).one() == (10, 100)
+        firm_actions = connection.execute(
+            select(actuaciones.c.id, actuaciones.c.orden, actuaciones.c.radicado_id)
+            .where(actuaciones.c.radicado_id == 10)
+            .order_by(actuaciones.c.orden)
+        ).all()
+        assert len(firm_actions) == 2
+        assert {row.radicado_id for row in firm_actions} == {10}
+        assert report["rows_to_merge"] == 1
 
 
 def test_manual_radicado_retry_reuses_original_arguments_and_consulta_id(monkeypatch):

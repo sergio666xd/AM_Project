@@ -209,6 +209,33 @@ Todas las rutas protegidas usan `Authorization: Bearer <token>`.
 - Redis para Celery y recordatorios.
 - Credenciales de almacenamiento compatible con S3/R2 si se probarán cargas de documentos o tarjetas.
 
+### Migración de radicados canónicos
+
+Antes de desplegar el esquema nuevo sobre una base existente, configura `DATABASE_URL` y ejecuta el preflight de solo lectura:
+
+```powershell
+python -m app.migrate_radicados_canonicos
+```
+
+Revisa los conteos. `invalid_rows`, `conflict_groups`, `cross_scope_references` y `unhandled_reference_tables` deben ser cero; si no, resuelve los casos antes de migrar. El preflight no modifica datos. La migración debe quedar aplicada antes de reabrir tráfico normal a la versión que consulta el esquema nuevo.
+
+Con un backup verificado, aplica la migración en una transacción:
+
+```powershell
+python -m app.migrate_radicados_canonicos --apply --backup-confirmed
+```
+
+La migración renombra `radicados.usuario_id` a `creado_por_id`, crea los vínculos usuario-radicado, fusiona duplicados solo dentro de `FIRMA` o del mismo propietario SaaS y redirige procesos, consultas, actuaciones, tareas y subtareas. Si detecta metadatos incompatibles, referencias no contempladas o números inválidos, aborta. Debe ejecutarse antes de desplegar el backend que usa el esquema nuevo.
+
+#### Ejecución desde Swagger
+
+El backend también expone estas operaciones ADMIN en `/docs`:
+
+- `GET /api/admin/migraciones/radicados/preview`: preflight de solo lectura.
+- `POST /api/admin/migraciones/radicados/aplicar`: aplica la migración únicamente si `RADICADO_MIGRATION_API_ENABLED=true` y el body contiene `{"confirmacion":"CONFIRMO_BACKUP_VERIFICADO"}`.
+
+Para producción, confirma primero que existe el backup. Despliega el código con el flag habilitado durante una ventana de mantenimiento, sin reabrir tráfico normal; autorízate como ADMIN en Swagger, revisa el preview, ejecuta el apply y confirma el resultado. Después deshabilita el flag y vuelve a desplegar. Reabre tráfico solo tras verificar el esquema migrado. No mantengas habilitada la ejecución de migraciones desde API.
+
 ### Backend
 
 ```powershell

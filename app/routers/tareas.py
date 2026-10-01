@@ -146,7 +146,9 @@ def validar_relaciones_tarea(datos, usuario_actual: models.Usuario, db: Session)
             )
             query = query.filter(
                 or_(
-                    models.Radicado.usuario_id == responsible_lawyer_id,
+                    models.Radicado.usuarios_vinculados.any(
+                        models.Usuario.id == responsible_lawyer_id
+                    ),
                     models.Radicado.id.in_(assigned_radicados),
                 )
             )
@@ -165,7 +167,9 @@ def validar_relaciones_tarea(datos, usuario_actual: models.Usuario, db: Session)
             )
             query = query.filter(
                 or_(
-                    models.Radicado.usuario_id == responsible_lawyer_id,
+                    models.Radicado.usuarios_vinculados.any(
+                        models.Usuario.id == responsible_lawyer_id
+                    ),
                     models.Radicado.id.in_(assigned_radicados),
                 )
             )
@@ -395,7 +399,7 @@ def crear_tarea(
     radicado_id = actuacion.radicado_id if datos.actuacion_id is not None and datos.radicado_id is None else datos.radicado_id
     responsable_id = usuario_actual.id
     if has_firm_wide_access(usuario_actual):
-        responsable_id = proceso.abogado_id if proceso is not None else radicado.usuario_id if radicado is not None else usuario_actual.id
+        responsable_id = proceso.abogado_id if proceso is not None else radicado.creado_por_id if radicado is not None else usuario_actual.id
     tarea = models.Tarea(
         usuario_id=responsable_id,
         radicado_id=radicado_id,

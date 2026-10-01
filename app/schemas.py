@@ -87,6 +87,10 @@ class AdminResourceUpdate(BaseModel):
     nombre_archivo: Optional[str] = None
 
 
+class AplicarMigracionRadicados(BaseModel):
+    confirmacion: Literal["CONFIRMO_BACKUP_VERIFICADO"]
+
+
 class AccionMasivaUsuarios(BaseModel):
     usuario_ids: list[int]
     estado: EstadoUsuario

@@ -254,7 +254,7 @@ def tarea_consultar_radicado(
 
         if nuevas:
 
-            usuario = radicado.usuario
+            usuario = radicado.creador
 
             if whatsapp_habilitado(usuario) and plan_whatsapp_habilitado(usuario, "notificaciones_whatsapp_procesos"):
 
@@ -567,10 +567,8 @@ def tarea_enviar_resumen_mensual():
 
             radicados = (
                 db.query(models.Radicado)
-                .filter(
-                    models.Radicado.usuario_id
-                    == usuario.id
-                )
+                .join(models.Radicado.usuarios_vinculados)
+                .filter(models.Usuario.id == usuario.id)
                 .all()
             )
 

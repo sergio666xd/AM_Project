@@ -1,181 +1,121 @@
-# Plan de refactorización
+# Plan: lanzadores Workflows para consultas y recordatorios
 
-## Alejandra Muñoz | Abogada y Asociados
+## Objetivo
 
-El producto tiene dos modalidades: (1) la firma interna Alejandra Muñoz | Abogada y Asociados, y (2) abogados externos individuales que se registran como SaaS y consumen un plan. No se soportan despachos externos con varios miembros ni una tabla genérica Tenant.
+Implementar en Vercel dos lanzadores durables: consultas periódicas de radicados y recordatorios individuales. Next.js inicia y orquesta los Workflows; FastAPI conserva la propiedad de la base de datos y la integración con la Rama Judicial.
 
-Estados: `[x]` hecho y verificado; `[~]` parcial; `[ ]` pendiente.
+## Alcance y reglas
 
-## Alcance objetivo
+- [X] La firma interna comparte recursos solo entre sus abogados autorizados. Las cuentas SaaS de abogados individuales permanecen aisladas por propietario; no se incorpora un modelo genérico de tenants ni equipos SaaS externos.
+- [X] No se almacenará una lista de IDs dentro de Usuario. La lista visible como `usuario.radicados` se persistirá mediante una relación Usuario-Radicado.
+- [ ] Confirmar antes de migrar la clave de deduplicación: fuente judicial + número normalizado + ámbito permitido. Propuesta: ficha compartida dentro de la firma y cada cuenta SaaS en su propio ámbito.
+- [X] Cada barrido consulta una vez cada ficha canónica de su ámbito. No se asume que la API de Rama tenga consulta masiva: cada radicado requiere llamadas propias.
+- [X] Horario visible para el admin: 12:00 y 17:00, hora de Colombia. Vercel Cron usa UTC: `0 17 * * 1-5` y `0 22 * * 1-5`, respectivamente. Hobby puede invocarlos en cualquier momento dentro de la hora programada (precisión de hasta ±59 minutos). Las horas quedan fijas en el despliegue; el admin puede activar el barrido y elegir días. Cambiar las horas desde la UI requiere otro scheduler/plan.
+- [X] Las tareas y subtareas conservan su responsable actual. Compartir la ficha del radicado no comparte tareas ni notas internas.
 
-- Firma interna fija: Alejandra Muñoz | Abogada y Asociados.
-- `ADMIN`: administrador de plataforma; puede gestionar el acceso SaaS y crear cuentas internas.
-- `ABOGADO_ADMIN`: abogado interno de la firma, creado solo por ADMIN y sin plan.
-- `ABOGADO`: abogado externo SaaS, único rol con registro público y plan obligatorio.
-- `CLIENTE`: usuario creado/asignado por un abogado; acceso solo a relaciones explícitas.
-- Los abogados SaaS individuales se aíslan por su `usuario_id`/owner existente; la firma interna es un espacio fijo y no comparte información con cuentas SaaS.
-- No crear una tabla para múltiples firmas externas. Conservar relaciones owner existentes y verificar que las consultas distingan modalidad.
+## Base ya validada
 
-## Fuera de alcance
+- [X] El probe de Next.js completó en Preview con `{ value: 7 }`; las rutas internas de Workflow se generan correctamente.
+- [X] El probe Python se retiró del branch de prueba para que el servicio Next no reciba workflows que no registra.
+- [ ] Implementar los lanzadores reales; el probe no realiza consultas ni programa recordatorios.
 
-- SaaS de despachos externos con equipos/membresías o selector de organización.
-- Planes para `ABOGADO_ADMIN`, ADMIN o CLIENTE de la firma.
-- Vercel como requisito de despliegue; el proveedor se decide según operación real.
+## Fases pendientes
 
-No borrar los datos ni las tablas SaaS hasta inventariarlos, respaldarlos y definir una migración reversible. El retiro de pantallas/rutas es gradual y solo después de confirmar que no son necesarias para la firma.
+### 1. Modelo canónico y migración
 
-## Política de acceso propuesta
+- [x] Definir ámbito de deduplicación: `FIRMA` compartida y `SAAS:<usuario_id>` aislado; normalizar a los 23 dígitos.
+- [x] Implementar ficha canónica por fuente/ámbito/número, la relación `Usuario.radicados` y la migración que renombra el propietario legacy a `creado_por_id`.
+- [ ] Ejecutar el preflight sobre la PostgreSQL objetivo, revisar sus conteos y aplicar con backup verificado. La PostgreSQL local no estaba disponible durante esta fase; no se tocó ninguna base real.
+- [x] Exponer preflight y apply desde Swagger bajo ADMIN; el apply requiere flag temporal, confirmación de backup y deja auditoría.
+- [ ] Ejecutar el apply real en ventana de mantenimiento; validar el esquema antes de reabrir tráfico.
+- [ ] Agregar y persistir el identificador de proceso que devuelve Rama (`idProceso`).
+- [x] Implementar preflight y fusión que preservan actuaciones, consultas, procesos, tareas, subtareas y vínculos; el test legacy sintético verifica referencias y duplicados.
+- [ ] Revisar los duplicados/conflictos que reporte la base objetivo antes del apply; abortar ante metadatos incompatibles o referencias cruzadas FIRMA/SAAS.
+- [x] Al quitar un radicado de un usuario, borrar solo la asociación; conservar la ficha canónica compartida.
+- [x] Proteger la creación concurrente con clave única por fuente/ámbito/número y crear o vincular dentro de un savepoint.
+- [ ] Hacer backup verificado y confirmar rollback antes de ejecutar la migración real.
 
-- ADMIN: acceso global administrativo a ambas modalidades.
-- ABOGADO_ADMIN: acceso interno a los recursos de la firma; sin `plan_id` requerido ni límites SaaS.
-- ABOGADO: acceso únicamente a sus recursos SaaS; los límites del plan se validan en backend.
-- CLIENTE: procesos/tareas/documentos asignados, tanto si lo gestiona la firma como un abogado SaaS.
-- Los IDs de propietario separan cuentas ABOGADO SaaS; las relaciones del proceso controlan el portal del cliente.
-- Mantener explícita la frontera entre ABOGADO SaaS y ABOGADO_ADMIN de la firma en cada query/API/UI.
+### 2. Sincronización idempotente con Rama Judicial
 
-## Estado actual
+- [ ] Normalizar el estado inicial a `SIN_CONSULTAR`. Para una ficha nueva o sin `idProceso`, buscar por número, guardar el ID y luego descargar actuaciones.
+- [ ] En las siguientes consultas, ir directamente a actuaciones por `idProceso`; repetir la búsqueda por número solo si falta ese ID.
+- [ ] Tratar los estados no encontrado, privado y error de API sin marcar como sincronización correcta ni bloquear el resto del lote.
+- [ ] Consultar primero las actuaciones recientes, paginar hasta el punto ya sincronizado cuando el orden de la API lo permita y deduplicar con clave estable en base de datos. Definir una reconciliación ocasional por si la API agrega actuaciones antiguas.
+- [ ] Aplicar concurrencia limitada, backoff y resultados independientes por radicado para no saturar Rama ni perder el resto del lote por un fallo.
 
-- [X] FastAPI, SQLAlchemy/PostgreSQL, Next.js, Celery/Redis y Cloudflare R2 existen.
-- [X] Procesos, radicados, clientes, tareas, subtareas, recordatorios, documentos y notificaciones ya tienen implementación parcial.
-- [X] Login local operativo con JWT/CORS configurados en `.env`; el secreto no se versiona.
-- [X] WhatsApp Web/Playwright se retiró; los mensajes salen por la API configurada.
-- [~] Verificación actual: 35 pruebas aprobadas, `compileall app tests` y TypeScript; ESLint de cliente pasa, mientras la pantalla abogado conserva un diagnóstico preexistente en su efecto de carga.
+### 3. Lanzador de consultas periódicas
 
-- [X] Planes y solicitudes SaaS se conservan y se usan en el onboarding de ABOGADO externo; no se purgaron datos existentes.
+- [ ] Registrar dos Cron protegidos en Vercel para los slots de Hobby: lunes a viernes, `0 17 * * 1-5` y `0 22 * * 1-5` (UTC). El handler valida secreto, día y slot antes de iniciar un Workflow.
+- [ ] Guardar en la DB la configuración del barrido: activo/inactivo y días habilitados. El Cron diario consulta esa configuración y no ejecuta si el día está deshabilitado.
+- [ ] El Workflow crea/actualiza un registro de ejecución, obtiene los radicados canónicos del ámbito y coordina su consulta. Añadir idempotencia por fecha/slot, prevención de solapamiento por radicado, progreso y errores.
+- [ ] Llamar a FastAPI mediante comunicación interna autenticada. El endpoint debe ejecutar el servicio de consulta/persistencia directamente, no encolar las tareas Celery actuales.
+- [ ] Añadir al panel ADMIN configuración de días/estado, última y próxima ejecución, progreso, errores y botón `Consultar ahora`. El botón usa el mismo flujo marcado como manual.
 
-- [X] Inventario agregado sin PII: 2 ADMIN activos, 1 ABOGADO_ADMIN activo, 1 ABOGADO activo con plan, 1 ABOGADO pendiente sin plan y 1 CLIENTE activo; 1 proceso, 9 radicados (6 SaaS, 2 ADMIN, 1 interno), 2 tareas SaaS y 2 planes activos.
-- [X] Mapeo conservador: ABOGADO activo conserva sus datos SaaS; ABOGADO_ADMIN conserva el proceso/radicado interno sin plan; ADMIN global; CLIENTE asignado; ABOGADO pendiente sigue pendiente.
+### 4. Cruce y envío de novedades
 
-- [X] Política híbrida definida: ADMIN global; ABOGADO_ADMIN acceso interno sin plan; ABOGADO acceso SaaS aislado por owner y sujeto a plan; CLIENTE por asignación.
-- [~] El portal cliente y relaciones proceso-documento requieren pruebas de extremo a extremo.
-- [~] El registro público requiere credenciales R2 para completar la carga de tarjeta profesional; no están configuradas en el entorno local.
+- [ ] Persistir cada actuación nueva una vez en la ficha canónica.
+- [ ] Encontrar los abogados vinculados dentro del ámbito y evaluar por separado rol, plan y preferencias de cada destinatario.
+- [ ] Inventariar todos los tipos de mensaje actuales y futuros (actuaciones, asignaciones de tareas/subtareas, recordatorios, documentos y resúmenes); aplicarles una política común sin omitir productores de notificaciones.
+- [ ] En Configuración, permitir a cada usuario no CLIENTE activar email y WhatsApp independientemente para cada tipo de mensaje. Respetar disponibilidad del canal, datos de contacto y límites del plan.
+- [ ] Para CLIENTE, reemplazar las preferencias por tipo por la selección de un canal obligatorio (email o WhatsApp): entregar en ese canal todas las alertas que le correspondan, sin opt-out por tipo. No emitir alertas fuera de sus asignaciones/relaciones autorizadas.
+- [ ] Definir la precedencia de la regla obligatoria del CLIENTE frente a `Subtarea.notificar_email`, `Subtarea.notificar_whatsapp` y controles de envío por evento; validar el canal seleccionado y resolver explícitamente el caso de contacto inválido o faltante.
+- [ ] Migrar `Usuario.notificaciones_email` y `Usuario.notificaciones_whatsapp` a valores iniciales por tipo que conserven el comportamiento vigente hasta que cada usuario los cambie; retirar los flags globales solo cuando ningún productor dependa de ellos.
+- [ ] Mostrar una matriz de preferencias por tipo para usuarios no CLIENTE y un selector de canal obligatorio para CLIENTE; no ofrecer al cliente interruptores que puedan suprimir alertas que le corresponden.
+- [ ] Si un radicado tiene varias actuaciones nuevas, informar cuántas se detectaron y mostrar el detalle solo de la más reciente; conservar todas las actuaciones en la DB.
+- [ ] Al terminar un barrido, agrupar los procesos con novedades por usuario y enviar un único mensaje consolidado por usuario y canal habilitado. Incluir una sección por proceso, con el número de actuaciones nuevas y el detalle de su más reciente; omitir procesos sin novedades.
+- [ ] Aplicar el mismo formato a consultas manuales; cuando se consulten varios procesos en una acción manual, consolidar por usuario igual que en el barrido.
+- [ ] Enviar WhatsApp y email cuando estén habilitados. El envío actual de novedades consulta WhatsApp; falta integrar email para este flujo.
+- [ ] Registrar entrega por actuación, usuario y canal con idempotencia/reintentos. Un fallo de notificación no debe volver a consultar ni duplicar las demás alertas.
 
-- [~] No existe sistema de migraciones versionado; el nuevo campo de archivo usa una migración aditiva idempotente al iniciar el backend. Falta documentar backup/rollback.
+### 5. Lanzador individual de recordatorios
 
-## Hoja de ruta
+- [ ] Al crear un recordatorio, guardarlo y emitir de forma confiable el evento que inicia su Workflow. Resolver la frontera DB/inicio mediante outbox o mecanismo de reconciliación.
+- [ ] Calcular la fecha de ejecución desde `fecha_hora` o desde `fecha_limite - anticipacion_minutos`, respetando la zona horaria acordada.
+- [ ] El Workflow espera hasta la fecha; antes de notificar vuelve a leer DB y verifica que el recordatorio siga activo, pendiente, vigente y asociado a una tarea válida.
+- [ ] Edición, reprogramación, desactivación o eliminación deben invalidar la versión anterior; reintentos nunca duplican el envío. Definir canales disponibles; hoy el modelo permite WhatsApp.
+- [ ] Migrar el procesamiento actual Celery/QStash solo después de probar el Workflow, evitando que ambos mecanismos envíen el mismo recordatorio.
 
-### Fase 1. Reencuadre y auditoría de datos `[x]`
+### 6. Consola operativa ADMIN y agenda de la firma
 
-- [X] Confirmar una firma interna más cuentas SaaS individuales; no se soportan despachos SaaS con varios miembros.
-- [X] Documentar módulos, rutas, roles, riesgos y estado de pruebas en la auditoría previa.
-- [X] Obtener conteos agregados de cuentas y recursos sin revelar información personal.
-- [x] Inventariar usuarios y distinguir la cuenta ABOGADO SaaS de la cuenta ABOGADO_ADMIN interna, sin alterar sus recursos.
-- [x] Identificar consumidores frontend de planes/registro en el portal SaaS y separarlos del sitio institucional de la firma.
-- [x] Diferenciar el sitio raíz de la firma del portal SaaS `/gestion-procesos`.
-- [x] Identificar registros SaaS a preservar: dos planes, dos solicitudes; no hay registros de interés.
+- [ ] Añadir al panel ADMIN un apartado de operación para iniciar consultas manuales de todos los radicados o de una selección, reutilizando el mismo Workflow y controles de idempotencia.
+- [ ] Mostrar ejecuciones manuales y automáticas con estado, progreso, hora de inicio/fin, radicados consultados, novedades, errores y opción segura de reintento cuando aplique.
+- [ ] Añadir pruebas diagnósticas de las integraciones configuradas: API de Rama Judicial, Workflow, WhatsApp, SMTP y otros servicios que se incorporen. Separar verificar conexión/configuración de enviar un mensaje real.
+- [ ] Proteger las pruebas de envío real: solo ADMIN, destinatario de prueba explícito, confirmación antes del envío, resultado sin exponer credenciales y registro de auditoría.
+- [ ] Añadir al dashboard ADMIN la agenda general de la firma con vista calendario y listado de tareas asociadas a abogados internos (`ABOGADO_ADMIN`), incluyendo responsable, cliente/proceso/radicado, estado y vencimiento.
+- [ ] Filtrar la agenda por rango/mes, abogado responsable, estado y vencimientos; permitir abrir el contexto autorizado de la tarea sin exponer tareas ni datos de abogados SaaS individuales.
+- [ ] Definir si la agenda ADMIN es de solo lectura o permite reasignar/actualizar tareas; cualquier mutación debe respetar permisos y quedar auditada.
 
-### Fase 2. Seguridad híbrida `[~]`
+### 7. Pruebas y despliegue gradual
 
-- [X] Eliminar CORS wildcard; usar allowlist configurable.
-- [X] Evitar exposición de secretos R2 en logs y restringir el diagnóstico de Redis.
-- [X] Retirar la ruta admin duplicada y corregir el filtro roto del job mensual.
-- [X] Mantener acceso cliente limitado y agregar filtros de relaciones cruzadas para procesos, tareas y documentos.
-- [X] Asegurar que el login local funcione y que WhatsApp use solo la API.
-- [X] Evitar una entidad Tenant genérica; separar cuentas SaaS ABOGADO por owner y la firma fija por ABOGADO_ADMIN.
-- [X] Registro público, catálogo y formulario habilitados solo para ABOGADO externo con plan activo.
-- [X] Dashboard SaaS habilitado para ABOGADO; ABOGADO_ADMIN usa el panel interno de la firma.
-- [X] Límites de radicados, actuaciones y notificaciones aplican solo a ABOGADO SaaS; ABOGADO_ADMIN no requiere plan.
+- [ ] Probar migración con duplicados: un radicado compartido dentro del ámbito produce una ficha y una consulta externa, pero mantiene tareas y destinatarios separados; quitar un vínculo no afecta a los demás.
+- [ ] Probar primera búsqueda por número, persistencia de `idProceso` y consultas posteriores directas a actuaciones; cubrir paginación, privacidad, no encontrado, reintentos y errores parciales.
+- [ ] Probar Cron en los dos slots, días deshabilitados, disparo manual, redelivery, ejecución concurrente y autenticación servicio-a-servicio.
+- [ ] Probar recordatorios concretos y por anticipación, además de reprogramar, desactivar, eliminar, completar tarea y reintentar sin duplicar notificaciones.
+- [ ] Usar destinatarios simulados en Preview; habilitar producción por etapas y verificar ejecuciones, consumo de Rama y entregas antes de iniciar el retiro de Celery/QStash.
+- [ ] Eliminar el endpoint y workflow temporales `workflow-probe` cuando los lanzadores reales estén validados.
 
-- [~] Cobertura de autorización: 21 pruebas SQLite verifican reglas y consultas; faltan tests HTTP integrales para ambas modalidades y límites de plan. Los rate limits de captación/recuperación son locales al proceso; usar Redis o WAF con varias réplicas.
+### 8. Retiro de infraestructura y dependencias sustituidas
 
-- [X] Separar ADMIN global, ABOGADO_ADMIN interno, ABOGADO SaaS y CLIENTE asignado; restan pruebas de no-filtración entre la firma y cuentas externas.
-- [~] Revisar descargas, lecturas sensibles, trabajos Celery, uploads y enlaces históricos.
-- [ ] Revisar el uso de `localStorage` para JWT y definir protección de sesión compatible con el frontend.
+- [ ] Inventariar cada tarea Celery, productor y schedule antes del corte: consultas individuales y por lote, recordatorios, notificaciones de email/WhatsApp y resumen mensual.
+- [ ] Migrar o reemplazar cada productor consumidor por Workflow u otro mecanismo acordado. No retirar Celery/Redis mientras quede una ruta que invoque `.delay()` o dependa del worker.
+- [ ] Tras validar el nuevo flujo de recordatorios en producción, desactivar la schedule de QStash y confirmar que no quedan entregas pendientes; luego retirar el endpoint QStash, verificación de firmas, paquete `qstash`, variables y documentación de Upstash.
+- [ ] Tras migrar todos los trabajos Celery, detener Beat/workers y confirmar que no quedan tareas en vuelo ni llamadas `.delay()` activas.
+- [ ] Si ya no existe otro consumidor, retirar Redis/Celery: dependencias Python, configuración `app/celery_app.py`, endpoint de diagnóstico Redis, indicador del panel ADMIN y servicio Redis del entorno local.
+- [ ] Limpiar `REDIS_URL`, secretos/variables QStash y referencias operativas de `.env.example`, Vercel, Docker Compose y README; conservar solo las variables todavía utilizadas.
+- [ ] Verificar con búsqueda global que no queden imports, endpoints, schedules, instrucciones o dependencias de Redis/Celery/QStash. Respaldar o confirmar como descartables los archivos locales de estado de Celery Beat antes de borrarlos.
 
-### Fase 3. Usuarios, contraseñas y onboarding `[x]`
+## Criterios de salida
 
-- [X] Alta interna de `ABOGADO_ADMIN` reservada a ADMIN; abogados internos y SaaS crean clientes vinculados a su alcance.
-- [X] Mantener registro público solo para ABOGADO SaaS; alta de ABOGADO_ADMIN y CLIENTE se reserva a ADMIN.
-- [X] Cambio obligatorio de contraseña temporal y flujo UI/API de recuperación implementados; verificar entrega real cuando SMTP esté configurado.
-- [X] Mapear los registros actuales antes de cambiar roles; no se cambiaron ni borraron cuentas durante el reencuadre.
-- [X] Mantener solicitud y tarjeta profesional solo en el registro de abogados SaaS; no exigirlas a los roles internos.
-- [X] Clientes solicitan cambios de correo, nombre y WhatsApp; responsable asignado o ADMIN los aprueba/rechaza, mientras las preferencias de notificación siguen siendo autogestionables.
-
-### Fase 4. Datos y modelo jurídico `[x]`
-
-- [X] Conservar la separación proceso/radicado y asociaciones existentes.
-
-- [X] Mantener `Proceso.abogado_id` como responsable; el alcance de los enlaces cliente/radicado ahora distingue dueño SaaS de firma interna.
-
-- [X] Mantener un responsable único por proceso y permitir que el responsable/admin asigne abogados internos `ABOGADO_ADMIN` como colaboradores; las asignaciones se auditan y SaaS no admite equipos.
-- [X] Restringir lectura y operación del colaborador a procesos activos asignados; solo el responsable o ADMIN administra el equipo, cambia datos básicos o archiva/restaura el proceso.
-- [X] ADMIN puede reasignar el responsable dentro del mismo rol/sector; se bloquean transferencias entre Firma y SaaS.
-- [X] Bloquear nuevas asociaciones cruzadas de clientes/radicados entre SaaS y firma, conservando colaboración interna; la prueba cubre ambas direcciones.
-- [X] Auditoría agregada actual: cero enlaces cruzados de cliente/radicado y cero inconsistencias tarea-proceso-cliente-radicado/documento-solicitud.
-- [X] No agregar estados, partes ni tipos jurídicos nuevos: no se identificó un flujo real que los requiera.
-- [X] Archivar procesos sin borrado físico; ocultar sus tareas/documentos del uso activo y permitir restauración auditada. Migración aditiva, sin modificar registros existentes.
-
-### Fase 5. Espacio de trabajo de la firma `[x]`
-
-- [X] Conservar `app/gestion-procesos/abogado` como workspace canónico compartido para `ABOGADO_ADMIN` y `ABOGADO`; ADMIN y el portal restringido CLIENTE mantienen áreas separadas.
-
-- [X] El resumen compartido conserva procesos/clientes/tareas y, para SaaS, plan/cuota, alertas y consultas recientes.
-
-- [X] Unificar inicio y shell de abogados; `/dashboard` redirige al workspace compartido y desaparece como segundo inicio.
-- [X] Navegación dinámica por rol con flujos SaaS de radicados/tareas preservados bajo el mismo shell; las llamadas de ADMIN, abogado, SaaS y cliente usan el transporte compartido para auth, errores HTTP/red, multipart y descargas.
-- [X] Los layouts protegen acceso por rol; backend sigue siendo autoridad para plan, owner y permisos.
-
-### Fase 6. Expediente, documentos y comunicaciones `[~]`
-
-- [X] Procesos, radicados, tareas, solicitudes documentales y cargas R2 existen.
-
-- [X] Ficha del proceso con solicitudes, estado de entrega, documentos descargables y notificaciones recientes; permite solicitar archivos y enviar avisos vinculados a actuación/cliente.
-
-- [X] Inventario documental con búsqueda por nombre, proceso, cliente y tipo MIME; solicitudes filtrables por texto y estado.
-- [ ] Completar una timeline cronológica unificada del expediente; el historial actual de avisos de actuaciones está en un módulo separado.
-- [~] Carga limita a 15 MB y valida firmas de PDF/JPEG/PNG/DOCX; descargas autenticadas, limitadas al ámbito asignado y auditadas. Si falla la transacción de metadatos, se revierte y se intenta borrar el objeto de R2; una prueba cubre éxito, rollback y fallo de limpieza sin ocultar el error original. Falta verificar el bucket R2 real, definir retención/limpieza periódica y decidir si se exige análisis antivirus.
-- [~] Portal cliente lista y entrega/descarga documentos de procesos asignados sin anotaciones internas. Hay pruebas de permisos por funciones de backend, pero faltan pruebas HTTP autenticadas de extremo a extremo.
-
-### Fase 7. Agenda y trabajo jurídico `[~]`
-
-- [X] Agenda de tareas por vencimiento y recordatorios en la vista de agenda; resúmenes de abogado y cliente incluyen calendario mensual basado en tareas existentes, sin crear modelos ni calcular plazos jurídicos.
-- [X] Tareas y subtareas permiten asignación general/proceso/radicado/actuación, asignación opcional al cliente y canales configurables de email/WhatsApp; el portal cliente solo lista sus subtareas asignadas y muestra su ámbito.
-- [~] Confirmar con la firma si requiere audiencias y términos; no se calculan días hábiles ni plazos legales automáticamente.
-- [ ] Si se aprueba: diseñar eventos vinculados a procesos, reglas de días hábiles configurables y alertas.
-- [ ] Probar calendarios/reglas jurídicas con casos revisados por la firma.
-
-### Fase 8. Administración y auditoría `[~]`
-
-- [X] Consola ADMIN rehecha con shell, resumen, usuarios, planes, solicitudes, auditoría y operación.
-
-- [X] Panel Administrativo separa en navegación `Control global`, `Firma`, `SaaS individual` y `Contenido público`, mostrando el ámbito en curso.
-- [X] Inventarios de procesos/radicados/tareas/documentos aceptan sectores backend `FIRMA`, `SAAS` y `GLOBAL`; la prueba confirma que no mezclan propietarios.
-- [X] Contenido público editable para ocho páginas con JSON estructurado, allowlist, fallback, restauración y auditoría de cambios.
-- [X] Inventarios FIRMA/SAAS/GLOBAL permiten crear, editar y retirar procesos, radicados y tareas con responsable validado; los procesos se archivan y restauran sin borrado físico.
-- [X] Documentos permiten crear con carga autenticada a R2, editar metadatos, descargar, eliminar y emitir URLs firmadas de 15 minutos con auditoría; la creación exige responsable, proceso activo y cliente del sector.
-- [X] SMTP codifica explícitamente en UTF-8 y `.env` se carga desde la raíz del proyecto antes de inicializar la conexión y servicios.
-- [~] Usuarios y planes tienen alta/edición/estado; las transiciones de rol de cuentas existentes no están habilitadas para evitar cambiar su ámbito propietario desde el panel.
-- [X] Solicitudes SaaS permiten revisar tarjeta privada, aprobar/rechazar individualmente o en lote, asignar plan y auditar las decisiones.
-- [X] ADMIN puede encolar consultas individuales o de todos los radicados del ámbito seleccionado; las acciones quedan auditadas.
-- [X] ADMIN puede forzar el borrado de radicados con historial; desaparecen actuaciones, consultas, tareas y vínculos, mientras se conservan procesos/documentos R2.
-- [X] La cuenta ADMIN puede actualizar correo/nombre/WhatsApp y cambiar contraseña con autenticación actual.
-- [~] Se registran varias mutaciones; la auditoría aún no cubre todas las lecturas sensibles ni jobs.
-
-- [ ] Completar auditoría de cambios y acciones extraordinarias sin guardar contraseñas ni contenido sensible.
-- [ ] Mantener actividad por responsable y expediente para trazabilidad.
-
-### Fase 9. Operación, pruebas y producción `[~]`
-
-- [X] PostgreSQL, Redis, Celery y R2 están configurados para operación local.
-- [X] Login y CORS del entorno local verificados.
-
-- [X] El procesador compartido de recordatorios puede ser llamado por Celery o QStash; serializa fecha local como UTC, confirma envíos y usa `FOR UPDATE SKIP LOCKED` para evitar ejecuciones concurrentes duplicadas en PostgreSQL.
-- [X] El endpoint QStash valida `Upstash-Signature` con ambas signing keys y la URL pública exacta; una prueba confirma rechazo de firma inválida sin procesar recordatorios.
-- [~] El retry de consulta manual reenvía la firma original y conserva `consulta_id` tras errores 503; quedan revisiones de destinatarios y tareas mensuales.
-
-- [~] Despliegue objetivo Vercel con QStash para recordatorios; falta asignar el dominio público a `QSTASH_ENDPOINT_URL` y crear en Upstash la schedule POST `CRON_TZ=America/Bogota * * * * *`. Sin esos pasos no habrá ejecución periódica en producción.
-- [ ] Añadir migraciones versionadas, backups y procedimiento de rollback antes de cambios de datos.
-- [ ] Completar pruebas API con entorno aislado, flujos frontend por rol y checks de regresión.
-- [ ] Documentar `.env`, rotación de secretos, servicios y pasos de recuperación.
-
-## Siguiente bloque
-
-Definir si ADMIN debe cargar documentos fuera del flujo de solicitudes y qué controles aplican a cambios de rol/propietario; ampliar después pruebas HTTP y cobertura de auditoría para esas decisiones.
-
-## Reglas
-
-- No crear tablas/abstracciones multi-tenant.
-- No eliminar roles, planes ni datos hasta completar inventario y migración reversible.
-- Mantener acceso de cliente por asignación, aunque la organización sea única.
-- Trabajar por flujos pequeños: prueba, cambio, validación y actualización de este plan.
-- No avanzar a módulos nuevos hasta cerrar identidad, permisos y estabilidad del núcleo.
+- [ ] No existen fichas duplicadas dentro del ámbito acordado y la base impide recrearlas bajo concurrencia.
+- [ ] `SIN_CONSULTAR` hace la búsqueda inicial y guarda `idProceso`; las consultas posteriores omiten esa búsqueda.
+- [ ] Los Cron procesan lunes a viernes en los slots visibles 12:00/17:00 Colombia (`0 17 * * 1-5` y `0 22 * * 1-5` UTC) dentro de la ventana permitida por Hobby; admin puede habilitar días y ejecutar manualmente.
+- [ ] Si un proceso trae varias actuaciones nuevas, se informa el total y solo se detalla la más reciente.
+- [ ] Si varios procesos del mismo barrido tienen novedades, cada usuario recibe un único mensaje consolidado por canal, con resumen independiente por proceso y sin incluir procesos sin novedades.
+- [ ] Usuarios no CLIENTE controlan email y WhatsApp por separado para cada tipo; CLIENTE recibe todas sus alertas aplicables en su canal obligatorio elegido, sin filtros por tipo.
+- [ ] Las preferencias, disponibilidad de canal, alcance de destinatarios y límites del plan se aplican coherentemente a todos los productores de mensajes; las migraciones conservan preferencias existentes.
+- [ ] ADMIN puede iniciar y seguir consultas manuales, probar integraciones sin exponer secretos ni enviar mensajes no confirmados y consultar el calendario agregado de tareas de abogados internos.
+- [ ] La agenda ADMIN incluye las tareas de la firma y excluye tareas privadas de abogados SaaS individuales.
+- [ ] Las novedades se consultan una vez por ficha canónica y se notifican solo a los destinatarios elegibles, sin duplicados.
+- [ ] Crear un recordatorio programa su Workflow; cambios, cancelaciones y reintentos no producen envíos obsoletos ni duplicados.
+- [ ] Cada error queda trazado por ejecución/radicado/destinatario, sin detener el resto del lote ni cruzar datos entre la firma y cuentas SaaS individuales.
+- [ ] Redis, Celery y QStash solo se eliminan cuando todos sus productores y consumidores hayan migrado, las schedules estén apagadas y no haya trabajos pendientes; después no quedan referencias operativas ni dependencias sin uso.

@@ -24,6 +24,7 @@ from app.routers import admin
 from app.security import obtener_usuario_actual
 from app.routers import admin, tareas, expedientes
 from app.tasks import procesar_recordatorios_tareas
+from app.radicados import obtener_o_vincular_radicado
 from app.firm_access import require_roles
 from app.audit import registrar_evento_auditoria
 from app.firm_access import has_firm_wide_access, lawyer_process_ids, lawyer_scope_id
@@ -539,7 +540,7 @@ def obtener_dashboard(
     # ---------------------------------------------------------
     radicados = (
         db.query(models.Radicado)
-        .filter(models.Radicado.usuario_id == usuario_actual.id)
+        .filter(models.Radicado.usuarios_vinculados.any(models.Usuario.id == usuario_actual.id))
         .all()
     )
 
@@ -561,7 +562,7 @@ def obtener_dashboard(
             models.ConsultaRadicado.radicado_id == models.Radicado.id,
         )
         .filter(
-            models.Radicado.usuario_id == usuario_actual.id,
+            models.Radicado.usuarios_vinculados.any(models.Usuario.id == usuario_actual.id),
             models.ConsultaRadicado.estado.in_(
                 ["ENCOLADA", "EJECUTANDO"]
             ),
@@ -579,7 +580,7 @@ def obtener_dashboard(
             models.ConsultaRadicado.radicado_id == models.Radicado.id,
         )
         .filter(
-            models.Radicado.usuario_id == usuario_actual.id,
+            models.Radicado.usuarios_vinculados.any(models.Usuario.id == usuario_actual.id),
             models.ConsultaRadicado.actuaciones_nuevas > 0,
         )
         .all()
@@ -600,7 +601,7 @@ def obtener_dashboard(
             models.ConsultaRadicado.radicado_id == models.Radicado.id,
         )
         .filter(
-            models.Radicado.usuario_id == usuario_actual.id,
+            models.Radicado.usuarios_vinculados.any(models.Usuario.id == usuario_actual.id),
             models.ConsultaRadicado.estado == "ERROR",
         )
         .count()
@@ -658,7 +659,7 @@ def obtener_dashboard(
             models.ConsultaRadicado.radicado_id == models.Radicado.id,
         )
         .filter(
-            models.Radicado.usuario_id == usuario_actual.id
+            models.Radicado.usuarios_vinculados.any(models.Usuario.id == usuario_actual.id)
         )
         .order_by(models.ConsultaRadicado.inicio.desc())
         .limit(10)
@@ -857,7 +858,7 @@ def radicados_visibles(usuario: models.Usuario, db: Session):
     )
     return query.filter(
         or_(
-            models.Radicado.usuario_id == responsible_lawyer_id,
+            models.Radicado.usuarios_vinculados.any(models.Usuario.id == responsible_lawyer_id),
             models.Radicado.id.in_(assigned_radicados),
         )
     )
@@ -878,31 +879,22 @@ def agregar_radicado(
 
     if usuario_actual.rol == models.RolUsuario.ABOGADO and usuario_actual.plan is None:
         raise HTTPException(status_code=403, detail="Tu cuenta SaaS necesita un plan activo para agregar radicados.")
-    if usuario_actual.rol == models.RolUsuario.ABOGADO:
-        total_registrados = db.query(models.Radicado).filter(models.Radicado.usuario_id == usuario_actual.id).count()
-        if total_registrados >= usuario_actual.plan.limite_radicados:
-            raise HTTPException(status_code=400, detail="Has alcanzado el límite de radicados de tu plan.")
 
-    existente = (
-        db.query(models.Radicado)
-        .filter(
-            models.Radicado.numero == radicado_in.numero,
-            models.Radicado.usuario_id == usuario_actual.id,
+    try:
+        nuevo_radicado, creado = obtener_o_vincular_radicado(
+            db, usuario_actual, radicado_in.numero
         )
-        .first()
-    )
-    if existente:
-        raise HTTPException(status_code=400, detail="Este radicado ya está registrado en la firma.")
-
-    # 4. Guardar el nuevo radicado
-    nuevo_radicado = models.Radicado(
-        numero=radicado_in.numero,
-        usuario_id=usuario_actual.id,
-        estado_consulta="sin consultar",
-    )
-    db.add(nuevo_radicado)
-    db.flush()
-    registrar_evento_auditoria(db, usuario_actual, "radicado.crear", "radicado", nuevo_radicado.id)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    if usuario_actual.rol == models.RolUsuario.ABOGADO:
+        total_registrados = db.query(models.Radicado).join(
+            models.Radicado.usuarios_vinculados
+        ).filter(models.Usuario.id == usuario_actual.id).count()
+        if total_registrados > usuario_actual.plan.limite_radicados:
+            db.rollback()
+            raise HTTPException(status_code=400, detail="Has alcanzado el límite de radicados de tu plan.")
+    accion = "radicado.crear" if creado else "radicado.vincular"
+    registrar_evento_auditoria(db, usuario_actual, accion, "radicado", nuevo_radicado.id)
     db.commit()
     db.refresh(nuevo_radicado)
 
@@ -962,13 +954,13 @@ def eliminar_radicado(
 
     if not radicado:
         raise HTTPException(status_code=404, detail="Radicado no encontrado en tu alcance.")
-    if usuario_actual.rol == models.RolUsuario.ABOGADO and radicado.usuario_id != usuario_actual.id:
-        raise HTTPException(status_code=403, detail="Solo puedes eliminar radicados bajo tu responsabilidad.")
+    if not any(vinculado.id == usuario_actual.id for vinculado in radicado.usuarios_vinculados):
+        raise HTTPException(status_code=403, detail="No tienes un vínculo directo con este radicado.")
 
-    registrar_evento_auditoria(db, usuario_actual, "radicado.eliminar", "radicado", radicado.id)
-    db.delete(radicado)
+    radicado.usuarios_vinculados.remove(usuario_actual)
+    registrar_evento_auditoria(db, usuario_actual, "radicado.desvincular", "radicado", radicado.id)
     db.commit()
-    return {"mensaje": f"Radicado {radicado.numero} eliminado correctamente."}
+    return {"mensaje": f"Radicado {radicado.numero} retirado de tu lista."}
 
 from app.tasks import tarea_consultar_radicado
 
