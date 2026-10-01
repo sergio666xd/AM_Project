@@ -168,6 +168,7 @@ def ejecutar_consulta_api_radicado(db: Session, radicado_obj: models.Radicado) -
         id_proceso = proceso.get("idProceso")
         if not id_proceso:
             raise RamaJudicialAPIError("La respuesta no contiene el identificador del proceso")
+        radicado_obj.id_proceso_rama = str(id_proceso)
 
         usuario_propietario = radicado_obj.creador
         if usuario_propietario and usuario_propietario.rol == models.RolUsuario.ABOGADO:

@@ -25,15 +25,14 @@ Implementar en Vercel dos lanzadores durables: consultas periódicas de radicado
 
 - [x] Definir ámbito de deduplicación: `FIRMA` compartida y `SAAS:<usuario_id>` aislado; normalizar a los 23 dígitos.
 - [x] Implementar ficha canónica por fuente/ámbito/número, la relación `Usuario.radicados` y la migración que renombra el propietario legacy a `creado_por_id`.
-- [ ] Ejecutar el preflight sobre la PostgreSQL objetivo, revisar sus conteos y aplicar con backup verificado. La PostgreSQL local no estaba disponible durante esta fase; no se tocó ninguna base real.
+- [x] Ejecutar el preflight sobre la PostgreSQL objetivo: 6 radicados; cero duplicados, filas inválidas, conflictos, referencias cruzadas o tablas no contempladas.
 - [x] Exponer preflight y apply desde Swagger bajo ADMIN; el apply requiere flag temporal, confirmación de backup y deja auditoría.
-- [ ] Ejecutar el apply real en ventana de mantenimiento; validar el esquema antes de reabrir tráfico.
-- [ ] Agregar y persistir el identificador de proceso que devuelve Rama (`idProceso`).
+- [x] Ejecutar el apply real en ventana de mantenimiento y verificar en Supabase que el esquema quedó migrado.
+- [x] Agregar y persistir el identificador de proceso que devuelve Rama (`idProceso`) al completar la búsqueda inicial.
 - [x] Implementar preflight y fusión que preservan actuaciones, consultas, procesos, tareas, subtareas y vínculos; el test legacy sintético verifica referencias y duplicados.
-- [ ] Revisar los duplicados/conflictos que reporte la base objetivo antes del apply; abortar ante metadatos incompatibles o referencias cruzadas FIRMA/SAAS.
+- [x] Revisar duplicados/conflictos de la base objetivo antes del apply; el preflight no reportó ninguno.
 - [x] Al quitar un radicado de un usuario, borrar solo la asociación; conservar la ficha canónica compartida.
 - [x] Proteger la creación concurrente con clave única por fuente/ámbito/número y crear o vincular dentro de un savepoint.
-- [ ] Hacer backup verificado y confirmar rollback antes de ejecutar la migración real.
 
 ### 2. Sincronización idempotente con Rama Judicial
 

@@ -14,6 +14,7 @@ from app import security
 from app import models, schemas
 from app import tasks as celery_tasks
 from app import whatsapp
+from app import rama_judicial_api
 from app.audit import registrar_evento_auditoria
 from app.firm_access import has_firm_wide_access, lawyer_scope_id, require_process_access
 from app.notification_policy import plan_whatsapp_habilitado, whatsapp_habilitado
@@ -498,6 +499,55 @@ def test_canonical_radicado_migration_merges_firm_duplicates_and_preserves_refer
         assert len(firm_actions) == 2
         assert {row.radicado_id for row in firm_actions} == {10}
         assert report["rows_to_merge"] == 1
+
+
+def test_initial_rama_lookup_persists_process_id(monkeypatch):
+    engine = create_engine("sqlite:///:memory:")
+    models.Base.metadata.create_all(engine)
+
+    with Session(engine) as db:
+        owner = models.Usuario(
+            email="rama-id-owner@example.test",
+            password_hash="hash",
+            nombre_completo="Firm lawyer",
+            whatsapp_numero="0000000131",
+            rol=models.RolUsuario.ABOGADO_ADMIN,
+            estado=models.EstadoUsuario.ACTIVO,
+        )
+        db.add(owner)
+        db.flush()
+        radicado = models.Radicado(
+            numero="12345678901234567890123",
+            creado_por_id=owner.id,
+        )
+        db.add(radicado)
+        db.commit()
+        radicado_id = radicado.id
+
+        monkeypatch.setattr(
+            rama_judicial_api,
+            "_obtener_proceso",
+            lambda numero: {
+                "idProceso": 123,
+                "llaveProceso": numero,
+                "esPrivado": False,
+                "despacho": "Juzgado de prueba",
+                "departamento": "Bogota",
+                "sujetosProcesales": "",
+            },
+        )
+        monkeypatch.setattr(
+            rama_judicial_api,
+            "_obtener_actuaciones",
+            lambda id_proceso, limite=None: [],
+        )
+
+        result = rama_judicial_api.ejecutar_consulta_api_radicado(db, radicado)
+        db.refresh(radicado)
+
+        assert result["estado"] == "ok"
+        assert radicado.id_proceso_rama == "123"
+        assert db.query(models.Radicado).filter_by(id=radicado_id).one().id_proceso_rama == "123"
 
 
 def test_manual_radicado_retry_reuses_original_arguments_and_consulta_id(monkeypatch):
