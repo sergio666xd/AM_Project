@@ -8,7 +8,11 @@ import requests
 from sqlalchemy.orm import Session
 
 from app import models
-from app.workflow_service import workflow_frontend_url, workflow_service_headers
+from app.workflow_service import (
+    workflow_401_reason,
+    workflow_frontend_url,
+    workflow_service_headers,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -79,24 +83,9 @@ def iniciar_workflow_recordatorio(db: Session, recordatorio_id: int) -> bool:
         )
         if not response.ok:
             if response.status_code == 401:
-                content_type = getattr(response, "headers", {}).get("content-type", "").lower()
-                reason = (
-                    "DEPLOYMENT_PROTECTION_OR_PROXY"
-                    if "html" in content_type or "text/" in content_type
-                    else "AUTH_REJECTED_WITHOUT_LAUNCHER_CODE"
-                )
-                if "json" in content_type:
-                    try:
-                        code = response.json().get("code")
-                        if code in {
-                            "WORKFLOW_SERVICE_TOKEN_MISSING",
-                            "AUTHORIZATION_HEADER_MISSING",
-                            "WORKFLOW_SERVICE_TOKEN_MISMATCH",
-                        }:
-                            reason = code
-                    except (ValueError, AttributeError):
-                        pass
+                reason = workflow_401_reason(response)
                 launcher_host = urlsplit(base_url).hostname or "unknown"
+                content_type = getattr(response, "headers", {}).get("content-type", "")
                 logger.error(
                     "El launcher de recordatorios respondió HTTP 401 (%s; host=%s; content_type=%s).",
                     reason,

@@ -23,7 +23,11 @@ from app.notification_policy import (
     plan_whatsapp_habilitado,
     whatsapp_habilitado,
 )
-from app.workflow_service import workflow_frontend_url, workflow_service_headers
+from app.workflow_service import (
+    workflow_401_reason,
+    workflow_frontend_url,
+    workflow_service_headers,
+)
 from app.radicados import (
     iniciar_consulta_nuevo_radicado,
     obtener_o_vincular_radicado,
@@ -1956,6 +1960,20 @@ def test_workflow_frontend_url_uses_vercel_deployment_without_reverse_binding(mo
 
     monkeypatch.setenv("WORKFLOW_FRONTEND_URL", "https://override.example.test/")
     assert workflow_frontend_url() == "https://override.example.test"
+
+
+def test_vercel_auth_protection_json_is_classified_separately_from_token_failure():
+    class ProtectedDeploymentResponse:
+        headers = {"content-type": "application/json"}
+
+        @staticmethod
+        def json():
+            return {
+                "message": "Protected by Vercel Authentication",
+                "protection": {"vercel_auth_enabled": True},
+            }
+
+    assert workflow_401_reason(ProtectedDeploymentResponse()) == "VERCEL_DEPLOYMENT_PROTECTED"
 
 
 def test_admin_real_integration_send_requires_confirmation_and_is_audited(monkeypatch):

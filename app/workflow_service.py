@@ -3,6 +3,31 @@
 import os
 
 
+def workflow_401_reason(response) -> str:
+    content_type = response.headers.get("content-type", "").lower()
+    if "html" in content_type or "text/" in content_type:
+        return "DEPLOYMENT_PROTECTION_OR_PROXY"
+    if "json" in content_type:
+        try:
+            body = response.json()
+        except (ValueError, AttributeError):
+            body = {}
+        protection = body.get("protection") or {}
+        if (
+            body.get("message") == "Protected by Vercel Authentication"
+            or protection.get("vercel_auth_enabled") is True
+        ):
+            return "VERCEL_DEPLOYMENT_PROTECTED"
+        code = body.get("code")
+        if code in {
+            "WORKFLOW_SERVICE_TOKEN_MISSING",
+            "AUTHORIZATION_HEADER_MISSING",
+            "WORKFLOW_SERVICE_TOKEN_MISMATCH",
+        }:
+            return code
+    return "AUTH_REJECTED_WITHOUT_LAUNCHER_CODE"
+
+
 def workflow_frontend_url() -> str:
     configured = os.getenv("WORKFLOW_FRONTEND_URL", "").strip()
     if configured:

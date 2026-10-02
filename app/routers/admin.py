@@ -37,7 +37,11 @@ from app.migrate_radicados_canonicos import migrar as migrar_radicados_canonicos
 from app.migrate_radicados_canonicos import previsualizar as previsualizar_migracion_radicados
 from app.rama_judicial_api import API_BASE_URL
 from app.whatsapp import WHATSAPP_API_URL, WHATSAPP_TOKEN, enviar_mensaje_whatsapp
-from app.workflow_service import workflow_frontend_url, workflow_service_headers
+from app.workflow_service import (
+    workflow_401_reason,
+    workflow_frontend_url,
+    workflow_service_headers,
+)
 import json
 
 
@@ -1136,23 +1140,7 @@ def probar_conexion_integracion(
             return {"integracion": "WORKFLOW", "estado": "FALLO", "detalle": "No fue posible contactar el servicio Workflow."}
         if not response.ok:
             if response.status_code == 401:
-                code = None
-                if "json" in response.headers.get("content-type", "").lower():
-                    try:
-                        code = response.json().get("code")
-                    except (ValueError, AttributeError):
-                        pass
-                if code not in {
-                    "WORKFLOW_SERVICE_TOKEN_MISSING",
-                    "AUTHORIZATION_HEADER_MISSING",
-                    "WORKFLOW_SERVICE_TOKEN_MISMATCH",
-                }:
-                    code = (
-                        "DEPLOYMENT_PROTECTION_OR_PROXY"
-                        if "html" in response.headers.get("content-type", "").lower()
-                        or "text/" in response.headers.get("content-type", "").lower()
-                        else "AUTH_REJECTED_WITHOUT_LAUNCHER_CODE"
-                    )
+                code = workflow_401_reason(response)
                 return {
                     "integracion": "WORKFLOW",
                     "estado": "FALLO",
