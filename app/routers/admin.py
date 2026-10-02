@@ -2,7 +2,7 @@ import os
 import smtplib
 from uuid import uuid4
 from urllib.error import HTTPError, URLError
-from urllib.parse import urljoin
+from urllib.parse import urljoin, urlsplit
 from urllib.request import Request, urlopen
 
 import requests
@@ -1147,8 +1147,20 @@ def probar_conexion_integracion(
                     "AUTHORIZATION_HEADER_MISSING",
                     "WORKFLOW_SERVICE_TOKEN_MISMATCH",
                 }:
-                    code = "DEPLOYMENT_PROTECTION_OR_PROXY"
-                return {"integracion": "WORKFLOW", "estado": "FALLO", "codigo_http": 401, "causa": code}
+                    code = (
+                        "DEPLOYMENT_PROTECTION_OR_PROXY"
+                        if "html" in response.headers.get("content-type", "").lower()
+                        or "text/" in response.headers.get("content-type", "").lower()
+                        else "AUTH_REJECTED_WITHOUT_LAUNCHER_CODE"
+                    )
+                return {
+                    "integracion": "WORKFLOW",
+                    "estado": "FALLO",
+                    "codigo_http": 401,
+                    "causa": code,
+                    "launcher_host": urlsplit(base_url).hostname or "unknown",
+                    "content_type": response.headers.get("content-type", "unknown"),
+                }
             return {"integracion": "WORKFLOW", "estado": "FALLO", "codigo_http": response.status_code}
         try:
             resultado = response.json()

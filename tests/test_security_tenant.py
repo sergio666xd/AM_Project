@@ -2024,8 +2024,17 @@ def test_integration_connection_diagnostics_do_not_send_or_expose_secrets(monkey
         def json():
             return {"code": "WORKFLOW_SERVICE_TOKEN_MISMATCH"}
 
+    class WorkflowGenericAuthFailure:
+        ok = False
+        status_code = 401
+        headers = {"content-type": "application/json"}
+
+        @staticmethod
+        def json():
+            return {"detail": "Unauthorized"}
+
     workflow_requests = []
-    workflow_responses = iter([WorkflowResponse(), WorkflowAuthFailure()])
+    workflow_responses = iter([WorkflowResponse(), WorkflowAuthFailure(), WorkflowGenericAuthFailure()])
     monkeypatch.setattr(
         admin_router.requests,
         "post",
@@ -2090,6 +2099,15 @@ def test_integration_connection_diagnostics_do_not_send_or_expose_secrets(monkey
     )
     assert rejected_workflow["causa"] == "WORKFLOW_SERVICE_TOKEN_MISMATCH"
     assert "unit-test-private-token" not in str(rejected_workflow)
+
+    generic_rejection = probar_conexion_integracion(
+        schemas.DiagnosticoIntegracion(integracion="WORKFLOW"),
+        admin=admin,
+    )
+    assert generic_rejection["causa"] == "AUTH_REJECTED_WITHOUT_LAUNCHER_CODE"
+    assert generic_rejection["launcher_host"] == "frontend.example.test"
+    assert generic_rejection["content_type"] == "application/json"
+    assert "unit-test-private-token" not in str(generic_rejection)
 
     smtp_result = probar_conexion_integracion(
         schemas.DiagnosticoIntegracion(integracion="SMTP"),
@@ -3287,6 +3305,7 @@ def test_reminder_401_is_visible_and_recovered_by_reconciler(monkeypatch, caplog
             "WORKFLOW_SERVICE_TOKEN_MISMATCH",
         ),
         LaunchResponse(False, 401, {"content-type": "text/html; charset=utf-8"}),
+        LaunchResponse(False, 401, {"content-type": "application/json"}),
         LaunchResponse(True, 202),
     ])
     launches = []
@@ -3336,10 +3355,15 @@ def test_reminder_401_is_visible_and_recovered_by_reconciler(monkeypatch, caplog
     assert protection_failed["errores"] == 1
     assert "DEPLOYMENT_PROTECTION_OR_PROXY" in caplog.text
 
+    generic_rejected = celery_tasks.procesar_recordatorios_tareas()
+    assert generic_rejected["recordatorios_programados"] == 0
+    assert generic_rejected["errores"] == 1
+    assert "AUTH_REJECTED_WITHOUT_LAUNCHER_CODE" in caplog.text
+
     recovered = celery_tasks.procesar_recordatorios_tareas()
     assert recovered["recordatorios_programados"] == 1
     assert recovered["errores"] == 0
-    assert len(launches) == 3
+    assert len(launches) == 4
     with Session(engine) as db:
         reminder = db.query(models.RecordatorioTarea).filter_by(id=reminder_id).one()
         assert reminder.workflow_version_lanzada == reminder.version == 1
