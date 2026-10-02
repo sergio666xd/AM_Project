@@ -18,6 +18,31 @@ router = APIRouter(
     tags=["Workflows internos"],
 )
 
+RECONCILIACION_INTERVALO_DIAS = 30
+DETALLE_RECONCILIACION_COMPLETA = "ok|RECONCILIACION_COMPLETA_V1"
+
+
+def _reconciliacion_completa_vencida(
+    db: Session,
+    radicado_id: int,
+    ahora: datetime,
+) -> bool:
+    ultima = (
+        db.query(models.ConsultaRadicado)
+        .filter_by(
+            radicado_id=radicado_id,
+            estado="COMPLETADA",
+            detalle=DETALLE_RECONCILIACION_COMPLETA,
+        )
+        .order_by(models.ConsultaRadicado.finalizacion.desc())
+        .first()
+    )
+    return (
+        ultima is None
+        or ultima.finalizacion is None
+        or ultima.finalizacion <= ahora - timedelta(days=RECONCILIACION_INTERVALO_DIAS)
+    )
+
 
 def verificar_token_workflow(authorization: str | None = Header(default=None)) -> None:
     expected = os.getenv("WORKFLOW_SERVICE_TOKEN", "")
@@ -250,7 +275,12 @@ def ejecutar_consulta_barrido_radicado(
     resultado_radicado.lease_hasta = datetime.utcnow() + timedelta(minutes=10)
     db.commit()
 
-    resultado = ejecutar_consulta_api_radicado(db, radicado)
+    reconciliar_historial = _reconciliacion_completa_vencida(db, radicado.id, ahora)
+    resultado = ejecutar_consulta_api_radicado(
+        db,
+        radicado,
+        reconciliar_historial=reconciliar_historial,
+    )
     estado_api = str(resultado.get("estado", ""))
     ahora = datetime.utcnow()
     if estado_api.startswith("error"):
@@ -267,7 +297,11 @@ def ejecutar_consulta_barrido_radicado(
         consulta.estado = "COMPLETADA"
         consulta.finalizacion = ahora
         consulta.actuaciones_nuevas = resultado_radicado.actuaciones_nuevas
-        consulta.detalle = estado_api
+        consulta.detalle = (
+            DETALLE_RECONCILIACION_COMPLETA
+            if resultado.get("reconciliacion_completa")
+            else estado_api
+        )
         errores_incremento = 0
 
     resultado_radicado.finalizacion = ahora

@@ -49,10 +49,11 @@ Implementar en Vercel dos lanzadores durables: consultas periódicas de radicado
 - [x] El Workflow crea/actualiza un registro de ejecución, obtiene los radicados canónicos del ámbito y coordina su consulta. Tiene idempotencia por fecha/slot, prevención de solapamiento por radicado, leases, progreso y errores.
 - [x] Llamar a FastAPI mediante el binding privado y autenticación de servicio. El endpoint ejecuta la consulta/persistencia directamente, no encola Celery.
 - [x] Limitar concurrencia a cinco radicados y aislar fallos por expediente para que no detengan el resto.
-- [ ] Definir y verificar política explícita de backoff/reintentos y límites de intentos por radicado.
-- [ ] Programar reconciliaciones completas ocasionales del historial de actuaciones para detectar correcciones o registros antiguos agregados por Rama.
+- [x] Configurar hasta dos reintentos por radicado con backoff durable de 5 y 20 segundos (tres intentos totales); el step reutiliza la consulta idempotente. La integración local prueba recuperación tras dos fallos y agotamiento tras tres; TypeScript y ESLint pasan.
+- [x] Reconciliar el historial completo cada 30 días por radicado: recorrer todas las páginas y reemplazar el snapshot para reflejar actuaciones antiguas agregadas, corregidas o retiradas por Rama. Pasan las pruebas de reconciliación, intervalo, idempotencia e incremental; suite backend: 50 tests.
 - [x] Añadir al panel ADMIN configuración de días/estado, última y próxima ejecución, progreso, errores por radicado y botón `Consultar ahora`. El botón usa el mismo flujo marcado como manual.
-- [ ] Configurar `CRON_SECRET` y el mismo `WORKFLOW_SERVICE_TOKEN` en Production; confirmar el binding generado `BACKEND_SERVICE_URL`, obtener autorización del usuario para push y verificar los Cron tras su confirmación de redeploy.
+- [x] Lanzar `Consultar ahora` desde el panel ADMIN del Preview; el Workflow terminó `completed`, validando el binding y la autenticación interna.
+- [ ] Configurar `CRON_SECRET` y `WORKFLOW_SERVICE_TOKEN` en Production; confirmar el binding generado `BACKEND_SERVICE_URL` y verificar ambos Cron tras autorizar y completar el redeploy de Production.
 
 ### 4. Cruce y envío de novedades
 

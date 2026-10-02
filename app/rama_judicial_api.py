@@ -172,7 +172,11 @@ def _clave_actuacion(actuacion: dict) -> tuple:
     )
 
 
-def ejecutar_consulta_api_radicado(db: Session, radicado_obj: models.Radicado) -> dict:
+def ejecutar_consulta_api_radicado(
+    db: Session,
+    radicado_obj: models.Radicado,
+    reconciliar_historial: bool = False,
+) -> dict:
     """Consulta un radicado por API, actualiza la base de datos y detecta novedades."""
     try:
         estado_normalizado = (radicado_obj.estado_consulta or "").strip().upper().replace(" ", "_")
@@ -211,6 +215,8 @@ def ejecutar_consulta_api_radicado(db: Session, radicado_obj: models.Radicado) -
             )
         else:
             limite_actuaciones = None
+        if reconciliar_historial:
+            limite_actuaciones = None
         actuaciones_conocidas = (
             db.query(models.Actuacion)
             .filter(models.Actuacion.radicado_id == radicado_obj.id)
@@ -233,7 +239,7 @@ def ejecutar_consulta_api_radicado(db: Session, radicado_obj: models.Radicado) -
         for actuacion in _obtener_actuaciones(
             int(id_proceso),
             limite_actuaciones if consulta_inicial else None,
-            None if consulta_inicial else set(claves_conocidas),
+            None if consulta_inicial or reconciliar_historial else set(claves_conocidas),
         ):
             actuacion_texto = (actuacion.get("actuacion") or "").strip()
             actuacion_capturada = {
@@ -293,33 +299,34 @@ def ejecutar_consulta_api_radicado(db: Session, radicado_obj: models.Radicado) -
             actuaciones_nuevas.append(actuacion)
 
     historial_actualizado = actuaciones_capturadas.copy()
-    claves_historial = Counter(_clave_actuacion(actuacion) for actuacion in historial_actualizado)
-    for existente in actuaciones_existentes:
-        clave = (
-            existente.fecha_actuacion,
-            existente.actuacion,
-            existente.anotacion,
-            existente.fecha_inicia_termino,
-            existente.fecha_finaliza_termino,
-            existente.fecha_registro,
-        )
-        if claves_historial[clave]:
-            claves_historial[clave] -= 1
-            continue
-        historial_actualizado.append(
-            {
-                "orden": existente.orden,
-                "fecha_actuacion": existente.fecha_actuacion,
-                "actuacion": existente.actuacion,
-                "anotacion": existente.anotacion,
-                "fecha_inicia_termino": existente.fecha_inicia_termino,
-                "fecha_finaliza_termino": existente.fecha_finaliza_termino,
-                "fecha_registro": existente.fecha_registro,
-                "es_fijacion": existente.es_fijacion,
-            }
-        )
+    if not reconciliar_historial:
+        claves_historial = Counter(_clave_actuacion(actuacion) for actuacion in historial_actualizado)
+        for existente in actuaciones_existentes:
+            clave = (
+                existente.fecha_actuacion,
+                existente.actuacion,
+                existente.anotacion,
+                existente.fecha_inicia_termino,
+                existente.fecha_finaliza_termino,
+                existente.fecha_registro,
+            )
+            if claves_historial[clave]:
+                claves_historial[clave] -= 1
+                continue
+            historial_actualizado.append(
+                {
+                    "orden": existente.orden,
+                    "fecha_actuacion": existente.fecha_actuacion,
+                    "actuacion": existente.actuacion,
+                    "anotacion": existente.anotacion,
+                    "fecha_inicia_termino": existente.fecha_inicia_termino,
+                    "fecha_finaliza_termino": existente.fecha_finaliza_termino,
+                    "fecha_registro": existente.fecha_registro,
+                    "es_fijacion": existente.es_fijacion,
+                }
+            )
 
-    if limite_actuaciones is not None:
+    if limite_actuaciones is not None and not reconciliar_historial:
         historial_actualizado = historial_actualizado[:limite_actuaciones]
     claves_existentes_ordenadas = [
         (
@@ -343,4 +350,5 @@ def ejecutar_consulta_api_radicado(db: Session, radicado_obj: models.Radicado) -
         "estado": "ok",
         "total_actuaciones": len(historial_actualizado),
         "actuaciones_nuevas": actuaciones_nuevas,
+        "reconciliacion_completa": reconciliar_historial,
     }

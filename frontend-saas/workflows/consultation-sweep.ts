@@ -1,3 +1,5 @@
+import { getStepMetadata, RetryableError } from "workflow";
+
 type WorkflowClaimConsulta = {
   clave_idempotencia: string;
   token_lanzamiento: string;
@@ -71,16 +73,27 @@ async function listRadicados(executionId: string, afterId: number): Promise<Radi
 
 async function processRadicado(executionId: string, radicadoId: number): Promise<RadicadoResult> {
   "use step";
-  const response = await workflowBackendFetch(
-    `/api/internal/workflows/consultas/${encodeURIComponent(executionId)}/radicados/${radicadoId}`,
-    { method: "POST", body: "{}" },
-  );
-  const result = (await response.json()) as RadicadoResult;
-  if (result.estado === "ERROR") {
-    throw new Error(`Consulta fallida para radicado ${radicadoId}`);
+  try {
+    const response = await workflowBackendFetch(
+      `/api/internal/workflows/consultas/${encodeURIComponent(executionId)}/radicados/${radicadoId}`,
+      { method: "POST", body: "{}" },
+    );
+    const result = (await response.json()) as RadicadoResult;
+    if (result.estado === "ERROR") {
+      throw new Error(`Consulta fallida para radicado ${radicadoId}`);
+    }
+    return result;
+  } catch (error) {
+    const { attempt } = getStepMetadata();
+    const retryAfter = Math.min(attempt ** 2 * 5_000, 30_000);
+    throw new RetryableError(
+      error instanceof Error ? error.message : `Consulta fallida para radicado ${radicadoId}`,
+      { retryAfter },
+    );
   }
-  return result;
 }
+
+processRadicado.maxRetries = 2;
 
 async function finishSweep(executionId: string): Promise<unknown> {
   "use step";

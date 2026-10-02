@@ -22,6 +22,8 @@ from app.radicados import obtener_o_vincular_radicado
 from app.migrate_radicados_canonicos import migrar as migrar_radicados_canonicos, previsualizar as previsualizar_migracion_radicados
 from app.routers import admin as admin_router
 from app.routers.workflows import (
+    DETALLE_RECONCILIACION_COMPLETA,
+    _reconciliacion_completa_vencida,
     ejecutar_consulta_barrido_radicado,
     reclamar_barrido,
     verificar_token_workflow,
@@ -254,10 +256,20 @@ def test_workflow_radicado_step_persists_result_and_retries_without_duplicate_ap
     engine = create_engine("sqlite:///:memory:")
     models.Base.metadata.create_all(engine)
     api_calls = []
+
+    def fake_consulta(db, radicado, reconciliar_historial=False):
+        api_calls.append(radicado.id)
+        if len(api_calls) == 1:
+            return {"estado": "error_api: falla transitoria"}
+        return {
+            "estado": "ok",
+            "actuaciones_nuevas": [{"actuacion": "Nueva"}],
+            "reconciliacion_completa": reconciliar_historial,
+        }
+
     monkeypatch.setattr(
         "app.routers.workflows.ejecutar_consulta_api_radicado",
-        lambda db, radicado: api_calls.append(radicado.id)
-        or {"estado": "ok", "actuaciones_nuevas": [{"actuacion": "Nueva"}]},
+        fake_consulta,
     )
 
     with Session(engine) as db:
@@ -297,20 +309,30 @@ def test_workflow_radicado_step_persists_result_and_retries_without_duplicate_ap
         db.add(ejecucion)
         db.commit()
 
-        first = ejecutar_consulta_barrido_radicado(
+        failed_attempt = ejecutar_consulta_barrido_radicado(
+            ejecucion.id, radicado.id, _=None, db=db
+        )
+        consulta_id = db.query(models.ConsultaRadicado).filter_by(
+            radicado_id=radicado.id
+        ).one().id
+        recovered = ejecutar_consulta_barrido_radicado(
             ejecucion.id, radicado.id, _=None, db=db
         )
         repeated = ejecutar_consulta_barrido_radicado(
             ejecucion.id, radicado.id, _=None, db=db
         )
 
-        assert first["estado"] == "COMPLETADA"
-        assert first["actuaciones_nuevas"] == 1
+        assert failed_attempt["estado"] == "ERROR"
+        assert recovered["estado"] == "COMPLETADA"
+        assert recovered["actuaciones_nuevas"] == 1
         assert repeated["repetida"] is True
-        assert api_calls == [radicado.id]
-        assert db.query(models.ConsultaRadicado).filter_by(radicado_id=radicado.id).count() == 1
+        assert api_calls == [radicado.id, radicado.id]
+        consulta = db.query(models.ConsultaRadicado).filter_by(radicado_id=radicado.id).one()
+        assert consulta.id == consulta_id
+        assert consulta.detalle == DETALLE_RECONCILIACION_COMPLETA
         db.refresh(ejecucion)
         assert ejecucion.procesados == 1
+        assert ejecucion.errores == 0
         assert ejecucion.actuaciones_nuevas == 1
         detalle = detalle_ejecucion_consultas(ejecucion.id, db=db, admin=admin)
         assert detalle["radicados"][0]["numero"] == radicado.numero
@@ -764,6 +786,132 @@ def test_initial_rama_lookup_persists_process_id(monkeypatch):
         assert result["estado"] == "ok"
         assert radicado.id_proceso_rama == "123"
         assert db.query(models.Radicado).filter_by(id=radicado_id).one().id_proceso_rama == "123"
+
+
+def test_full_rama_reconciliation_replaces_the_saved_history(monkeypatch):
+    engine = create_engine("sqlite:///:memory:")
+    models.Base.metadata.create_all(engine)
+
+    with Session(engine) as db:
+        owner = models.Usuario(
+            email="rama-reconciliation-owner@example.test",
+            password_hash="hash",
+            nombre_completo="Firm lawyer",
+            whatsapp_numero="0000000133",
+            rol=models.RolUsuario.ABOGADO_ADMIN,
+            estado=models.EstadoUsuario.ACTIVO,
+        )
+        db.add(owner)
+        db.flush()
+        radicado = models.Radicado(
+            numero="12345678901234567890123",
+            creado_por_id=owner.id,
+            id_proceso_rama="123",
+            estado_consulta="ok",
+        )
+        db.add(radicado)
+        db.flush()
+        db.add(
+            models.Actuacion(
+                radicado_id=radicado.id,
+                orden=1,
+                fecha_actuacion="01/10/2026",
+                actuacion="Texto desactualizado",
+                anotacion="",
+                fecha_inicia_termino="",
+                fecha_finaliza_termino="",
+                fecha_registro="01/10/2026",
+                es_fijacion=False,
+            )
+        )
+        db.commit()
+
+        fetch_options = []
+
+        def fetch_full_history(id_proceso, limite=None, claves_conocidas=None):
+            fetch_options.append((limite, claves_conocidas))
+            return [
+                {
+                    "fechaActuacion": "2026-10-01T00:00:00Z",
+                    "actuacion": "Texto corregido por Rama",
+                    "anotacion": "",
+                    "fechaInicial": "",
+                    "fechaFinal": "",
+                    "fechaRegistro": "2026-10-01T00:00:00Z",
+                },
+                {
+                    "fechaActuacion": "2026-09-01T00:00:00Z",
+                    "actuacion": "Actuación antigua agregada",
+                    "anotacion": "",
+                    "fechaInicial": "",
+                    "fechaFinal": "",
+                    "fechaRegistro": "2026-09-01T00:00:00Z",
+                },
+            ]
+
+        monkeypatch.setattr(rama_judicial_api, "_obtener_actuaciones", fetch_full_history)
+
+        result = rama_judicial_api.ejecutar_consulta_api_radicado(
+            db,
+            radicado,
+            reconciliar_historial=True,
+        )
+
+        historial = (
+            db.query(models.Actuacion)
+            .filter_by(radicado_id=radicado.id)
+            .order_by(models.Actuacion.orden.asc())
+            .all()
+        )
+        assert result["estado"] == "ok"
+        assert result["reconciliacion_completa"] is True
+        assert fetch_options == [(None, None)]
+        assert [act.actuacion for act in historial] == [
+            "Texto corregido por Rama",
+            "Actuación antigua agregada",
+        ]
+
+
+def test_reconciliation_interval_expires_after_30_days():
+    engine = create_engine("sqlite:///:memory:")
+    models.Base.metadata.create_all(engine)
+
+    with Session(engine) as db:
+        owner = models.Usuario(
+            email="reconciliation-interval-owner@example.test",
+            password_hash="hash",
+            nombre_completo="Firm lawyer",
+            whatsapp_numero="0000000134",
+            rol=models.RolUsuario.ABOGADO_ADMIN,
+            estado=models.EstadoUsuario.ACTIVO,
+        )
+        db.add(owner)
+        db.flush()
+        radicado = models.Radicado(
+            numero="12345678901234567890123",
+            creado_por_id=owner.id,
+        )
+        db.add(radicado)
+        db.flush()
+        reconciliacion = models.ConsultaRadicado(
+            radicado_id=radicado.id,
+            estado="COMPLETADA",
+            detalle=DETALLE_RECONCILIACION_COMPLETA,
+            finalizacion=datetime(2026, 9, 1),
+        )
+        db.add(reconciliacion)
+        db.commit()
+
+        assert not _reconciliacion_completa_vencida(
+            db,
+            radicado.id,
+            datetime(2026, 9, 30),
+        )
+        assert _reconciliacion_completa_vencida(
+            db,
+            radicado.id,
+            datetime(2026, 10, 1),
+        )
 
 
 def test_known_rama_process_skips_lookup_and_merges_only_new_actions(monkeypatch):
