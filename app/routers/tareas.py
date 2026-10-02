@@ -13,15 +13,39 @@ from app.firm_access import (
     lawyer_scope_id,
     require_roles,
 )
-from app.notification_policy import plan_whatsapp_habilitado, whatsapp_habilitado
 from app.security import obtener_usuario_actual
-from app.tasks import tarea_enviar_email, tarea_enviar_whatsapp
+from app.notification_service import emitir_notificacion_workflow
+from app.reminder_workflow import iniciar_workflow_recordatorio, normalizar_utc_naive
 
 
 router = APIRouter(
     prefix="/api/tareas",
     tags=["Tareas"],
 )
+
+
+def _versionar_recordatorios_pendientes(tarea: models.Tarea) -> list[int]:
+    recordatorio_ids = []
+    for recordatorio in tarea.recordatorios:
+        if not recordatorio.activo or recordatorio.enviado_en is not None:
+            continue
+        recordatorio.version += 1
+        if recordatorio.anticipacion_minutos is not None and tarea.fecha_limite is None:
+            recordatorio.activo = False
+            continue
+        recordatorio_ids.append(recordatorio.id)
+    return recordatorio_ids
+
+
+def _lanzar_recordatorios_pendientes(
+    db: Session,
+    tarea: models.Tarea,
+    recordatorio_ids: list[int],
+) -> None:
+    if tarea.estado in {models.EstadoTarea.COMPLETADA, models.EstadoTarea.CANCELADA}:
+        return
+    for recordatorio_id in recordatorio_ids:
+        iniciar_workflow_recordatorio(db, recordatorio_id)
 
 
 def filtrar_tareas_por_firma(query, db: Session):
@@ -299,14 +323,15 @@ def notificar_subtarea_asignada(
     if cliente is None:
         return
     mensaje = f"{usuario.nombre_completo} le ha asignado la subtarea: {subtarea.titulo}."
-    if subtarea.notificar_email and cliente.notificaciones_email:
-        tarea_enviar_email.delay(cliente.email, "Nueva subtarea asignada", mensaje)
-    if (
-        subtarea.notificar_whatsapp
-        and whatsapp_habilitado(cliente)
-        and plan_whatsapp_habilitado(usuario, "notificaciones_whatsapp_tareas")
-    ):
-        tarea_enviar_whatsapp.delay(cliente.whatsapp_numero, mensaje)
+    emitir_notificacion_workflow(
+        db,
+        cliente,
+        "SUBTAREAS",
+        f"SUBTAREA:{subtarea.id}:{cliente.id}",
+        "Nueva subtarea asignada",
+        mensaje,
+        emisor=usuario,
+    )
 
 
 @router.get("", response_model=list[schemas.TareaOut])
@@ -424,10 +449,15 @@ def crear_tarea(
         cliente = db.query(models.Usuario).filter_by(id=tarea.cliente_id).first()
         if cliente:
             mensaje = f"{usuario_actual.nombre_completo} le ha asignado una tarea: {tarea.titulo}."
-            if cliente.notificaciones_email:
-                tarea_enviar_email.delay(cliente.email, "Nueva tarea asignada", mensaje)
-            if whatsapp_habilitado(cliente) and plan_whatsapp_habilitado(usuario_actual, "notificaciones_whatsapp_tareas"):
-                tarea_enviar_whatsapp.delay(cliente.whatsapp_numero, mensaje)
+            emitir_notificacion_workflow(
+                db,
+                cliente,
+                "TAREAS",
+                f"TAREA:{tarea.id}:{cliente.id}",
+                "Nueva tarea asignada",
+                mensaje,
+                emisor=usuario_actual,
+            )
     return tarea
 
 
@@ -444,11 +474,14 @@ def actualizar_tarea(
         tarea.estado = models.EstadoTarea.COMPLETADA
         if tarea.completada_en is None:
             tarea.completada_en = datetime.utcnow()
+        recordatorio_ids = _versionar_recordatorios_pendientes(tarea)
         registrar_evento_auditoria(db, usuario_actual, "tarea.completar", "tarea", tarea.id)
         db.commit()
+        _lanzar_recordatorios_pendientes(db, tarea, recordatorio_ids)
         db.refresh(tarea)
         return tarea
 
+    reprogramar_recordatorios = False
     if datos.titulo is not None:
         titulo = datos.titulo.strip()
         if not titulo:
@@ -457,12 +490,15 @@ def actualizar_tarea(
     if datos.descripcion is not None:
         tarea.descripcion = datos.descripcion
     if datos.estado is not None:
+        reprogramar_recordatorios = tarea.estado != datos.estado
         tarea.estado = datos.estado
         tarea.completada_en = datetime.utcnow() if datos.estado == models.EstadoTarea.COMPLETADA else None
     if datos.prioridad is not None:
         tarea.prioridad = datos.prioridad
     if datos.fecha_limite is not None:
-        tarea.fecha_limite = datos.fecha_limite
+        fecha_limite = normalizar_utc_naive(datos.fecha_limite)
+        reprogramar_recordatorios = reprogramar_recordatorios or tarea.fecha_limite != fecha_limite
+        tarea.fecha_limite = fecha_limite
     if datos.radicado_id is not None or datos.actuacion_id is not None:
         radicado, actuacion = validar_relaciones_tarea(datos, usuario_actual, db)
         if datos.actuacion_id is not None:
@@ -471,8 +507,14 @@ def actualizar_tarea(
         else:
             tarea.radicado_id = datos.radicado_id
             tarea.actuacion_id = None
+    recordatorio_ids = (
+        _versionar_recordatorios_pendientes(tarea)
+        if reprogramar_recordatorios
+        else []
+    )
     registrar_evento_auditoria(db, usuario_actual, "tarea.actualizar", "tarea", tarea.id)
     db.commit()
+    _lanzar_recordatorios_pendientes(db, tarea, recordatorio_ids)
     db.refresh(tarea)
     return serializar_tarea_para_usuario(tarea, usuario_actual)
 
@@ -499,8 +541,10 @@ def completar_tarea(
         tarea.estado = models.EstadoTarea.COMPLETADA
         tarea.completada_en = datetime.utcnow()
 
+    recordatorio_ids = _versionar_recordatorios_pendientes(tarea)
     registrar_evento_auditoria(db, usuario_actual, "tarea.completar", "tarea", tarea.id)
     db.commit()
+    _lanzar_recordatorios_pendientes(db, tarea, recordatorio_ids)
     db.refresh(tarea)
 
     return serializar_tarea_para_usuario(tarea, usuario_actual)
@@ -738,23 +782,10 @@ def crear_recordatorio(
     )
     require_task_manager(usuario_actual, tarea, action="gestionar recordatorios", db=db)
 
-    responsable = tarea.usuario
-    if not whatsapp_habilitado(responsable) or not plan_whatsapp_habilitado(responsable, "notificaciones_whatsapp_tareas"):
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Activa WhatsApp y configura un número para recibir recordatorios.",
-        )
-
-    if (
-        datos.fecha_hora is None
-        and datos.anticipacion_minutos is None
-    ):
+    if (datos.fecha_hora is None) == (datos.anticipacion_minutos is None):
         raise HTTPException(
             status_code=400,
-            detail=(
-                "Debes indicar una fecha y hora concreta "
-                "o una anticipación respecto al vencimiento."
-            ),
+            detail="Indica una fecha y hora o una anticipación, pero no ambas.",
         )
 
     if (
@@ -782,7 +813,7 @@ def crear_recordatorio(
         tarea_id=tarea.id,
         canal=datos.canal,
         activo=datos.activo,
-        fecha_hora=datos.fecha_hora,
+        fecha_hora=normalizar_utc_naive(datos.fecha_hora),
         anticipacion_minutos=datos.anticipacion_minutos,
     )
 
@@ -791,6 +822,12 @@ def crear_recordatorio(
     registrar_evento_auditoria(db, usuario_actual, "recordatorio.crear", "recordatorio_tarea", recordatorio.id)
     db.commit()
     db.refresh(recordatorio)
+    if recordatorio.activo and tarea.estado not in {
+        models.EstadoTarea.COMPLETADA,
+        models.EstadoTarea.CANCELADA,
+    }:
+        iniciar_workflow_recordatorio(db, recordatorio.id)
+        db.refresh(recordatorio)
 
     return recordatorio
 
@@ -828,35 +865,41 @@ def actualizar_recordatorio(
             detail="Recordatorio no encontrado.",
         )
 
-    if datos.activo is not None:
+    fields_set = datos.model_fields_set
+    cambio_programacion = False
+    if "activo" in fields_set and datos.activo is not None and recordatorio.activo != datos.activo:
         recordatorio.activo = datos.activo
+        cambio_programacion = True
+    if "fecha_hora" in fields_set:
+        fecha_hora = normalizar_utc_naive(datos.fecha_hora)
+        if recordatorio.fecha_hora != fecha_hora:
+            recordatorio.fecha_hora = fecha_hora
+            cambio_programacion = True
+    if "anticipacion_minutos" in fields_set:
+        anticipacion = datos.anticipacion_minutos
+        if anticipacion is not None and anticipacion < 0:
+            raise HTTPException(status_code=400, detail="La anticipación no puede ser negativa.")
+        if anticipacion is not None and tarea.fecha_limite is None:
+            raise HTTPException(status_code=400, detail="La tarea debe tener fecha límite para utilizar una anticipación.")
+        if recordatorio.anticipacion_minutos != anticipacion:
+            recordatorio.anticipacion_minutos = anticipacion
+            cambio_programacion = True
 
-    if datos.fecha_hora is not None:
-        recordatorio.fecha_hora = datos.fecha_hora
-
-    if datos.anticipacion_minutos is not None:
-        if datos.anticipacion_minutos < 0:
-            raise HTTPException(
-                status_code=400,
-                detail="La anticipación no puede ser negativa.",
-            )
-
-        if tarea.fecha_limite is None:
-            raise HTTPException(
-                status_code=400,
-                detail=(
-                    "La tarea debe tener fecha límite "
-                    "para utilizar una anticipación."
-                ),
-            )
-
-        recordatorio.anticipacion_minutos = (
-            datos.anticipacion_minutos
-        )
+    if (recordatorio.fecha_hora is None) == (recordatorio.anticipacion_minutos is None):
+        raise HTTPException(status_code=400, detail="Debe quedar configurada una sola fecha o anticipación.")
+    if cambio_programacion:
+        recordatorio.version += 1
 
     registrar_evento_auditoria(db, usuario_actual, "recordatorio.actualizar", "recordatorio_tarea", recordatorio.id)
     db.commit()
     db.refresh(recordatorio)
+    if (
+        recordatorio.activo
+        and recordatorio.enviado_en is None
+        and tarea.estado not in {models.EstadoTarea.COMPLETADA, models.EstadoTarea.CANCELADA}
+    ):
+        iniciar_workflow_recordatorio(db, recordatorio.id)
+        db.refresh(recordatorio)
 
     return recordatorio
 

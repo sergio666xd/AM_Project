@@ -1,16 +1,26 @@
 import hmac
+import hashlib
 import os
 from datetime import date, datetime, timedelta
 from uuid import uuid4
 
 from fastapi import APIRouter, Depends, Header, HTTPException, Query
-from sqlalchemy import case, func
+from sqlalchemy import and_, case, func, or_
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app import models, schemas
 from app.database import get_db
+from app.email_service import enviar_correo
+from app.notification_policy import (
+    abogados_notificables_para_radicado,
+    canales_habilitados,
+    clientes_notificables_para_radicado,
+)
+from app.notification_service import emitir_notificacion_workflow
 from app.rama_judicial_api import ejecutar_consulta_api_radicado
+from app.reminder_workflow import momento_programado, normalizar_utc_naive
+from app.whatsapp import enviar_mensaje_whatsapp
 
 
 router = APIRouter(
@@ -20,6 +30,7 @@ router = APIRouter(
 
 RECONCILIACION_INTERVALO_DIAS = 30
 DETALLE_RECONCILIACION_COMPLETA = "ok|RECONCILIACION_COMPLETA_V1"
+MAX_INTENTOS_NOTIFICACION = 3
 
 
 def _aplicar_delta_contadores_barrido(
@@ -82,6 +93,105 @@ def verificar_token_workflow(authorization: str | None = Header(default=None)) -
         raise HTTPException(status_code=401, detail="Credencial interna inválida.")
 
 
+@router.post("/consultas/manual/preparar")
+def preparar_consulta_manual_workflow(
+    datos: schemas.WorkflowConsultaManualCreate,
+    _: None = Depends(verificar_token_workflow),
+    db: Session = Depends(get_db),
+):
+    actor = db.query(models.Usuario).filter_by(
+        id=datos.actor_id,
+        rol=models.RolUsuario.ADMIN,
+        estado=models.EstadoUsuario.ACTIVO,
+    ).first()
+    if not actor:
+        raise HTTPException(status_code=403, detail="Se requiere ADMIN activo.")
+    radicado = db.query(models.Radicado).filter_by(id=datos.radicado_id).first()
+    if not radicado:
+        raise HTTPException(status_code=404, detail="Radicado no encontrado.")
+    consulta = models.ConsultaRadicado(
+        radicado_id=radicado.id,
+        tipo="MANUAL",
+        estado="ENCOLADA",
+        inicio=datetime.utcnow(),
+    )
+    db.add(consulta)
+    db.commit()
+    db.refresh(consulta)
+    return {"consulta_id": consulta.id}
+
+
+@router.post("/consultas/nuevo/{consulta_id}/procesar")
+def procesar_consulta_nuevo_workflow(
+    consulta_id: int,
+    datos: schemas.WorkflowConsultaRadicado,
+    _: None = Depends(verificar_token_workflow),
+    db: Session = Depends(get_db),
+):
+    consulta = db.query(models.ConsultaRadicado).filter_by(id=consulta_id).with_for_update().first()
+    if not consulta or consulta.tipo not in {"AUTOMATICA_NUEVO", "MANUAL"}:
+        raise HTTPException(status_code=404, detail="Consulta Workflow no encontrada.")
+    if consulta.estado == "COMPLETADA":
+        return {
+            "estado": "COMPLETADA",
+            "actuaciones_nuevas": consulta.actuaciones_nuevas,
+            "repetida": True,
+        }
+
+    actor = db.query(models.Usuario).filter_by(id=datos.actor_id).first()
+    radicado = db.query(models.Radicado).filter_by(id=consulta.radicado_id).first()
+    if not actor or not radicado or actor.estado != models.EstadoUsuario.ACTIVO:
+        raise HTTPException(status_code=403, detail="Actor o radicado no disponible.")
+    if consulta.tipo == "MANUAL":
+        autorizado = actor.rol == models.RolUsuario.ADMIN
+    elif actor.rol == models.RolUsuario.ADMIN:
+        autorizado = True
+    elif actor.rol == models.RolUsuario.ABOGADO_ADMIN:
+        autorizado = (
+            radicado.ambito_key == "FIRMA"
+            and any(link.id == actor.id for link in radicado.usuarios_vinculados)
+        )
+    else:
+        autorizado = (
+            actor.rol == models.RolUsuario.ABOGADO
+            and radicado.ambito_key == f"SAAS:{actor.id}"
+            and actor.plan is not None
+            and actor.plan.precio_mensual > 0
+        )
+    if not autorizado:
+        raise HTTPException(status_code=403, detail="No puedes consultar este radicado.")
+    if consulta.estado == "EN_PROCESO" and consulta.task_id != datos.launch_token:
+        raise HTTPException(status_code=409, detail="La consulta ya está siendo procesada.")
+
+    consulta.estado = "EN_PROCESO"
+    consulta.task_id = datos.launch_token
+    consulta.error = None
+    consulta.inicio = datetime.utcnow()
+    db.commit()
+
+    resultado = ejecutar_consulta_api_radicado(db, radicado)
+    estado_api = str(resultado.get("estado", ""))
+    ahora = datetime.utcnow()
+    if estado_api.startswith("error"):
+        consulta.estado = "ERROR"
+        consulta.error = estado_api
+        consulta.finalizacion = ahora
+        db.commit()
+        raise HTTPException(status_code=503, detail="La consulta del radicado falló; el Workflow la reintentará.")
+
+    consulta.estado = "COMPLETADA"
+    consulta.error = None
+    consulta.finalizacion = ahora
+    consulta.actuaciones_nuevas = len(resultado.get("actuaciones_nuevas", []))
+    consulta.detalle = estado_api
+    db.commit()
+    return {
+        "estado": "COMPLETADA",
+        "actuaciones_nuevas": consulta.actuaciones_nuevas,
+        "resultado": resultado,
+    }
+
+
 def _configuracion(db: Session, bloquear: bool = False) -> models.ConfiguracionConsultas:
     query = db.query(models.ConfiguracionConsultas).filter_by(id=1)
     if bloquear:
@@ -108,6 +218,472 @@ def _serializar_ejecucion(ejecucion: models.EjecucionBarrido) -> dict:
     }
 
 
+def _obtener_id_actuacion(
+    db: Session,
+    radicado_id: int,
+    datos: dict,
+) -> int | None:
+    return (
+        db.query(models.Actuacion.id)
+        .filter_by(
+            radicado_id=radicado_id,
+            fecha_actuacion=datos.get("fecha_actuacion", ""),
+            actuacion=datos.get("actuacion", ""),
+            anotacion=datos.get("anotacion", ""),
+            fecha_inicia_termino=datos.get("fecha_inicia_termino", ""),
+            fecha_finaliza_termino=datos.get("fecha_finaliza_termino", ""),
+            fecha_registro=datos.get("fecha_registro", ""),
+        )
+        .order_by(models.Actuacion.id.desc())
+        .scalar()
+    )
+
+
+def _agregar_actuaciones_a_grupo(
+    grupos: dict,
+    usuario: models.Usuario,
+    emisor: models.Usuario | None,
+    radicado: models.Radicado,
+    proceso: models.Proceso | None,
+    actuaciones: list[dict],
+) -> None:
+    for canal in canales_habilitados(usuario, "ACTUACIONES", emisor=emisor):
+        clave = (usuario.id, canal)
+        grupo = grupos.setdefault(clave, {"usuario": usuario, "canal": canal, "secciones": {}})
+        proceso_id = proceso.id if proceso else None
+        seccion_key = (proceso_id, radicado.id)
+        seccion = grupo["secciones"].setdefault(
+            seccion_key,
+            {
+                "proceso": proceso.nombre if proceso else None,
+                "radicado": radicado.numero,
+                "actuaciones": {},
+            },
+        )
+        for actuacion in actuaciones:
+            seccion["actuaciones"][actuacion["id"]] = actuacion
+
+
+def _cuerpo_novedades(secciones: list[dict]) -> str:
+    bloques = []
+    for seccion in secciones:
+        actuaciones = list(seccion["actuaciones"].values())
+        actuaciones.sort(key=lambda item: (item.get("orden", 0), item.get("id", 0)))
+        reciente = actuaciones[-1]
+        encabezado = f"Proceso: {seccion['proceso']}\n" if seccion["proceso"] else ""
+        bloque = (
+            f"{encabezado}Radicado: {seccion['radicado']}\n"
+            f"Novedades: {len(actuaciones)}\n"
+            f"Actuación más reciente ({reciente.get('fecha_actuacion') or 'sin fecha'}): "
+            f"{reciente.get('actuacion') or 'Sin descripción'}"
+        )
+        if reciente.get("anotacion"):
+            bloque += f"\nAnotación: {reciente['anotacion']}"
+        bloques.append(bloque)
+    return "Novedades judiciales\n\n" + "\n\n".join(bloques)
+
+
+@router.post("/consultas/{ejecucion_id}/notificaciones/preparar")
+def preparar_notificaciones_actuaciones(
+    ejecucion_id: str,
+    datos: schemas.WorkflowNovedadesPreparar,
+    _: None = Depends(verificar_token_workflow),
+    db: Session = Depends(get_db),
+):
+    ejecucion = db.query(models.EjecucionBarrido).filter_by(id=ejecucion_id).first()
+    if not ejecucion:
+        raise HTTPException(status_code=404, detail="Ejecución no encontrada.")
+
+    grupos: dict[tuple[int, str], dict] = {}
+    seen_by_recipient: set[tuple[int, int, str]] = set()
+    for evento in datos.eventos:
+        resultado_radicado = db.query(models.EjecucionRadicado).filter_by(
+            ejecucion_id=ejecucion.id,
+            radicado_id=evento.radicado_id,
+            estado="COMPLETADA",
+        ).first()
+        radicado = db.query(models.Radicado).filter_by(id=evento.radicado_id).first()
+        if not resultado_radicado or not radicado:
+            continue
+
+        nuevas = []
+        for actuacion in evento.actuaciones_nuevas:
+            actuacion_id = _obtener_id_actuacion(db, radicado.id, actuacion.model_dump())
+            if actuacion_id is not None:
+                nuevas.append({**actuacion.model_dump(), "id": actuacion_id})
+        if not nuevas:
+            continue
+
+        processes = [
+            link.proceso
+            for link in radicado.procesos
+            if link.proceso and link.proceso.archivado_en is None
+        ]
+        lawyers = abogados_notificables_para_radicado(radicado)
+        for lawyer in lawyers:
+            if processes:
+                for proceso in processes:
+                    _agregar_actuaciones_a_grupo(
+                        grupos,
+                        lawyer,
+                        lawyer,
+                        radicado,
+                        proceso,
+                        nuevas,
+                    )
+            else:
+                _agregar_actuaciones_a_grupo(
+                    grupos,
+                    lawyer,
+                    lawyer,
+                    radicado,
+                    None,
+                    nuevas,
+                )
+
+        for cliente, proceso in clientes_notificables_para_radicado(radicado):
+            if not canales_habilitados(cliente, "ACTUACIONES", emisor=proceso.abogado):
+                omitida = _cuerpo_novedades([{
+                    "proceso": proceso.nombre,
+                    "radicado": radicado.numero,
+                    "actuaciones": {actuacion["id"]: actuacion for actuacion in nuevas},
+                }])
+                emitir_notificacion_workflow(
+                    db,
+                    cliente,
+                    "ACTUACIONES",
+                    f"ACTUACIONES:{ejecucion.id}:{radicado.id}:{proceso.id}",
+                    "Novedades judiciales",
+                    omitida,
+                    emisor=proceso.abogado,
+                    iniciar_workflow=False,
+                    actuacion_ids=[actuacion["id"] for actuacion in nuevas],
+                )
+            else:
+                _agregar_actuaciones_a_grupo(
+                    grupos,
+                    cliente,
+                    proceso.abogado,
+                    radicado,
+                    proceso,
+                    nuevas,
+                )
+
+    delivery_ids = []
+    for grupo in grupos.values():
+        usuario = grupo["usuario"]
+        canal = grupo["canal"]
+        secciones = list(grupo["secciones"].values())
+        actuaciones_por_id = {
+            actuacion["id"]: actuacion
+            for seccion in secciones
+            for actuacion in seccion["actuaciones"].values()
+        }
+        pendientes = []
+        for actuacion_id, actuacion in actuaciones_por_id.items():
+            mapping = db.query(models.EntregaNotificacionActuacion).filter_by(
+                actuacion_id=actuacion_id,
+                usuario_id=usuario.id,
+                canal=canal,
+            ).first()
+            if mapping:
+                entrega_previa = db.query(models.EntregaNotificacion).filter_by(
+                    id=mapping.entrega_id
+                ).first()
+                if entrega_previa and entrega_previa.estado in {"ENVIADA", "OMITIDA"}:
+                    continue
+            key = (actuacion_id, usuario.id, canal)
+            if key not in seen_by_recipient:
+                seen_by_recipient.add(key)
+                pendientes.append((actuacion_id, actuacion))
+        if not pendientes:
+            continue
+
+        pending_ids = {actuacion_id for actuacion_id, _ in pendientes}
+        secciones_pendientes = []
+        for seccion in secciones:
+            secciones_pendientes.append({
+                **seccion,
+                "actuaciones": {
+                    actuacion_id: actuacion
+                    for actuacion_id, actuacion in seccion["actuaciones"].items()
+                    if actuacion_id in pending_ids
+                },
+            })
+        secciones_pendientes = [seccion for seccion in secciones_pendientes if seccion["actuaciones"]]
+
+        actuacion_ids = sorted(pending_ids)
+        event_digest = hashlib.sha256(
+            ",".join(map(str, actuacion_ids)).encode("ascii")
+        ).hexdigest()
+        clave = f"ACTUACIONES:{usuario.id}:{canal}:{event_digest}"
+        entrega = db.query(models.EntregaNotificacion).filter_by(clave_idempotencia=clave).with_for_update().first()
+        if entrega is None:
+            entrega = models.EntregaNotificacion(
+                clave_idempotencia=clave,
+                usuario_id=usuario.id,
+                tipo="ACTUACIONES",
+                canal=canal,
+                asunto="Novedades judiciales",
+                cuerpo=_cuerpo_novedades(secciones_pendientes),
+                estado="PENDIENTE",
+            )
+            db.add(entrega)
+            db.flush()
+        else:
+            if entrega.intentos >= MAX_INTENTOS_NOTIFICACION:
+                continue
+            entrega.asunto = "Novedades judiciales"
+            entrega.cuerpo = _cuerpo_novedades(secciones_pendientes)
+            if entrega.estado != "ENVIADA":
+                entrega.estado = "PENDIENTE"
+                entrega.error = None
+
+        for actuacion_id, _ in pendientes:
+            mapping = db.query(models.EntregaNotificacionActuacion).filter_by(
+                actuacion_id=actuacion_id,
+                usuario_id=usuario.id,
+                canal=canal,
+            ).first()
+            if mapping is None:
+                db.add(models.EntregaNotificacionActuacion(
+                    entrega_id=entrega.id,
+                    actuacion_id=actuacion_id,
+                    usuario_id=usuario.id,
+                    canal=canal,
+                ))
+        delivery_ids.append(entrega.id)
+
+    db.commit()
+    return {"entrega_ids": delivery_ids}
+
+
+@router.get("/notificaciones/pendientes")
+def listar_entregas_notificacion_pendientes(
+    despues_de: int = 0,
+    limite: int = Query(default=100, ge=1, le=250),
+    _: None = Depends(verificar_token_workflow),
+    db: Session = Depends(get_db),
+):
+    ahora = datetime.utcnow()
+    entrega_ids = (
+        db.query(models.EntregaNotificacion.id)
+        .filter(
+            models.EntregaNotificacion.id > despues_de,
+            models.EntregaNotificacion.intentos < MAX_INTENTOS_NOTIFICACION,
+            or_(
+                models.EntregaNotificacion.estado == "PENDIENTE",
+                models.EntregaNotificacion.estado == "ERROR",
+                and_(
+                    models.EntregaNotificacion.estado == "ENVIANDO",
+                    models.EntregaNotificacion.lease_hasta < ahora,
+                ),
+            ),
+        )
+        .order_by(models.EntregaNotificacion.id.asc())
+        .limit(limite)
+        .all()
+    )
+    ids = [row.id for row in entrega_ids]
+    return {"entrega_ids": ids, "siguiente_cursor": ids[-1] if ids else None}
+
+
+def _marcar_recordatorio_completo_si_aplica(
+    db: Session,
+    entrega: models.EntregaNotificacion,
+) -> None:
+    if entrega.recordatorio_id is None:
+        return
+    recordatorio = db.query(models.RecordatorioTarea).filter_by(
+        id=entrega.recordatorio_id
+    ).with_for_update().first()
+    if (
+        recordatorio is None
+        or entrega.recordatorio_version is not None
+        and recordatorio.version != entrega.recordatorio_version
+    ):
+        return
+    version = recordatorio.version
+    pendientes = db.query(models.EntregaNotificacion.id).filter(
+        models.EntregaNotificacion.recordatorio_id == entrega.recordatorio_id,
+        models.EntregaNotificacion.recordatorio_version == version,
+        ~or_(
+            models.EntregaNotificacion.estado.in_(("ENVIADA", "OMITIDA")),
+            and_(
+                models.EntregaNotificacion.estado == "ERROR",
+                models.EntregaNotificacion.intentos >= MAX_INTENTOS_NOTIFICACION,
+            ),
+        ),
+    ).count()
+    if pendientes == 0:
+        if recordatorio.enviado_en is None:
+            recordatorio.enviado_en = datetime.utcnow()
+
+
+@router.post("/recordatorios/{recordatorio_id}/preparar")
+def preparar_recordatorio_workflow(
+    recordatorio_id: int,
+    datos: schemas.WorkflowRecordatorioPreparar,
+    _: None = Depends(verificar_token_workflow),
+    db: Session = Depends(get_db),
+):
+    recordatorio = db.query(models.RecordatorioTarea).filter_by(
+        id=recordatorio_id
+    ).with_for_update().first()
+    if (
+        recordatorio is None
+        or recordatorio.version != datos.version
+        or not recordatorio.activo
+        or recordatorio.enviado_en is not None
+    ):
+        db.commit()
+        return {"estado": "CANCELADO", "entrega_ids": []}
+
+    tarea = recordatorio.tarea
+    usuario = tarea.usuario if tarea else None
+    if (
+        tarea is None
+        or tarea.estado in {models.EstadoTarea.COMPLETADA, models.EstadoTarea.CANCELADA}
+        or usuario is None
+        or usuario.estado != models.EstadoUsuario.ACTIVO
+    ):
+        db.commit()
+        return {"estado": "CANCELADO", "entrega_ids": []}
+
+    ahora = datetime.utcnow()
+    momento = momento_programado(recordatorio, tarea)
+    if momento is None:
+        recordatorio.activo = False
+        recordatorio.version += 1
+        db.commit()
+        return {"estado": "CANCELADO", "entrega_ids": []}
+    if momento > ahora:
+        db.commit()
+        return {
+            "estado": "TODAVIA_NO_VENCE",
+            "entrega_ids": [],
+            "programado_para": momento.replace(tzinfo=timezone.utc).isoformat(),
+        }
+
+    mensaje = f"📌 *Recordatorio de tarea*\n\n*{tarea.titulo}*"
+    if tarea.fecha_limite:
+        fecha_limite = normalizar_utc_naive(tarea.fecha_limite)
+        mensaje += f"\nFecha límite: {fecha_limite.strftime('%d/%m/%Y %H:%M')}"
+    entrega_ids = emitir_notificacion_workflow(
+        db,
+        usuario,
+        "RECORDATORIOS",
+        f"RECORDATORIO:{recordatorio.id}:V{recordatorio.version}",
+        "Recordatorio de tarea",
+        mensaje,
+        emisor=usuario,
+        iniciar_workflow=False,
+        recordatorio_id=recordatorio.id,
+        recordatorio_version=recordatorio.version,
+    )
+    if not entrega_ids:
+        recordatorio.enviado_en = ahora
+        db.commit()
+        return {"estado": "OMITIDO", "entrega_ids": []}
+
+    entregas = db.query(models.EntregaNotificacion).filter(
+        models.EntregaNotificacion.id.in_(entrega_ids)
+    ).all()
+    pendientes = any(
+        entrega.estado not in {"ENVIADA", "OMITIDA"}
+        and not (entrega.estado == "ERROR" and entrega.intentos >= MAX_INTENTOS_NOTIFICACION)
+        for entrega in entregas
+    )
+    if not pendientes:
+        recordatorio.enviado_en = ahora
+    db.commit()
+    return {"estado": "PREPARADO", "entrega_ids": entrega_ids}
+
+
+@router.post("/notificaciones/{entrega_id}/enviar")
+def enviar_entrega_notificacion_workflow(
+    entrega_id: int,
+    _: None = Depends(verificar_token_workflow),
+    db: Session = Depends(get_db),
+):
+    entrega = db.query(models.EntregaNotificacion).filter_by(id=entrega_id).with_for_update().first()
+    if not entrega:
+        raise HTTPException(status_code=404, detail="Entrega no encontrada.")
+    if entrega.estado == "ENVIADA":
+        return {"estado": "ENVIADA", "repetida": True}
+    ahora = datetime.utcnow()
+    if entrega.intentos >= MAX_INTENTOS_NOTIFICACION:
+        entrega.estado = "ERROR"
+        entrega.error = entrega.error or "Se agotaron los reintentos de entrega."
+        entrega.lease_hasta = None
+        _marcar_recordatorio_completo_si_aplica(db, entrega)
+        db.commit()
+        return {"estado": "ERROR", "agotada": True}
+    if entrega.estado == "ENVIANDO" and entrega.lease_hasta and entrega.lease_hasta > ahora:
+        raise HTTPException(status_code=409, detail="La entrega ya está en curso.")
+
+    if entrega.recordatorio_id is not None or entrega.recordatorio_version is not None:
+        recordatorio = db.query(models.RecordatorioTarea).filter_by(
+            id=entrega.recordatorio_id
+        ).with_for_update().first() if entrega.recordatorio_id is not None else None
+        tarea_recordatorio = recordatorio.tarea if recordatorio else None
+        if (
+            recordatorio is None
+            or not recordatorio.activo
+            or recordatorio.enviado_en is not None
+            or entrega.recordatorio_version is not None
+            and recordatorio.version != entrega.recordatorio_version
+            or tarea_recordatorio is None
+            or tarea_recordatorio.estado in {
+                models.EstadoTarea.COMPLETADA,
+                models.EstadoTarea.CANCELADA,
+            }
+        ):
+            entrega.estado = "OMITIDA"
+            entrega.error = "El recordatorio fue cancelado, completado o reprogramado."
+            entrega.lease_hasta = None
+            _marcar_recordatorio_completo_si_aplica(db, entrega)
+            db.commit()
+            return {"estado": "OMITIDA", "motivo": entrega.error}
+
+    usuario = db.query(models.Usuario).filter_by(id=entrega.usuario_id).first()
+    if not usuario or entrega.canal not in canales_habilitados(usuario, entrega.tipo):
+        entrega.estado = "OMITIDA"
+        entrega.error = "El destinatario ya no tiene habilitado este canal."
+        entrega.lease_hasta = None
+        _marcar_recordatorio_completo_si_aplica(db, entrega)
+        db.commit()
+        return {"estado": "OMITIDA", "motivo": entrega.error}
+
+    entrega.intentos += 1
+    entrega.estado = "ENVIANDO"
+    entrega.error = None
+    entrega.lease_hasta = ahora + timedelta(minutes=15)
+    db.commit()
+    try:
+        if entrega.canal == "EMAIL":
+            enviado = enviar_correo(usuario.email, entrega.asunto, entrega.cuerpo)
+        else:
+            enviado = enviar_mensaje_whatsapp(usuario.whatsapp_numero, entrega.cuerpo)
+        if not enviado:
+            raise RuntimeError("El proveedor no confirmó la entrega.")
+    except Exception as exc:
+        entrega.estado = "ERROR"
+        entrega.error = str(exc)
+        entrega.lease_hasta = None
+        _marcar_recordatorio_completo_si_aplica(db, entrega)
+        db.commit()
+        raise HTTPException(status_code=503, detail="No fue posible entregar la notificación; Workflow reintentará.") from exc
+
+    entrega.estado = "ENVIADA"
+    entrega.error = None
+    entrega.enviado_en = datetime.utcnow()
+    entrega.lease_hasta = None
+    _marcar_recordatorio_completo_si_aplica(db, entrega)
+    db.commit()
+    return {"estado": "ENVIADA", "intentos": entrega.intentos}
+
+
 @router.post("/consultas/claim")
 def reclamar_barrido(
     datos: schemas.WorkflowClaimConsulta,
@@ -125,6 +701,9 @@ def reclamar_barrido(
         raise HTTPException(status_code=400, detail="token_lanzamiento inválido.")
 
     configuracion = _configuracion(db, bloquear=True)
+    radicado_ids = sorted(set(datos.radicado_ids or []))
+    consulta_seleccionada = datos.radicado_id is not None or bool(radicado_ids)
+    consulta_individual_registro = None
     if datos.tipo == "AUTOMATICA":
         if datos.hora_local not in {"12:00", "17:00"}:
             raise HTTPException(status_code=400, detail="Hora automática no permitida.")
@@ -134,8 +713,43 @@ def reclamar_barrido(
         if fecha.weekday() not in (configuracion.dias_habilitados or []):
             db.commit()
             return {"debe_ejecutar": False, "motivo": "DIA_DESHABILITADO"}
+    elif datos.tipo == "AUTOMATICA_NUEVO":
+        if datos.hora_local != "NUEVO" or datos.radicado_id is None or radicado_ids or not datos.consulta_id:
+            raise HTTPException(status_code=400, detail="La consulta inmediata requiere radicado y consulta.")
+        radicado = db.query(models.Radicado).filter_by(id=datos.radicado_id).first()
+        consulta = db.query(models.ConsultaRadicado).filter_by(
+            id=datos.consulta_id,
+            radicado_id=datos.radicado_id,
+            tipo="AUTOMATICA_NUEVO",
+        ).first()
+        actor = db.query(models.Usuario).filter_by(id=datos.solicitada_por_id).first()
+        if not radicado or not consulta or not actor:
+            raise HTTPException(status_code=404, detail="Consulta o radicado no disponible.")
+        if actor.rol == models.RolUsuario.ABOGADO:
+            autorizado = (
+                radicado.ambito_key == f"SAAS:{actor.id}"
+                and actor.estado == models.EstadoUsuario.ACTIVO
+                and actor.plan is not None
+                and actor.plan.precio_mensual > 0
+            )
+        elif actor.rol == models.RolUsuario.ABOGADO_ADMIN:
+            autorizado = (
+                radicado.ambito_key == "FIRMA"
+                and actor.estado == models.EstadoUsuario.ACTIVO
+                and any(link.id == actor.id for link in radicado.usuarios_vinculados)
+            )
+        else:
+            autorizado = actor.rol == models.RolUsuario.ADMIN
+        if not autorizado:
+            raise HTTPException(status_code=403, detail="No puedes iniciar esta consulta.")
     elif datos.hora_local != "MANUAL":
         raise HTTPException(status_code=400, detail="El lanzamiento manual debe usar hora_local=MANUAL.")
+    elif datos.tipo == "MANUAL":
+        actor = db.query(models.Usuario).filter_by(id=datos.solicitada_por_id).first()
+        if not actor or actor.rol != models.RolUsuario.ADMIN:
+            raise HTTPException(status_code=403, detail="Se requiere ADMIN para lanzar consultas manuales.")
+        if datos.radicado_id is not None and radicado_ids:
+            raise HTTPException(status_code=400, detail="Selecciona un radicado individual o una lista, no ambos.")
 
     existing = db.query(models.EjecucionBarrido).filter_by(
         clave_idempotencia=datos.clave_idempotencia
@@ -152,7 +766,7 @@ def reclamar_barrido(
         }
 
     ahora = datetime.utcnow()
-    activa = (
+    activa = None if consulta_seleccionada else (
         db.query(models.EjecucionBarrido)
         .filter(
             models.EjecucionBarrido.estado == "EN_PROCESO",
@@ -170,8 +784,20 @@ def reclamar_barrido(
             "ejecucion": _serializar_ejecucion(activa),
         }
 
-    radicados_query = db.query(models.Radicado.id).filter(models.Radicado.ambito_key == "FIRMA")
+    radicados_query = db.query(models.Radicado.id).filter(
+        (models.Radicado.ambito_key == "FIRMA")
+        | models.Radicado.ambito_key.like("SAAS:%")
+    )
+    if datos.radicado_id is not None:
+        radicados_query = radicados_query.filter(models.Radicado.id == datos.radicado_id)
+    elif radicado_ids:
+        radicados_query = radicados_query.filter(models.Radicado.id.in_(radicado_ids))
     total = radicados_query.count()
+    ids_esperados = 1 if datos.radicado_id is not None else len(radicado_ids)
+    if consulta_seleccionada and total != ids_esperados:
+        raise HTTPException(status_code=404, detail="Uno o más radicados no existen.")
+    if datos.tipo == "AUTOMATICA_NUEVO" and total != 1:
+        raise HTTPException(status_code=404, detail="Radicado no encontrado.")
     ejecucion = models.EjecucionBarrido(
         id=str(uuid4()),
         clave_idempotencia=datos.clave_idempotencia,
@@ -198,8 +824,31 @@ def reclamar_barrido(
             "ejecucion": _serializar_ejecucion(existente),
         }
 
-    configuracion.ejecucion_activa_id = ejecucion.id
-    configuracion.lease_hasta = ejecucion.lease_hasta
+    if not consulta_seleccionada:
+        configuracion.ejecucion_activa_id = ejecucion.id
+        configuracion.lease_hasta = ejecucion.lease_hasta
+    else:
+        selected_ids = [datos.radicado_id] if datos.radicado_id is not None else radicado_ids
+        for radicado_id in selected_ids:
+            consulta_id = datos.consulta_id if datos.tipo == "AUTOMATICA_NUEVO" else None
+            if consulta_id is None and datos.tipo == "MANUAL":
+                consulta = models.ConsultaRadicado(
+                    radicado_id=radicado_id,
+                    tipo="MANUAL",
+                    estado="ENCOLADA",
+                    inicio=ahora,
+                )
+                db.add(consulta)
+                db.flush()
+                consulta_id = consulta.id
+            db.add(
+                models.EjecucionRadicado(
+                    ejecucion_id=ejecucion.id,
+                    radicado_id=radicado_id,
+                    consulta_id=consulta_id,
+                    estado="PENDIENTE",
+                )
+            )
     db.commit()
     return {"debe_ejecutar": True, "ejecucion": _serializar_ejecucion(ejecucion)}
 
@@ -218,13 +867,18 @@ def listar_radicados_barrido(
     radicados = (
         db.query(models.Radicado.id, models.Radicado.numero)
         .filter(
-            models.Radicado.ambito_key == "FIRMA",
+            (models.Radicado.ambito_key == "FIRMA")
+            | models.Radicado.ambito_key.like("SAAS:%"),
             models.Radicado.id > despues_de,
         )
         .order_by(models.Radicado.id.asc())
-        .limit(limite)
-        .all()
     )
+    if ejecucion.clave_idempotencia.startswith(("NUEVO:", "MANUAL_RADICADO:")):
+        selected_ids = db.query(models.EjecucionRadicado.radicado_id).filter_by(
+            ejecucion_id=ejecucion.id
+        )
+        radicados = radicados.filter(models.Radicado.id.in_(selected_ids))
+    radicados = radicados.limit(limite).all()
     ejecucion.lease_hasta = datetime.utcnow() + timedelta(minutes=30)
     configuracion = db.query(models.ConfiguracionConsultas).filter_by(id=1).first()
     if configuracion and configuracion.ejecucion_activa_id == ejecucion.id:
@@ -246,9 +900,12 @@ def ejecutar_consulta_barrido_radicado(
     ejecucion = db.query(models.EjecucionBarrido).filter_by(id=ejecucion_id).first()
     if not ejecucion or ejecucion.estado != "EN_PROCESO":
         raise HTTPException(status_code=409, detail="La ejecución no está activa.")
-    radicado = db.query(models.Radicado).filter_by(id=radicado_id, ambito_key="FIRMA").first()
-    if not radicado:
-        raise HTTPException(status_code=404, detail="Radicado fuera del ámbito de la firma.")
+    radicado = db.query(models.Radicado).filter_by(id=radicado_id).first()
+    if not radicado or not (
+        radicado.ambito_key == "FIRMA"
+        or (radicado.ambito_key or "").startswith("SAAS:")
+    ):
+        raise HTTPException(status_code=404, detail="Radicado fuera de un ámbito consultable.")
 
     resultado_radicado = db.query(models.EjecucionRadicado).filter_by(
         ejecucion_id=ejecucion.id,

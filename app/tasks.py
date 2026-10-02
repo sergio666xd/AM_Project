@@ -6,7 +6,8 @@ from app.celery_app import celery_app
 from app.database import SessionLocal
 from app import models
 from app.rama_judicial_api import ejecutar_consulta_api_radicado
-from app.notification_policy import plan_whatsapp_habilitado, whatsapp_habilitado
+from app.notification_service import emitir_notificacion_workflow
+from app.reminder_workflow import iniciar_workflow_recordatorio, momento_programado
 from app.whatsapp import enviar_mensaje_whatsapp
 from app.email_service import enviar_correo
 
@@ -83,17 +84,16 @@ def tarea_enviar_email(self, destinatario: str, asunto: str, cuerpo: str):
 
 @celery_app.task(name="tareas.enviar_recordatorios_tareas")
 def tarea_enviar_recordatorios_tareas():
-    """Celery entry point; QStash can invoke the shared processor on Vercel."""
+    """Legacy scheduler entry point; only reconcile durable Workflow launches."""
     return procesar_recordatorios_tareas()
 
 
 def procesar_recordatorios_tareas():
-    """Send due WhatsApp reminders directly and persist successful deliveries."""
+    """Reconcile active reminders whose durable Workflow was not launched."""
     db = SessionLocal()
-    enviados = 0
+    programados = 0
     errores = 0
     try:
-        ahora = datetime.utcnow()
         recordatorios = (
             db.query(models.RecordatorioTarea)
             .join(models.Tarea)
@@ -102,35 +102,28 @@ def procesar_recordatorios_tareas():
                 models.RecordatorioTarea.activo == True,
                 models.RecordatorioTarea.enviado_en == None,
                 models.Usuario.estado == models.EstadoUsuario.ACTIVO,
+                models.Tarea.estado.notin_(
+                    (models.EstadoTarea.COMPLETADA, models.EstadoTarea.CANCELADA)
+                ),
+                models.RecordatorioTarea.workflow_version_lanzada != models.RecordatorioTarea.version,
             )
             .with_for_update(skip_locked=True, of=models.RecordatorioTarea)
             .all()
         )
         for recordatorio in recordatorios:
-            tarea = recordatorio.tarea
-            usuario = tarea.usuario
-            if not whatsapp_habilitado(usuario) or not plan_whatsapp_habilitado(usuario, "notificaciones_whatsapp_tareas"):
-                continue
-            momento = recordatorio.fecha_hora
-            if momento is None and recordatorio.anticipacion_minutos is not None and tarea.fecha_limite:
-                momento = tarea.fecha_limite - timedelta(minutes=recordatorio.anticipacion_minutos)
-            if momento is None or momento > ahora:
-                continue
-            mensaje = f"📌 *Recordatorio de tarea*\n\n*{tarea.titulo}*"
-            if tarea.fecha_limite:
-                mensaje += f"\nFecha límite: {tarea.fecha_limite.strftime('%d/%m/%Y %H:%M')}"
-            try:
-                enviado = enviar_mensaje_whatsapp(usuario.whatsapp_numero, mensaje)
-            except Exception:
-                logger.exception("No se pudo enviar un recordatorio de tarea.")
-                enviado = False
-            if not enviado:
+            if momento_programado(recordatorio, recordatorio.tarea) is None:
                 errores += 1
                 continue
-            recordatorio.enviado_en = ahora
-            db.commit()
-            enviados += 1
-        return {"estado": "ok", "recordatorios_enviados": enviados, "errores": errores}
+            if iniciar_workflow_recordatorio(db, recordatorio.id):
+                programados += 1
+            elif recordatorio.workflow_version_lanzada != recordatorio.version:
+                errores += 1
+        return {
+            "estado": "ok",
+            "recordatorios_programados": programados,
+            "recordatorios_enviados": 0,
+            "errores": errores,
+        }
     finally:
         db.close()
 
@@ -155,15 +148,9 @@ def tarea_consultar_radicado(
 
     try:
 
-        # ---------------------------------------------------------
-        # BUSCAR RADICADO
-        # ---------------------------------------------------------
-
         radicado = (
             db.query(models.Radicado)
-            .filter(
-                models.Radicado.id == radicado_id
-            )
+            .filter(models.Radicado.id == radicado_id)
             .first()
         )
 
@@ -247,48 +234,6 @@ def tarea_consultar_radicado(
             "actuaciones_nuevas",
             [],
         )
-
-        # ---------------------------------------------------------
-        # NOTIFICACIÓN WHATSAPP
-        # ---------------------------------------------------------
-
-        if nuevas:
-
-            usuario = radicado.creador
-
-            if whatsapp_habilitado(usuario) and plan_whatsapp_habilitado(usuario, "notificaciones_whatsapp_procesos"):
-
-                mensaje = (
-                    f"⚖️ *Novedad Judicial Detectada*\n\n"
-                    f"📌 *Radicado:* "
-                    f"`{radicado.numero}`\n"
-                    f"🏢 *Despacho:* "
-                    f"{radicado.despacho_departamento}\n\n"
-                    f"📝 *Nueva Actuación "
-                    f"({nuevas[0]['fecha_actuacion']}):*\n"
-                    f"{nuevas[0]['actuacion']}\n"
-                )
-
-                if nuevas[0].get("anotacion"):
-
-                    mensaje += (
-                        f"\nℹ️ *Anotación:* "
-                        f"{nuevas[0]['anotacion']}\n"
-                    )
-
-                if nuevas[0].get("es_fijacion"):
-
-                    mensaje += (
-                        "\n⚠️ *Atención:* "
-                        "Esta actuación incluye "
-                        "Fijación en Estado."
-                    )
-
-                # Enviar WhatsApp como tarea independiente
-                tarea_enviar_whatsapp.delay(
-                    usuario.whatsapp_numero,
-                    mensaje,
-                )
 
         # ---------------------------------------------------------
         # CONSULTA COMPLETADA
@@ -422,7 +367,6 @@ def tarea_consultar_todos_los_radicados():
     db = SessionLocal()
 
     try:
-
         radicados = (
             db.query(models.Radicado)
             .order_by(
@@ -651,17 +595,16 @@ def tarea_enviar_resumen_mensual():
                 "por tu plataforma SaaS Judicial.*"
             )
 
-            # -----------------------------------------------------
-            # ENVIAR WHATSAPP
-            # -----------------------------------------------------
-
-            if whatsapp_habilitado(usuario) and plan_whatsapp_habilitado(usuario, "notificaciones_whatsapp_procesos"):
-
-                tarea_enviar_whatsapp.delay(
-                    usuario.whatsapp_numero,
-                    mensaje,
-                )
-
+            entrega_ids = emitir_notificacion_workflow(
+                db,
+                usuario,
+                "RESUMENES",
+                f"RESUMEN:{usuario.id}:{hoy.year:04d}-{hoy.month:02d}",
+                f"Resumen mensual de procesos ({mes_actual})",
+                mensaje,
+                emisor=usuario,
+            )
+            if entrega_ids:
                 usuarios_notificados += 1
 
         return {

@@ -2,7 +2,7 @@
 
 import { apiRequest } from "@/lib/api";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import {
   Bell,
   Check,
@@ -14,22 +14,68 @@ import {
 
 import { useSession } from "@/context/SessionContext";
 
+const TIPOS_MENSAJE = [
+  { id: "ACCESO", label: "Acceso y cuenta" },
+  { id: "ACTUACIONES", label: "Actuaciones judiciales" },
+  { id: "TAREAS", label: "Asignaciones de tareas" },
+  { id: "SUBTAREAS", label: "Asignaciones de subtareas" },
+  { id: "RECORDATORIOS", label: "Recordatorios" },
+  { id: "DOCUMENTOS", label: "Documentos y solicitudes" },
+  { id: "RESUMENES", label: "Resúmenes" },
+] as const;
+
+type NotificationType = (typeof TIPOS_MENSAJE)[number]["id"];
+type ChannelPreferences = Record<NotificationType, { email: boolean; whatsapp: boolean }>;
+
+const DEFAULT_PREFERENCES: ChannelPreferences = {
+  ACCESO: { email: true, whatsapp: false },
+  ACTUACIONES: { email: true, whatsapp: false },
+  TAREAS: { email: true, whatsapp: false },
+  SUBTAREAS: { email: true, whatsapp: false },
+  RECORDATORIOS: { email: true, whatsapp: false },
+  DOCUMENTOS: { email: true, whatsapp: false },
+  RESUMENES: { email: true, whatsapp: false },
+};
+
+const WHATSAPP_PLAN_FLAGS: Record<NotificationType, string | null> = {
+  ACCESO: "notificaciones_whatsapp_procesos",
+  ACTUACIONES: "notificaciones_whatsapp_procesos",
+  TAREAS: "notificaciones_whatsapp_tareas",
+  SUBTAREAS: "notificaciones_whatsapp_tareas",
+  RECORDATORIOS: "notificaciones_whatsapp_tareas",
+  DOCUMENTOS: "notificaciones_whatsapp_procesos",
+  RESUMENES: "notificaciones_whatsapp_procesos",
+};
+
 
 export default function ConfiguracionAbogadoPage() {
   const { user, token, refreshUser } = useSession();
 
-  const [email, setEmail] = useState(true);
-  const [whatsapp, setWhatsapp] = useState(false);
+  const [preferences, setPreferences] = useState<ChannelPreferences>(DEFAULT_PREFERENCES);
+  const [clientChannel, setClientChannel] = useState<"EMAIL" | "WHATSAPP">("EMAIL");
+  const [previousUser, setPreviousUser] = useState(user);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
 
-  useEffect(() => {
+  if (user !== previousUser) {
+    setPreviousUser(user);
     if (user) {
-      setEmail(user.notificaciones_email !== false);
-      setWhatsapp(!!user.notificaciones_whatsapp);
+      setPreferences(Object.fromEntries(
+        TIPOS_MENSAJE.map(({ id }) => [
+          id,
+          user.preferencias_notificacion?.[id] ?? {
+            email: user.notificaciones_email !== false,
+            whatsapp: !!user.notificaciones_whatsapp,
+          },
+        ]),
+      ) as ChannelPreferences);
+      setClientChannel(user.canal_notificacion_cliente ?? "EMAIL");
+    } else {
+      setPreferences(DEFAULT_PREFERENCES);
+      setClientChannel("EMAIL");
     }
-  }, [user]);
+  }
 
   async function save() {
     setSaving(true);
@@ -45,10 +91,9 @@ export default function ConfiguracionAbogadoPage() {
             "Content-Type": "application/json",
             Authorization: `Bearer ${token}`,
           },
-          body: JSON.stringify({
-            notificaciones_email: email,
-            notificaciones_whatsapp: whatsapp,
-          }),
+          body: JSON.stringify(user?.rol === "CLIENTE"
+            ? { canal_cliente: clientChannel }
+            : { preferencias: preferences }),
         },
       );
 
@@ -145,38 +190,83 @@ export default function ConfiguracionAbogadoPage() {
         </div>
 
         {/* Opciones */}
-        <div className="divide-y divide-[var(--border)]">
-          {/* Correo */}
-          <NotificationOption
-            icon={<Mail className="size-5" />}
-            title="Correo electrónico"
-            description={`Recibe avisos en ${
-              user?.email || "tu correo electrónico"
-            }.`}
-            checked={email}
-            onChange={setEmail}
-          />
-
-          {/* WhatsApp */}
-          <NotificationOption
-            icon={<MessageCircle className="size-5" />}
-            title="WhatsApp"
-            description={
-              user?.whatsapp_numero
-                ? `Recibe alertas en ${user.whatsapp_numero}.`
-                : "Configura un número de WhatsApp en tu perfil para activar este canal."
-            }
-            checked={whatsapp}
-            onChange={setWhatsapp}
-            disabled={!user?.whatsapp_numero}
-          />
-        </div>
+        {user?.rol === "CLIENTE" ? (
+          <fieldset className="space-y-3 p-5 sm:p-6">
+            <legend className="text-sm font-semibold text-[var(--foreground)]">
+              Canal obligatorio para todas tus alertas
+            </legend>
+            <label className="flex cursor-pointer items-center gap-3 rounded-lg border border-[var(--border)] p-4">
+              <input
+                type="radio"
+                name="canal-cliente"
+                value="EMAIL"
+                checked={clientChannel === "EMAIL"}
+                onChange={() => setClientChannel("EMAIL")}
+              />
+              <Mail className="size-4" />
+              <span className="text-sm">Correo · {user.email}</span>
+            </label>
+            <label className={`flex items-center gap-3 rounded-lg border border-[var(--border)] p-4 ${user.whatsapp_numero ? "cursor-pointer" : "cursor-not-allowed opacity-50"}`}>
+              <input
+                type="radio"
+                name="canal-cliente"
+                value="WHATSAPP"
+                checked={clientChannel === "WHATSAPP"}
+                disabled={!user.whatsapp_numero}
+                onChange={() => setClientChannel("WHATSAPP")}
+              />
+              <MessageCircle className="size-4" />
+              <span className="text-sm">WhatsApp · {user.whatsapp_numero || "Sin número configurado"}</span>
+            </label>
+          </fieldset>
+        ) : (
+          <div className="divide-y divide-[var(--border)]">
+            {TIPOS_MENSAJE.map(({ id, label }) => {
+              const whatsappPlanFlag = WHATSAPP_PLAN_FLAGS[id];
+              const whatsappAvailable = Boolean(user?.whatsapp_numero)
+                && (user?.rol !== "ABOGADO"
+                  || !whatsappPlanFlag
+                  || user.plan?.[whatsappPlanFlag as keyof NonNullable<typeof user.plan>] === true);
+              return (
+                <fieldset key={id} className="grid gap-3 p-5 sm:grid-cols-[minmax(0,1fr)_auto_auto] sm:items-center sm:px-6">
+                  <legend className="font-medium text-[var(--foreground)]">{label}</legend>
+                  <label className="flex items-center gap-2 text-sm text-[var(--foreground-muted)]">
+                    <input
+                      type="checkbox"
+                      checked={preferences[id].email}
+                      onChange={(event) => setPreferences((current) => ({
+                        ...current,
+                        [id]: { ...current[id], email: event.target.checked },
+                      }))}
+                    />
+                    <Mail className="size-4" />
+                    Email
+                  </label>
+                  <label className={`flex items-center gap-2 text-sm text-[var(--foreground-muted)] ${whatsappAvailable ? "" : "cursor-not-allowed opacity-50"}`}>
+                    <input
+                      type="checkbox"
+                      checked={preferences[id].whatsapp}
+                      disabled={!whatsappAvailable}
+                      onChange={(event) => setPreferences((current) => ({
+                        ...current,
+                        [id]: { ...current[id], whatsapp: event.target.checked },
+                      }))}
+                    />
+                    <MessageCircle className="size-4" />
+                    WhatsApp
+                  </label>
+                </fieldset>
+              );
+            })}
+          </div>
+        )}
 
         {/* Footer */}
         <div className="flex flex-col gap-3 border-t border-[var(--border)] bg-[var(--surface-secondary)] p-5 sm:flex-row sm:items-center sm:justify-between sm:p-6">
           <div className="text-xs leading-5 text-[var(--foreground-muted)]">
-            Los cambios se aplicarán a las próximas alertas enviadas a tu
-            cuenta.
+            {user?.rol === "CLIENTE"
+              ? "Recibirás todas las alertas que te correspondan en el canal elegido."
+              : "Cada tipo aplica sus canales de forma independiente."}
           </div>
 
           <button
@@ -226,86 +316,6 @@ export default function ConfiguracionAbogadoPage() {
         </div>
       </section>
     </section>
-  );
-}
-
-function NotificationOption({
-  icon,
-  title,
-  description,
-  checked,
-  onChange,
-  disabled = false,
-}: {
-  icon: React.ReactNode;
-  title: string;
-  description: string;
-  checked: boolean;
-  onChange: (value: boolean) => void;
-  disabled?: boolean;
-}) {
-  return (
-    <label
-      className={`flex items-center justify-between gap-5 p-5 transition sm:p-6 ${
-        disabled
-          ? "cursor-not-allowed opacity-60"
-          : "cursor-pointer hover:bg-[var(--surface-secondary)]"
-      }`}
-    >
-      <div className="flex min-w-0 items-start gap-4">
-        <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-[var(--surface-secondary)] text-[var(--foreground-muted)]">
-          {icon}
-        </div>
-
-        <div className="min-w-0">
-          <p className="font-medium text-[var(--foreground)]">{title}</p>
-
-          <p className="mt-1 text-sm leading-6 text-[var(--foreground-muted)]">
-            {description}
-          </p>
-
-          {disabled && (
-            <p className="mt-2 text-xs font-medium text-amber-600 dark:text-amber-400">
-              Requiere un número de WhatsApp configurado.
-            </p>
-          )}
-        </div>
-      </div>
-
-      {/* Switch */}
-      <span className="relative shrink-0">
-        <input
-          type="checkbox"
-          checked={checked}
-          onChange={(event) => onChange(event.target.checked)}
-          disabled={disabled}
-          className="peer sr-only"
-        />
-
-        <span
-          className="
-            block h-6 w-11 rounded-full
-            bg-[var(--border)]
-            transition
-            peer-checked:bg-[var(--primary)]
-            peer-focus-visible:ring-2
-            peer-focus-visible:ring-[var(--primary)]/40
-            peer-disabled:opacity-50
-          "
-        />
-
-        <span
-          className="
-            pointer-events-none
-            absolute left-1 top-1
-            size-4 rounded-full
-            bg-white shadow-sm
-            transition-transform
-            peer-checked:translate-x-5
-          "
-        />
-      </span>
-    </label>
   );
 }
 

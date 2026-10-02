@@ -20,8 +20,13 @@ from app.document_validation import (
     MAX_DOCUMENT_BYTES,
     document_content_matches_type as _document_content_matches_type,
 )
-from app.tasks import tarea_enviar_email, tarea_enviar_whatsapp
-from app.radicados import ambito_radicado_usuario, obtener_o_vincular_radicado
+from app.notification_service import emitir_notificacion_workflow
+from app.radicados import (
+    ambito_radicado_usuario,
+    iniciar_consulta_nuevo_radicado,
+    obtener_o_vincular_radicado,
+    radicado_vinculado_a_usuario,
+)
 from app.firm_access import (
     has_firm_wide_access,
     is_process_manager,
@@ -31,7 +36,6 @@ from app.firm_access import (
     require_process_manager,
     require_roles,
 )
-from app.notification_policy import plan_whatsapp_habilitado, whatsapp_habilitado
 
 logger = logging.getLogger(__name__)
 
@@ -154,18 +158,23 @@ def _equipo_proceso(proceso: models.Proceso) -> dict:
 
 
 def _notificar(
+    db: Session,
     usuario: models.Usuario,
     asunto: str,
     cuerpo: str,
+    tipo: str,
+    origen: str,
     emisor: models.Usuario | None = None,
-    feature_plan: str | None = None,
 ) -> None:
-    if usuario.notificaciones_email:
-        tarea_enviar_email.delay(usuario.email, asunto, cuerpo)
-    if whatsapp_habilitado(usuario) and (
-        emisor is None or feature_plan is None or plan_whatsapp_habilitado(emisor, feature_plan)
-    ):
-        tarea_enviar_whatsapp.delay(usuario.whatsapp_numero, cuerpo)
+    emitir_notificacion_workflow(
+        db,
+        usuario,
+        tipo,
+        origen,
+        asunto,
+        cuerpo,
+        emisor=emisor,
+    )
 
 
 @router.post("/abogados", status_code=status.HTTP_201_CREATED)
@@ -179,7 +188,15 @@ def crear_abogado_admin(datos: schemas.AbogadoAdminCreate, db: Session = Depends
     db.add(abogado); db.flush()
     registrar_evento_auditoria(db, usuario, "abogado.crear", "usuario", abogado.id)
     db.commit(); db.refresh(abogado)
-    _notificar(abogado, "Acceso de abogado administrador", "Su acceso fue creado. Cambie la contraseña temporal al ingresar.")
+    _notificar(
+        db,
+        abogado,
+        "Acceso de abogado administrador",
+        "Su acceso fue creado. Cambie la contraseña temporal al ingresar.",
+        "ACCESO",
+        f"USUARIO:{abogado.id}:ACCESO",
+        emisor=usuario,
+    )
     return {"id": abogado.id, "email": abogado.email, "debe_cambiar_password": True}
 
 
@@ -190,11 +207,19 @@ def crear_cliente(datos: schemas.ClienteCreate, db: Session = Depends(get_db), u
         raise HTTPException(status_code=400, detail="Ya existe un usuario con este correo.")
     if len(datos.password_temporal) < 8:
         raise HTTPException(status_code=400, detail="La contraseña temporal debe tener al menos 8 caracteres.")
-    cliente = models.Usuario(email=str(datos.email).lower(), nombre_completo=datos.nombre_completo.strip(), whatsapp_numero=datos.whatsapp_numero.strip(), password_hash=security.hash_password(datos.password_temporal), rol=models.RolUsuario.CLIENTE, estado=models.EstadoUsuario.ACTIVO, creado_por_abogado_id=usuario.id, debe_cambiar_password=True, notificaciones_email=True, notificaciones_whatsapp=False)
+    cliente = models.Usuario(email=str(datos.email).lower(), nombre_completo=datos.nombre_completo.strip(), whatsapp_numero=datos.whatsapp_numero.strip(), password_hash=security.hash_password(datos.password_temporal), rol=models.RolUsuario.CLIENTE, estado=models.EstadoUsuario.ACTIVO, creado_por_abogado_id=usuario.id, debe_cambiar_password=True, notificaciones_email=True, notificaciones_whatsapp=False, canal_notificacion_cliente="EMAIL")
     db.add(cliente); db.flush()
     registrar_evento_auditoria(db, usuario, "cliente.crear", "usuario", cliente.id)
     db.commit(); db.refresh(cliente)
-    _notificar(cliente, "Acceso a sus procesos", f"{usuario.nombre_completo} creó su acceso. Use la contraseña temporal entregada y cámbiela al ingresar.")
+    _notificar(
+        db,
+        cliente,
+        "Acceso a sus procesos",
+        f"{usuario.nombre_completo} creó su acceso. Use la contraseña temporal entregada y cámbiela al ingresar.",
+        "ACCESO",
+        f"USUARIO:{cliente.id}:ACCESO",
+        emisor=usuario,
+    )
     return {"id": cliente.id, "email": cliente.email, "debe_cambiar_password": True}
 
 
@@ -398,7 +423,7 @@ def obtener_cliente(cliente_id: int, db: Session = Depends(get_db), usuario: mod
     procesos = procesos_query.all()
     tareas = tareas_query.order_by(models.Tarea.created_at.desc()).all()
     solicitudes = solicitudes_query.order_by(models.SolicitudDocumento.created_at.desc()).all()
-    return {"id": cliente.id, "nombre_completo": cliente.nombre_completo, "email": cliente.email, "whatsapp_numero": cliente.whatsapp_numero, "notificaciones_email": cliente.notificaciones_email, "notificaciones_whatsapp": cliente.notificaciones_whatsapp, "procesos": [{"id": p.id, "nombre": p.nombre} for p in procesos], "tareas": [{"id": t.id, "titulo": t.titulo, "estado": t.estado.value, "fecha_limite": t.fecha_limite} for t in tareas], "solicitudes_documento": [{"id": s.id, "titulo": s.titulo, "atendida_en": s.atendida_en, "proceso": s.proceso.nombre} for s in solicitudes]}
+    return {"id": cliente.id, "nombre_completo": cliente.nombre_completo, "email": cliente.email, "whatsapp_numero": cliente.whatsapp_numero, "canal_notificacion_cliente": cliente.canal_notificacion_cliente, "procesos": [{"id": p.id, "nombre": p.nombre} for p in procesos], "tareas": [{"id": t.id, "titulo": t.titulo, "estado": t.estado.value, "fecha_limite": t.fecha_limite} for t in tareas], "solicitudes_documento": [{"id": s.id, "titulo": s.titulo, "atendida_en": s.atendida_en, "proceso": s.proceso.nombre} for s in solicitudes]}
 
 
 @router.put("/clientes/{cliente_id}")
@@ -833,6 +858,11 @@ def asignar_radicado(proceso_id: int, radicado_id: int, db: Session = Depends(ge
         models.Radicado.ambito_key == scope_key,
     ).first()
     if not radicado: raise HTTPException(status_code=404, detail="Radicado no encontrado en la firma.")
+    vinculado_previamente = radicado_vinculado_a_usuario(
+        db,
+        proceso.abogado,
+        radicado.numero,
+    )
     if not db.query(models.ProcesoRadicado).filter_by(proceso_id=proceso.id, radicado_id=radicado.id).first():
         try:
             obtener_o_vincular_radicado(db, proceso.abogado, radicado.numero)
@@ -841,6 +871,16 @@ def asignar_radicado(proceso_id: int, radicado_id: int, db: Session = Depends(ge
         db.add(models.ProcesoRadicado(proceso_id=proceso.id, radicado_id=radicado.id))
         registrar_evento_auditoria(db, usuario, "proceso.radicado.asignar", "proceso_radicado", f"{proceso.id}:{radicado.id}")
         db.commit()
+        if not vinculado_previamente:
+            mensaje_consulta, consulta_id = iniciar_consulta_nuevo_radicado(
+                db,
+                proceso.abogado,
+                radicado,
+            )
+            return {
+                "mensaje": f"Radicado asignado al proceso. {mensaje_consulta}",
+                "consulta_id": consulta_id,
+            }
     return {"mensaje": "Radicado asignado al proceso."}
 
 
@@ -855,6 +895,11 @@ def crear_y_asignar_radicado(
     _abogado(usuario)
     proceso = _proceso_abogado(proceso_id, usuario, db)
     numero = datos.numero.strip()
+    vinculado_previamente = radicado_vinculado_a_usuario(
+        db,
+        proceso.abogado,
+        numero,
+    )
     try:
         radicado, created = obtener_o_vincular_radicado(db, proceso.abogado, numero)
         if usuario.id != proceso.abogado_id:
@@ -868,7 +913,21 @@ def crear_y_asignar_radicado(
     action = "radicado.crear_en_proceso" if created else "radicado.vincular_en_proceso"
     registrar_evento_auditoria(db, usuario, action, "radicado", radicado.id)
     db.commit(); db.refresh(radicado)
-    return {"id": radicado.id, "numero": radicado.numero, "mensaje": "Radicado creado y asociado al proceso."}
+    mensaje = "Radicado creado y asociado al proceso."
+    consulta_id = None
+    if created or not vinculado_previamente:
+        mensaje_consulta, consulta_id = iniciar_consulta_nuevo_radicado(
+            db,
+            proceso.abogado,
+            radicado,
+        )
+        mensaje = f"{mensaje} {mensaje_consulta}"
+    return {
+        "id": radicado.id,
+        "numero": radicado.numero,
+        "mensaje": mensaje,
+        "consulta_id": consulta_id,
+    }
 
 
 @router.post("/procesos/{proceso_id}/clientes/{cliente_id}")
@@ -909,7 +968,15 @@ def notificar_actuacion(proceso_id: int, actuacion_id: int, datos: schemas.Notif
     if not actuacion: raise HTTPException(status_code=404, detail="La actuación no corresponde al proceso.")
     cuerpo = f"El abogado {usuario.nombre_completo} le notifica de esta actuación en el proceso {proceso.nombre} con N° radicado {actuacion.radicado_rel.numero}.\n\nActuación: {actuacion.actuacion}\nComentarios del abogado: {datos.comentarios}"
     asunto = f"Actualización del proceso {proceso.nombre}"
-    _notificar(cliente, asunto, cuerpo, usuario, "notificaciones_whatsapp_procesos")
+    _notificar(
+        db,
+        cliente,
+        asunto,
+        cuerpo,
+        "ACTUACIONES",
+        f"NOTIFICACION_ACTUACION:{actuacion.id}:{cliente.id}",
+        emisor=usuario,
+    )
     db.add(models.NotificacionProceso(
         abogado_id=usuario.id, proceso_id=proceso.id, cliente_id=cliente.id,
         actuacion_id=actuacion.id, comentarios=datos.comentarios,
@@ -929,11 +996,13 @@ def solicitar_documento(proceso_id: int, datos: schemas.SolicitudDocumentoCreate
     registrar_evento_auditoria(db, usuario, "documento.solicitar", "solicitud_documento", solicitud.id)
     db.commit(); db.refresh(solicitud)
     _notificar(
+        db,
         cliente,
         f"Documento solicitado: {proceso.nombre}",
         f"{usuario.nombre_completo} le solicitó: {solicitud.titulo}. {solicitud.instrucciones or ''}",
+        "DOCUMENTOS",
+        f"SOLICITUD_DOCUMENTO:{solicitud.id}",
         usuario,
-        "notificaciones_whatsapp_procesos",
     )
     return {"id": solicitud.id, "mensaje": "Solicitud enviada al cliente."}
 

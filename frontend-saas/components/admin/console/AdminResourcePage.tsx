@@ -17,7 +17,7 @@ import {
   X,
 } from "lucide-react";
 import { useSession } from "@/context/SessionContext";
-import { API_URL, apiRequest } from "@/lib/api";
+import { API_URL, apiRequest, iniciarWorkflowConsultaRadicado } from "@/lib/api";
 
 type Sector = "FIRMA" | "SAAS" | "GLOBAL";
 type Resource = "procesos" | "radicados" | "tareas" | "documentos";
@@ -401,7 +401,20 @@ export default function AdminResourcePage({ sector }: { sector: Sector }) {
       const result = await response.json().catch(() => ({}));
       if (!response.ok)
         throw new Error(result.detail || "No fue posible guardar el registro.");
-      setNotice(result.mensaje || "Cambios guardados.");
+      let noticeMessage = result.mensaje || "Cambios guardados.";
+      if (!editing && resource === "radicados" && typeof result.consulta_id === "number") {
+        try {
+          await iniciarWorkflowConsultaRadicado(token, {
+            tipo: "AUTOMATICA_NUEVO",
+            radicado_id: Number(result.id),
+            consulta_id: result.consulta_id,
+          });
+          noticeMessage = `${noticeMessage} Workflow de consulta iniciado.`;
+        } catch {
+          noticeMessage = `${noticeMessage} No fue posible iniciar el Workflow; vuelve a intentarlo desde ADMIN.`;
+        }
+      }
+      setNotice(noticeMessage);
       setEditing(null);
       setFormOpen(false);
       await reload();
@@ -609,14 +622,11 @@ export default function AdminResourcePage({ sector }: { sector: Sector }) {
     setError("");
     setNotice("");
     try {
-      const response = await adminFetch(
-        `${API_URL}/api/admin/radicados/${row.id}/consultar?sector=${sector}`,
-        { method: "POST", headers: { Authorization: `Bearer ${token}` } },
-      );
-      const result = await response.json().catch(() => ({}));
-      if (!response.ok)
-        throw new Error(result.detail || "No fue posible encolar la consulta.");
-      setNotice(result.mensaje || "Consulta encolada.");
+      await iniciarWorkflowConsultaRadicado(token, {
+        tipo: "MANUAL",
+        radicado_id: row.id,
+      });
+      setNotice("Consulta enviada al Workflow.");
       await reload();
     } catch (cause) {
       setError(
@@ -635,16 +645,16 @@ export default function AdminResourcePage({ sector }: { sector: Sector }) {
     setError("");
     setNotice("");
     try {
-      const response = await adminFetch(
-        `${API_URL}/api/admin/radicados/consultar?sector=${sector}`,
-        { method: "POST", headers: { Authorization: `Bearer ${token}` } },
-      );
-      const result = await response.json().catch(() => ({}));
-      if (!response.ok)
-        throw new Error(
-          result.detail || "No fue posible encolar las consultas.",
-        );
-      setNotice(result.mensaje || "Consultas encoladas.");
+      const radicadoIds = rows.map((row) => row.id);
+      if (!radicadoIds.length) {
+        setNotice("No hay radicados para consultar.");
+        return;
+      }
+      await iniciarWorkflowConsultaRadicado(token, {
+        tipo: "MANUAL",
+        radicado_ids: radicadoIds,
+      });
+      setNotice(`${radicadoIds.length} consultas enviadas al Workflow.`);
       await reload();
     } catch (cause) {
       setError(

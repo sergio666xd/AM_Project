@@ -18,7 +18,7 @@ import {
   X,
 } from "lucide-react";
 
-import { fetchApi } from "@/lib/api";
+import { fetchApi, iniciarWorkflowConsultaRadicado } from "@/lib/api";
 import { useSession } from "@/context/SessionContext";
 
 interface Actuacion {
@@ -122,6 +122,7 @@ export default function DetalleRadicadoPage() {
   const router = useRouter();
 
   const {
+    user,
     token,
     loading: sessionLoading,
   } = useSession();
@@ -271,13 +272,10 @@ export default function DetalleRadicadoPage() {
       setConsultando(true);
       setError("");
 
-      await fetchApi(
-        `/api/radicados/${id}/consultar`,
-        {
-          method: "POST",
-          token,
-        }
-      );
+      await iniciarWorkflowConsultaRadicado(token, {
+        tipo: "MANUAL",
+        radicado_id: Number(id),
+      });
 
       /*
        * La consulta queda encolada en backend.
@@ -584,22 +582,21 @@ export default function DetalleRadicadoPage() {
                 </div>
               </div>
 
-              <button
-                type="button"
-                onClick={handleConsultar}
-                disabled={consultando}
-                className="inline-flex w-full shrink-0 items-center justify-center gap-2 rounded-lg bg-[var(--primary)] px-4 py-2.5 text-sm font-medium text-white transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto"
-              >
-                {consultando ? (
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                ) : (
-                  <RefreshCw className="h-4 w-4" />
-                )}
-
-                {consultando
-                  ? "Consultando..."
-                  : "Consultar ahora"}
-              </button>
+              {user?.rol === "ADMIN" && (
+                <button
+                  type="button"
+                  onClick={handleConsultar}
+                  disabled={consultando}
+                  className="inline-flex w-full shrink-0 items-center justify-center gap-2 rounded-lg bg-[var(--primary)] px-4 py-2.5 text-sm font-medium text-white transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto"
+                >
+                  {consultando ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <RefreshCw className="h-4 w-4" />
+                  )}
+                  {consultando ? "Consultando..." : "Consultar ahora"}
+                </button>
+              )}
             </div>
 
             {/* ====================================================

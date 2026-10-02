@@ -13,6 +13,24 @@ radicados_usuarios = Table(
 )
 
 
+TIPOS_NOTIFICACION = (
+    "ACCESO",
+    "ACTUACIONES",
+    "TAREAS",
+    "SUBTAREAS",
+    "RECORDATORIOS",
+    "DOCUMENTOS",
+    "RESUMENES",
+)
+
+
+def preferencias_notificacion_por_defecto() -> dict:
+    return {
+        tipo: {"email": True, "whatsapp": False}
+        for tipo in TIPOS_NOTIFICACION
+    }
+
+
 class EstadoUsuario(str, enum.Enum):
     PENDIENTE_APROBACION = "PENDIENTE_APROBACION"
     ACTIVO = "ACTIVO"
@@ -129,6 +147,12 @@ class Usuario(Base):
     debe_cambiar_password = Column(Boolean, nullable=False, default=False)
     notificaciones_email = Column(Boolean, nullable=False, default=True)
     notificaciones_whatsapp = Column(Boolean, nullable=False, default=False)
+    preferencias_notificacion = Column(
+        JSON,
+        nullable=False,
+        default=preferencias_notificacion_por_defecto,
+    )
+    canal_notificacion_cliente = Column(String(16), nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
 
     tareas = relationship(
@@ -369,6 +393,71 @@ class NotificacionProceso(Base):
     created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
 
 
+class EntregaNotificacion(Base):
+    __tablename__ = "entregas_notificacion"
+    __table_args__ = (
+        UniqueConstraint("clave_idempotencia", name="uq_entrega_notificacion_clave"),
+        Index("ix_entrega_notificacion_estado", "estado", "created_at"),
+        Index("ix_entrega_notificacion_destinatario", "usuario_id", "created_at"),
+    )
+
+    id = Column(Integer, primary_key=True, index=True)
+    clave_idempotencia = Column(String(200), nullable=False)
+    usuario_id = Column(Integer, ForeignKey("usuarios.id", ondelete="CASCADE"), nullable=False)
+    tipo = Column(String(32), nullable=False)
+    canal = Column(String(16), nullable=False)
+    recordatorio_id = Column(
+        Integer,
+        ForeignKey("recordatorios_tareas.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
+    recordatorio_version = Column(Integer, nullable=True)
+    asunto = Column(String(255), nullable=False)
+    cuerpo = Column(Text, nullable=False)
+    estado = Column(String(20), nullable=False, default="PENDIENTE")
+    intentos = Column(Integer, nullable=False, default=0)
+    error = Column(Text, nullable=True)
+    created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
+    enviado_en = Column(DateTime, nullable=True)
+    lease_hasta = Column(DateTime, nullable=True)
+
+    actuaciones = relationship(
+        "EntregaNotificacionActuacion",
+        back_populates="entrega",
+        cascade="all, delete-orphan",
+    )
+
+
+class EntregaNotificacionActuacion(Base):
+    __tablename__ = "entregas_notificacion_actuaciones"
+    __table_args__ = (
+        UniqueConstraint(
+            "actuacion_id",
+            "usuario_id",
+            "canal",
+            name="uq_entrega_actuacion_usuario_canal",
+        ),
+    )
+
+    id = Column(Integer, primary_key=True, index=True)
+    entrega_id = Column(
+        Integer,
+        ForeignKey("entregas_notificacion.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    actuacion_id = Column(
+        Integer,
+        ForeignKey("actuaciones.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    usuario_id = Column(Integer, ForeignKey("usuarios.id", ondelete="CASCADE"), nullable=False)
+    canal = Column(String(16), nullable=False)
+
+    entrega = relationship("EntregaNotificacion", back_populates="actuaciones")
+
+
 class EventoAuditoria(Base):
     __tablename__ = "eventos_auditoria"
 
@@ -414,7 +503,7 @@ class ConsultaRadicado(Base):
         index=True
     )
 
-    # MANUAL / AUTOMATICA
+    # MANUAL / AUTOMATICA / AUTOMATICA_NUEVO
     tipo = Column(String(20), nullable=False, default="AUTOMATICA")
 
     # ENCOLADA / EN_PROCESO / COMPLETADA / ERROR
@@ -649,6 +738,9 @@ class RecordatorioTarea(Base):
         nullable=False,
         default=True,
     )
+
+    version = Column(Integer, nullable=False, default=1, server_default="1")
+    workflow_version_lanzada = Column(Integer, nullable=False, default=0, server_default="0")
 
     # Momento exacto del recordatorio
     fecha_hora = Column(

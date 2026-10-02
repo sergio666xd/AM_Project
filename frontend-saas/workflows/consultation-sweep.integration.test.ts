@@ -67,6 +67,11 @@ async function startBackendStub(): Promise<BackendStub> {
       return;
     }
 
+    if (path.endsWith("/notificaciones/pendientes")) {
+      response.end(JSON.stringify({ entrega_ids: [], siguiente_cursor: null }));
+      return;
+    }
+
     response.writeHead(404).end(JSON.stringify({ error: "not found" }));
   });
 
@@ -108,6 +113,7 @@ describe("consultationSweep durable retries", () => {
       await expect(run.returnValue).resolves.toEqual({
         estado: "COMPLETADA_CON_ERRORES",
         errores: 1,
+        errores_notificacion: 0,
       });
       expect(Date.now() - startedAt).toBeGreaterThanOrEqual(20_000);
       expect([...backend.processAttempts.entries()].sort()).toEqual([

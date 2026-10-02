@@ -46,57 +46,59 @@ Implementar en Vercel dos lanzadores durables: consultas periódicas de radicado
 
 - [x] Registrar dos Cron protegidos en Vercel para los slots de Hobby: diarios, `0 17 * * *` y `0 22 * * *` (UTC). El handler valida secreto y slot; el backend filtra días deshabilitados antes de crear el Workflow.
 - [x] Guardar en la DB la configuración del barrido: activo/inactivo y días habilitados. El Cron diario consulta esa configuración y no ejecuta si el día está deshabilitado.
-- [x] El Workflow crea/actualiza un registro de ejecución, obtiene los radicados canónicos del ámbito y coordina su consulta. Tiene idempotencia por fecha/slot, prevención de solapamiento por radicado, leases, progreso y errores.
+- [x] El Workflow crea/actualiza un registro de ejecución, obtiene los radicados canónicos `FIRMA` y `SAAS:<id>` y coordina su consulta. Tiene idempotencia por fecha/slot, prevención de solapamiento por radicado, leases, progreso y errores.
 - [x] Llamar a FastAPI mediante el binding privado y autenticación de servicio. El endpoint ejecuta la consulta/persistencia directamente, no encola Celery.
 - [x] Limitar concurrencia a cinco radicados y aislar fallos por expediente para que no detengan el resto.
 - [x] Configurar hasta dos reintentos por radicado con backoff durable de 5 y 20 segundos (tres intentos totales); el step reutiliza la consulta idempotente. La integración local prueba recuperación tras dos fallos y agotamiento tras tres; TypeScript y ESLint pasan.
-- [x] Reconciliar el historial completo cada 30 días por radicado: recorrer todas las páginas y reemplazar el snapshot para reflejar actuaciones antiguas agregadas, corregidas o retiradas por Rama. Pasan las pruebas de reconciliación, intervalo, idempotencia e incremental; suite backend: 50 tests.
+- [x] Reconciliar el historial completo cada 30 días por radicado: recorrer todas las páginas y reemplazar el snapshot para reflejar actuaciones antiguas agregadas, corregidas o retiradas por Rama. Pasan las pruebas de reconciliación, intervalo, idempotencia e incremental.
 - [x] Añadir al panel ADMIN configuración de días/estado, última y próxima ejecución, progreso, errores por radicado y botón `Consultar ahora`. El botón usa el mismo flujo marcado como manual.
-- [x] Lanzar `Consultar ahora` desde el panel ADMIN del Preview; el Workflow terminó `completed`, validando el binding y la autenticación interna.
-- [ ] Configurar `CRON_SECRET` y `WORKFLOW_SERVICE_TOKEN` en Production; confirmar el binding generado `BACKEND_SERVICE_URL` y verificar ambos Cron tras autorizar y completar el redeploy de Production.
+- [x] Validar `Consultar ahora` desde el panel ADMIN del Preview: la ejecución corregida terminó `COMPLETADA`, con 6/6 radicados, 0 errores y actuaciones correctas.
+- [x] Configurar `CRON_SECRET` y `WORKFLOW_SERVICE_TOKEN` en Production; confirmar el binding generado `BACKEND_SERVICE_URL` y verificar los Cron. El usuario confirmó una ejecución AUTOMATICA correcta en Production: 6/6 radicados, estado `COMPLETADA`, cero errores.
 
 ### 4. Cruce y envío de novedades
 
-- [ ] Persistir cada actuación nueva una vez en la ficha canónica.
-- [ ] Encontrar los abogados vinculados dentro del ámbito y evaluar por separado rol, plan y preferencias de cada destinatario.
-- [ ] Inventariar todos los tipos de mensaje actuales y futuros (actuaciones, asignaciones de tareas/subtareas, recordatorios, documentos y resúmenes); aplicarles una política común sin omitir productores de notificaciones.
-- [ ] En Configuración, permitir a cada usuario no CLIENTE activar email y WhatsApp independientemente para cada tipo de mensaje. Respetar disponibilidad del canal, datos de contacto y límites del plan.
-- [ ] Para CLIENTE, reemplazar las preferencias por tipo por la selección de un canal obligatorio (email o WhatsApp): entregar en ese canal todas las alertas que le correspondan, sin opt-out por tipo. No emitir alertas fuera de sus asignaciones/relaciones autorizadas.
-- [ ] Definir la precedencia de la regla obligatoria del CLIENTE frente a `Subtarea.notificar_email`, `Subtarea.notificar_whatsapp` y controles de envío por evento; validar el canal seleccionado y resolver explícitamente el caso de contacto inválido o faltante.
-- [ ] Migrar `Usuario.notificaciones_email` y `Usuario.notificaciones_whatsapp` a valores iniciales por tipo que conserven el comportamiento vigente hasta que cada usuario los cambie; retirar los flags globales solo cuando ningún productor dependa de ellos.
-- [ ] Mostrar una matriz de preferencias por tipo para usuarios no CLIENTE y un selector de canal obligatorio para CLIENTE; no ofrecer al cliente interruptores que puedan suprimir alertas que le corresponden.
-- [ ] Si un radicado tiene varias actuaciones nuevas, informar cuántas se detectaron y mostrar el detalle solo de la más reciente; conservar todas las actuaciones en la DB.
-- [ ] Al terminar un barrido, agrupar los procesos con novedades por usuario y enviar un único mensaje consolidado por usuario y canal habilitado. Incluir una sección por proceso, con el número de actuaciones nuevas y el detalle de su más reciente; omitir procesos sin novedades.
-- [ ] Aplicar el mismo formato a consultas manuales; cuando se consulten varios procesos en una acción manual, consolidar por usuario igual que en el barrido.
-- [ ] Enviar WhatsApp y email cuando estén habilitados. El envío actual de novedades consulta WhatsApp; falta integrar email para este flujo.
-- [ ] Registrar entrega por actuación, usuario y canal con idempotencia/reintentos. Un fallo de notificación no debe volver a consultar ni duplicar las demás alertas.
+- [x] Persistir cada actuación nueva una vez en la ficha canónica, deduplicando por clave estable y serializando la fusión por radicado; cubierto por las pruebas de sincronización incremental y reconciliación.
+- [x] Al crear un vínculo nuevo de radicado, iniciar un Workflow tipo `AUTOMATICA_NUEVO`; los planes de precio cero esperan la programación configurada. Vercel Cron/Workflow consulta `FIRMA` y `SAAS` a las 12:00/17:00 Colombia, respetando el switch y días ADMIN; Celery no participa en consultas.
+- [x] Retirar la consulta manual de las vistas y rutas disponibles a usuarios no ADMIN; conservar las acciones manuales en el panel y endpoints ADMIN.
+- [x] Encontrar los abogados vinculados dentro del ámbito y evaluar por separado rol, plan y preferencias de cada destinatario.
+- [x] Inventariar todos los tipos de mensaje actuales y futuros (actuaciones, asignaciones de tareas/subtareas, recordatorios, documentos y resúmenes); aplicarles una política común sin omitir productores de notificaciones.
+- [x] En Configuración, permitir a cada usuario no CLIENTE activar email y WhatsApp independientemente para cada tipo de mensaje. Respetar disponibilidad del canal, datos de contacto y límites del plan.
+- [x] Para CLIENTE, reemplazar las preferencias por tipo por la selección de un canal obligatorio (email o WhatsApp): entregar en ese canal todas las alertas que le correspondan, sin opt-out por tipo. No emitir alertas fuera de sus asignaciones/relaciones autorizadas.
+- [x] Definir la precedencia de la regla obligatoria del CLIENTE frente a `Subtarea.notificar_email`, `Subtarea.notificar_whatsapp` y controles de envío por evento; validar el canal seleccionado y resolver explícitamente el caso de contacto inválido o faltante.
+- [x] Migrar `Usuario.notificaciones_email` y `Usuario.notificaciones_whatsapp` a valores iniciales por tipo que conserven el comportamiento vigente hasta que cada usuario los cambie; retirar los flags globales solo cuando ningún productor dependa de ellos.
+- [x] Mostrar una matriz de preferencias por tipo para usuarios no CLIENTE y un selector de canal obligatorio para CLIENTE; no ofrecer al cliente interruptores que puedan suprimir alertas que le corresponden.
+- [x] Si un radicado tiene varias actuaciones nuevas, informar cuántas se detectaron y mostrar el detalle solo de la más reciente; conservar todas las actuaciones en la DB.
+- [x] Al terminar un barrido, agrupar los procesos con novedades por usuario y enviar un único mensaje consolidado por usuario y canal habilitado. Incluir una sección por proceso, con el número de actuaciones nuevas y el detalle de su más reciente; omitir procesos sin novedades.
+- [x] Aplicar el mismo formato a consultas manuales; cuando se consulten varios procesos en una acción manual, consolidar por usuario igual que en el barrido.
+- [x] Enviar WhatsApp y email cuando estén habilitados.
+- [x] Registrar entrega por actuación, usuario y canal con idempotencia/reintentos. Un fallo de notificación no debe volver a consultar ni duplicar las demás alertas.
 
 ### 5. Lanzador individual de recordatorios
 
-- [ ] Al crear un recordatorio, guardarlo y emitir de forma confiable el evento que inicia su Workflow. Resolver la frontera DB/inicio mediante outbox o mecanismo de reconciliación.
-- [ ] Calcular la fecha de ejecución desde `fecha_hora` o desde `fecha_limite - anticipacion_minutos`, respetando la zona horaria acordada.
-- [ ] El Workflow espera hasta la fecha; antes de notificar vuelve a leer DB y verifica que el recordatorio siga activo, pendiente, vigente y asociado a una tarea válida.
-- [ ] Edición, reprogramación, desactivación o eliminación deben invalidar la versión anterior; reintentos nunca duplican el envío. Definir canales disponibles; hoy el modelo permite WhatsApp.
-- [ ] Migrar el procesamiento actual Celery/QStash solo después de probar el Workflow, evitando que ambos mecanismos envíen el mismo recordatorio.
+- [x] Al crear un recordatorio, guardarlo y emitir de forma confiable el evento que inicia su Workflow. Si falla el lanzamiento después del commit, el reconciliador vuelve a intentarlo.
+- [x] Calcular la fecha de ejecución desde `fecha_hora` o desde `fecha_limite - anticipacion_minutos`, normalizando la entrada y el vencimiento a UTC.
+- [x] El Workflow espera hasta la fecha; antes de preparar o enviar vuelve a leer DB y verifica versión, estado activo, vigencia, destinatario y estado de la tarea.
+- [x] Edición, reprogramación, desactivación, eliminación, cambio del vencimiento y completar/cancelar la tarea invalidan versiones antiguas. La entrega queda versionada; los reintentos y lanzamientos repetidos son idempotentes. Los canales aplican la política `RECORDATORIOS` de Fase 4.
+- [x] Tras probar el Workflow, el procesador Celery/QStash dejó de enviar y solo reconcilia lanzamientos pendientes; la entrega ocurre exclusivamente por Workflow y el outbox.
 
 ### 6. Consola operativa ADMIN y agenda de la firma
 
-- [ ] Añadir al panel ADMIN un apartado de operación para iniciar consultas manuales de todos los radicados o de una selección, reutilizando el mismo Workflow y controles de idempotencia.
-- [ ] Mostrar ejecuciones manuales y automáticas con estado, progreso, hora de inicio/fin, radicados consultados, novedades, errores y opción segura de reintento cuando aplique.
-- [ ] Añadir pruebas diagnósticas de las integraciones configuradas: API de Rama Judicial, Workflow, WhatsApp, SMTP y otros servicios que se incorporen. Separar verificar conexión/configuración de enviar un mensaje real.
-- [ ] Proteger las pruebas de envío real: solo ADMIN, destinatario de prueba explícito, confirmación antes del envío, resultado sin exponer credenciales y registro de auditoría.
-- [ ] Añadir al dashboard ADMIN la agenda general de la firma con vista calendario y listado de tareas asociadas a abogados internos (`ABOGADO_ADMIN`), incluyendo responsable, cliente/proceso/radicado, estado y vencimiento.
-- [ ] Filtrar la agenda por rango/mes, abogado responsable, estado y vencimientos; permitir abrir el contexto autorizado de la tarea sin exponer tareas ni datos de abogados SaaS individuales.
-- [ ] Definir si la agenda ADMIN es de solo lectura o permite reasignar/actualizar tareas; cualquier mutación debe respetar permisos y quedar auditada.
+- [x] Añadir al panel ADMIN un apartado de operación para iniciar consultas manuales de todos los radicados o de una selección, reutilizando el mismo Workflow y controles de idempotencia.
+- [x] Mostrar ejecuciones manuales y automáticas con estado, progreso, hora de inicio/fin, radicados consultados, novedades, errores y opción segura de reintento cuando aplique.
+- [x] Añadir pruebas diagnósticas de las integraciones configuradas: API de Rama Judicial, Workflow, WhatsApp, SMTP y otros servicios que se incorporen. Separar verificar conexión/configuración de enviar un mensaje real.
+- [x] Proteger las pruebas de envío real: solo ADMIN, destinatario de prueba explícito, confirmación antes del envío, resultado sin exponer credenciales y registro de auditoría.
+- [x] Añadir al dashboard ADMIN la agenda general de la firma con vista calendario y listado de tareas asociadas a abogados internos (`ABOGADO_ADMIN`), incluyendo responsable, cliente/proceso/radicado, estado y vencimiento.
+- [x] Filtrar la agenda por rango/mes, abogado responsable, estado y vencimientos; permitir abrir el contexto autorizado de la tarea sin exponer tareas ni datos de abogados SaaS individuales.
+- [x] Definir la agenda ADMIN como solo lectura; el detalle expandible muestra el contexto autorizado sin habilitar mutaciones no auditadas.
 
 ### 7. Pruebas y despliegue gradual
 
-- [ ] Probar migración con duplicados: un radicado compartido dentro del ámbito produce una ficha y una consulta externa, pero mantiene tareas y destinatarios separados; quitar un vínculo no afecta a los demás.
-- [ ] Probar primera búsqueda por número, persistencia de `idProceso` y consultas posteriores directas a actuaciones; cubrir paginación, privacidad, no encontrado, reintentos y errores parciales.
-- [ ] Probar Cron en los dos slots, días deshabilitados, disparo manual, redelivery, ejecución concurrente y autenticación servicio-a-servicio.
-- [ ] Probar recordatorios concretos y por anticipación, además de reprogramar, desactivar, eliminar, completar tarea y reintentar sin duplicar notificaciones.
-- [ ] Usar destinatarios simulados en Preview; habilitar producción por etapas y verificar ejecuciones, consumo de Rama y entregas antes de iniciar el retiro de Celery/QStash.
-- [ ] Eliminar el endpoint y workflow temporales `workflow-probe` cuando los lanzadores reales estén validados.
+- [x] Probar migración con duplicados: un radicado compartido dentro del ámbito produce una ficha y una consulta externa, pero mantiene tareas y destinatarios separados; quitar un vínculo no afecta a los demás.
+- [x] Probar primera búsqueda por número, persistencia de `idProceso` y consultas posteriores directas a actuaciones; cubrir paginación, privacidad, no encontrado, reintentos y errores parciales.
+- [x] Probar Cron en los dos slots, días deshabilitados, disparo manual, redelivery, ejecución concurrente y autenticación servicio-a-servicio.
+- [x] Probar recordatorios concretos y por anticipación, además de reprogramar, desactivar, eliminar, completar tarea y reintentar sin duplicar notificaciones.
+- [ ] Usar destinatarios simulados en Preview; habilitar producción por etapas y verificar ejecuciones, consumo de Rama y entregas antes de iniciar el retiro de Celery/QStash. La validación local con proveedores simulados pasa; falta autorización y ejecución del despliegue Preview/Production.
+- [x] Eliminar el endpoint y workflow temporales `workflow-probe` después de validar los lanzadores reales.
 
 ### 8. Retiro de infraestructura y dependencias sustituidas
 

@@ -1,16 +1,23 @@
 import os
+import smtplib
 from uuid import uuid4
+from urllib.error import HTTPError, URLError
+from urllib.parse import urljoin
+from urllib.request import Request, urlopen
 
+import requests
+from email_validator import EmailNotValidError, validate_email
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile, status
 from botocore.exceptions import BotoCoreError, ClientError
 from datetime import datetime, timedelta, timezone
 from zoneinfo import ZoneInfo
-from sqlalchemy import func, or_
+from sqlalchemy import and_, func, or_
 from sqlalchemy.orm import Session
 
 from app import models, schemas, security, storage
 from app.audit import registrar_evento_auditoria
 from app.database import engine, get_db
+from app.email_service import enviar_correo
 from app.document_validation import (
     ALLOWED_DOCUMENT_TYPES,
     MAX_DOCUMENT_BYTES,
@@ -19,10 +26,17 @@ from app.document_validation import (
 from app.security import obtener_usuario_actual
 from app.firm_access import require_roles
 from app.site_content import PUBLIC_CONTENT_PAGES
-from app.tasks import tarea_consultar_radicado
-from app.radicados import ambito_radicado_usuario, obtener_o_vincular_radicado, normalizar_numero_radicado
+from app.radicados import (
+    ambito_radicado_usuario,
+    iniciar_consulta_nuevo_radicado,
+    obtener_o_vincular_radicado,
+    radicado_vinculado_a_usuario,
+    normalizar_numero_radicado,
+)
 from app.migrate_radicados_canonicos import migrar as migrar_radicados_canonicos
 from app.migrate_radicados_canonicos import previsualizar as previsualizar_migracion_radicados
+from app.rama_judicial_api import API_BASE_URL
+from app.whatsapp import WHATSAPP_API_URL, WHATSAPP_TOKEN, enviar_mensaje_whatsapp
 import json
 
 
@@ -414,12 +428,18 @@ def crear_recurso_admin(
     admin: models.Usuario = Depends(verificar_admin),
 ):
     owner = _owner_admin(db, datos.owner_id, sector)
+    radicado_vinculado_previamente = False
     if recurso == "procesos":
         if not datos.nombre or not datos.nombre.strip():
             raise HTTPException(status_code=400, detail="El nombre del proceso es obligatorio.")
         item = models.Proceso(abogado_id=owner.id, nombre=datos.nombre.strip(), descripcion=datos.descripcion)
         action = "crear_proceso"
     elif recurso == "radicados":
+        radicado_vinculado_previamente = radicado_vinculado_a_usuario(
+            db,
+            owner,
+            datos.numero or "",
+        )
         try:
             item, created = obtener_o_vincular_radicado(db, owner, datos.numero or "")
         except ValueError as exc:
@@ -481,7 +501,16 @@ def crear_recurso_admin(
     registrar_evento_auditoria(db, admin, f"admin.inventario.{sector.lower()}.{action}", recurso, item.id)
     db.commit()
     db.refresh(item)
-    return {"id": item.id, "mensaje": "Registro creado.", "sector": sector.upper()}
+    mensaje = "Registro creado."
+    consulta_id = None
+    if recurso == "radicados" and (created or not radicado_vinculado_previamente):
+        mensaje, consulta_id = iniciar_consulta_nuevo_radicado(db, owner, item)
+    return {
+        "id": item.id,
+        "mensaje": mensaje,
+        "sector": sector.upper(),
+        "consulta_id": consulta_id,
+    }
 
 
 @router.post("/inventario/documentos/cargar", status_code=status.HTTP_201_CREATED)
@@ -738,53 +767,16 @@ def restaurar_proceso_admin(
     return {"mensaje": "Proceso restaurado."}
 
 
-def _encolar_consulta_radicado_admin(
-    db: Session,
-    admin: models.Usuario,
-    radicado: models.Radicado,
-) -> bool:
-    consulta = models.ConsultaRadicado(
-        radicado_id=radicado.id,
-        tipo="MANUAL",
-        estado="ENCOLADA",
-        inicio=datetime.utcnow(),
-    )
-    db.add(consulta)
-    db.commit()
-    db.refresh(consulta)
-    try:
-        task = tarea_consultar_radicado.delay(radicado.id, "MANUAL", consulta.id)
-        consulta.task_id = task.id
-        registrar_evento_auditoria(
-            db, admin, "admin.radicado.consulta.iniciar", "radicado", radicado.id
-        )
-        encolada = True
-    except Exception as exc:
-        consulta.estado = "ERROR"
-        consulta.finalizacion = datetime.utcnow()
-        consulta.error = str(exc)
-        registrar_evento_auditoria(
-            db, admin, "admin.radicado.consulta.error", "radicado", radicado.id
-        )
-        encolada = False
-    db.commit()
-    return encolada
-
-
 @router.post("/radicados/consultar")
 def consultar_todos_radicados_admin(
     sector: str,
     db: Session = Depends(get_db),
     admin: models.Usuario = Depends(verificar_admin),
 ):
-    radicados = _query_inventario_admin(db, "radicados", sector).all()
-    queued = sum(_encolar_consulta_radicado_admin(db, admin, item) for item in radicados)
-    return {
-        "total": len(radicados),
-        "encoladas": queued,
-        "errores": len(radicados) - queued,
-        "mensaje": f"{queued} de {len(radicados)} consultas encoladas.",
-    }
+    raise HTTPException(
+        status_code=410,
+        detail="Este endpoint legacy fue deshabilitado. Usa el launcher ADMIN de Workflows.",
+    )
 
 
 @router.post("/radicados/{radicado_id}/consultar")
@@ -794,20 +786,10 @@ def consultar_radicado_admin(
     db: Session = Depends(get_db),
     admin: models.Usuario = Depends(verificar_admin),
 ):
-    radicado = _query_inventario_admin(db, "radicados", sector).filter(
-        models.Radicado.id == radicado_id
-    ).first()
-    if not radicado:
-        raise HTTPException(
-            status_code=404,
-            detail="Radicado no encontrado en el ámbito seleccionado.",
-        )
-    if not _encolar_consulta_radicado_admin(db, admin, radicado):
-        raise HTTPException(
-            status_code=503,
-            detail="No fue posible encolar la consulta del radicado.",
-        )
-    return {"mensaje": f"Consulta del radicado {radicado.numero} encolada."}
+    raise HTTPException(
+        status_code=410,
+        detail="Este endpoint legacy fue deshabilitado. Usa el launcher ADMIN de Workflows.",
+    )
 
 
 def _serializar_configuracion_consultas(configuracion: models.ConfiguracionConsultas) -> dict:
@@ -854,6 +836,28 @@ def obtener_configuracion_consultas(
         db.commit()
         db.refresh(configuracion)
     return _serializar_configuracion_consultas(configuracion)
+
+
+@router.get("/consultas/radicados")
+def buscar_radicados_consulta_manual(
+    q: str = "",
+    limite: int = 25,
+    db: Session = Depends(get_db),
+    admin: models.Usuario = Depends(verificar_admin),
+):
+    query = db.query(models.Radicado)
+    texto = q.strip()
+    if texto:
+        query = query.filter(models.Radicado.numero.ilike(f"%{texto}%"))
+    radicados = (
+        query.order_by(models.Radicado.created_at.desc(), models.Radicado.id.desc())
+        .limit(min(max(limite, 1), 100))
+        .all()
+    )
+    return [
+        {"id": radicado.id, "numero": radicado.numero, "ambito": radicado.ambito_key}
+        for radicado in radicados
+    ]
 
 
 @router.put("/consultas/configuracion", response_model=schemas.ConfiguracionConsultasOut)
@@ -907,6 +911,118 @@ def listar_ejecuciones_consultas(
     ]
 
 
+@router.get("/agenda/tareas")
+def obtener_agenda_tareas_firma(
+    mes: str | None = None,
+    fecha_desde: str | None = None,
+    fecha_hasta: str | None = None,
+    abogado_id: int | None = None,
+    estado: str | None = None,
+    limite: int = 500,
+    db: Session = Depends(get_db),
+    admin: models.Usuario = Depends(verificar_admin),
+):
+    zona = ZoneInfo("America/Bogota")
+    if mes:
+        try:
+            inicio_local = datetime.strptime(mes, "%Y-%m").date().replace(day=1)
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail="mes debe tener formato YYYY-MM.") from exc
+        if inicio_local.month == 12:
+            fin_local = inicio_local.replace(year=inicio_local.year + 1, month=1)
+        else:
+            fin_local = inicio_local.replace(month=inicio_local.month + 1)
+    elif fecha_desde and fecha_hasta:
+        try:
+            inicio_local = datetime.fromisoformat(fecha_desde).date()
+            fin_local = datetime.fromisoformat(fecha_hasta).date() + timedelta(days=1)
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail="Usa fechas ISO YYYY-MM-DD.") from exc
+    elif fecha_desde or fecha_hasta:
+        raise HTTPException(status_code=400, detail="Indica ambas fechas del rango.")
+    else:
+        hoy_local = datetime.now(zona).date()
+        inicio_local = hoy_local.replace(day=1)
+        fin_local = inicio_local.replace(year=inicio_local.year + 1, month=1) if inicio_local.month == 12 else inicio_local.replace(month=inicio_local.month + 1)
+
+    if fin_local <= inicio_local:
+        raise HTTPException(status_code=400, detail="El rango de fechas no es válido.")
+    inicio_utc = datetime.combine(inicio_local, datetime.min.time(), tzinfo=zona).astimezone(timezone.utc).replace(tzinfo=None)
+    fin_utc = datetime.combine(fin_local, datetime.min.time(), tzinfo=zona).astimezone(timezone.utc).replace(tzinfo=None)
+
+    query = (
+        db.query(models.Tarea)
+        .join(models.Usuario, models.Usuario.id == models.Tarea.usuario_id)
+        .filter(
+            models.Usuario.rol == models.RolUsuario.ABOGADO_ADMIN,
+            models.Tarea.fecha_limite >= inicio_utc,
+            models.Tarea.fecha_limite < fin_utc,
+            or_(
+                models.Tarea.proceso_id.is_(None),
+                models.Tarea.proceso.has(and_(
+                    models.Proceso.archivado_en.is_(None),
+                    models.Proceso.abogado.has(models.Usuario.rol.in_((
+                        models.RolUsuario.ABOGADO_ADMIN,
+                        models.RolUsuario.ADMIN,
+                    ))),
+                )),
+            ),
+            or_(
+                models.Tarea.radicado_id.is_(None),
+                models.Tarea.radicado.has(models.Radicado.ambito_key == "FIRMA"),
+            ),
+        )
+    )
+    if abogado_id is not None:
+        query = query.filter(models.Tarea.usuario_id == abogado_id)
+    if estado:
+        try:
+            estado_tarea = models.EstadoTarea(estado.upper())
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail="Estado de tarea no válido.") from exc
+        query = query.filter(models.Tarea.estado == estado_tarea)
+
+    tareas = query.order_by(models.Tarea.fecha_limite.asc(), models.Tarea.id.asc()).limit(min(max(limite, 1), 1000)).all()
+    responsables = (
+        db.query(models.Usuario.id, models.Usuario.nombre_completo)
+        .filter(
+            models.Usuario.rol == models.RolUsuario.ABOGADO_ADMIN,
+            models.Usuario.estado == models.EstadoUsuario.ACTIVO,
+        )
+        .order_by(models.Usuario.nombre_completo.asc())
+        .all()
+    )
+    return {
+        "tareas": [
+            {
+                "id": tarea.id,
+                "titulo": tarea.titulo,
+                "descripcion": tarea.descripcion,
+                "estado": tarea.estado.value,
+                "prioridad": tarea.prioridad.value,
+                "fecha_limite": tarea.fecha_limite,
+                "responsable_id": tarea.usuario_id,
+                "responsable": tarea.usuario.nombre_completo,
+                "cliente_id": tarea.cliente_id,
+                "cliente": (
+                    tarea.cliente_asignado.nombre_completo
+                    if tarea.cliente_asignado
+                    and tarea.proceso
+                    and tarea.cliente_asignado.rol == models.RolUsuario.CLIENTE
+                    and any(link.cliente_id == tarea.cliente_id for link in tarea.proceso.clientes)
+                    else None
+                ),
+                "proceso_id": tarea.proceso_id,
+                "proceso": tarea.proceso.nombre if tarea.proceso else None,
+                "radicado_id": tarea.radicado_id,
+                "radicado": tarea.radicado.numero if tarea.radicado else None,
+            }
+            for tarea in tareas
+        ],
+        "responsables": [{"id": responsable.id, "nombre": responsable.nombre_completo} for responsable in responsables],
+    }
+
+
 @router.get("/consultas/ejecuciones/{ejecucion_id}")
 def detalle_ejecucion_consultas(
     ejecucion_id: str,
@@ -954,6 +1070,145 @@ def detalle_ejecucion_consultas(
             for resultado in resultados
         ],
     }
+
+
+@router.get("/diagnosticos/configuracion")
+def obtener_estado_configuracion_integraciones(
+    admin: models.Usuario = Depends(verificar_admin),
+):
+    smtp_configurado = bool(os.getenv("SMTP_HOST") and os.getenv("SMTP_FROM"))
+    whatsapp_configurado = bool(
+        WHATSAPP_API_URL.startswith(("https://", "http://"))
+        and WHATSAPP_TOKEN
+        and WHATSAPP_TOKEN != "TU_TOKEN_AQUI"
+    )
+    workflow_configurado = bool(
+        (os.getenv("WORKFLOW_FRONTEND_URL") or os.getenv("NODE_ENV") == "development")
+        and os.getenv("WORKFLOW_SERVICE_TOKEN")
+    )
+    return {
+        "integraciones": {
+            "RAMA": {"configurada": True, "estado": "PUBLICA"},
+            "WORKFLOW": {"configurada": workflow_configurado, "estado": "CONFIGURADA" if workflow_configurado else "FALTAN_VARIABLES"},
+            "SMTP": {"configurada": smtp_configurado, "estado": "CONFIGURADA" if smtp_configurado else "FALTAN_VARIABLES"},
+            "WHATSAPP": {"configurada": whatsapp_configurado, "estado": "CONFIGURADA" if whatsapp_configurado else "FALTAN_VARIABLES"},
+        }
+    }
+
+
+@router.post("/diagnosticos/conexion")
+def probar_conexion_integracion(
+    datos: schemas.DiagnosticoIntegracion,
+    admin: models.Usuario = Depends(verificar_admin),
+):
+    if datos.integracion == "RAMA":
+        try:
+            with urlopen(Request(API_BASE_URL), timeout=8) as response:
+                codigo = response.status
+        except HTTPError as exc:
+            codigo = exc.code
+            if codigo >= 500:
+                return {"integracion": "RAMA", "estado": "FALLO", "codigo_http": codigo}
+            return {
+                "integracion": "RAMA",
+                "estado": "ALCANZABLE",
+                "codigo_http": codigo,
+                "detalle": "El host respondió; la URL base no es un endpoint de consulta.",
+            }
+        except (URLError, TimeoutError, OSError):
+            return {"integracion": "RAMA", "estado": "FALLO", "detalle": "No fue posible conectar con la API pública."}
+        return {"integracion": "RAMA", "estado": "CONECTADA", "codigo_http": codigo}
+
+    if datos.integracion == "WORKFLOW":
+        base_url = os.getenv("WORKFLOW_FRONTEND_URL") or (
+            "http://localhost:3000" if os.getenv("NODE_ENV") == "development" else ""
+        )
+        token = os.getenv("WORKFLOW_SERVICE_TOKEN", "")
+        if not base_url or not token:
+            return {"integracion": "WORKFLOW", "estado": "FALTAN_VARIABLES"}
+        try:
+            response = requests.post(
+                urljoin(base_url.rstrip("/") + "/", "workflow-internal/diagnosticos"),
+                headers={"Authorization": f"Bearer {token}"},
+                json={},
+                timeout=10,
+            )
+        except requests.RequestException:
+            return {"integracion": "WORKFLOW", "estado": "FALLO", "detalle": "No fue posible contactar el servicio Workflow."}
+        if not response.ok:
+            return {"integracion": "WORKFLOW", "estado": "FALLO", "codigo_http": response.status_code}
+        try:
+            resultado = response.json()
+        except requests.RequestException:
+            return {"integracion": "WORKFLOW", "estado": "FALLO", "detalle": "El servicio Workflow respondió un formato no válido."}
+        return {"integracion": "WORKFLOW", "estado": "ACEPTADO", "workflow_run_id": resultado.get("workflow_run_id")}
+
+    if datos.integracion == "SMTP":
+        host = os.getenv("SMTP_HOST")
+        remitente = os.getenv("SMTP_FROM")
+        if not host or not remitente:
+            return {"integracion": "SMTP", "estado": "FALTAN_VARIABLES"}
+        try:
+            with smtplib.SMTP(host, int(os.getenv("SMTP_PORT", "587")), timeout=8) as servidor:
+                servidor.ehlo()
+                if os.getenv("SMTP_STARTTLS", "true").lower() == "true":
+                    servidor.starttls()
+                    servidor.ehlo()
+        except (OSError, smtplib.SMTPException, ValueError):
+            return {"integracion": "SMTP", "estado": "FALLO", "detalle": "No fue posible establecer la conexión SMTP."}
+        return {"integracion": "SMTP", "estado": "CONECTADO", "detalle": "Conexión verificada; no se envió correo."}
+
+    configurado = bool(
+        WHATSAPP_API_URL.startswith(("https://", "http://"))
+        and WHATSAPP_TOKEN
+        and WHATSAPP_TOKEN != "TU_TOKEN_AQUI"
+    )
+    return {
+        "integracion": "WHATSAPP",
+        "estado": "CONFIGURADA_SIN_ENVIAR" if configurado else "FALTAN_VARIABLES",
+        "detalle": "Esta comprobación no envía un mensaje.",
+    }
+
+
+@router.post("/diagnosticos/envio")
+def enviar_mensaje_prueba_integracion(
+    datos: schemas.DiagnosticoEnvioPrueba,
+    db: Session = Depends(get_db),
+    admin: models.Usuario = Depends(verificar_admin),
+):
+    if not datos.confirmar_envio:
+        raise HTTPException(status_code=400, detail="Confirma explícitamente el envío real de prueba.")
+
+    destinatario = datos.destinatario.strip()
+    if datos.canal == "EMAIL":
+        try:
+            destinatario = validate_email(destinatario, check_deliverability=False).normalized
+        except EmailNotValidError as exc:
+            raise HTTPException(status_code=400, detail="El correo de prueba no es válido.") from exc
+    else:
+        digitos = "".join(filter(str.isdigit, destinatario))
+        if not 8 <= len(digitos) <= 15:
+            raise HTTPException(status_code=400, detail="El teléfono de prueba debe tener entre 8 y 15 dígitos.")
+
+    registrar_evento_auditoria(
+        db,
+        admin,
+        "admin.integracion.envio_prueba",
+        "integracion",
+        datos.canal,
+    )
+    db.commit()
+    try:
+        enviado = (
+            enviar_correo(destinatario, "Prueba de integración", "Mensaje de prueba solicitado por un administrador.")
+            if datos.canal == "EMAIL"
+            else enviar_mensaje_whatsapp(destinatario, "Mensaje de prueba solicitado por un administrador.")
+        )
+    except Exception as exc:
+        raise HTTPException(status_code=502, detail="El proveedor no pudo completar el envío de prueba.") from exc
+    if not enviado:
+        raise HTTPException(status_code=502, detail="El proveedor no confirmó el envío de prueba.")
+    return {"estado": "ENVIADO", "canal": datos.canal, "destinatario": destinatario}
 
 
 # ============================================================
@@ -1017,6 +1272,7 @@ def crear_usuario_admin(
         estado=models.EstadoUsuario.ACTIVO, plan_id=plan_id,
         creado_por_abogado_id=abogado_id, debe_cambiar_password=True,
         notificaciones_email=True, notificaciones_whatsapp=False,
+        canal_notificacion_cliente="EMAIL" if datos.rol == models.RolUsuario.CLIENTE else None,
     )
     db.add(usuario)
     db.flush()

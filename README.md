@@ -64,13 +64,16 @@ La tabla y el panel de planes se conservan temporalmente para migrar datos exist
 
 El dashboard administrativo consume una vista agregada de usuarios, procesos, radicados, actuaciones, tareas, documentos, consultas y estado de operación.
 
+En `/gestion-procesos/admin/operacion`, ADMIN puede consultar todos los radicados o una selección, revisar ejecuciones y reintentar solo los radicados fallidos. El diagnóstico separa conectividad/configuración de los envíos reales; estos últimos requieren destinatario explícito, confirmación y quedan auditados. La agenda `/gestion-procesos/admin/agenda` es de solo lectura y muestra únicamente tareas asociadas a abogados internos `ABOGADO_ADMIN`, con filtros por mes, responsable y estado; excluye tareas/procesos SaaS.
+
 Procesos, radicados, tareas y documentos tienen inventarios globales con búsqueda, filtro por estado cuando el recurso lo ofrece, selección, exportación CSV de la vista o selección, y copia de identificador.
 
-La operación local usa `Celery + Redis`. En Vercel, el endpoint `POST /api/cron/recordatorios-tareas` permite que QStash invoque el mismo procesador de recordatorios con firma verificada. Redis/Celery sigue siendo necesario para los demás trabajos que dependan de un worker.
+La operación local usa `Celery + Redis`. Para recordatorios, Celery Beat y el endpoint firmado `POST /api/cron/recordatorios-tareas` (invocado por QStash en Vercel) solo reconcilian lanzamientos pendientes; el envío y la espera individual ocurren en Workflows durables. La versión del recordatorio invalida ejecuciones anteriores al editarlo, desactivarlo, cambiar el vencimiento o completar/cancelar la tarea. Los canales salen de las preferencias `RECORDATORIOS` y pueden ser email o WhatsApp. Redis/Celery sigue siendo necesario para los demás trabajos que dependan de un worker.
 
 ### Workflows de consultas judiciales
 
 - El servicio frontend llama al backend por el binding privado `BACKEND_SERVICE_URL` definido en `vercel.json`; no configures ese URL manualmente en Vercel.
+- El backend inicia Flows en el frontend por el binding privado `WORKFLOW_FRONTEND_URL` definido en `vercel.json`.
 - Configura `WORKFLOW_SERVICE_TOKEN` en los entornos runtime de frontend y backend con el mismo valor aleatorio. FastAPI lo usa para proteger `/api/internal/workflows/*`.
 - Configura `CRON_SECRET` en el frontend de Production. Vercel lo envía como `Authorization: Bearer ...` a los dos Cron. Los Cron solo corren en Production; cada uno invoca una vez al día y la DB filtra los días seleccionados.
 - Para ejecutar workflows con `next dev`, configura `WORKFLOW_BACKEND_URL=http://localhost:8000` en `frontend-saas/.env.local` y el mismo `WORKFLOW_SERVICE_TOKEN` en el backend local. No reutilices un token real de producción en desarrollo.

@@ -17,8 +17,18 @@ from app import whatsapp
 from app import rama_judicial_api
 from app.audit import registrar_evento_auditoria
 from app.firm_access import has_firm_wide_access, lawyer_scope_id, require_process_access
-from app.notification_policy import plan_whatsapp_habilitado, whatsapp_habilitado
-from app.radicados import obtener_o_vincular_radicado
+from app.notification_policy import (
+    abogados_notificables_para_radicado,
+    canales_habilitados,
+    plan_whatsapp_habilitado,
+    whatsapp_habilitado,
+)
+from app.radicados import (
+    iniciar_consulta_nuevo_radicado,
+    obtener_o_vincular_radicado,
+    radicado_vinculado_a_usuario,
+)
+from app.reminder_workflow import momento_programado
 from app.migrate_radicados_canonicos import migrar as migrar_radicados_canonicos, previsualizar as previsualizar_migracion_radicados
 from app.routers import admin as admin_router
 from app.routers.workflows import (
@@ -26,12 +36,22 @@ from app.routers.workflows import (
     _aplicar_delta_contadores_barrido,
     _reconciliacion_completa_vencida,
     ejecutar_consulta_barrido_radicado,
+    enviar_entrega_notificacion_workflow,
+    finalizar_barrido,
+    listar_radicados_barrido,
+    preparar_recordatorio_workflow,
+    preparar_notificaciones_actuaciones,
     reclamar_barrido,
     verificar_token_workflow,
 )
 from app.routers.workflows import reclamar_barrido
 from app.routers.admin import (
     actualizar_configuracion_consultas,
+    buscar_radicados_consulta_manual,
+    enviar_mensaje_prueba_integracion,
+    obtener_agenda_tareas_firma,
+    obtener_estado_configuracion_integraciones,
+    probar_conexion_integracion,
     actualizar_recurso_admin,
     crear_recurso_admin,
     eliminar_recurso_admin,
@@ -70,8 +90,13 @@ from app.routers.expedientes import (
     solicitar_edicion_perfil_cliente,
 )
 from app.routers.tareas import (
+    actualizar_recordatorio,
     actualizar_subtarea,
+    actualizar_tarea,
+    completar_tarea,
+    crear_recordatorio,
     crear_subtarea,
+    eliminar_recordatorio,
     listar_tareas,
     obtener_tarea,
     obtener_tarea_usuario,
@@ -170,12 +195,40 @@ def test_workflow_sweep_claim_is_idempotent_and_prevents_parallel_runs():
             rol=models.RolUsuario.ABOGADO_ADMIN,
             estado=models.EstadoUsuario.ACTIVO,
         )
-        db.add(owner)
+        admin = models.Usuario(
+            email="sweep-manual-admin@example.test",
+            password_hash="hash",
+            nombre_completo="Admin",
+            whatsapp_numero="0000000006",
+            rol=models.RolUsuario.ADMIN,
+            estado=models.EstadoUsuario.ACTIVO,
+        )
+        free_plan = models.Plan(
+            nombre="Básico",
+            limite_radicados=10,
+            precio_mensual=0,
+        )
+        saas_owner = models.Usuario(
+            email="sweep-saas-owner@example.test",
+            password_hash="hash",
+            nombre_completo="SaaS owner",
+            whatsapp_numero="0000000007",
+            rol=models.RolUsuario.ABOGADO,
+            estado=models.EstadoUsuario.ACTIVO,
+            plan=free_plan,
+        )
+        db.add_all([owner, admin, saas_owner])
         db.flush()
         db.add(
             models.Radicado(
                 numero="12345678901234567890123",
                 creado_por_id=owner.id,
+            )
+        )
+        db.add(
+            models.Radicado(
+                numero="12345678901234567890124",
+                creado_por_id=saas_owner.id,
             )
         )
         db.add(
@@ -203,13 +256,14 @@ def test_workflow_sweep_claim_is_idempotent_and_prevents_parallel_runs():
                 tipo="MANUAL",
                 fecha_local="2026-10-05",
                 hora_local="MANUAL",
-                solicitada_por_id=owner.id,
+                solicitada_por_id=admin.id,
             ),
             _=None,
             db=db,
         )
 
         assert first["debe_ejecutar"] is True
+        assert first["ejecucion"]["total_radicados"] == 2
         assert retry["debe_ejecutar"] is True
         assert retry["ejecucion"]["id"] == first["ejecucion"]["id"]
         assert parallel_manual["debe_ejecutar"] is False
@@ -251,6 +305,124 @@ def test_automatic_workflow_claim_obeys_enabled_days():
         assert result["debe_ejecutar"] is False
         assert result["motivo"] == "DIA_DESHABILITADO"
         assert db.query(models.EjecucionBarrido).count() == 0
+
+
+def test_new_radicado_workflow_claim_processes_only_the_selected_case(monkeypatch):
+    engine = create_engine("sqlite:///:memory:")
+    models.Base.metadata.create_all(engine)
+
+    with Session(engine) as db:
+        owner = models.Usuario(
+            email="workflow-new-case-owner@example.test",
+            password_hash="hash",
+            nombre_completo="Firm owner",
+            whatsapp_numero="0000000150",
+            rol=models.RolUsuario.ABOGADO_ADMIN,
+            estado=models.EstadoUsuario.ACTIVO,
+        )
+        db.add(owner)
+        db.flush()
+        radicado, _ = obtener_o_vincular_radicado(
+            db,
+            owner,
+            "12345678901234567890123",
+        )
+        db.commit()
+        mensaje, consulta_id = iniciar_consulta_nuevo_radicado(db, owner, radicado)
+        monkeypatch.setattr(
+            "app.routers.workflows.ejecutar_consulta_api_radicado",
+            lambda db, radicado, reconciliar_historial=False: {
+                "estado": "ok",
+                "actuaciones_nuevas": [],
+                "reconciliacion_completa": reconciliar_historial,
+            },
+        )
+
+        claim = reclamar_barrido(
+            schemas.WorkflowClaimConsulta(
+                clave_idempotencia=f"NUEVO:{consulta_id}",
+                token_lanzamiento="new-case-launch",
+                tipo="AUTOMATICA_NUEVO",
+                fecha_local="2026-10-01",
+                hora_local="NUEVO",
+                solicitada_por_id=owner.id,
+                radicado_id=radicado.id,
+                consulta_id=consulta_id,
+            ),
+            _=None,
+            db=db,
+        )
+        execution_id = claim["ejecucion"]["id"]
+        page = listar_radicados_barrido(execution_id, limite=50, _=None, db=db)
+        result = ejecutar_consulta_barrido_radicado(
+            execution_id,
+            radicado.id,
+            _=None,
+            db=db,
+        )
+        finished = finalizar_barrido(execution_id, _=None, db=db)
+
+        assert "Workflow" in mensaje
+        assert claim["debe_ejecutar"] is True
+        assert [item["id"] for item in page["radicados"]] == [radicado.id]
+        assert result["estado"] == "COMPLETADA"
+        assert finished["estado"] == "COMPLETADA"
+        assert db.query(models.ConsultaRadicado).filter_by(id=consulta_id).one().tipo == "AUTOMATICA_NUEVO"
+
+
+def test_admin_manual_workflow_claim_supports_one_selected_batch():
+    engine = create_engine("sqlite:///:memory:")
+    models.Base.metadata.create_all(engine)
+
+    with Session(engine) as db:
+        admin = models.Usuario(
+            email="workflow-manual-admin@example.test",
+            password_hash="hash",
+            nombre_completo="Admin",
+            whatsapp_numero="0000000151",
+            rol=models.RolUsuario.ADMIN,
+            estado=models.EstadoUsuario.ACTIVO,
+        )
+        owner = models.Usuario(
+            email="workflow-manual-owner@example.test",
+            password_hash="hash",
+            nombre_completo="SaaS owner",
+            whatsapp_numero="0000000152",
+            rol=models.RolUsuario.ABOGADO,
+            estado=models.EstadoUsuario.ACTIVO,
+        )
+        db.add_all([admin, owner])
+        db.flush()
+        first, _ = obtener_o_vincular_radicado(db, admin, "12345678901234567890123")
+        second, _ = obtener_o_vincular_radicado(db, owner, "12345678901234567890124")
+        db.commit()
+
+        claim = reclamar_barrido(
+            schemas.WorkflowClaimConsulta(
+                clave_idempotencia="MANUAL_RADICADO:batch-launch",
+                token_lanzamiento="batch-launch-token",
+                tipo="MANUAL",
+                fecha_local="2026-10-01",
+                hora_local="MANUAL",
+                solicitada_por_id=admin.id,
+                radicado_ids=[first.id, second.id],
+            ),
+            _=None,
+            db=db,
+        )
+        page = listar_radicados_barrido(
+            claim["ejecucion"]["id"],
+            limite=50,
+            _=None,
+            db=db,
+        )
+
+        assert claim["debe_ejecutar"] is True
+        assert claim["ejecucion"]["total_radicados"] == 2
+        assert {item["id"] for item in page["radicados"]} == {first.id, second.id}
+        assert db.query(models.ConsultaRadicado).filter(
+            models.ConsultaRadicado.radicado_id.in_([first.id, second.id])
+        ).count() == 2
 
 
 def test_workflow_radicado_step_persists_result_and_retries_without_duplicate_api_call(monkeypatch):
@@ -496,9 +668,17 @@ def test_process_associations_cannot_cross_saas_or_firm_boundary():
             )
         assert external_radicado_error.value.status_code == 404
 
-        assert asignar_radicado(
+        result = asignar_radicado(
             firm_process.id, firm_radicado.id, db=db, usuario=firm_owner
-        )["mensaje"] == "Radicado asignado al proceso."
+        )
+        assert result["mensaje"] == (
+            "Radicado asignado al proceso. "
+            "Consulta inmediata iniciada mediante Workflow."
+        )
+        consulta = db.query(models.ConsultaRadicado).filter_by(
+            radicado_id=firm_radicado.id
+        ).one()
+        assert consulta.tipo == "AUTOMATICA_NUEVO"
         assert db.query(models.ProcesoRadicado).filter_by(
             proceso_id=firm_process.id, radicado_id=firm_radicado.id
         ).first()
@@ -601,7 +781,9 @@ def test_obtener_o_vincular_radicado_reuses_only_within_scope():
         db.flush()
 
         number = "12345678901234567890123"
+        assert not radicado_vinculado_a_usuario(db, firm_owner, number)
         firm_radicado, created = obtener_o_vincular_radicado(db, firm_owner, number)
+        assert radicado_vinculado_a_usuario(db, firm_owner, number)
         same_firm_radicado, created_again = obtener_o_vincular_radicado(
             db, firm_colleague, number
         )
@@ -617,6 +799,393 @@ def test_obtener_o_vincular_radicado_reuses_only_within_scope():
             firm_owner.id,
             firm_colleague.id,
         }
+
+
+def test_new_radicado_records_automatic_new_consultation_for_workflow():
+    engine = create_engine("sqlite:///:memory:")
+    models.Base.metadata.create_all(engine)
+
+    with Session(engine) as db:
+        owner = models.Usuario(
+            email="new-radicado-consult-owner@example.test",
+            password_hash="hash",
+            nombre_completo="Firm owner",
+            whatsapp_numero="0000000144",
+            rol=models.RolUsuario.ABOGADO_ADMIN,
+            estado=models.EstadoUsuario.ACTIVO,
+        )
+        db.add(owner)
+        db.flush()
+        radicado, created = obtener_o_vincular_radicado(
+            db,
+            owner,
+            "12345678901234567890123",
+        )
+        db.commit()
+
+        message, consulta_id = iniciar_consulta_nuevo_radicado(db, owner, radicado)
+        consulta = db.query(models.ConsultaRadicado).filter_by(
+            radicado_id=radicado.id
+        ).one()
+
+        assert created is True
+        assert "Workflow" in message
+        assert consulta_id == consulta.id
+        assert consulta.tipo == "AUTOMATICA_NUEVO"
+        assert consulta.estado == "ENCOLADA"
+        assert consulta.task_id is None
+
+
+def test_free_plan_new_radicado_skips_immediate_consultation():
+    engine = create_engine("sqlite:///:memory:")
+    models.Base.metadata.create_all(engine)
+
+    with Session(engine) as db:
+        free_plan = models.Plan(
+            nombre="Básico",
+            limite_radicados=10,
+            precio_mensual=0,
+        )
+        owner = models.Usuario(
+            email="free-new-radicado-owner@example.test",
+            password_hash="hash",
+            nombre_completo="Free owner",
+            whatsapp_numero="0000000145",
+            rol=models.RolUsuario.ABOGADO,
+            estado=models.EstadoUsuario.ACTIVO,
+            plan=free_plan,
+        )
+        db.add(owner)
+        db.flush()
+        radicado, _ = obtener_o_vincular_radicado(
+            db,
+            owner,
+            "12345678901234567890123",
+        )
+        db.commit()
+
+        message, consulta_id = iniciar_consulta_nuevo_radicado(db, owner, radicado)
+
+        assert "plan gratuito" in message
+        assert "desactivada" in message
+        assert consulta_id is None
+        assert db.query(models.ConsultaRadicado).filter_by(radicado_id=radicado.id).count() == 0
+
+
+def test_free_plan_message_uses_active_consultation_schedule():
+    engine = create_engine("sqlite:///:memory:")
+    models.Base.metadata.create_all(engine)
+
+    with Session(engine) as db:
+        free_plan = models.Plan(nombre="Básico", limite_radicados=10, precio_mensual=0)
+        owner = models.Usuario(
+            email="free-schedule-message@example.test",
+            password_hash="hash",
+            nombre_completo="Free owner",
+            whatsapp_numero="0000000148",
+            rol=models.RolUsuario.ABOGADO,
+            estado=models.EstadoUsuario.ACTIVO,
+            plan=free_plan,
+        )
+        db.add_all([
+            owner,
+            models.ConfiguracionConsultas(
+                id=1,
+                activa=True,
+                dias_habilitados=[0, 2, 4],
+            ),
+        ])
+        db.flush()
+        radicado, _ = obtener_o_vincular_radicado(
+            db,
+            owner,
+            "12345678901234567890123",
+        )
+        db.commit()
+
+        message, consulta_id = iniciar_consulta_nuevo_radicado(db, owner, radicado)
+
+        assert "12:00 y 17:00" in message
+        assert "lunes, miércoles, viernes" in message
+        assert consulta_id is None
+        assert db.query(models.ConsultaRadicado).filter_by(radicado_id=radicado.id).count() == 0
+
+
+def test_actuation_notification_recipients_are_limited_to_active_lawyers_in_scope():
+    engine = create_engine("sqlite:///:memory:")
+    models.Base.metadata.create_all(engine)
+
+    with Session(engine) as db:
+        firm_owner = models.Usuario(
+            email="notification-firm-owner@example.test",
+            password_hash="hash",
+            nombre_completo="Firm owner",
+            whatsapp_numero="0000000140",
+            rol=models.RolUsuario.ABOGADO_ADMIN,
+            estado=models.EstadoUsuario.ACTIVO,
+        )
+        firm_colleague = models.Usuario(
+            email="notification-firm-colleague@example.test",
+            password_hash="hash",
+            nombre_completo="Firm colleague",
+            whatsapp_numero="0000000141",
+            rol=models.RolUsuario.ABOGADO_ADMIN,
+            estado=models.EstadoUsuario.ACTIVO,
+            notificaciones_whatsapp=True,
+        )
+        firm_inactive = models.Usuario(
+            email="notification-firm-inactive@example.test",
+            password_hash="hash",
+            nombre_completo="Inactive lawyer",
+            whatsapp_numero="0000000142",
+            rol=models.RolUsuario.ABOGADO_ADMIN,
+            estado=models.EstadoUsuario.PENDIENTE_APROBACION,
+        )
+        saas_owner = models.Usuario(
+            email="notification-saas-owner@example.test",
+            password_hash="hash",
+            nombre_completo="SaaS owner",
+            whatsapp_numero="0000000143",
+            rol=models.RolUsuario.ABOGADO,
+            estado=models.EstadoUsuario.ACTIVO,
+        )
+        db.add_all([firm_owner, firm_colleague, firm_inactive, saas_owner])
+        db.flush()
+
+        firm_radicado = models.Radicado(numero="12345678901234567890123", usuario_id=firm_owner.id)
+        firm_radicado.usuarios_vinculados.extend(
+            [firm_colleague, firm_inactive, saas_owner]
+        )
+        saas_radicado = models.Radicado(numero="12345678901234567890124", usuario_id=saas_owner.id)
+        saas_radicado.usuarios_vinculados.append(firm_colleague)
+        db.add_all([firm_radicado, saas_radicado])
+        db.commit()
+
+        firm_recipients = abogados_notificables_para_radicado(firm_radicado)
+        saas_recipients = abogados_notificables_para_radicado(saas_radicado)
+
+        assert {user.id for user in firm_recipients} == {
+            firm_owner.id,
+            firm_colleague.id,
+        }
+        assert [user.id for user in saas_recipients] == [saas_owner.id]
+        assert not whatsapp_habilitado(firm_owner)
+        assert whatsapp_habilitado(firm_colleague)
+
+
+def test_workflow_actuation_notifications_consolidate_by_user_channel_and_scope():
+    engine = create_engine("sqlite:///:memory:")
+    models.Base.metadata.create_all(engine)
+
+    with Session(engine) as db:
+        lawyer = models.Usuario(
+            email="actuation-lawyer@example.test",
+            password_hash="hash",
+            nombre_completo="Firm lawyer",
+            whatsapp_numero="0000000153",
+            rol=models.RolUsuario.ABOGADO_ADMIN,
+            estado=models.EstadoUsuario.ACTIVO,
+            notificaciones_email=True,
+            notificaciones_whatsapp=True,
+            preferencias_notificacion={
+                "ACTUACIONES": {"email": True, "whatsapp": False},
+            },
+        )
+        client = models.Usuario(
+            email="actuation-client@example.test",
+            password_hash="hash",
+            nombre_completo="Assigned client",
+            whatsapp_numero="0000000154",
+            rol=models.RolUsuario.CLIENTE,
+            estado=models.EstadoUsuario.ACTIVO,
+            canal_notificacion_cliente="WHATSAPP",
+        )
+        unassigned_client = models.Usuario(
+            email="actuation-unassigned@example.test",
+            password_hash="hash",
+            nombre_completo="Unassigned client",
+            whatsapp_numero="0000000155",
+            rol=models.RolUsuario.CLIENTE,
+            estado=models.EstadoUsuario.ACTIVO,
+            canal_notificacion_cliente="EMAIL",
+        )
+        db.add_all([lawyer, client, unassigned_client])
+        db.flush()
+        radicado, _ = obtener_o_vincular_radicado(
+            db,
+            lawyer,
+            "12345678901234567890123",
+        )
+        proceso = models.Proceso(abogado_id=lawyer.id, nombre="Proceso asignado")
+        db.add(proceso)
+        db.flush()
+        db.add_all([
+            models.ProcesoRadicado(proceso_id=proceso.id, radicado_id=radicado.id),
+            models.ProcesoCliente(proceso_id=proceso.id, cliente_id=client.id),
+        ])
+        actuacion = models.Actuacion(
+            radicado_id=radicado.id,
+            orden=1,
+            fecha_actuacion="02/10/2026",
+            actuacion="Auto interlocutorio",
+            anotacion="Notificación de prueba",
+            fecha_inicia_termino="",
+            fecha_finaliza_termino="",
+            fecha_registro="02/10/2026",
+            es_fijacion=False,
+        )
+        ejecucion = models.EjecucionBarrido(
+            id="run-notification-aggregation",
+            clave_idempotencia="AUTO:notification-aggregation",
+            token_lanzamiento="notification-aggregation-token",
+            tipo="AUTOMATICA",
+            estado="EN_PROCESO",
+            inicio=datetime.utcnow(),
+            total_radicados=1,
+        )
+        db.add_all([
+            actuacion,
+            ejecucion,
+            models.EjecucionRadicado(
+                ejecucion_id=ejecucion.id,
+                radicado_id=radicado.id,
+                estado="COMPLETADA",
+                actuaciones_nuevas=1,
+            ),
+        ])
+        db.commit()
+
+        payload = schemas.WorkflowNovedadesPreparar(
+            eventos=[
+                schemas.WorkflowEventoActuaciones(
+                    radicado_id=radicado.id,
+                    actuaciones_nuevas=[schemas.WorkflowActuacionNueva(
+                        orden=1,
+                        fecha_actuacion=actuacion.fecha_actuacion,
+                        actuacion=actuacion.actuacion,
+                        anotacion=actuacion.anotacion,
+                        fecha_inicia_termino=actuacion.fecha_inicia_termino,
+                        fecha_finaliza_termino=actuacion.fecha_finaliza_termino,
+                        fecha_registro=actuacion.fecha_registro,
+                        es_fijacion=False,
+                    )],
+                )
+            ]
+        )
+        result = preparar_notificaciones_actuaciones(
+            ejecucion.id,
+            payload,
+            _=None,
+            db=db,
+        )
+        deliveries = db.query(models.EntregaNotificacion).order_by(
+            models.EntregaNotificacion.usuario_id.asc()
+        ).all()
+
+        assert len(result["entrega_ids"]) == 2
+        assert {(item.usuario_id, item.canal) for item in deliveries} == {
+            (lawyer.id, "EMAIL"),
+            (client.id, "WHATSAPP"),
+        }
+        assert all("Proceso asignado" in item.cuerpo for item in deliveries)
+        assert db.query(models.EntregaNotificacionActuacion).count() == 2
+
+        repeated = preparar_notificaciones_actuaciones(
+            ejecucion.id,
+            payload,
+            _=None,
+            db=db,
+        )
+        assert set(repeated["entrega_ids"]) == set(result["entrega_ids"])
+        assert db.query(models.EntregaNotificacion).count() == 2
+        assert db.query(models.EntregaNotificacionActuacion).count() == 2
+
+
+def test_notification_delivery_retry_is_idempotent(monkeypatch):
+    engine = create_engine("sqlite:///:memory:")
+    models.Base.metadata.create_all(engine)
+
+    with Session(engine) as db:
+        recipient = models.Usuario(
+            email="delivery-retry@example.test",
+            password_hash="hash",
+            nombre_completo="Delivery recipient",
+            whatsapp_numero="0000000156",
+            rol=models.RolUsuario.ABOGADO_ADMIN,
+            estado=models.EstadoUsuario.ACTIVO,
+        )
+        db.add(recipient)
+        db.flush()
+        delivery = models.EntregaNotificacion(
+            clave_idempotencia="ACTUACIONES:retry:1:EMAIL",
+            usuario_id=recipient.id,
+            tipo="ACTUACIONES",
+            canal="EMAIL",
+            asunto="Novedades judiciales",
+            cuerpo="Una novedad",
+            estado="PENDIENTE",
+        )
+        db.add(delivery)
+        db.commit()
+        delivery_id = delivery.id
+
+    sends = []
+    monkeypatch.setattr(
+        "app.routers.workflows.enviar_correo",
+        lambda email, subject, body: sends.append(email) or len(sends) > 1,
+    )
+    with Session(engine) as db:
+        with pytest.raises(HTTPException) as failed:
+            enviar_entrega_notificacion_workflow(delivery_id, _=None, db=db)
+        assert failed.value.status_code == 503
+        assert db.query(models.EntregaNotificacion).filter_by(id=delivery_id).one().intentos == 1
+
+        sent = enviar_entrega_notificacion_workflow(delivery_id, _=None, db=db)
+        duplicate = enviar_entrega_notificacion_workflow(delivery_id, _=None, db=db)
+
+        assert sent["estado"] == "ENVIADA"
+        assert duplicate["repetida"] is True
+        assert sends == ["delivery-retry@example.test", "delivery-retry@example.test"]
+        assert db.query(models.EntregaNotificacion).filter_by(id=delivery_id).one().intentos == 2
+
+
+def test_deleted_reminder_delivery_is_omitted_after_foreign_key_is_cleared(monkeypatch):
+    engine = create_engine("sqlite:///:memory:")
+    models.Base.metadata.create_all(engine)
+    with Session(engine) as db:
+        recipient = models.Usuario(
+            email="deleted-reminder@example.test",
+            password_hash="hash",
+            nombre_completo="Reminder recipient",
+            whatsapp_numero="",
+            rol=models.RolUsuario.ABOGADO_ADMIN,
+            estado=models.EstadoUsuario.ACTIVO,
+            notificaciones_email=True,
+        )
+        db.add(recipient)
+        db.flush()
+        delivery = models.EntregaNotificacion(
+            clave_idempotencia="RECORDATORIOS:deleted-generation",
+            usuario_id=recipient.id,
+            tipo="RECORDATORIOS",
+            canal="EMAIL",
+            recordatorio_version=3,
+            asunto="Recordatorio",
+            cuerpo="No debe enviarse",
+            estado="PENDIENTE",
+        )
+        db.add(delivery)
+        db.commit()
+        delivery_id = delivery.id
+
+    monkeypatch.setattr(
+        "app.routers.workflows.enviar_correo",
+        lambda *args: pytest.fail("A deleted reminder must not be delivered."),
+    )
+    with Session(engine) as db:
+        result = enviar_entrega_notificacion_workflow(delivery_id, _=None, db=db)
+        assert result["estado"] == "OMITIDA"
+        assert db.query(models.EntregaNotificacion).filter_by(id=delivery_id).one().intentos == 0
 
 
 def test_canonical_radicado_migration_merges_firm_duplicates_and_preserves_references():
@@ -1108,66 +1677,6 @@ def test_rama_actuation_pagination_stops_at_first_known_action(monkeypatch):
     ]
 
 
-def test_manual_radicado_retry_reuses_original_arguments_and_consulta_id(monkeypatch):
-    engine = create_engine("sqlite:///:memory:")
-    models.Base.metadata.create_all(engine)
-    test_session = sessionmaker(bind=engine)
-    monkeypatch.setattr(celery_tasks, "SessionLocal", test_session)
-
-    with test_session() as db:
-        owner = models.Usuario(
-            email="retry-owner@example.test",
-            password_hash="hash",
-            nombre_completo="Retry owner",
-            whatsapp_numero="0000000301",
-            rol=models.RolUsuario.ABOGADO_ADMIN,
-            estado=models.EstadoUsuario.ACTIVO,
-        )
-        db.add(owner)
-        db.flush()
-        radicado = models.Radicado(
-            numero="42345678901234567890123", usuario_id=owner.id
-        )
-        db.add(radicado)
-        db.flush()
-        consulta = models.ConsultaRadicado(
-            radicado_id=radicado.id,
-            tipo="MANUAL",
-            estado="ENCOLADA",
-        )
-        db.add(consulta)
-        db.commit()
-        radicado_id = radicado.id
-        consulta_id = consulta.id
-
-    monkeypatch.setattr(
-        celery_tasks,
-        "ejecutar_consulta_api_radicado",
-        lambda db, radicado: {"estado": "error_api: HTTP 503"},
-    )
-    captured: dict[str, object] = {}
-
-    class RetryRequested(Exception):
-        pass
-
-    def capture_retry(**kwargs):
-        captured.update(kwargs)
-        return RetryRequested()
-
-    monkeypatch.setattr(celery_tasks.tarea_consultar_radicado, "retry", capture_retry)
-
-    with pytest.raises(RetryRequested):
-        celery_tasks.tarea_consultar_radicado.run(
-            radicado_id, "MANUAL", consulta_id
-        )
-
-    assert captured["args"] == (radicado_id, "MANUAL", consulta_id)
-    assert captured["kwargs"] == {}
-    with test_session() as db:
-        retried_consulta = db.query(models.ConsultaRadicado).filter_by(id=consulta_id).one()
-        assert retried_consulta.estado == "REINTENTANDO"
-
-
 def test_archiving_process_preserves_relations_and_restoration_reopens_access():
     engine = create_engine("sqlite:///:memory:")
     models.Base.metadata.create_all(engine)
@@ -1309,6 +1818,254 @@ def test_single_firm_access_scopes_associates_and_allows_firm_admins():
         require_process_access(associate, 99)
 
 
+def test_admin_firm_agenda_is_monthly_filtered_and_excludes_saas_tasks():
+    engine = create_engine("sqlite:///:memory:")
+    models.Base.metadata.create_all(engine)
+    with Session(engine) as db:
+        admin = models.Usuario(
+            email="agenda-platform-admin@example.test",
+            password_hash="hash",
+            nombre_completo="Platform admin",
+            whatsapp_numero="",
+            rol=models.RolUsuario.ADMIN,
+            estado=models.EstadoUsuario.ACTIVO,
+        )
+        firm_lawyer = models.Usuario(
+            email="agenda-firm-lawyer@example.test",
+            password_hash="hash",
+            nombre_completo="Internal lawyer",
+            whatsapp_numero="",
+            rol=models.RolUsuario.ABOGADO_ADMIN,
+            estado=models.EstadoUsuario.ACTIVO,
+        )
+        saas_lawyer = models.Usuario(
+            email="agenda-saas-lawyer@example.test",
+            password_hash="hash",
+            nombre_completo="External lawyer",
+            whatsapp_numero="",
+            rol=models.RolUsuario.ABOGADO,
+            estado=models.EstadoUsuario.ACTIVO,
+        )
+        db.add_all([admin, firm_lawyer, saas_lawyer])
+        db.flush()
+        saas_process = models.Proceso(
+            abogado_id=saas_lawyer.id,
+            nombre="External SaaS process",
+        )
+        db.add(saas_process)
+        db.flush()
+        firm_task = models.Tarea(
+            usuario_id=firm_lawyer.id,
+            titulo="Firma October task",
+            fecha_limite=datetime(2026, 10, 15, 12),
+        )
+        saas_task = models.Tarea(
+            usuario_id=saas_lawyer.id,
+            titulo="SaaS October task",
+            fecha_limite=datetime(2026, 10, 15, 12),
+        )
+        cross_scope_task = models.Tarea(
+            usuario_id=firm_lawyer.id,
+            proceso_id=saas_process.id,
+            titulo="Cross-scope legacy task",
+            fecha_limite=datetime(2026, 10, 16, 12),
+        )
+        november_task = models.Tarea(
+            usuario_id=firm_lawyer.id,
+            titulo="November task",
+            fecha_limite=datetime(2026, 11, 2, 12),
+        )
+        db.add_all([firm_task, saas_task, cross_scope_task, november_task])
+        db.commit()
+
+        result = obtener_agenda_tareas_firma(mes="2026-10", db=db, admin=admin)
+        assert [item["id"] for item in result["tareas"]] == [firm_task.id]
+        assert result["tareas"][0]["responsable"] == "Internal lawyer"
+        assert result["responsables"] == [{"id": firm_lawyer.id, "nombre": "Internal lawyer"}]
+
+        filtered = obtener_agenda_tareas_firma(
+            mes="2026-10",
+            abogado_id=saas_lawyer.id,
+            db=db,
+            admin=admin,
+        )
+        assert filtered["tareas"] == []
+
+
+def test_admin_manual_radicado_picker_search_returns_bounded_metadata():
+    engine = create_engine("sqlite:///:memory:")
+    models.Base.metadata.create_all(engine)
+    with Session(engine) as db:
+        admin = models.Usuario(
+            email="radicado-picker-admin@example.test",
+            password_hash="hash",
+            nombre_completo="Picker admin",
+            whatsapp_numero="",
+            rol=models.RolUsuario.ADMIN,
+            estado=models.EstadoUsuario.ACTIVO,
+        )
+        db.add(admin)
+        db.flush()
+        for number, scope in (
+            ("12345000000000000000001", "FIRMA"),
+            ("92345000000000000000002", "SAAS:99"),
+        ):
+            db.add(models.Radicado(
+                numero=number,
+                creado_por_id=admin.id,
+                ambito_key=scope,
+                numero_normalizado=number,
+            ))
+        db.commit()
+
+        result = buscar_radicados_consulta_manual(q="12345", limite=1, db=db, admin=admin)
+        assert len(result) == 1
+        assert result[0]["numero"] == "12345000000000000000001"
+        assert result[0]["ambito"] == "FIRMA"
+        assert set(result[0]) == {"id", "numero", "ambito"}
+
+
+def test_admin_real_integration_send_requires_confirmation_and_is_audited(monkeypatch):
+    engine = create_engine("sqlite:///:memory:")
+    models.Base.metadata.create_all(engine)
+    sent = []
+    monkeypatch.setattr(
+        "app.routers.admin.enviar_correo",
+        lambda recipient, subject, body: sent.append((recipient, subject, body)) or True,
+    )
+
+    with Session(engine) as db:
+        admin = models.Usuario(
+            email="diagnostic-admin@example.test",
+            password_hash="hash",
+            nombre_completo="Diagnostic admin",
+            whatsapp_numero="",
+            rol=models.RolUsuario.ADMIN,
+            estado=models.EstadoUsuario.ACTIVO,
+        )
+        db.add(admin)
+        db.flush()
+
+        with pytest.raises(HTTPException) as unconfirmed:
+            enviar_mensaje_prueba_integracion(
+                schemas.DiagnosticoEnvioPrueba(
+                    canal="EMAIL",
+                    destinatario="explicit-recipient@example.com",
+                    confirmar_envio=False,
+                ),
+                db=db,
+                admin=admin,
+            )
+        assert unconfirmed.value.status_code == 400
+        assert sent == []
+        assert db.query(models.EventoAuditoria).count() == 0
+
+        result = enviar_mensaje_prueba_integracion(
+            schemas.DiagnosticoEnvioPrueba(
+                canal="EMAIL",
+                destinatario="explicit-recipient@example.com",
+                confirmar_envio=True,
+            ),
+            db=db,
+            admin=admin,
+        )
+        assert result == {
+            "estado": "ENVIADO",
+            "canal": "EMAIL",
+            "destinatario": "explicit-recipient@example.com",
+        }
+        assert sent[0][0] == "explicit-recipient@example.com"
+        event = db.query(models.EventoAuditoria).one()
+        assert event.accion == "admin.integracion.envio_prueba"
+        assert event.recurso_id == "EMAIL"
+        assert "password" not in str(result).lower()
+
+
+def test_integration_connection_diagnostics_do_not_send_or_expose_secrets(monkeypatch):
+    from urllib.error import HTTPError
+
+    monkeypatch.setenv("WORKFLOW_FRONTEND_URL", "https://frontend.example.test")
+    monkeypatch.setenv("WORKFLOW_SERVICE_TOKEN", "unit-test-private-token")
+    monkeypatch.setenv("SMTP_HOST", "smtp.example.test")
+    monkeypatch.setenv("SMTP_FROM", "sender@example.com")
+    monkeypatch.setenv("SMTP_USER", "smtp-user")
+    monkeypatch.setenv("SMTP_PASSWORD", "unit-test-private-password")
+
+    class WorkflowResponse:
+        ok = True
+
+        @staticmethod
+        def json():
+            return {"workflow_run_id": "diagnostic-run"}
+
+    workflow_requests = []
+    monkeypatch.setattr(
+        admin_router.requests,
+        "post",
+        lambda url, **kwargs: workflow_requests.append((url, kwargs)) or WorkflowResponse(),
+    )
+
+    class FakeSMTP:
+        def __init__(self, host, port, timeout):
+            self.host = host
+            self.port = port
+            self.calls = []
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *args):
+            return None
+
+        def ehlo(self):
+            self.calls.append("ehlo")
+
+        def starttls(self):
+            self.calls.append("starttls")
+
+    smtp_instances = []
+
+    def create_smtp(*args, **kwargs):
+        instance = FakeSMTP(*args, **kwargs)
+        smtp_instances.append(instance)
+        return instance
+
+    monkeypatch.setattr(admin_router.smtplib, "SMTP", create_smtp)
+    admin = models.Usuario(id=1, rol=models.RolUsuario.ADMIN)
+    status = obtener_estado_configuracion_integraciones(admin=admin)
+    assert status["integraciones"]["SMTP"]["configurada"] is True
+    assert "unit-test-private-password" not in str(status)
+    assert "unit-test-private-token" not in str(status)
+
+    def rama_base_no_es_endpoint(*args, **kwargs):
+        raise HTTPError(rama_judicial_api.API_BASE_URL, 404, "Not Found", {}, None)
+
+    monkeypatch.setattr(admin_router, "urlopen", rama_base_no_es_endpoint)
+    rama_result = probar_conexion_integracion(
+        schemas.DiagnosticoIntegracion(integracion="RAMA"),
+        admin=admin,
+    )
+    assert rama_result["estado"] == "ALCANZABLE"
+    assert rama_result["codigo_http"] == 404
+
+    workflow_result = probar_conexion_integracion(
+        schemas.DiagnosticoIntegracion(integracion="WORKFLOW"),
+        admin=admin,
+    )
+    assert workflow_result == {"integracion": "WORKFLOW", "estado": "ACEPTADO", "workflow_run_id": "diagnostic-run"}
+    assert workflow_requests[0][0].endswith("/workflow-internal/diagnosticos")
+    assert workflow_requests[0][1]["headers"]["Authorization"].startswith("Bearer ")
+    assert "unit-test-private-token" not in str(workflow_result)
+
+    smtp_result = probar_conexion_integracion(
+        schemas.DiagnosticoIntegracion(integracion="SMTP"),
+        admin=admin,
+    )
+    assert smtp_result["estado"] == "CONECTADO"
+    assert smtp_instances[0].calls == ["ehlo", "starttls", "ehlo"]
+    assert "send_message" not in smtp_instances[0].calls
+
+
 def test_saas_notification_features_require_plan_but_internal_staff_do_not():
     class Plan:
         notificaciones_whatsapp_tareas = True
@@ -1318,8 +2075,11 @@ def test_saas_notification_features_require_plan_but_internal_staff_do_not():
         def __init__(self, role, plan=None):
             self.rol = role
             self.plan = plan
+            self.estado = models.EstadoUsuario.ACTIVO
+            self.email = "notification@example.test"
             self.notificaciones_whatsapp = True
             self.whatsapp_numero = "573000000000"
+            self.canal_notificacion_cliente = "WHATSAPP" if role == models.RolUsuario.CLIENTE else None
 
     external_lawyer = User(models.RolUsuario.ABOGADO, Plan())
     firm_lawyer = User(models.RolUsuario.ABOGADO_ADMIN)
@@ -1330,6 +2090,61 @@ def test_saas_notification_features_require_plan_but_internal_staff_do_not():
     assert not plan_whatsapp_habilitado(external_lawyer, "notificaciones_whatsapp_procesos")
     assert plan_whatsapp_habilitado(firm_lawyer, "notificaciones_whatsapp_tareas")
     assert whatsapp_habilitado(client)
+    assert canales_habilitados(client, "ACTUACIONES", emisor=external_lawyer) == ("WHATSAPP",)
+
+
+def test_client_notification_preferences_require_one_available_channel():
+    main = importlib.import_module("app.main")
+    engine = create_engine("sqlite:///:memory:")
+    models.Base.metadata.create_all(engine)
+
+    with Session(engine) as db:
+        client = models.Usuario(
+            email="required-channel@example.test",
+            password_hash="hash",
+            nombre_completo="Client",
+            whatsapp_numero="",
+            rol=models.RolUsuario.CLIENTE,
+            estado=models.EstadoUsuario.ACTIVO,
+            canal_notificacion_cliente="EMAIL",
+        )
+        db.add(client)
+        db.flush()
+
+        with pytest.raises(HTTPException) as missing_channel:
+            main.actualizar_preferencias_notificaciones(
+                schemas.PreferenciasNotificacionUpdate(),
+                usuario_actual=client,
+                db=db,
+            )
+        assert missing_channel.value.status_code == 400
+
+        with pytest.raises(HTTPException) as missing_number:
+            main.actualizar_preferencias_notificaciones(
+                schemas.PreferenciasNotificacionUpdate(canal_cliente="WHATSAPP"),
+                usuario_actual=client,
+                db=db,
+            )
+        assert missing_number.value.status_code == 400
+
+        email_result = main.actualizar_preferencias_notificaciones(
+            schemas.PreferenciasNotificacionUpdate(canal_cliente="EMAIL"),
+            usuario_actual=client,
+            db=db,
+        )
+        assert email_result["canal_notificacion_cliente"] == "EMAIL"
+        assert client.notificaciones_email is True
+        assert client.notificaciones_whatsapp is False
+
+        client.whatsapp_numero = "573000000099"
+        whatsapp_result = main.actualizar_preferencias_notificaciones(
+            schemas.PreferenciasNotificacionUpdate(canal_cliente="WHATSAPP"),
+            usuario_actual=client,
+            db=db,
+        )
+        assert whatsapp_result["canal_notificacion_cliente"] == "WHATSAPP"
+        assert client.notificaciones_email is False
+        assert client.notificaciones_whatsapp is True
 
 
 def test_require_roles_rejects_client_from_lawyer_operation():
@@ -2052,19 +2867,9 @@ def test_admin_resource_crud_respects_sector_and_archives_processes():
         assert db.query(models.EventoAuditoria).filter(models.EventoAuditoria.actor_id == admin.id).count() >= 5
 
 
-def test_admin_can_queue_individual_and_sector_radicado_consultations(monkeypatch):
+def test_legacy_admin_manual_consultation_endpoints_are_disabled():
     engine = create_engine("sqlite:///:memory:")
     models.Base.metadata.create_all(engine)
-    queued_tasks = []
-
-    class FakeTask:
-        id = "task-admin-test"
-
-    def enqueue(radicado_id, tipo, consulta_id):
-        queued_tasks.append((radicado_id, tipo, consulta_id))
-        return FakeTask()
-
-    monkeypatch.setattr("app.routers.admin.tarea_consultar_radicado.delay", enqueue)
 
     with Session(engine) as db:
         admin = models.Usuario(
@@ -2083,28 +2888,17 @@ def test_admin_can_queue_individual_and_sector_radicado_consultations(monkeypatc
             rol=models.RolUsuario.ABOGADO, estado=models.EstadoUsuario.ACTIVO,
         )
         db.add_all([admin, firm_owner, saas_owner])
-        db.flush()
-        firm_radicado = models.Radicado(numero="62345678901234567890123", usuario_id=firm_owner.id)
-        saas_radicado = models.Radicado(numero="72345678901234567890123", usuario_id=saas_owner.id)
-        db.add_all([firm_radicado, saas_radicado])
         db.commit()
 
-        result = consultar_todos_radicados_admin(sector="FIRMA", db=db, admin=admin)
-        assert result["total"] == 1
-        assert result["encoladas"] == 1
-        assert queued_tasks[0][0] == firm_radicado.id
-
-        individual = consultar_radicado_admin(
-            saas_radicado.id, sector="SAAS", db=db, admin=admin
-        )
-        assert "encolada" in individual["mensaje"].lower()
-        with pytest.raises(HTTPException) as scope_error:
+        with pytest.raises(HTTPException) as all_disabled:
+            consultar_todos_radicados_admin(sector="FIRMA", db=db, admin=admin)
+        assert all_disabled.value.status_code == 410
+        with pytest.raises(HTTPException) as individual_disabled:
             consultar_radicado_admin(
-                firm_radicado.id, sector="SAAS", db=db, admin=admin
+                1, sector="FIRMA", db=db, admin=admin
             )
-        assert scope_error.value.status_code == 404
-        assert db.query(models.ConsultaRadicado).count() == 2
-        assert db.query(models.EventoAuditoria).filter_by(actor_id=admin.id).count() == 2
+        assert individual_disabled.value.status_code == 410
+        assert db.query(models.ConsultaRadicado).count() == 0
 
 
 def test_firm_process_collaborators_get_scoped_case_access_but_not_team_control():
@@ -2329,17 +3123,25 @@ def test_reminder_datetimes_are_serialized_with_utc_offset():
     }
 
 
-def test_due_reminders_send_directly_without_celery_and_only_once(monkeypatch):
+def test_due_reminders_use_workflow_delivery_and_complete_after_send(monkeypatch):
     engine = create_engine("sqlite:///:memory:")
     models.Base.metadata.create_all(engine)
     test_session = sessionmaker(bind=engine)
     monkeypatch.setattr(celery_tasks, "SessionLocal", test_session)
-    monkeypatch.setattr(celery_tasks, "whatsapp_habilitado", lambda user: True)
-    monkeypatch.setattr(celery_tasks, "plan_whatsapp_habilitado", lambda user, feature: True)
+    workflow_launches = []
+
+    class AcceptedLaunch:
+        ok = True
+
+    monkeypatch.setattr(
+        "app.reminder_workflow.requests.post",
+        lambda url, **kwargs: workflow_launches.append(kwargs["json"]) or AcceptedLaunch(),
+    )
+    monkeypatch.setenv("WORKFLOW_FRONTEND_URL", "https://frontend.example.test")
+    monkeypatch.setenv("WORKFLOW_SERVICE_TOKEN", "reminder-test-token")
     sent = []
     monkeypatch.setattr(
-        celery_tasks,
-        "enviar_mensaje_whatsapp",
+        "app.routers.workflows.enviar_mensaje_whatsapp",
         lambda numero, mensaje: sent.append((numero, mensaje)) or True,
     )
 
@@ -2352,6 +3154,9 @@ def test_due_reminders_send_directly_without_celery_and_only_once(monkeypatch):
             rol=models.RolUsuario.ABOGADO_ADMIN,
             estado=models.EstadoUsuario.ACTIVO,
             notificaciones_whatsapp=True,
+            preferencias_notificacion={
+                "RECORDATORIOS": {"email": False, "whatsapp": True},
+            },
         )
         db.add(lawyer)
         db.flush()
@@ -2368,15 +3173,295 @@ def test_due_reminders_send_directly_without_celery_and_only_once(monkeypatch):
         reminder_id = reminder.id
 
     result = celery_tasks.procesar_recordatorios_tareas()
-    assert result["recordatorios_enviados"] == 1
+    assert result["recordatorios_programados"] == 1
+    assert result["recordatorios_enviados"] == 0
     assert result["errores"] == 0
-    assert len(sent) == 1
+    assert sent == []
+    assert len(workflow_launches) == 1
+    assert workflow_launches[0]["programado_para"] == "2020-01-01T00:00:00Z"
     with Session(engine) as db:
-        assert db.query(models.RecordatorioTarea).filter_by(id=reminder_id).one().enviado_en is not None
+        reminder = db.query(models.RecordatorioTarea).filter_by(id=reminder_id).one()
+        assert reminder.enviado_en is None
+        assert reminder.workflow_version_lanzada == reminder.version == 1
 
     repeated = celery_tasks.procesar_recordatorios_tareas()
-    assert repeated["recordatorios_enviados"] == 0
+    assert repeated["recordatorios_programados"] == 0
+    assert len(workflow_launches) == 1
+    with Session(engine) as db:
+        prepared = preparar_recordatorio_workflow(
+            reminder_id,
+            schemas.WorkflowRecordatorioPreparar(version=1),
+            _=None,
+            db=db,
+        )
+        assert prepared["estado"] == "PREPARADO"
+        delivery = db.query(models.EntregaNotificacion).filter_by(recordatorio_id=reminder_id).one()
+        assert delivery.estado == "PENDIENTE"
+        assert delivery.recordatorio_version == 1
+        delivery_id = delivery.id
+        sent_delivery = enviar_entrega_notificacion_workflow(delivery_id, _=None, db=db)
+        assert sent_delivery["estado"] == "ENVIADA"
+        assert db.query(models.RecordatorioTarea).filter_by(id=reminder_id).one().enviado_en is not None
     assert len(sent) == 1
+
+    completed = celery_tasks.procesar_recordatorios_tareas()
+    assert completed["recordatorios_programados"] == 0
+
+    with Session(engine) as db:
+        reminder = db.query(models.RecordatorioTarea).filter_by(id=reminder_id).one()
+        reminder.enviado_en = None
+        reminder.version = 2
+        db.commit()
+        stale = preparar_recordatorio_workflow(
+            reminder_id,
+            schemas.WorkflowRecordatorioPreparar(version=1),
+            _=None,
+            db=db,
+        )
+        assert stale == {"estado": "CANCELADO", "entrega_ids": []}
+        assert db.query(models.EntregaNotificacion).filter_by(recordatorio_version=2).count() == 0
+        delivery = db.query(models.EntregaNotificacion).filter_by(id=delivery_id).one()
+        delivery.estado = "PENDIENTE"
+        delivery.intentos = 0
+        delivery.enviado_en = None
+        db.commit()
+        stale_delivery = enviar_entrega_notificacion_workflow(delivery_id, _=None, db=db)
+        assert stale_delivery["estado"] == "OMITIDA"
+        assert db.query(models.EntregaNotificacion).filter_by(id=delivery_id).one().intentos == 0
+
+
+def test_reminder_launch_failure_is_recovered_by_reconciler(monkeypatch):
+    engine = create_engine("sqlite:///:memory:")
+    models.Base.metadata.create_all(engine)
+    monkeypatch.setattr(celery_tasks, "SessionLocal", sessionmaker(bind=engine))
+
+    class LaunchResponse:
+        def __init__(self, ok, status_code):
+            self.ok = ok
+            self.status_code = status_code
+
+    responses = iter([LaunchResponse(False, 503), LaunchResponse(True, 202)])
+    launches = []
+    monkeypatch.setattr(
+        "app.reminder_workflow.requests.post",
+        lambda url, **kwargs: launches.append(kwargs["json"]) or next(responses),
+    )
+    monkeypatch.setenv("WORKFLOW_FRONTEND_URL", "https://frontend.example.test")
+    monkeypatch.setenv("WORKFLOW_SERVICE_TOKEN", "reminder-test-token")
+
+    with Session(engine) as db:
+        lawyer = models.Usuario(
+            email="retry-reminder@example.test",
+            password_hash="hash",
+            nombre_completo="Retry reminder owner",
+            whatsapp_numero="",
+            rol=models.RolUsuario.ABOGADO_ADMIN,
+            estado=models.EstadoUsuario.ACTIVO,
+            notificaciones_email=True,
+        )
+        db.add(lawyer)
+        db.flush()
+        task = models.Tarea(usuario_id=lawyer.id, titulo="Retry reminder task")
+        db.add(task)
+        db.flush()
+        reminder = models.RecordatorioTarea(
+            tarea_id=task.id,
+            fecha_hora=datetime(2020, 1, 1),
+            activo=True,
+        )
+        db.add(reminder)
+        db.commit()
+        reminder_id = reminder.id
+
+    failed = celery_tasks.procesar_recordatorios_tareas()
+    assert failed["recordatorios_programados"] == 0
+    assert failed["errores"] == 1
+    with Session(engine) as db:
+        assert db.query(models.RecordatorioTarea).filter_by(id=reminder_id).one().workflow_version_lanzada == 0
+
+    recovered = celery_tasks.procesar_recordatorios_tareas()
+    assert recovered["recordatorios_programados"] == 1
+    assert recovered["errores"] == 0
+    assert len(launches) == 2
+    with Session(engine) as db:
+        reminder = db.query(models.RecordatorioTarea).filter_by(id=reminder_id).one()
+        assert reminder.workflow_version_lanzada == reminder.version == 1
+
+
+def test_reminder_versions_follow_schedule_and_task_mutations(monkeypatch):
+    engine = create_engine("sqlite:///:memory:")
+    models.Base.metadata.create_all(engine)
+    launches = []
+    monkeypatch.setattr(
+        "app.routers.tareas.iniciar_workflow_recordatorio",
+        lambda db, reminder_id: launches.append(reminder_id) or True,
+    )
+
+    with Session(engine) as db:
+        lawyer = models.Usuario(
+            email="versioned-reminder@example.test",
+            password_hash="hash",
+            nombre_completo="Reminder manager",
+            whatsapp_numero="",
+            rol=models.RolUsuario.ABOGADO_ADMIN,
+            estado=models.EstadoUsuario.ACTIVO,
+            notificaciones_email=True,
+        )
+        db.add(lawyer)
+        db.flush()
+        task = models.Tarea(usuario_id=lawyer.id, titulo="Versioned task")
+        db.add(task)
+        db.commit()
+
+        reminder = crear_recordatorio(
+            task.id,
+            schemas.RecordatorioTareaCreate(
+                fecha_hora=datetime(2026, 11, 1, 12, 0, tzinfo=timezone.utc),
+            ),
+            db=db,
+            usuario_actual=lawyer,
+        )
+        assert reminder.version == 1
+        assert reminder.fecha_hora == datetime(2026, 11, 1, 12, 0)
+        assert launches == [reminder.id]
+
+        reminder = actualizar_recordatorio(
+            task.id,
+            reminder.id,
+            schemas.RecordatorioTareaUpdate(
+                fecha_hora=datetime(2026, 11, 1, 13, 0, tzinfo=timezone.utc),
+            ),
+            db=db,
+            usuario_actual=lawyer,
+        )
+        assert reminder.version == 2
+        assert launches == [reminder.id, reminder.id]
+
+        reminder = actualizar_recordatorio(
+            task.id,
+            reminder.id,
+            schemas.RecordatorioTareaUpdate(activo=False),
+            db=db,
+            usuario_actual=lawyer,
+        )
+        assert reminder.version == 3
+        assert launches == [reminder.id, reminder.id]
+
+        reminder = actualizar_recordatorio(
+            task.id,
+            reminder.id,
+            schemas.RecordatorioTareaUpdate(activo=True),
+            db=db,
+            usuario_actual=lawyer,
+        )
+        assert reminder.version == 4
+        assert launches == [reminder.id, reminder.id, reminder.id]
+
+        actualizar_tarea(
+            task.id,
+            schemas.TareaUpdate(fecha_limite=datetime(2026, 11, 2, 12, 0)),
+            db=db,
+            usuario_actual=lawyer,
+        )
+        assert db.query(models.RecordatorioTarea).filter_by(id=reminder.id).one().version == 5
+        assert len(launches) == 4
+
+        completar_tarea(task.id, db=db, usuario_actual=lawyer)
+        assert db.query(models.RecordatorioTarea).filter_by(id=reminder.id).one().version == 6
+        assert len(launches) == 4
+
+        completar_tarea(task.id, db=db, usuario_actual=lawyer)
+        assert db.query(models.RecordatorioTarea).filter_by(id=reminder.id).one().version == 7
+        assert len(launches) == 5
+
+        anticipation_task = models.Tarea(
+            usuario_id=lawyer.id,
+            titulo="Anticipation task",
+            fecha_limite=datetime(2026, 12, 1, 12, 0),
+        )
+        db.add(anticipation_task)
+        db.commit()
+        anticipation_reminder = crear_recordatorio(
+            anticipation_task.id,
+            schemas.RecordatorioTareaCreate(anticipacion_minutos=60),
+            db=db,
+            usuario_actual=lawyer,
+        )
+        assert momento_programado(anticipation_reminder, anticipation_task) == datetime(2026, 12, 1, 11, 0)
+        assert len(launches) == 6
+
+        deleted_id = anticipation_reminder.id
+        eliminar_recordatorio(
+            anticipation_task.id,
+            deleted_id,
+            db=db,
+            usuario_actual=lawyer,
+        )
+        assert db.query(models.RecordatorioTarea).filter_by(id=deleted_id).first() is None
+        deleted_run = preparar_recordatorio_workflow(
+            deleted_id,
+            schemas.WorkflowRecordatorioPreparar(version=1),
+            _=None,
+            db=db,
+        )
+        assert deleted_run == {"estado": "CANCELADO", "entrega_ids": []}
+
+
+def test_monthly_summary_uses_idempotent_workflow_delivery(monkeypatch):
+    engine = create_engine("sqlite:///:memory:")
+    models.Base.metadata.create_all(engine)
+    monkeypatch.setattr(celery_tasks, "SessionLocal", sessionmaker(bind=engine))
+
+    class MonthEndDatetime(datetime):
+        @classmethod
+        def now(cls, tz=None):
+            return cls(2026, 10, 31, 12, 0)
+
+    monkeypatch.setattr(celery_tasks, "datetime", MonthEndDatetime)
+    workflow_launches = []
+    monkeypatch.setattr(
+        "app.notification_service._iniciar_workflow",
+        lambda delivery_ids: workflow_launches.extend(delivery_ids),
+    )
+
+    with Session(engine) as db:
+        lawyer = models.Usuario(
+            email="monthly-summary@example.test",
+            password_hash="hash",
+            nombre_completo="Monthly summary lawyer",
+            whatsapp_numero="",
+            rol=models.RolUsuario.ABOGADO_ADMIN,
+            estado=models.EstadoUsuario.ACTIVO,
+            notificaciones_email=True,
+            preferencias_notificacion={
+                "RESUMENES": {"email": True, "whatsapp": False},
+            },
+        )
+        db.add(lawyer)
+        db.flush()
+        radicado = models.Radicado(
+            numero="92345678901234567890125",
+            creado_por_id=lawyer.id,
+            ambito_key="FIRMA",
+            numero_normalizado="92345678901234567890125",
+        )
+        db.add(radicado)
+        db.commit()
+
+    result = celery_tasks.tarea_enviar_resumen_mensual()
+    assert result == {"estado": "ok", "usuarios_notificados": 1}
+    with Session(engine) as db:
+        delivery = db.query(models.EntregaNotificacion).one()
+        assert delivery.tipo == "RESUMENES"
+        assert delivery.canal == "EMAIL"
+        assert delivery.clave_idempotencia.startswith("RESUMENES:")
+        delivery_id = delivery.id
+
+    repeated = celery_tasks.tarea_enviar_resumen_mensual()
+    assert repeated == {"estado": "ok", "usuarios_notificados": 1}
+    with Session(engine) as db:
+        assert db.query(models.EntregaNotificacion).count() == 1
+    assert workflow_launches == [delivery_id, delivery_id]
 
 
 def test_qstash_reminder_endpoint_verifies_signature_and_endpoint(monkeypatch):
@@ -2458,9 +3543,11 @@ def test_qstash_reminder_endpoint_verifies_signature_and_endpoint(monkeypatch):
 def test_subtask_inherits_scope_and_configures_client_notifications(monkeypatch):
     engine = create_engine("sqlite:///:memory:")
     models.Base.metadata.create_all(engine)
-    notifications = {"email": 0, "whatsapp": 0}
-    monkeypatch.setattr("app.routers.tareas.tarea_enviar_email", type("Task", (), {"delay": staticmethod(lambda *args: notifications.__setitem__("email", notifications["email"] + 1))})())
-    monkeypatch.setattr("app.routers.tareas.tarea_enviar_whatsapp", type("Task", (), {"delay": staticmethod(lambda *args: notifications.__setitem__("whatsapp", notifications["whatsapp"] + 1))})())
+    notifications = []
+    monkeypatch.setattr(
+        "app.routers.tareas.emitir_notificacion_workflow",
+        lambda *args, **kwargs: notifications.append((args, kwargs)) or ["delivery"],
+    )
 
     with Session(engine) as db:
         owner = models.Usuario(
@@ -2473,6 +3560,7 @@ def test_subtask_inherits_scope_and_configures_client_notifications(monkeypatch)
             nombre_completo="Firm client", whatsapp_numero="573000000032",
             rol=models.RolUsuario.CLIENTE, estado=models.EstadoUsuario.ACTIVO,
             notificaciones_email=True, notificaciones_whatsapp=True,
+            canal_notificacion_cliente="WHATSAPP",
         )
         db.add_all([owner, client])
         db.flush()
@@ -2509,7 +3597,7 @@ def test_subtask_inherits_scope_and_configures_client_notifications(monkeypatch)
                 asignada_cliente=True,
                 cliente_id=client.id,
                 notificar_email=False,
-                notificar_whatsapp=True,
+                notificar_whatsapp=False,
             ),
             db=db,
             usuario_actual=owner,
@@ -2519,8 +3607,10 @@ def test_subtask_inherits_scope_and_configures_client_notifications(monkeypatch)
         assert subtask.actuacion_id == actuation.id
         assert subtask.asignada_cliente is True
         assert subtask.notificar_email is False
-        assert subtask.notificar_whatsapp is True
-        assert notifications == {"email": 0, "whatsapp": 1}
+        assert subtask.notificar_whatsapp is False
+        assert len(notifications) == 1
+        assert notifications[0][0][2] == "SUBTAREAS"
+        assert notifications[0][0][1].id == client.id
 
         internal_subtask = crear_subtarea(
             parent_task.id,
@@ -2542,8 +3632,8 @@ def test_subtask_inherits_scope_and_configures_client_notifications(monkeypatch)
         assert updated.proceso_id == process.id
         assert updated.radicado_id == radicado.id
         assert updated.actuacion_id == actuation.id
-        assert updated.notificar_whatsapp is True
-        assert notifications == {"email": 0, "whatsapp": 1}
+        assert updated.notificar_whatsapp is False
+        assert len(notifications) == 1
 
         with pytest.raises(HTTPException) as scope_error:
             actualizar_subtarea(

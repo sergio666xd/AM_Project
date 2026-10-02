@@ -11,7 +11,9 @@ import {
   FileText,
   Play,
   RefreshCw,
+  Search,
   Save,
+  Send,
   ServerCog,
 } from "lucide-react";
 import { fetchApi } from "@/lib/api";
@@ -52,6 +54,9 @@ type SweepRadicadoDetail = {
   error: string | null;
 };
 type SweepDetails = { ejecucion: SweepRun; radicados: SweepRadicadoDetail[] };
+type RadicadoOption = { id: number; numero: string; ambito: string };
+type IntegrationName = "RAMA" | "WORKFLOW" | "SMTP" | "WHATSAPP";
+type IntegrationResult = { estado: string; detalle?: string; codigo_http?: number; workflow_run_id?: string };
 type OperationsData = {
   vision: Vision;
   redis: RedisStatus;
@@ -103,6 +108,17 @@ export default function AdminOperationsPage() {
   const [loading, setLoading] = useState(true);
   const [savingSchedule, setSavingSchedule] = useState(false);
   const [startingManual, setStartingManual] = useState(false);
+  const [manualMode, setManualMode] = useState<"TODOS" | "SELECCION">("TODOS");
+  const [radicadoQuery, setRadicadoQuery] = useState("");
+  const [radicadoOptions, setRadicadoOptions] = useState<RadicadoOption[]>([]);
+  const [selectedRadicadoIds, setSelectedRadicadoIds] = useState<number[]>([]);
+  const [searchingRadicados, setSearchingRadicados] = useState(false);
+  const [integrationResults, setIntegrationResults] = useState<Partial<Record<IntegrationName, IntegrationResult>>>({});
+  const [checkingIntegration, setCheckingIntegration] = useState<IntegrationName | null>(null);
+  const [testChannel, setTestChannel] = useState<"EMAIL" | "WHATSAPP">("EMAIL");
+  const [testRecipient, setTestRecipient] = useState("");
+  const [confirmTestSend, setConfirmTestSend] = useState(false);
+  const [sendingTest, setSendingTest] = useState(false);
   const [expandedRunId, setExpandedRunId] = useState<string | null>(null);
   const [sweepDetails, setSweepDetails] = useState<SweepDetails | null>(null);
   const [scheduleMessage, setScheduleMessage] = useState("");
@@ -150,6 +166,52 @@ export default function AdminOperationsPage() {
     }
   }
 
+  async function checkIntegration(integration: IntegrationName) {
+    if (!token) return;
+    setCheckingIntegration(integration);
+    setError("");
+    try {
+      const result = await fetchApi("/api/admin/diagnosticos/conexion", {
+        method: "POST",
+        token,
+        body: JSON.stringify({ integracion: integration }),
+      });
+      setIntegrationResults((current) => ({ ...current, [integration]: result }));
+    } catch (cause) {
+      setIntegrationResults((current) => ({
+        ...current,
+        [integration]: { estado: cause instanceof Error ? cause.message : "FALLO" },
+      }));
+    } finally {
+      setCheckingIntegration(null);
+    }
+  }
+
+  async function sendIntegrationTest(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!token || !confirmTestSend || !testRecipient.trim()) return;
+    setSendingTest(true);
+    setError("");
+    setScheduleMessage("");
+    try {
+      const result = await fetchApi("/api/admin/diagnosticos/envio", {
+        method: "POST",
+        token,
+        body: JSON.stringify({
+          canal: testChannel,
+          destinatario: testRecipient.trim(),
+          confirmar_envio: confirmTestSend,
+        }),
+      });
+      setScheduleMessage(`Prueba ${result.estado.toLowerCase()} por ${result.canal}.`);
+      setConfirmTestSend(false);
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "No fue posible enviar el mensaje de prueba.");
+    } finally {
+      setSendingTest(false);
+    }
+  }
+
   async function saveSchedule() {
     if (!token || !data) return;
     setSavingSchedule(true);
@@ -173,15 +235,27 @@ export default function AdminOperationsPage() {
     }
   }
 
-  async function startManualSweep() {
+  async function startManualSweep(radicadoIds?: number[]) {
     if (!token) return;
+    const ids = radicadoIds ?? selectedRadicadoIds;
+    const selected = radicadoIds !== undefined || manualMode === "SELECCION";
+    if (selected && ids.length === 0) {
+      setError("Selecciona al menos un radicado.");
+      return;
+    }
     setStartingManual(true);
     setScheduleMessage("");
     setError("");
     try {
-      const response = await fetch("/workflow-admin/consultas", {
+      const response = await fetch(selected ? "/workflow-admin/consultas/radicado" : "/workflow-admin/consultas", {
         method: "POST",
-        headers: { Authorization: `Bearer ${token}` },
+        headers: {
+          Authorization: `Bearer ${token}`,
+          ...(selected ? { "Content-Type": "application/json" } : {}),
+        },
+        ...(selected ? {
+          body: JSON.stringify({ tipo: "MANUAL", radicado_ids: ids }),
+        } : {}),
       });
       const result = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(result.detail || `Error ${response.status}`);
@@ -192,6 +266,30 @@ export default function AdminOperationsPage() {
     } finally {
       setStartingManual(false);
     }
+  }
+
+  async function searchManualRadicados(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!token) return;
+    setSearchingRadicados(true);
+    setError("");
+    try {
+      const result = await fetchApi(
+        `/api/admin/consultas/radicados?q=${encodeURIComponent(radicadoQuery)}&limite=50`,
+        { method: "GET", token },
+      );
+      setRadicadoOptions(result);
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "No fue posible buscar radicados.");
+    } finally {
+      setSearchingRadicados(false);
+    }
+  }
+
+  function toggleSelectedRadicado(radicadoId: number) {
+    setSelectedRadicadoIds((current) => current.includes(radicadoId)
+      ? current.filter((id) => id !== radicadoId)
+      : [...current, radicadoId]);
   }
 
   async function toggleSweepDetails(runId: string) {
@@ -351,13 +449,44 @@ export default function AdminOperationsPage() {
                 <button
                   type="button"
                   onClick={() => void startManualSweep()}
-                  disabled={startingManual}
+                  disabled={startingManual || manualMode === "SELECCION" && selectedRadicadoIds.length === 0}
                   className="inline-flex items-center gap-2 rounded-md border border-border px-3 py-2 text-sm font-medium hover:bg-surface-hover disabled:opacity-50"
                 >
                   <Play className="size-4" />
-                  {startingManual ? "Iniciando..." : "Consultar ahora"}
+                  {startingManual ? "Iniciando..." : manualMode === "TODOS" ? "Consultar todos" : `Consultar selección (${selectedRadicadoIds.length})`}
                 </button>
                 {scheduleMessage && <span role="status" className="text-sm text-success">{scheduleMessage}</span>}
+              </div>
+              <div className="space-y-3 rounded-md border border-border p-3">
+                <div role="group" aria-label="Alcance de consulta manual" className="inline-flex gap-1 rounded-md border border-border p-1">
+                  {(["TODOS", "SELECCION"] as const).map((mode) => (
+                    <button key={mode} type="button" aria-pressed={manualMode === mode} onClick={() => setManualMode(mode)} className={`rounded px-3 py-1.5 text-sm ${manualMode === mode ? "bg-primary text-white" : "text-foreground-muted hover:bg-surface-hover"}`}>
+                      {mode === "TODOS" ? "Todos los radicados" : "Selección manual"}
+                    </button>
+                  ))}
+                </div>
+                {manualMode === "SELECCION" && (
+                  <>
+                    <form onSubmit={searchManualRadicados} className="flex max-w-xl gap-2">
+                      <input value={radicadoQuery} onChange={(event) => setRadicadoQuery(event.target.value)} placeholder="Buscar por número de radicado" className="min-w-0 flex-1 rounded-md border border-border bg-background px-3 py-2 text-sm" />
+                      <button type="submit" disabled={searchingRadicados} aria-label="Buscar radicados" title="Buscar radicados" className="grid size-10 place-items-center rounded-md border border-border hover:bg-surface-hover disabled:opacity-50">
+                        <Search className={`size-4 ${searchingRadicados ? "animate-pulse" : ""}`} />
+                      </button>
+                    </form>
+                    {radicadoOptions.length > 0 && (
+                      <div className="max-h-56 max-w-2xl overflow-y-auto rounded-md border border-border">
+                        {radicadoOptions.map((radicado) => (
+                          <label key={radicado.id} className="flex cursor-pointer items-center gap-3 border-b border-border px-3 py-2 text-sm last:border-b-0 hover:bg-surface-hover">
+                            <input type="checkbox" checked={selectedRadicadoIds.includes(radicado.id)} onChange={() => toggleSelectedRadicado(radicado.id)} className="size-4 accent-primary" />
+                            <span className="font-medium">{radicado.numero}</span>
+                            <span className="text-xs text-foreground-muted">{radicado.ambito}</span>
+                          </label>
+                        ))}
+                      </div>
+                    )}
+                    <p className="text-xs text-foreground-muted">{selectedRadicadoIds.length} radicado(s) seleccionado(s).</p>
+                  </>
+                )}
               </div>
               <div className="overflow-x-auto border-t border-border pt-4">
                 <h3 className="mb-3 text-sm font-semibold">Ejecuciones recientes</h3>
@@ -368,6 +497,7 @@ export default function AdminOperationsPage() {
                     <thead className="text-xs text-foreground-muted">
                       <tr>
                         <th className="py-2 pr-4 font-medium">Inicio</th>
+                        <th className="py-2 pr-4 font-medium">Fin</th>
                         <th className="py-2 pr-4 font-medium">Tipo</th>
                         <th className="py-2 pr-4 font-medium">Estado</th>
                         <th className="py-2 pr-4 font-medium">Radicados</th>
@@ -381,6 +511,7 @@ export default function AdminOperationsPage() {
                         <Fragment key={sweep.id}>
                           <tr className="border-t border-border">
                             <td className="py-2 pr-4">{new Date(sweep.inicio).toLocaleString("es-CO")}</td>
+                            <td className="py-2 pr-4">{sweep.finalizacion ? new Date(sweep.finalizacion).toLocaleString("es-CO") : "En curso"}</td>
                             <td className="py-2 pr-4">{sweep.tipo}</td>
                             <td className="py-2 pr-4">{sweep.estado}</td>
                             <td className="py-2 pr-4">{sweep.procesados}/{sweep.total_radicados}</td>
@@ -399,13 +530,24 @@ export default function AdminOperationsPage() {
                           </tr>
                           {expandedRunId === sweep.id && (
                             <tr className="border-t border-border bg-surface-secondary">
-                              <td colSpan={7} className="p-3">
+                              <td colSpan={8} className="p-3">
                                 {!sweepDetails || sweepDetails.ejecucion.id !== sweep.id ? (
                                   <p className="text-sm text-foreground-muted">Cargando detalle...</p>
                                 ) : sweepDetails.radicados.length === 0 ? (
                                   <p className="text-sm text-foreground-muted">La ejecución aún no registra radicados.</p>
                                 ) : (
                                   <div className="space-y-2">
+                                    {sweepDetails.radicados.some((item) => item.estado === "ERROR") && (
+                                      <button
+                                        type="button"
+                                        disabled={startingManual}
+                                        onClick={() => void startManualSweep(sweepDetails.radicados.filter((item) => item.estado === "ERROR").map((item) => item.radicado_id))}
+                                        className="mb-2 inline-flex items-center gap-2 rounded-md border border-danger/30 px-3 py-2 text-sm text-danger hover:bg-danger-light disabled:opacity-50"
+                                      >
+                                        <RefreshCw className="size-4" />
+                                        Reintentar {sweepDetails.radicados.filter((item) => item.estado === "ERROR").length} fallido(s)
+                                      </button>
+                                    )}
                                     {sweepDetails.radicados.map((item) => (
                                       <div key={item.id} className="flex flex-wrap justify-between gap-2 text-sm">
                                         <span>{item.numero} · {item.estado} · {item.actuaciones_nuevas} novedad(es)</span>
@@ -448,6 +590,48 @@ export default function AdminOperationsPage() {
                   </div>
                 </div>
               </div>
+            </section>
+            <section className="space-y-4 border-t border-border pt-5">
+              <div>
+                <h2 className="font-semibold">Diagnóstico de integraciones</h2>
+                <p className="mt-1 text-sm text-foreground-muted">Las comprobaciones no envían mensajes. El envío de prueba requiere destinatario y confirmación.</p>
+              </div>
+              <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
+                {([
+                  ["RAMA", "Rama Judicial"],
+                  ["WORKFLOW", "Workflows"],
+                  ["SMTP", "SMTP"],
+                  ["WHATSAPP", "WhatsApp · configuración"],
+                ] as const).map(([integration, label]) => (
+                  <div key={integration} className="flex items-center justify-between gap-3 border border-border px-3 py-2">
+                    <div className="min-w-0">
+                      <p className="text-sm font-medium">{label}</p>
+                      <p role="status" className="truncate text-xs text-foreground-muted">{integrationResults[integration]?.estado ?? "Sin comprobar"}</p>
+                    </div>
+                    <button type="button" onClick={() => void checkIntegration(integration)} disabled={checkingIntegration !== null} aria-label={`Comprobar ${label}`} title={`Comprobar ${label}`} className="grid size-9 shrink-0 place-items-center rounded-md border border-border hover:bg-surface-hover disabled:opacity-50">
+                      <RefreshCw className={`size-4 ${checkingIntegration === integration ? "animate-spin" : ""}`} />
+                    </button>
+                  </div>
+                ))}
+              </div>
+              <form onSubmit={sendIntegrationTest} className="grid gap-3 border border-border p-3 sm:grid-cols-[10rem_minmax(0,1fr)_auto] sm:items-end">
+                <label className="grid gap-1 text-xs text-foreground-muted">Canal
+                  <select value={testChannel} onChange={(event) => setTestChannel(event.target.value as "EMAIL" | "WHATSAPP")} className="h-10 rounded-md border border-border bg-background px-2 text-sm text-foreground">
+                    <option value="EMAIL">Email</option>
+                    <option value="WHATSAPP">WhatsApp</option>
+                  </select>
+                </label>
+                <label className="grid gap-1 text-xs text-foreground-muted">Destinatario explícito
+                  <input required value={testRecipient} onChange={(event) => setTestRecipient(event.target.value)} type={testChannel === "EMAIL" ? "email" : "tel"} placeholder={testChannel === "EMAIL" ? "prueba@dominio.com" : "+573001234567"} className="h-10 rounded-md border border-border bg-background px-3 text-sm text-foreground" />
+                </label>
+                <button type="submit" disabled={sendingTest || !confirmTestSend || !testRecipient.trim()} className="inline-flex h-10 items-center justify-center gap-2 rounded-md bg-primary px-3 text-sm font-medium text-white disabled:opacity-50">
+                  <Send className="size-4" />{sendingTest ? "Enviando..." : "Enviar prueba real"}
+                </button>
+                <label className="flex items-start gap-2 text-xs text-foreground-muted sm:col-span-2">
+                  <input type="checkbox" checked={confirmTestSend} onChange={(event) => setConfirmTestSend(event.target.checked)} className="mt-0.5 size-4 accent-primary" />
+                  Confirmo que autorizo un envío real al destinatario indicado. La acción quedará auditada.
+                </label>
+              </form>
             </section>
             <p className="flex items-start gap-2 text-xs text-foreground-muted">
               <CheckCircle2 className="mt-0.5 size-4 shrink-0" />

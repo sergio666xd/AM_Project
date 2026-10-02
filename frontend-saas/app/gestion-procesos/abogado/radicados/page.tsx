@@ -1,6 +1,7 @@
 "use client";
 
-import { apiRequest } from "@/lib/api";
+import { apiRequest, iniciarWorkflowConsultaRadicado } from "@/lib/api";
+import { useSession } from "@/context/SessionContext";
 
 import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
@@ -138,6 +139,8 @@ function getStatusStyle(status?: string | null) {
 }
 
 export default function RadicadosPage() {
+  const { user } = useSession();
+  const isAdmin = user?.rol === "ADMIN";
   const [radicados, setRadicados] = useState<Radicado[]>([]);
 
   const [search, setSearch] = useState("");
@@ -349,13 +352,21 @@ export default function RadicadosPage() {
         );
       }
 
+      if (typeof data?.consulta_id === "number") {
+        await iniciarWorkflowConsultaRadicado(token(), {
+          tipo: "AUTOMATICA_NUEVO",
+          radicado_id: data.id,
+          consulta_id: data.consulta_id,
+        });
+      }
+
       setShowCreateModal(false);
       setNuevoNumero("");
 
       await loadRadicados();
 
       setMessage(
-        `El radicado ${numero} fue agregado correctamente.`
+        data?.mensaje || `El radicado ${numero} fue agregado correctamente.`
       );
     } catch (cause) {
       setError(
@@ -374,24 +385,10 @@ export default function RadicadosPage() {
     setMessage("");
 
     try {
-      const response = await apiRequest(
-        `/api/radicados/${radicado.id}/consultar`,
-        {
-          method: "POST",
-          headers: {
-            Authorization: `Bearer ${token()}`,
-          },
-        }
-      );
-
-      const data = await response.json().catch(() => null);
-
-      if (!response.ok) {
-        throw new Error(
-          data?.detail ||
-            `No fue posible consultar el radicado ${radicado.numero}.`
-        );
-      }
+      await iniciarWorkflowConsultaRadicado(token(), {
+        tipo: "MANUAL",
+        radicado_id: radicado.id,
+      });
 
       setMessage(
         `La consulta del radicado ${radicado.numero} fue enviada a segundo plano.`
@@ -470,46 +467,11 @@ export default function RadicadosPage() {
     setMessage("");
 
     try {
-      const results = await Promise.allSettled(
-        selectedIds.map(async (id) => {
-          const response = await apiRequest(
-            `/api/radicados/${id}/consultar`,
-            {
-              method: "POST",
-              headers: {
-                Authorization: `Bearer ${token()}`,
-              },
-            }
-          );
-
-          const data = await response.json().catch(() => null);
-
-          if (!response.ok) {
-            throw new Error(
-              data?.detail ||
-                `No fue posible consultar el radicado ${id}.`
-            );
-          }
-
-          return data;
-        })
-      );
-
-      const successful = results.filter(
-        (result) => result.status === "fulfilled"
-      ).length;
-
-      const failed = results.length - successful;
-
-      if (failed > 0) {
-        setError(
-          `${successful} consulta(s) iniciada(s) y ${failed} no pudieron iniciarse.`
-        );
-      } else {
-        setMessage(
-          `${successful} consulta(s) fueron enviadas a segundo plano.`
-        );
-      }
+      await iniciarWorkflowConsultaRadicado(token(), {
+        tipo: "MANUAL",
+        radicado_ids: selectedIds,
+      });
+      setMessage(`${selectedIds.length} consulta(s) enviadas al Workflow.`);
 
       clearSelection();
       await loadRadicados();
@@ -789,23 +751,25 @@ export default function RadicadosPage() {
           </div>
 
           <div className="flex flex-wrap items-center gap-2">
-            <button
-              type="button"
-              onClick={() => void consultSelected()}
-              disabled={bulkLoading}
-              className="inline-flex items-center gap-2 rounded-lg border px-3 py-2 text-sm font-medium transition disabled:opacity-50"
-              style={{
-                background: "var(--surface)",
-                borderColor: "var(--border)",
-                color: "var(--foreground-secondary)",
-              }}
-            >
-              <RefreshCw
-                size={15}
-                className={bulkLoading ? "animate-spin" : ""}
-              />
-              Consultar seleccionados
-            </button>
+            {isAdmin && (
+              <button
+                type="button"
+                onClick={() => void consultSelected()}
+                disabled={bulkLoading}
+                className="inline-flex items-center gap-2 rounded-lg border px-3 py-2 text-sm font-medium transition disabled:opacity-50"
+                style={{
+                  background: "var(--surface)",
+                  borderColor: "var(--border)",
+                  color: "var(--foreground-secondary)",
+                }}
+              >
+                <RefreshCw
+                  size={15}
+                  className={bulkLoading ? "animate-spin" : ""}
+                />
+                Consultar seleccionados
+              </button>
+            )}
 
             <button
               type="button"
@@ -1277,33 +1241,21 @@ export default function RadicadosPage() {
                       <td className="px-5 py-4 align-top">
                         <div className="flex items-center justify-end gap-1">
                           {/* Consultar */}
-                          <button
-                            type="button"
-                            onClick={() =>
-                              void consultarRadicado(
-                                radicado
-                              )
-                            }
-                            disabled={
-                              isConsulting ||
-                              isDeleting ||
-                              bulkLoading
-                            }
-                            className="rounded-lg p-2 transition hover:bg-[var(--surface-muted)] disabled:cursor-not-allowed disabled:opacity-50"
-                            title="Consultar actuaciones"
-                            style={{
-                              color: "var(--info)",
-                            }}
-                          >
-                            <RefreshCw
-                              size={17}
-                              className={
-                                isConsulting
-                                  ? "animate-spin"
-                                  : ""
-                              }
-                            />
-                          </button>
+                          {isAdmin && (
+                            <button
+                              type="button"
+                              onClick={() => void consultarRadicado(radicado)}
+                              disabled={isConsulting || isDeleting || bulkLoading}
+                              className="rounded-lg p-2 transition hover:bg-[var(--surface-muted)] disabled:cursor-not-allowed disabled:opacity-50"
+                              title="Consultar actuaciones"
+                              style={{ color: "var(--info)" }}
+                            >
+                              <RefreshCw
+                                size={17}
+                                className={isConsulting ? "animate-spin" : ""}
+                              />
+                            </button>
+                          )}
 
                           {/* Ver detalle */}
                           <Link
@@ -1326,22 +1278,13 @@ export default function RadicadosPage() {
                                 radicado
                               )
                             }
-                            disabled={
-                              isDeleting ||
-                              isConsulting ||
-                              bulkLoading
-                            }
+                            disabled={isDeleting || isConsulting || bulkLoading}
                             className="rounded-lg p-2 transition hover:bg-[var(--danger-light)] disabled:cursor-not-allowed disabled:opacity-50"
                             title="Eliminar radicado"
-                            style={{
-                              color: "var(--danger)",
-                            }}
+                            style={{ color: "var(--danger)" }}
                           >
                             {isDeleting ? (
-                              <RefreshCw
-                                size={17}
-                                className="animate-spin"
-                              />
+                              <RefreshCw size={17} className="animate-spin" />
                             ) : (
                               <Trash2 size={17} />
                             )}

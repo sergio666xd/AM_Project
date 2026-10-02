@@ -1,6 +1,7 @@
 "use client";
 
 import { apiRequest } from "@/lib/api";
+import { iniciarWorkflowConsultaRadicado } from "@/lib/api";
 
 import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
@@ -222,6 +223,22 @@ export default function ProcesoDetallePage() {
         throw new Error(
           data.detail || "No fue posible completar la acción."
         );
+      }
+
+      if (typeof data.consulta_id === "number") {
+        try {
+          await iniciarWorkflowConsultaRadicado(
+            localStorage.getItem("token") || "",
+            {
+              tipo: "AUTOMATICA_NUEVO",
+              radicado_id: Number(data.id),
+              consulta_id: data.consulta_id,
+            },
+          );
+          data.mensaje = `${data.mensaje} Workflow de consulta iniciado.`;
+        } catch {
+          data.mensaje = `${data.mensaje} No fue posible iniciar el Workflow; informa a ADMIN.`;
+        }
       }
 
       setNotice(data.mensaje || "Cambios guardados correctamente.");

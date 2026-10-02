@@ -1,4 +1,4 @@
-from pydantic import BaseModel, EmailStr, field_serializer
+from pydantic import BaseModel, EmailStr, Field, field_serializer
 from typing import Any, Literal, Optional
 from datetime import datetime, timezone
 from app.models import EstadoUsuario, RolUsuario
@@ -73,10 +73,41 @@ class ConfiguracionConsultasUpdate(BaseModel):
 class WorkflowClaimConsulta(BaseModel):
     clave_idempotencia: str
     token_lanzamiento: str
-    tipo: Literal["AUTOMATICA", "MANUAL"]
+    tipo: Literal["AUTOMATICA", "MANUAL", "AUTOMATICA_NUEVO"]
     fecha_local: str
-    hora_local: Literal["12:00", "17:00", "MANUAL"]
+    hora_local: Literal["12:00", "17:00", "MANUAL", "NUEVO"]
     solicitada_por_id: int | None = None
+    radicado_id: int | None = None
+    radicado_ids: list[int] | None = None
+    consulta_id: int | None = None
+
+class WorkflowConsultaRadicado(BaseModel):
+    actor_id: int
+    launch_token: str
+
+class WorkflowConsultaManualCreate(BaseModel):
+    actor_id: int
+    radicado_id: int
+
+class WorkflowActuacionNueva(BaseModel):
+    orden: int = 0
+    fecha_actuacion: str = ""
+    actuacion: str = ""
+    anotacion: str = ""
+    fecha_inicia_termino: str = ""
+    fecha_finaliza_termino: str = ""
+    fecha_registro: str = ""
+    es_fijacion: bool = False
+
+class WorkflowEventoActuaciones(BaseModel):
+    radicado_id: int
+    actuaciones_nuevas: list[WorkflowActuacionNueva]
+
+class WorkflowNovedadesPreparar(BaseModel):
+    eventos: list[WorkflowEventoActuaciones]
+
+class WorkflowRecordatorioPreparar(BaseModel):
+    version: int
 
 class ContenidoPaginaUpdate(BaseModel):
     contenido: dict[str, Any]
@@ -107,6 +138,16 @@ class AdminResourceUpdate(BaseModel):
     prioridad: Optional[PrioridadTarea] = None
     fecha_limite: Optional[datetime] = None
     nombre_archivo: Optional[str] = None
+
+
+class DiagnosticoEnvioPrueba(BaseModel):
+    canal: Literal["EMAIL", "WHATSAPP"]
+    destinatario: str = Field(min_length=5, max_length=254)
+    confirmar_envio: bool = False
+
+
+class DiagnosticoIntegracion(BaseModel):
+    integracion: Literal["RAMA", "WORKFLOW", "SMTP", "WHATSAPP"]
 
 
 class AplicarMigracionRadicados(BaseModel):
@@ -145,6 +186,12 @@ class UsuarioAdminUpdate(BaseModel):
     plan_id: Optional[int] = None
     creado_por_abogado_id: Optional[int] = None
 
+
+class CanalesNotificacionTipo(BaseModel):
+    email: bool
+    whatsapp: bool
+
+
 class UsuarioOut(BaseModel):
     id: int
     email: EmailStr
@@ -155,6 +202,10 @@ class UsuarioOut(BaseModel):
     plan: Optional[PlanOut] = None
     creado_por_abogado_id: Optional[int] = None
     debe_cambiar_password: bool = False
+    preferencias_notificacion: dict[str, CanalesNotificacionTipo] = Field(default_factory=dict)
+    canal_notificacion_cliente: Literal["EMAIL", "WHATSAPP"] | None = None
+    notificaciones_email: bool = True
+    notificaciones_whatsapp: bool = False
     created_at: Optional[datetime] = None
 
     class Config:
@@ -193,6 +244,8 @@ class ConfirmacionRecuperacionPassword(BaseModel):
 
 
 class PreferenciasNotificacionUpdate(BaseModel):
+    preferencias: dict[str, CanalesNotificacionTipo] | None = None
+    canal_cliente: Literal["EMAIL", "WHATSAPP"] | None = None
     notificaciones_email: Optional[bool] = None
     notificaciones_whatsapp: Optional[bool] = None
 
@@ -290,6 +343,8 @@ class ActuacionOut(BaseModel):
 class RadicadoOut(BaseModel):
     id: int
     numero: str
+    mensaje: Optional[str] = None
+    consulta_id: Optional[int] = None
     estado_consulta: str
     despacho_departamento: str
     demandante: str

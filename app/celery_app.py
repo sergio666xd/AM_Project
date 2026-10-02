@@ -25,11 +25,6 @@ celery_app.conf.beat_schedule = {
         "task": "tareas.enviar_recordatorios_tareas",
         "schedule": crontab(minute="*"),
     },
-    # Barridos diarios de lunes a viernes a las 12:00 PM y 6:00 PM
-    "barrido-lunes-a-viernes-12-y-18": {
-        "task": "tareas.consultar_todos_los_radicados",
-        "schedule": crontab(hour="12,18", minute=0, day_of_week="mon-fri"),
-    },
     # Informe consolidado de fin de mes (Ejecuta el día 28, 29, 30 o 31 a las 17:00 según el mes)
     "informe-fin-de-mes-5pm": {
         "task": "tareas.enviar_resumen_mensual_usuarios",

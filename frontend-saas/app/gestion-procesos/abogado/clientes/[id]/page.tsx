@@ -29,8 +29,7 @@ type Client = {
   nombre_completo: string;
   email: string;
   whatsapp_numero: string;
-  notificaciones_email: boolean;
-  notificaciones_whatsapp: boolean;
+  canal_notificacion_cliente?: "EMAIL" | "WHATSAPP" | null;
   procesos: {
     id: number;
     nombre: string;
@@ -642,18 +641,17 @@ export default function ClienteDetalle() {
               </p>
             </div>
 
-            <div className="space-y-3 p-5">
-              <NotificationRow
-                icon={<Mail className="size-4" />}
-                label="Correo electrónico"
-                enabled={client.notificaciones_email}
-              />
-
-              <NotificationRow
-                icon={<MessageCircle className="size-4" />}
-                label="WhatsApp"
-                enabled={client.notificaciones_whatsapp}
-              />
+            <div className="p-5">
+              <p className="text-sm text-[var(--foreground-muted)]">
+                Canal obligatorio elegido por el cliente
+              </p>
+              <p className="mt-2 font-medium text-[var(--foreground)]">
+                {client.canal_notificacion_cliente === "WHATSAPP"
+                  ? `WhatsApp · ${client.whatsapp_numero || "sin número configurado"}`
+                  : client.canal_notificacion_cliente === "EMAIL"
+                    ? `Correo · ${client.email}`
+                    : "Sin canal configurado"}
+              </p>
             </div>
           </section>
         </aside>
@@ -740,38 +738,6 @@ function EmptySection({
       <p className="mx-auto mt-1 max-w-sm text-xs text-[var(--foreground-muted)]">
         {description}
       </p>
-    </div>
-  );
-}
-
-function NotificationRow({
-  icon,
-  label,
-  enabled,
-}: {
-  icon: React.ReactNode;
-  label: string;
-  enabled: boolean;
-}) {
-  return (
-    <div className="flex items-center justify-between gap-3">
-      <div className="flex items-center gap-2.5 text-sm text-[var(--foreground)]">
-        <span className="text-[var(--foreground-muted)]">
-          {icon}
-        </span>
-
-        {label}
-      </div>
-
-      <span
-        className={`rounded-full px-2.5 py-1 text-xs font-medium ${
-          enabled
-            ? "bg-emerald-500/10 text-emerald-700 dark:text-emerald-400"
-            : "bg-[var(--surface-secondary)] text-[var(--foreground-muted)]"
-        }`}
-      >
-        {enabled ? "Activo" : "Inactivo"}
-      </span>
     </div>
   );
 }

@@ -20,11 +20,15 @@ export interface UsuarioActual {
   debe_cambiar_password?: boolean;
   notificaciones_email?: boolean;
   notificaciones_whatsapp?: boolean;
+  preferencias_notificacion?: Record<string, { email: boolean; whatsapp: boolean }>;
+  canal_notificacion_cliente?: "EMAIL" | "WHATSAPP" | null;
   plan?: {
     id: number;
     nombre: string;
     limite_radicados: number;
     precio_mensual: number;
+    notificaciones_whatsapp_procesos?: boolean;
+    notificaciones_whatsapp_tareas?: boolean;
   } | null;
 }
 

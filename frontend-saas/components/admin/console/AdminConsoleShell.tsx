@@ -7,6 +7,7 @@ import { usePathname } from "next/navigation";
 import {
   Activity,
   BookOpenText,
+  CalendarDays,
   ChevronRight,
   CreditCard,
   FileText,
@@ -88,6 +89,11 @@ const sections: Section[] = [
         icon: ListChecks,
       },
       {
+        label: "Agenda",
+        href: "/gestion-procesos/admin/agenda",
+        icon: CalendarDays,
+      },
+      {
         label: "Documentos",
         href: "/gestion-procesos/admin/documentos",
         icon: BookOpenText,
@@ -152,7 +158,7 @@ function activeScope(pathname: string) {
     return "Global · todas las modalidades";
   if (/\/admin\/(planes|solicitudes)(\/|$)/.test(pathname))
     return "SaaS · abogados externos";
-  if (/\/admin\/(procesos|radicados|tareas|documentos)(\/|$)/.test(pathname))
+  if (/\/admin\/(procesos|radicados|tareas|documentos|agenda)(\/|$)/.test(pathname))
     return "Firma · Alejandra Muñoz Abogada y Asociados";
   return "Global · todas las modalidades";
 }

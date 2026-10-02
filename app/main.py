@@ -24,7 +24,12 @@ from app.routers import admin
 from app.security import obtener_usuario_actual
 from app.routers import admin, tareas, expedientes, workflows
 from app.tasks import procesar_recordatorios_tareas
-from app.radicados import obtener_o_vincular_radicado
+from app.radicados import (
+    iniciar_consulta_nuevo_radicado,
+    obtener_o_vincular_radicado,
+    radicado_vinculado_a_usuario,
+)
+from app.notification_policy import PREFERENCIA_PLAN_WHATSAPP, plan_whatsapp_habilitado
 from app.firm_access import require_roles
 from app.audit import registrar_evento_auditoria
 from app.firm_access import has_firm_wide_access, lawyer_process_ids, lawyer_scope_id
@@ -45,8 +50,35 @@ def actualizar_esquema_planes() -> None:
         conexion.execute(text("ALTER TABLE usuarios ADD COLUMN IF NOT EXISTS debe_cambiar_password BOOLEAN NOT NULL DEFAULT FALSE"))
         conexion.execute(text("ALTER TABLE usuarios ADD COLUMN IF NOT EXISTS notificaciones_email BOOLEAN NOT NULL DEFAULT TRUE"))
         conexion.execute(text("ALTER TABLE usuarios ADD COLUMN IF NOT EXISTS notificaciones_whatsapp BOOLEAN NOT NULL DEFAULT FALSE"))
+        conexion.execute(text("ALTER TABLE usuarios ADD COLUMN IF NOT EXISTS preferencias_notificacion JSON NOT NULL DEFAULT '{}'::json"))
+        conexion.execute(text("ALTER TABLE usuarios ADD COLUMN IF NOT EXISTS canal_notificacion_cliente VARCHAR(16)"))
+        conexion.execute(text("""
+            UPDATE usuarios
+            SET preferencias_notificacion = json_build_object(
+                'ACTUACIONES', json_build_object('email', notificaciones_email, 'whatsapp', notificaciones_whatsapp),
+                'ACCESO', json_build_object('email', notificaciones_email, 'whatsapp', notificaciones_whatsapp),
+                'TAREAS', json_build_object('email', notificaciones_email, 'whatsapp', notificaciones_whatsapp),
+                'SUBTAREAS', json_build_object('email', notificaciones_email, 'whatsapp', notificaciones_whatsapp),
+                'RECORDATORIOS', json_build_object('email', notificaciones_email, 'whatsapp', notificaciones_whatsapp),
+                'DOCUMENTOS', json_build_object('email', notificaciones_email, 'whatsapp', notificaciones_whatsapp),
+                'RESUMENES', json_build_object('email', notificaciones_email, 'whatsapp', notificaciones_whatsapp)
+            )
+            WHERE preferencias_notificacion::text = '{}'
+        """))
+        conexion.execute(text("""
+            UPDATE usuarios
+            SET canal_notificacion_cliente = CASE
+                WHEN notificaciones_email THEN 'EMAIL'
+                WHEN notificaciones_whatsapp AND whatsapp_numero <> '' THEN 'WHATSAPP'
+                ELSE 'EMAIL'
+            END
+            WHERE rol = 'CLIENTE' AND canal_notificacion_cliente IS NULL
+        """))
         conexion.execute(text("ALTER TABLE tareas ADD COLUMN IF NOT EXISTS proceso_id INTEGER"))
         conexion.execute(text("ALTER TABLE tareas ADD COLUMN IF NOT EXISTS cliente_id INTEGER"))
+        conexion.execute(text("ALTER TABLE recordatorios_tareas ADD COLUMN IF NOT EXISTS version INTEGER NOT NULL DEFAULT 1"))
+        conexion.execute(text("ALTER TABLE recordatorios_tareas ADD COLUMN IF NOT EXISTS workflow_version_lanzada INTEGER NOT NULL DEFAULT 0"))
+        conexion.execute(text("ALTER TABLE entregas_notificacion ADD COLUMN IF NOT EXISTS recordatorio_version INTEGER"))
         conexion.execute(text("ALTER TABLE subtareas ADD COLUMN IF NOT EXISTS cliente_id INTEGER"))
         conexion.execute(text("ALTER TABLE subtareas ADD COLUMN IF NOT EXISTS asignada_cliente BOOLEAN NOT NULL DEFAULT FALSE"))
         conexion.execute(text("ALTER TABLE subtareas ADD COLUMN IF NOT EXISTS proceso_id INTEGER REFERENCES procesos(id)"))
@@ -450,11 +482,56 @@ def restablecer_password(
 
 @app.patch("/api/auth/preferencias-notificaciones")
 def actualizar_preferencias_notificaciones(datos: schemas.PreferenciasNotificacionUpdate, usuario_actual: models.Usuario = Depends(obtener_usuario_actual), db: Session = Depends(get_db)):
-    if datos.notificaciones_email is not None: usuario_actual.notificaciones_email = datos.notificaciones_email
-    if datos.notificaciones_whatsapp is not None: usuario_actual.notificaciones_whatsapp = datos.notificaciones_whatsapp
+    if usuario_actual.rol == models.RolUsuario.CLIENTE:
+        if datos.preferencias is not None or datos.notificaciones_email is not None or datos.notificaciones_whatsapp is not None:
+            raise HTTPException(status_code=400, detail="Los clientes solo pueden seleccionar un canal obligatorio.")
+        if datos.canal_cliente is None:
+            raise HTTPException(status_code=400, detail="Selecciona un canal obligatorio.")
+        if datos.canal_cliente == "WHATSAPP" and not usuario_actual.whatsapp_numero.strip():
+            raise HTTPException(status_code=400, detail="Configura un número de WhatsApp antes de seleccionar ese canal.")
+        usuario_actual.canal_notificacion_cliente = datos.canal_cliente
+        usuario_actual.notificaciones_email = datos.canal_cliente == "EMAIL"
+        usuario_actual.notificaciones_whatsapp = datos.canal_cliente == "WHATSAPP"
+    else:
+        if datos.canal_cliente is not None:
+            raise HTTPException(status_code=400, detail="El canal obligatorio solo aplica a CLIENTE.")
+        preferencias = dict(usuario_actual.preferencias_notificacion or {})
+        if datos.preferencias is not None:
+            desconocidas = set(datos.preferencias) - set(models.TIPOS_NOTIFICACION)
+            if desconocidas:
+                raise HTTPException(status_code=400, detail="La solicitud contiene tipos de notificación desconocidos.")
+            for tipo, canales in datos.preferencias.items():
+                if canales.whatsapp and not usuario_actual.whatsapp_numero.strip():
+                    raise HTTPException(status_code=400, detail="Configura un número de WhatsApp antes de habilitar ese canal.")
+                funcion_plan = PREFERENCIA_PLAN_WHATSAPP.get(tipo)
+                if canales.whatsapp and funcion_plan and not plan_whatsapp_habilitado(usuario_actual, funcion_plan):
+                    raise HTTPException(status_code=403, detail="Tu plan no permite WhatsApp para ese tipo de notificación.")
+                preferencias[tipo] = canales.model_dump()
+        if datos.notificaciones_email is not None or datos.notificaciones_whatsapp is not None:
+            for tipo in models.TIPOS_NOTIFICACION:
+                canales = dict(preferencias.get(tipo) or {})
+                if datos.notificaciones_email is not None:
+                    canales["email"] = datos.notificaciones_email
+                if datos.notificaciones_whatsapp is not None:
+                    canales["whatsapp"] = datos.notificaciones_whatsapp
+                preferencias[tipo] = canales
+        usuario_actual.preferencias_notificacion = preferencias
+        usuario_actual.notificaciones_email = any(
+            preferencias.get(tipo, {}).get("email", usuario_actual.notificaciones_email)
+            for tipo in models.TIPOS_NOTIFICACION
+        )
+        usuario_actual.notificaciones_whatsapp = any(
+            preferencias.get(tipo, {}).get("whatsapp", usuario_actual.notificaciones_whatsapp)
+            for tipo in models.TIPOS_NOTIFICACION
+        )
     registrar_evento_auditoria(db, usuario_actual, "auth.notificaciones.actualizar", "usuario", usuario_actual.id)
     db.commit()
-    return {"notificaciones_email": usuario_actual.notificaciones_email, "notificaciones_whatsapp": usuario_actual.notificaciones_whatsapp}
+    return {
+        "preferencias_notificacion": usuario_actual.preferencias_notificacion,
+        "canal_notificacion_cliente": usuario_actual.canal_notificacion_cliente,
+        "notificaciones_email": usuario_actual.notificaciones_email,
+        "notificaciones_whatsapp": usuario_actual.notificaciones_whatsapp,
+    }
 
 
 @app.patch("/api/auth/perfil")
@@ -519,6 +596,10 @@ def obtener_mi_usuario(
         "debe_cambiar_password": usuario.debe_cambiar_password,
         "notificaciones_email": usuario.notificaciones_email,
         "notificaciones_whatsapp": usuario.notificaciones_whatsapp,
+        "preferencias_notificacion": usuario.preferencias_notificacion or {},
+        "canal_notificacion_cliente": usuario.canal_notificacion_cliente,
+        "preferencias_notificacion": usuario.preferencias_notificacion,
+        "canal_notificacion_cliente": usuario.canal_notificacion_cliente,
         "plan": (
             {
                 "id": usuario.plan.id,
@@ -884,6 +965,11 @@ def agregar_radicado(
     if usuario_actual.rol == models.RolUsuario.ABOGADO and usuario_actual.plan is None:
         raise HTTPException(status_code=403, detail="Tu cuenta SaaS necesita un plan activo para agregar radicados.")
 
+    vinculado_previamente = radicado_vinculado_a_usuario(
+        db,
+        usuario_actual,
+        radicado_in.numero,
+    )
     try:
         nuevo_radicado, creado = obtener_o_vincular_radicado(
             db, usuario_actual, radicado_in.numero
@@ -902,7 +988,23 @@ def agregar_radicado(
     db.commit()
     db.refresh(nuevo_radicado)
 
-    return nuevo_radicado
+    if creado or not vinculado_previamente:
+        mensaje, consulta_id = iniciar_consulta_nuevo_radicado(
+            db,
+            usuario_actual,
+            nuevo_radicado,
+        )
+    else:
+        mensaje, consulta_id = "El radicado ya estaba agregado; no se inició otra consulta.", None
+    limite = (
+        usuario_actual.plan.limite_ultimas_actuaciones
+        if usuario_actual.rol == models.RolUsuario.ABOGADO
+        else None
+    )
+    resultado = serializar_radicado(nuevo_radicado, limite)
+    resultado["mensaje"] = mensaje
+    resultado["consulta_id"] = consulta_id
+    return resultado
 
 
 @app.get("/api/radicados", response_model=list[schemas.RadicadoOut])
@@ -966,63 +1068,15 @@ def eliminar_radicado(
     db.commit()
     return {"mensaje": f"Radicado {radicado.numero} retirado de tu lista."}
 
-from app.tasks import tarea_consultar_radicado
-
 @app.post("/api/radicados/{radicado_id}/consultar")
 def consultar_radicado_manual(
     radicado_id: int,
     usuario_actual: models.Usuario = Depends(security.obtener_usuario_actual),
     db: Session = Depends(get_db),
 ):
-    """Encola la consulta del radicado en segundo plano sin congelar la API."""
-    require_roles(usuario_actual, ["ABOGADO", "ABOGADO_ADMIN", "ADMIN"], action="consultar radicados")
-    radicado = radicados_visibles(usuario_actual, db).filter(models.Radicado.id == radicado_id).first()
-
-    if not radicado:
-        raise HTTPException(status_code=404, detail="Radicado no encontrado en tu alcance.")
-
-    # Enviar tarea a Redis/Celery
-    consulta = models.ConsultaRadicado(
-    radicado_id=radicado.id,
-    tipo="MANUAL",
-    estado="ENCOLADA",
-    inicio=datetime.utcnow(),
-)
-
-    db.add(consulta)
-    db.commit()
-    db.refresh(consulta)
-
-    try:
-        task = tarea_consultar_radicado.delay(
-            radicado.id,
-            "MANUAL",
-            consulta.id,
-        )
-
-        consulta.task_id = task.id
-        registrar_evento_auditoria(
-            db, usuario_actual, "radicado.consulta.iniciar", "consulta_radicado", consulta.id
-        )
-        db.commit()
-
-    except Exception as exc:
-        consulta.estado = "ERROR"
-        consulta.finalizacion = datetime.utcnow()
-        consulta.error = str(exc)
-        registrar_evento_auditoria(
-            db, usuario_actual, "radicado.consulta.error", "consulta_radicado", consulta.id
-        )
-        db.commit()
-
-        raise HTTPException(
-            status_code=500,
-            detail="No fue posible encolar la consulta."
-        )
-
-    return {
-        "mensaje": "Consulta iniciada en segundo plano.",
-        "radicado": radicado.numero,
-        "task_id": task.id,
-        "consulta_id": consulta.id,
-    }
+    """Reject the legacy Celery path; manual calls start through the Next Workflow launcher."""
+    require_roles(usuario_actual, ["ADMIN"], action="consultar radicados manualmente")
+    raise HTTPException(
+        status_code=410,
+        detail="Este endpoint legacy fue deshabilitado. Inicia la consulta desde la interfaz ADMIN mediante Workflow.",
+    )
