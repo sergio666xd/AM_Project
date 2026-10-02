@@ -23,6 +23,7 @@ from app.migrate_radicados_canonicos import migrar as migrar_radicados_canonicos
 from app.routers import admin as admin_router
 from app.routers.workflows import (
     DETALLE_RECONCILIACION_COMPLETA,
+    _aplicar_delta_contadores_barrido,
     _reconciliacion_completa_vencida,
     ejecutar_consulta_barrido_radicado,
     reclamar_barrido,
@@ -339,6 +340,58 @@ def test_workflow_radicado_step_persists_result_and_retries_without_duplicate_ap
         assert detalle["radicados"][0]["estado"] == "COMPLETADA"
         assert detalle["radicados"][0]["actuaciones_nuevas"] == 1
         assert detalle["radicados"][0]["error"] is None
+
+
+def test_sweep_counters_apply_deltas_after_stale_parallel_reads(tmp_path):
+    engine = create_engine(f"sqlite:///{tmp_path / 'sweep-counters.db'}")
+    models.Base.metadata.create_all(engine)
+    first_session = Session(engine)
+    second_session = Session(engine)
+    try:
+        execution = models.EjecucionBarrido(
+            id="run-parallel-counters",
+            clave_idempotencia="MANUAL:parallel-counters",
+            token_lanzamiento="launch-parallel-counters",
+            tipo="MANUAL",
+            inicio=datetime.utcnow(),
+            total_radicados=2,
+        )
+        first_session.add(execution)
+        first_session.commit()
+
+        first_snapshot = first_session.query(models.EjecucionBarrido).filter_by(
+            id=execution.id
+        ).one()
+        second_snapshot = second_session.query(models.EjecucionBarrido).filter_by(
+            id=execution.id
+        ).one()
+        assert first_snapshot.procesados == second_snapshot.procesados == 0
+
+        _aplicar_delta_contadores_barrido(
+            first_session,
+            execution.id,
+            procesados_delta=1,
+            errores_delta=0,
+            actuaciones_delta=0,
+            lease_hasta=datetime.utcnow(),
+        )
+        first_session.commit()
+        _aplicar_delta_contadores_barrido(
+            second_session,
+            execution.id,
+            procesados_delta=1,
+            errores_delta=0,
+            actuaciones_delta=0,
+            lease_hasta=datetime.utcnow(),
+        )
+        second_session.commit()
+
+        first_session.refresh(first_snapshot)
+        assert first_snapshot.procesados == 2
+        assert first_snapshot.errores == 0
+    finally:
+        first_session.close()
+        second_session.close()
 
 
 def test_process_associations_cannot_cross_saas_or_firm_boundary():

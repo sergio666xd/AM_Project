@@ -4,7 +4,7 @@ from datetime import date, datetime, timedelta
 from uuid import uuid4
 
 from fastapi import APIRouter, Depends, Header, HTTPException, Query
-from sqlalchemy import func
+from sqlalchemy import case, func
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
@@ -20,6 +20,35 @@ router = APIRouter(
 
 RECONCILIACION_INTERVALO_DIAS = 30
 DETALLE_RECONCILIACION_COMPLETA = "ok|RECONCILIACION_COMPLETA_V1"
+
+
+def _aplicar_delta_contadores_barrido(
+    db: Session,
+    ejecucion_id: str,
+    procesados_delta: int,
+    errores_delta: int,
+    actuaciones_delta: int,
+    lease_hasta: datetime,
+) -> None:
+    errores_actualizados = models.EjecucionBarrido.errores + errores_delta
+    actuaciones_actualizadas = models.EjecucionBarrido.actuaciones_nuevas + actuaciones_delta
+    db.query(models.EjecucionBarrido).filter_by(id=ejecucion_id).update(
+        {
+            models.EjecucionBarrido.procesados: (
+                models.EjecucionBarrido.procesados + procesados_delta
+            ),
+            models.EjecucionBarrido.errores: case(
+                (errores_actualizados < 0, 0),
+                else_=errores_actualizados,
+            ),
+            models.EjecucionBarrido.actuaciones_nuevas: case(
+                (actuaciones_actualizadas < 0, 0),
+                else_=actuaciones_actualizadas,
+            ),
+            models.EjecucionBarrido.lease_hasta: lease_hasta,
+        },
+        synchronize_session=False,
+    )
 
 
 def _reconciliacion_completa_vencida(
@@ -306,16 +335,18 @@ def ejecutar_consulta_barrido_radicado(
 
     resultado_radicado.finalizacion = ahora
     resultado_radicado.lease_hasta = None
-    ejecucion.procesados += 0 if procesado_previo else 1
-    ejecucion.errores = max(0, ejecucion.errores - errores_previos + errores_incremento)
-    ejecucion.actuaciones_nuevas = max(
-        0,
-        ejecucion.actuaciones_nuevas - actuaciones_previas + resultado_radicado.actuaciones_nuevas,
+    lease_hasta = ahora + timedelta(minutes=30)
+    _aplicar_delta_contadores_barrido(
+        db,
+        ejecucion.id,
+        procesados_delta=0 if procesado_previo else 1,
+        errores_delta=errores_incremento - errores_previos,
+        actuaciones_delta=resultado_radicado.actuaciones_nuevas - actuaciones_previas,
+        lease_hasta=lease_hasta,
     )
-    ejecucion.lease_hasta = ahora + timedelta(minutes=30)
     configuracion = db.query(models.ConfiguracionConsultas).filter_by(id=1).first()
     if configuracion and configuracion.ejecucion_activa_id == ejecucion.id:
-        configuracion.lease_hasta = ejecucion.lease_hasta
+        configuracion.lease_hasta = lease_hasta
     db.commit()
     return {
         "estado": resultado_radicado.estado,
