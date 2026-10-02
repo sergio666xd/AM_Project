@@ -107,6 +107,22 @@ from app.routers.tareas import (
 from app.firm_access import require_roles
 
 
+def test_database_engine_does_not_retain_connections_on_vercel(monkeypatch):
+    from sqlalchemy.pool import NullPool
+
+    from app.database import _crear_engine
+
+    monkeypatch.setenv("VERCEL", "1")
+    serverless_engine = _crear_engine("sqlite://")
+    assert isinstance(serverless_engine.pool, NullPool)
+    serverless_engine.dispose()
+
+    monkeypatch.delenv("VERCEL")
+    local_engine = _crear_engine("sqlite://")
+    assert not isinstance(local_engine.pool, NullPool)
+    local_engine.dispose()
+
+
 def test_radicados_migration_api_routes_are_registered_in_admin_router():
     route_methods = {
         (route.path, method)
