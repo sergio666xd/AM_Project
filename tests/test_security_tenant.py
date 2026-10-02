@@ -12,9 +12,10 @@ from sqlalchemy.orm import Session, sessionmaker
 
 from app import security
 from app import models, schemas
-from app import tasks as celery_tasks
 from app import whatsapp
 from app import rama_judicial_api
+from app import reminder_workflow
+from app import monthly_summary
 from app.audit import registrar_evento_auditoria
 from app.firm_access import has_firm_wide_access, lawyer_scope_id, require_process_access
 from app.notification_policy import (
@@ -3213,7 +3214,7 @@ def test_due_reminders_use_workflow_delivery_and_complete_after_send(monkeypatch
     engine = create_engine("sqlite:///:memory:")
     models.Base.metadata.create_all(engine)
     test_session = sessionmaker(bind=engine)
-    monkeypatch.setattr(celery_tasks, "SessionLocal", test_session)
+    monkeypatch.setattr(reminder_workflow, "SessionLocal", test_session)
     workflow_launches = []
 
     class AcceptedLaunch:
@@ -3258,7 +3259,7 @@ def test_due_reminders_use_workflow_delivery_and_complete_after_send(monkeypatch
         db.commit()
         reminder_id = reminder.id
 
-    result = celery_tasks.procesar_recordatorios_tareas()
+    result = reminder_workflow.procesar_recordatorios_tareas()
     assert result["recordatorios_programados"] == 1
     assert result["recordatorios_enviados"] == 0
     assert result["errores"] == 0
@@ -3270,7 +3271,7 @@ def test_due_reminders_use_workflow_delivery_and_complete_after_send(monkeypatch
         assert reminder.enviado_en is None
         assert reminder.workflow_version_lanzada == reminder.version == 1
 
-    repeated = celery_tasks.procesar_recordatorios_tareas()
+    repeated = reminder_workflow.procesar_recordatorios_tareas()
     assert repeated["recordatorios_programados"] == 0
     assert len(workflow_launches) == 1
     with Session(engine) as db:
@@ -3290,7 +3291,7 @@ def test_due_reminders_use_workflow_delivery_and_complete_after_send(monkeypatch
         assert db.query(models.RecordatorioTarea).filter_by(id=reminder_id).one().enviado_en is not None
     assert len(sent) == 1
 
-    completed = celery_tasks.procesar_recordatorios_tareas()
+    completed = reminder_workflow.procesar_recordatorios_tareas()
     assert completed["recordatorios_programados"] == 0
 
     with Session(engine) as db:
@@ -3319,7 +3320,7 @@ def test_due_reminders_use_workflow_delivery_and_complete_after_send(monkeypatch
 def test_reminder_401_is_visible_and_recovered_by_reconciler(monkeypatch, caplog):
     engine = create_engine("sqlite:///:memory:")
     models.Base.metadata.create_all(engine)
-    monkeypatch.setattr(celery_tasks, "SessionLocal", sessionmaker(bind=engine))
+    monkeypatch.setattr(reminder_workflow, "SessionLocal", sessionmaker(bind=engine))
 
     class LaunchResponse:
         def __init__(self, ok, status_code, headers=None, code=None):
@@ -3374,7 +3375,7 @@ def test_reminder_401_is_visible_and_recovered_by_reconciler(monkeypatch, caplog
         db.commit()
         reminder_id = reminder.id
 
-    failed = celery_tasks.procesar_recordatorios_tareas()
+    failed = reminder_workflow.procesar_recordatorios_tareas()
     assert failed["recordatorios_programados"] == 0
     assert failed["errores"] == 1
     assert "WORKFLOW_SERVICE_TOKEN_MISMATCH" in caplog.text
@@ -3384,17 +3385,17 @@ def test_reminder_401_is_visible_and_recovered_by_reconciler(monkeypatch, caplog
         assert reminder.workflow_pendiente_lanzamiento is True
         assert schemas.RecordatorioTareaOut.model_validate(reminder).workflow_pendiente_lanzamiento is True
 
-    protection_failed = celery_tasks.procesar_recordatorios_tareas()
+    protection_failed = reminder_workflow.procesar_recordatorios_tareas()
     assert protection_failed["recordatorios_programados"] == 0
     assert protection_failed["errores"] == 1
     assert "DEPLOYMENT_PROTECTION_OR_PROXY" in caplog.text
 
-    generic_rejected = celery_tasks.procesar_recordatorios_tareas()
+    generic_rejected = reminder_workflow.procesar_recordatorios_tareas()
     assert generic_rejected["recordatorios_programados"] == 0
     assert generic_rejected["errores"] == 1
     assert "AUTH_REJECTED_WITHOUT_LAUNCHER_CODE" in caplog.text
 
-    recovered = celery_tasks.procesar_recordatorios_tareas()
+    recovered = reminder_workflow.procesar_recordatorios_tareas()
     assert recovered["recordatorios_programados"] == 1
     assert recovered["errores"] == 0
     assert len(launches) == 4
@@ -3526,14 +3527,14 @@ def test_reminder_versions_follow_schedule_and_task_mutations(monkeypatch):
 def test_monthly_summary_uses_idempotent_workflow_delivery(monkeypatch):
     engine = create_engine("sqlite:///:memory:")
     models.Base.metadata.create_all(engine)
-    monkeypatch.setattr(celery_tasks, "SessionLocal", sessionmaker(bind=engine))
+    monkeypatch.setattr(monthly_summary, "SessionLocal", sessionmaker(bind=engine))
 
     class MonthEndDatetime(datetime):
         @classmethod
         def now(cls, tz=None):
             return cls(2026, 10, 31, 12, 0)
 
-    monkeypatch.setattr(celery_tasks, "datetime", MonthEndDatetime)
+    monkeypatch.setattr(monthly_summary, "datetime", MonthEndDatetime)
     workflow_launches = []
     monkeypatch.setattr(
         "app.notification_service._iniciar_workflow",
@@ -3564,7 +3565,7 @@ def test_monthly_summary_uses_idempotent_workflow_delivery(monkeypatch):
         db.add(radicado)
         db.commit()
 
-    result = celery_tasks.tarea_enviar_resumen_mensual()
+    result = monthly_summary.enviar_resumen_mensual()
     assert result == {"estado": "ok", "usuarios_notificados": 1}
     with Session(engine) as db:
         delivery = db.query(models.EntregaNotificacion).one()
@@ -3573,87 +3574,11 @@ def test_monthly_summary_uses_idempotent_workflow_delivery(monkeypatch):
         assert delivery.clave_idempotencia.startswith("RESUMENES:")
         delivery_id = delivery.id
 
-    repeated = celery_tasks.tarea_enviar_resumen_mensual()
+    repeated = monthly_summary.enviar_resumen_mensual()
     assert repeated == {"estado": "ok", "usuarios_notificados": 1}
     with Session(engine) as db:
         assert db.query(models.EntregaNotificacion).count() == 1
     assert workflow_launches == [delivery_id, delivery_id]
-
-
-def test_qstash_reminder_endpoint_verifies_signature_and_endpoint(monkeypatch):
-    import asyncio
-
-    from starlette.requests import Request
-
-    from app import database
-
-    monkeypatch.setattr(database, "engine", create_engine("sqlite:///:memory:"))
-    main = importlib.import_module("app.main")
-    monkeypatch.setenv("QSTASH_CURRENT_SIGNING_KEY", "current-test-key")
-    monkeypatch.setenv("QSTASH_NEXT_SIGNING_KEY", "next-test-key")
-    monkeypatch.setenv("QSTASH_ENDPOINT_URL", "https://example.test/api/cron/recordatorios-tareas")
-
-    verified = {}
-    class FakeReceiver:
-        def __init__(self, *, current_signing_key, next_signing_key):
-            verified["keys"] = (current_signing_key, next_signing_key)
-
-        def verify(self, *, signature, body, url):
-            if signature != "valid-test-signature":
-                raise ValueError("invalid signature")
-            verified["request"] = (signature, body, url)
-
-    monkeypatch.setattr(main, "QStashReceiver", FakeReceiver)
-    processed = []
-
-    def process_reminders():
-        processed.append(True)
-        return {"recordatorios_enviados": 1}
-
-    monkeypatch.setattr(main, "procesar_recordatorios_tareas", process_reminders)
-
-    async def receive():
-        return {"type": "http.request", "body": b"{}", "more_body": False}
-
-    request = Request(
-        {
-            "type": "http",
-            "method": "POST",
-            "path": "/api/cron/recordatorios-tareas",
-            "headers": [(b"upstash-signature", b"valid-test-signature")],
-            "query_string": b"",
-            "server": ("example.test", 443),
-            "client": ("127.0.0.1", 12345),
-        },
-        receive=receive,
-    )
-
-    result = asyncio.run(main.ejecutar_recordatorios_qstash(request))
-
-    assert result == {"recordatorios_enviados": 1}
-    assert verified["keys"] == ("current-test-key", "next-test-key")
-    assert verified["request"] == (
-        "valid-test-signature",
-        "{}",
-        "https://example.test/api/cron/recordatorios-tareas",
-    )
-
-    invalid_request = Request(
-        {
-            "type": "http",
-            "method": "POST",
-            "path": "/api/cron/recordatorios-tareas",
-            "headers": [(b"upstash-signature", b"invalid-test-signature")],
-            "query_string": b"",
-            "server": ("example.test", 443),
-            "client": ("127.0.0.1", 12345),
-        },
-        receive=receive,
-    )
-    with pytest.raises(HTTPException) as error:
-        asyncio.run(main.ejecutar_recordatorios_qstash(invalid_request))
-    assert error.value.status_code == 401
-    assert processed == [True]
 
 
 def test_subtask_inherits_scope_and_configures_client_notifications(monkeypatch):

@@ -27,6 +27,10 @@
       {
         "path": "/cron/consultas/17",
         "schedule": "0 22 * * *"
+      },
+      {
+        "path": "/cron/resumen-mensual",
+        "schedule": "0 22 * * *"
       }
     ],
     "rewrites": [

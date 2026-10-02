@@ -378,7 +378,7 @@ def obtener_vision_global(
         "usuarios_por_rol": usuarios_por_rol,
         "tareas_por_estado": tareas_por_estado,
         "operacion": {
-            "motor_local": "Celery + Redis",
+            "motor_local": "Vercel Workflows",
             "webhooks_vercel": "no configurados",
             "mostrar_planes": configuracion.mostrar_planes if configuracion else False,
         },

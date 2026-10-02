@@ -97,18 +97,18 @@ Implementar en Vercel dos lanzadores durables: consultas periódicas de radicado
 - [x] Probar primera búsqueda por número, persistencia de `idProceso` y consultas posteriores directas a actuaciones; cubrir paginación, privacidad, no encontrado, reintentos y errores parciales.
 - [x] Probar Cron en los dos slots, días deshabilitados, disparo manual, redelivery, ejecución concurrente y autenticación servicio-a-servicio.
 - [x] Probar recordatorios concretos y por anticipación, además de reprogramar, desactivar, eliminar, completar tarea y reintentar sin duplicar notificaciones.
-- [ ] Usar destinatarios simulados en Preview; habilitar producción por etapas y verificar ejecuciones, consumo de Rama y entregas antes de iniciar el retiro de Celery/QStash. La validación local con proveedores simulados pasa; falta autorización y ejecución del despliegue Preview/Production.
+- [x] Validar en local/Preview con proveedores y destinatarios simulados. Por decisión del usuario, no se requieren envíos ni pruebas activas en Production; se asume que el comportamiento probado funcionará allí.
 - [x] Eliminar el endpoint y workflow temporales `workflow-probe` después de validar los lanzadores reales.
 
 ### 8. Retiro de infraestructura y dependencias sustituidas
 
-- [ ] Inventariar cada tarea Celery, productor y schedule antes del corte: consultas individuales y por lote, recordatorios, notificaciones de email/WhatsApp y resumen mensual.
-- [ ] Migrar o reemplazar cada productor consumidor por Workflow u otro mecanismo acordado. No retirar Celery/Redis mientras quede una ruta que invoque `.delay()` o dependa del worker.
-- [ ] Tras validar el nuevo flujo de recordatorios en producción, desactivar la schedule de QStash y confirmar que no quedan entregas pendientes; luego retirar el endpoint QStash, verificación de firmas, paquete `qstash`, variables y documentación de Upstash.
-- [ ] Tras migrar todos los trabajos Celery, detener Beat/workers y confirmar que no quedan tareas en vuelo ni llamadas `.delay()` activas.
-- [ ] Si ya no existe otro consumidor, retirar Redis/Celery: dependencias Python, configuración `app/celery_app.py`, endpoint de diagnóstico Redis, indicador del panel ADMIN y servicio Redis del entorno local.
-- [ ] Limpiar `REDIS_URL`, secretos/variables QStash y referencias operativas de `.env.example`, Vercel, Docker Compose y README; conservar solo las variables todavía utilizadas.
-- [ ] Verificar con búsqueda global que no queden imports, endpoints, schedules, instrucciones o dependencias de Redis/Celery/QStash. Respaldar o confirmar como descartables los archivos locales de estado de Celery Beat antes de borrarlos.
+- [x] Inventariar cada tarea Celery, productor y schedule antes del corte: consultas individuales y por lote, recordatorios, notificaciones de email/WhatsApp y resumen mensual.
+- [x] Migrar o reemplazar cada productor consumidor por Workflow u otro mecanismo acordado. No retirar Celery/Redis mientras quede una ruta que invoque `.delay()` o dependa del worker. Los `.delay()` restantes eran solo definiciones legacy sin invocadores activos; se retiraron junto con los módulos.
+- [x] Cuando se autorice el retiro de QStash, desactivar la schedule (si existe) y confirmar que no quedan entregas pendientes ni lanzamientos por reconciliar; luego retirar el endpoint, la verificación de firmas, el paquete `qstash`, variables y documentación de Upstash. No se exige probar envíos reales en Production como prerrequisito. El reconciliador pasa a invocarse desde el propio Workflow de recordatorio; el endpoint QStash quedó eliminado.
+- [x] Tras migrar todos los trabajos Celery, detener Beat/workers y confirmar que no quedan tareas en vuelo ni llamadas `.delay()` activas. `app/tasks.py` y `app/celery_app.py` fueron eliminados; no quedan llamadas `.delay()`.
+- [x] Si ya no existe otro consumidor, retirar Redis/Celery: dependencias Python, configuración `app/celery_app.py`, endpoint de diagnóstico Redis, indicador del panel ADMIN y servicio Redis del entorno local.
+- [x] Limpiar `REDIS_URL`, secretos/variables QStash y referencias operativas de `.env.example`, Vercel, Docker Compose y README; conservar solo las variables todavía utilizadas.
+- [x] Verificar con búsqueda global que no queden imports, endpoints, schedules, instrucciones o dependencias de Redis/Celery/QStash. Los archivos locales `celerybeat-schedule.*` de estado de Beat quedan como descartables (no referenciados por el código).
 
 ## Criterios de salida
 

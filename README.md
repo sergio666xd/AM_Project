@@ -31,7 +31,7 @@ Todos los paneles usan el `AppShell` compartido, navegación móvil, modo oscuro
 - Perfil personal: nombre completo y número de WhatsApp.
 - Configuración personal: preferencias de correo electrónico y WhatsApp.
 - Tema claro/oscuro desde el menú de cuenta.
-- Tareas, subtareas y recordatorios mediante Celery/Redis en desarrollo local.
+- Tareas, subtareas y recordatorios mediante Workflows durables.
 
 ## Administración de firma
 
@@ -68,23 +68,22 @@ En `/gestion-procesos/admin/operacion`, ADMIN puede consultar todos los radicado
 
 Procesos, radicados, tareas y documentos tienen inventarios globales con búsqueda, filtro por estado cuando el recurso lo ofrece, selección, exportación CSV de la vista o selección, y copia de identificador.
 
-La operación local usa `Celery + Redis`. Para recordatorios, Celery Beat y el endpoint firmado `POST /api/cron/recordatorios-tareas` (invocado por QStash en Vercel) solo reconcilian lanzamientos pendientes; el envío y la espera individual ocurren en Workflows durables. La versión del recordatorio invalida ejecuciones anteriores al editarlo, desactivarlo, cambiar el vencimiento o completar/cancelar la tarea. Los canales salen de las preferencias `RECORDATORIOS` y pueden ser email o WhatsApp. Redis/Celery sigue siendo necesario para los demás trabajos que dependan de un worker.
+Los recordatorios, las notificaciones y el resumen mensual se ejecutan como Workflows durables. La versión del recordatorio invalida ejecuciones anteriores al editarlo, desactivarlo, cambiar el vencimiento o completar/cancelar la tarea. Los canales salen de las preferencias `RECORDATORIOS` y pueden ser email o WhatsApp. Cada Workflow de recordatorio que despierta reintenta los lanzamientos pendientes de otros recordatorios (`POST /api/internal/workflows/recordatorios/reconciliar`), por lo que no se necesita un scheduler por minuto.
+
+El resumen mensual se ejecuta desde el Cron diario `0 22 * * *` (17:00 Colombia) en `/cron/resumen-mensual`, que solo actúa el último día del mes.
+
+No se usa Celery, Redis ni QStash: fueron retirados del código, las dependencias y la configuración local.
 
 ### Workflows de consultas judiciales
 
 - El servicio frontend llama al backend por el binding privado `BACKEND_SERVICE_URL` definido en `vercel.json`; no configures ese URL manualmente en Vercel.
 - El backend inicia Flows en el frontend mediante `VERCEL_URL`, que apunta al deployment público de frontend. Puedes fijar `WORKFLOW_FRONTEND_URL` como override si usas otro dominio. Si Preview tiene Deployment Protection, habilita `VERCEL_AUTOMATION_BYPASS_SECRET` para las llamadas de servicio; el código lo envía solo como header y nunca lo registra.
 - Configura `WORKFLOW_SERVICE_TOKEN` en los entornos runtime de frontend y backend con el mismo valor aleatorio. FastAPI lo usa para proteger `/api/internal/workflows/*`.
-- Configura `CRON_SECRET` en el frontend de Production. Vercel lo envía como `Authorization: Bearer ...` a los dos Cron. Los Cron solo corren en Production; cada uno invoca una vez al día y la DB filtra los días seleccionados.
+- Configura `CRON_SECRET` en el frontend de Production. Vercel lo envía como `Authorization: Bearer ...` a los Cron de consultas y al resumen mensual. Los Cron solo corren en Production; cada uno invoca una vez al día y la DB filtra los días seleccionados.
 - Para ejecutar workflows con `next dev`, configura `WORKFLOW_BACKEND_URL=http://localhost:8000` en `frontend-saas/.env.local` y el mismo `WORKFLOW_SERVICE_TOKEN` en el backend local. No reutilices un token real de producción en desarrollo.
 - No guardes valores reales de estos secretos en Git ni los pegues en conversaciones o logs.
 
-Para activar los recordatorios en producción:
-
-1. En las variables del backend en Vercel, configura `QSTASH_ENDPOINT_URL` con la URL pública exacta terminada en `/api/cron/recordatorios-tareas`, además de `QSTASH_CURRENT_SIGNING_KEY` y `QSTASH_NEXT_SIGNING_KEY`.
-2. En Upstash QStash, crea una schedule `POST` cada minuto con `CRON_TZ=America/Bogota * * * * *`, usando esa misma URL como destino.
-
-La schedule todavía no está creada: hace falta conocer el dominio público del despliegue para fijar la URL exacta.
+Para activar los recordatorios en producción basta con la configuración de Workflows indicada arriba: cada recordatorio inicia su propio Workflow al crearse y el propio motor los despierta a la hora programada.
 
 ## Panel del abogado administrador
 
@@ -217,7 +216,6 @@ Todas las rutas protegidas usan `Authorization: Bearer <token>`.
 - Python 3.11 o compatible.
 - Node.js 20 o compatible.
 - PostgreSQL configurado mediante las variables de entorno del backend.
-- Redis para Celery y recordatorios.
 - Credenciales de almacenamiento compatible con S3/R2 si se probarán cargas de documentos o tarjetas.
 
 ### Migración de radicados canónicos
@@ -257,14 +255,6 @@ uvicorn app.main:app --reload
 ```
 
 La aplicación crea tablas y, al iniciar, aplica DDL de compatibilidad para instalaciones PostgreSQL existentes. Ya no crea planes comerciales automáticamente. Solo crea una cuenta ADMIN si `ADMIN_PASSWORD` está configurada y aún no existe ninguna cuenta ADMIN.
-
-### Trabajador Celery
-
-En otra consola, con Redis disponible:
-
-```powershell
-celery -A app.celery_app worker --loglevel=info
-```
 
 ### Frontend
 

@@ -1,5 +1,4 @@
 import os
-import redis
 import time
 import hashlib
 import logging
@@ -12,7 +11,6 @@ from fastapi.responses import StreamingResponse
 from sqlalchemy import or_, text
 from sqlalchemy.orm import Session
 from fastapi.middleware.cors import CORSMiddleware
-from qstash import Receiver as QStashReceiver
 from datetime import datetime
 from urllib.parse import quote
 from botocore.exceptions import BotoCoreError, ClientError
@@ -23,7 +21,6 @@ from app.site_content import PUBLIC_CONTENT_PAGES
 from app.routers import admin
 from app.security import obtener_usuario_actual
 from app.routers import admin, tareas, expedientes, workflows
-from app.tasks import procesar_recordatorios_tareas
 from app.radicados import (
     iniciar_consulta_nuevo_radicado,
     obtener_o_vincular_radicado,
@@ -126,33 +123,8 @@ app.add_middleware(
 )
 
 
-@app.post("/api/cron/recordatorios-tareas")
-async def ejecutar_recordatorios_qstash(request: Request):
-    current_signing_key = os.getenv("QSTASH_CURRENT_SIGNING_KEY", "")
-    next_signing_key = os.getenv("QSTASH_NEXT_SIGNING_KEY", "")
-    endpoint_url = os.getenv("QSTASH_ENDPOINT_URL", "")
-    signature = request.headers.get("Upstash-Signature")
-    if not all((current_signing_key, next_signing_key, endpoint_url)):
-        raise HTTPException(status_code=503, detail="El endpoint de QStash no está configurado.")
-    if not signature:
-        raise HTTPException(status_code=401, detail="Firma de QStash requerida.")
-    raw_body = await request.body()
-    try:
-        QStashReceiver(
-            current_signing_key=current_signing_key,
-            next_signing_key=next_signing_key,
-        ).verify(
-            signature=signature,
-            body=raw_body.decode("utf-8"),
-            url=endpoint_url,
-        )
-    except Exception as exc:
-        raise HTTPException(status_code=401, detail="Firma de QStash inválida.") from exc
-    return procesar_recordatorios_tareas()
-
-
 # Protección ligera para el único endpoint público de captación. Para una
-# instalación con varias réplicas, conviene mover este contador a Redis/WAF.
+# instalación con varias réplicas, conviene mover este contador a una capa WAF.
 _interest_attempts: dict[str, deque[float]] = defaultdict(deque)
 
 
@@ -204,26 +176,6 @@ def _send_password_reset_email(email: str, reset_url: str) -> None:
             logging.getLogger(__name__).warning("Password reset email skipped because SMTP is not configured.")
     except Exception:
         logging.getLogger(__name__).exception("Password reset email delivery failed.")
-
-@app.get("/api/test-redis")
-def test_redis(usuario_actual: models.Usuario = Depends(security.obtener_usuario_actual)):
-    require_roles(usuario_actual, ["ADMIN"], action="consultar el estado de Redis")
-    redis_url = os.getenv("REDIS_URL")
-
-    if not redis_url:
-        return {"ok": False, "redis": "no configurado"}
-
-    try:
-        r = redis.from_url(redis_url)
-        r.ping()
-
-        return {
-            "ok": True,
-            "redis": "conectado"
-        }
-
-    except Exception:
-        return {"ok": False, "redis": "desconectado"}
 
 @app.on_event("startup")
 def crear_datos_iniciales():

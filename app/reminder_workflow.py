@@ -8,6 +8,7 @@ import requests
 from sqlalchemy.orm import Session
 
 from app import models
+from app.database import SessionLocal
 from app.workflow_service import (
     workflow_401_reason,
     workflow_frontend_url,
@@ -15,6 +16,50 @@ from app.workflow_service import (
 )
 
 logger = logging.getLogger(__name__)
+
+
+def procesar_recordatorios_tareas():
+    """Reconcile active reminders whose durable Workflow was not launched.
+
+    Sin Celery Beat ni QStash: se invoca desde el endpoint interno y desde el
+    Workflow de recordatorio para recuperar lanzamientos fallidos.
+    """
+    db = SessionLocal()
+    programados = 0
+    errores = 0
+    try:
+        recordatorios = (
+            db.query(models.RecordatorioTarea)
+            .join(models.Tarea)
+            .join(models.Usuario, models.Usuario.id == models.Tarea.usuario_id)
+            .filter(
+                models.RecordatorioTarea.activo == True,
+                models.RecordatorioTarea.enviado_en == None,
+                models.Usuario.estado == models.EstadoUsuario.ACTIVO,
+                models.Tarea.estado.notin_(
+                    (models.EstadoTarea.COMPLETADA, models.EstadoTarea.CANCELADA)
+                ),
+                models.RecordatorioTarea.workflow_version_lanzada != models.RecordatorioTarea.version,
+            )
+            .with_for_update(skip_locked=True, of=models.RecordatorioTarea)
+            .all()
+        )
+        for recordatorio in recordatorios:
+            if momento_programado(recordatorio, recordatorio.tarea) is None:
+                errores += 1
+                continue
+            if iniciar_workflow_recordatorio(db, recordatorio.id):
+                programados += 1
+            elif recordatorio.workflow_version_lanzada != recordatorio.version:
+                errores += 1
+        return {
+            "estado": "ok",
+            "recordatorios_programados": programados,
+            "recordatorios_enviados": 0,
+            "errores": errores,
+        }
+    finally:
+        db.close()
 
 
 def normalizar_utc_naive(momento: datetime | None) -> datetime | None:

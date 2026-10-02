@@ -7,7 +7,6 @@ import {
   CalendarDays,
   CheckCircle2,
   Clock3,
-  Database,
   FileText,
   Play,
   RefreshCw,
@@ -27,7 +26,6 @@ type Vision = {
   };
   operacion: { motor_local: string; webhooks_vercel: string };
 };
-type RedisStatus = { ok: boolean; redis: string };
 type ConsultationConfig = {
   activa: boolean;
   dias_habilitados: number[];
@@ -67,18 +65,16 @@ type IntegrationResult = {
 };
 type OperationsData = {
   vision: Vision;
-  redis: RedisStatus;
   consultationConfig: ConsultationConfig;
   sweeps: SweepRun[];
 };
 async function loadOperations(token: string): Promise<OperationsData> {
-  const [vision, redis, consultationConfig, sweeps] = await Promise.all([
+  const [vision, consultationConfig, sweeps] = await Promise.all([
     fetchApi("/api/admin/vision-global", { method: "GET", token }),
-    fetchApi("/api/test-redis", { method: "GET", token }),
     fetchApi("/api/admin/consultas/configuracion", { method: "GET", token }),
     fetchApi("/api/admin/consultas/ejecuciones?limite=8", { method: "GET", token }),
   ]);
-  return { vision, redis, consultationConfig, sweeps };
+  return { vision, consultationConfig, sweeps };
 }
 
 const WEEKDAYS = [
@@ -375,13 +371,7 @@ export default function AdminOperationsPage() {
       ) : (
         data && (
           <>
-            <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-              <Metric
-                icon={Database}
-                label="Redis"
-                value={data.redis.ok ? "Conectado" : data.redis.redis}
-                tone={data.redis.ok ? "text-success" : "text-warning"}
-              />
+            <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
               <Metric
                 icon={ServerCog}
                 label="Motor de tareas"
@@ -660,9 +650,9 @@ export default function AdminOperationsPage() {
             </section>
             <p className="flex items-start gap-2 text-xs text-foreground-muted">
               <CheckCircle2 className="mt-0.5 size-4 shrink-0" />
-              El estado del worker Celery no se expone como healthcheck
-              independiente; la cola muestra consultas registradas en la base de
-              datos.
+              Las consultas, notificaciones y recordatorios se ejecutan como
+              Vercel Workflows durables; la lista de ejecuciones se lee desde
+              la base de datos.
             </p>
           </>
         )

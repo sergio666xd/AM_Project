@@ -70,8 +70,17 @@ async function sendDelivery(deliveryId: number): Promise<void> {
 
 sendDelivery.maxRetries = 2;
 
+async function reconcileReminderLaunches(): Promise<void> {
+  "use step";
+  await backendFetch("/api/internal/workflows/recordatorios/reconciliar", {
+    method: "POST",
+    body: "{}",
+  });
+}
+
 export async function taskReminderWorkflow(input: TaskReminderInput) {
   "use workflow";
+  await reconcileReminderLaunches();
   const scheduledAt = new Date(input.programado_para);
   const delayMs = scheduledAt.getTime() - Date.now();
   if (delayMs > 0) await sleep(delayMs);

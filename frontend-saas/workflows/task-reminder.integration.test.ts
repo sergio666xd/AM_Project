@@ -15,6 +15,10 @@ async function startBackendStub(preparedState: string) {
       response.writeHead(401).end(JSON.stringify({ detail: "unauthorized" }));
       return;
     }
+    if (path.endsWith("/recordatorios/reconciliar")) {
+      response.end(JSON.stringify({ estado: "ok" }));
+      return;
+    }
     if (path.endsWith("/preparar")) {
       preparations += 1;
       response.end(JSON.stringify({

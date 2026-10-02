@@ -19,7 +19,12 @@ from app.notification_policy import (
 )
 from app.notification_service import emitir_notificacion_workflow
 from app.rama_judicial_api import ejecutar_consulta_api_radicado
-from app.reminder_workflow import momento_programado, normalizar_utc_naive
+from app.reminder_workflow import (
+    momento_programado,
+    normalizar_utc_naive,
+    procesar_recordatorios_tareas,
+)
+from app.monthly_summary import enviar_resumen_mensual
 from app.whatsapp import enviar_mensaje_whatsapp
 
 
@@ -518,6 +523,23 @@ def _marcar_recordatorio_completo_si_aplica(
     if pendientes == 0:
         if recordatorio.enviado_en is None:
             recordatorio.enviado_en = datetime.utcnow()
+
+
+@router.post("/recordatorios/reconciliar")
+def reconciliar_lanzamientos_recordatorios(
+    _: None = Depends(verificar_token_workflow),
+):
+    """Reintenta lanzamientos de Workflow pendientes; sin scheduler externo."""
+    return procesar_recordatorios_tareas()
+
+
+@router.post("/resumen-mensual")
+def ejecutar_resumen_mensual_workflow(
+    _: None = Depends(verificar_token_workflow),
+):
+    """Ejecuta el resumen mensual; el Cron diario lo invoca y el mismo
+    handler solo actúa en el último día del mes."""
+    return enviar_resumen_mensual()
 
 
 @router.post("/recordatorios/{recordatorio_id}/preparar")
