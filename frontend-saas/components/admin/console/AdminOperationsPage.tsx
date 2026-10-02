@@ -56,7 +56,15 @@ type SweepRadicadoDetail = {
 type SweepDetails = { ejecucion: SweepRun; radicados: SweepRadicadoDetail[] };
 type RadicadoOption = { id: number; numero: string; ambito: string };
 type IntegrationName = "RAMA" | "WORKFLOW" | "SMTP" | "WHATSAPP";
-type IntegrationResult = { estado: string; detalle?: string; codigo_http?: number; workflow_run_id?: string; causa?: string };
+type IntegrationResult = {
+  estado: string;
+  detalle?: string;
+  codigo_http?: number;
+  workflow_run_id?: string;
+  causa?: string;
+  launcher_host?: string;
+  content_type?: string;
+};
 type OperationsData = {
   vision: Vision;
   redis: RedisStatus;
@@ -608,11 +616,20 @@ export default function AdminOperationsPage() {
                       <p className="text-sm font-medium">{label}</p>
                       <p
                         role="status"
-                        title={integrationResults[integration]?.causa}
+                        title={[
+                          integrationResults[integration]?.causa,
+                          integrationResults[integration]?.launcher_host,
+                          integrationResults[integration]?.content_type,
+                        ].filter(Boolean).join(" · ")}
                         className="break-all text-xs leading-4 text-foreground-muted"
                       >
                         {integrationResults[integration]
-                          ? [integrationResults[integration]?.estado, integrationResults[integration]?.causa].filter(Boolean).join(" · ")
+                          ? [
+                            integrationResults[integration]?.estado,
+                            integrationResults[integration]?.causa,
+                            integrationResults[integration]?.launcher_host,
+                            integrationResults[integration]?.content_type,
+                          ].filter(Boolean).join(" · ")
                           : "Sin comprobar"}
                       </p>
                     </div>
