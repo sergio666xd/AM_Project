@@ -19,10 +19,14 @@ async function adminId(request: Request): Promise<number | Response> {
     return Response.json({ detail: "Autenticación requerida." }, { status: 401 });
   }
 
+  const headers = new Headers({ Authorization: authorization });
+  const cookie = request.headers.get("cookie");
+  if (cookie) headers.set("cookie", cookie);
+
   let response: Response;
   try {
     response = await fetch(new URL("/api/auth/me", request.url), {
-      headers: { Authorization: authorization },
+      headers,
       cache: "no-store",
     });
   } catch {
@@ -31,8 +35,16 @@ async function adminId(request: Request): Promise<number | Response> {
   if (!response.ok) {
     return Response.json({ detail: "Sesión inválida o expirada." }, { status: 401 });
   }
+  if (!response.headers.get("content-type")?.includes("application/json")) {
+    return Response.json({ detail: "La validación recibió HTML en lugar de JSON; verifica la protección del Preview." }, { status: 502 });
+  }
 
-  const user = (await response.json()) as { id?: number; rol?: string };
+  let user: { id?: number; rol?: string };
+  try {
+    user = (await response.json()) as { id?: number; rol?: string };
+  } catch {
+    return Response.json({ detail: "No fue posible leer el usuario autenticado." }, { status: 502 });
+  }
   if (user.rol !== "ADMIN" || typeof user.id !== "number") {
     return Response.json({ detail: "Se requiere una cuenta ADMIN." }, { status: 403 });
   }
