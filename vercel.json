@@ -3,7 +3,15 @@
     "services": {
       "frontend": {
         "root": "frontend-saas/",
-        "framework": "nextjs"
+        "framework": "nextjs",
+        "bindings": [
+          {
+            "type": "service",
+            "service": "backend",
+            "format": "url",
+            "env": "BACKEND_SERVICE_URL"
+          }
+        ]
       },
       "backend": {
         "root": "./",
@@ -11,6 +19,16 @@
         "framework": "fastapi"
       }
     },
+    "crons": [
+      {
+        "path": "/cron/consultas/12",
+        "schedule": "0 17 * * *"
+      },
+      {
+        "path": "/cron/consultas/17",
+        "schedule": "0 22 * * *"
+      }
+    ],
     "rewrites": [
       {
         "source": "/api/(.*)",

@@ -68,6 +68,14 @@ Procesos, radicados, tareas y documentos tienen inventarios globales con búsque
 
 La operación local usa `Celery + Redis`. En Vercel, el endpoint `POST /api/cron/recordatorios-tareas` permite que QStash invoque el mismo procesador de recordatorios con firma verificada. Redis/Celery sigue siendo necesario para los demás trabajos que dependan de un worker.
 
+### Workflows de consultas judiciales
+
+- El servicio frontend llama al backend por el binding privado `BACKEND_SERVICE_URL` definido en `vercel.json`; no configures ese URL manualmente en Vercel.
+- Configura `WORKFLOW_SERVICE_TOKEN` en los entornos runtime de frontend y backend con el mismo valor aleatorio. FastAPI lo usa para proteger `/api/internal/workflows/*`.
+- Configura `CRON_SECRET` en el frontend de Production. Vercel lo envía como `Authorization: Bearer ...` a los dos Cron. Los Cron solo corren en Production; cada uno invoca una vez al día y la DB filtra los días seleccionados.
+- Para ejecutar workflows con `next dev`, configura `WORKFLOW_BACKEND_URL=http://localhost:8000` en `frontend-saas/.env.local` y el mismo `WORKFLOW_SERVICE_TOKEN` en el backend local. No reutilices un token real de producción en desarrollo.
+- No guardes valores reales de estos secretos en Git ni los pegues en conversaciones o logs.
+
 Para activar los recordatorios en producción:
 
 1. En las variables del backend en Vercel, configura `QSTASH_ENDPOINT_URL` con la URL pública exacta terminada en `/api/cron/recordatorios-tareas`, además de `QSTASH_CURRENT_SIGNING_KEY` y `QSTASH_NEXT_SIGNING_KEY`.

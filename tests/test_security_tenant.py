@@ -21,7 +21,14 @@ from app.notification_policy import plan_whatsapp_habilitado, whatsapp_habilitad
 from app.radicados import obtener_o_vincular_radicado
 from app.migrate_radicados_canonicos import migrar as migrar_radicados_canonicos, previsualizar as previsualizar_migracion_radicados
 from app.routers import admin as admin_router
+from app.routers.workflows import (
+    ejecutar_consulta_barrido_radicado,
+    reclamar_barrido,
+    verificar_token_workflow,
+)
+from app.routers.workflows import reclamar_barrido
 from app.routers.admin import (
+    actualizar_configuracion_consultas,
     actualizar_recurso_admin,
     crear_recurso_admin,
     eliminar_recurso_admin,
@@ -30,8 +37,10 @@ from app.routers.admin import (
     listar_contenido_publico_admin,
     cargar_documento_admin,
     emitir_url_temporal_documento_admin,
+    obtener_configuracion_consultas,
     consultar_radicado_admin,
     consultar_todos_radicados_admin,
+    detalle_ejecucion_consultas,
     restaurar_proceso_admin,
     restaurar_contenido_publico_admin,
     aplicar_migracion_radicados_admin,
@@ -101,6 +110,213 @@ def test_radicados_migration_api_apply_is_disabled_unless_explicitly_enabled(mon
         )
 
     assert error.value.status_code == 404
+
+
+def test_admin_can_update_consultation_days_and_receive_next_colombia_slot():
+    engine = create_engine("sqlite:///:memory:")
+    models.Base.metadata.create_all(engine)
+
+    with Session(engine) as db:
+        admin = models.Usuario(
+            email="consultation-config-admin@example.test",
+            password_hash="hash",
+            nombre_completo="Admin",
+            whatsapp_numero="0000000005",
+            rol=models.RolUsuario.ADMIN,
+            estado=models.EstadoUsuario.ACTIVO,
+        )
+        db.add(admin)
+        db.commit()
+
+        result = actualizar_configuracion_consultas(
+            schemas.ConfiguracionConsultasUpdate(
+                activa=True,
+                dias_habilitados=[4, 0, 2, 2],
+            ),
+            db=db,
+            admin=admin,
+        )
+        assert result["activa"] is True
+        assert result["dias_habilitados"] == [0, 2, 4]
+        assert result["horas_colombia"] == ["12:00", "17:00"]
+        assert result["proxima_ejecucion"] is not None
+        assert result["proxima_ejecucion"].utcoffset().total_seconds() == -5 * 3600
+
+        with pytest.raises(HTTPException) as invalid_days:
+            actualizar_configuracion_consultas(
+                schemas.ConfiguracionConsultasUpdate(activa=True, dias_habilitados=[7]),
+                db=db,
+                admin=admin,
+            )
+        assert invalid_days.value.status_code == 400
+
+        current = obtener_configuracion_consultas(db=db, admin=admin)
+        assert current["dias_habilitados"] == [0, 2, 4]
+
+
+def test_workflow_sweep_claim_is_idempotent_and_prevents_parallel_runs():
+    engine = create_engine("sqlite:///:memory:")
+    models.Base.metadata.create_all(engine)
+
+    with Session(engine) as db:
+        owner = models.Usuario(
+            email="sweep-owner@example.test",
+            password_hash="hash",
+            nombre_completo="Firm owner",
+            whatsapp_numero="0000000002",
+            rol=models.RolUsuario.ABOGADO_ADMIN,
+            estado=models.EstadoUsuario.ACTIVO,
+        )
+        db.add(owner)
+        db.flush()
+        db.add(
+            models.Radicado(
+                numero="12345678901234567890123",
+                creado_por_id=owner.id,
+            )
+        )
+        db.add(
+            models.ConfiguracionConsultas(
+                id=1,
+                activa=True,
+                dias_habilitados=[0, 1, 2, 3, 4],
+            )
+        )
+        db.commit()
+
+        automatic_claim = schemas.WorkflowClaimConsulta(
+            clave_idempotencia="AUTO:2026-10-05:12:00",
+            token_lanzamiento="launch-token-1",
+            tipo="AUTOMATICA",
+            fecha_local="2026-10-05",
+            hora_local="12:00",
+        )
+        first = reclamar_barrido(automatic_claim, _=None, db=db)
+        retry = reclamar_barrido(automatic_claim, _=None, db=db)
+        parallel_manual = reclamar_barrido(
+            schemas.WorkflowClaimConsulta(
+                clave_idempotencia="MANUAL:run-2",
+                token_lanzamiento="launch-token-2",
+                tipo="MANUAL",
+                fecha_local="2026-10-05",
+                hora_local="MANUAL",
+                solicitada_por_id=owner.id,
+            ),
+            _=None,
+            db=db,
+        )
+
+        assert first["debe_ejecutar"] is True
+        assert retry["debe_ejecutar"] is True
+        assert retry["ejecucion"]["id"] == first["ejecucion"]["id"]
+        assert parallel_manual["debe_ejecutar"] is False
+        assert parallel_manual["motivo"] == "YA_HAY_UN_BARRIDO_ACTIVO"
+        assert db.query(models.EjecucionBarrido).count() == 1
+
+
+def test_workflow_service_requires_configured_constant_time_token(monkeypatch):
+    monkeypatch.delenv("WORKFLOW_SERVICE_TOKEN", raising=False)
+    with pytest.raises(HTTPException) as disabled:
+        verificar_token_workflow("Bearer any-token")
+    assert disabled.value.status_code == 503
+
+    monkeypatch.setenv("WORKFLOW_SERVICE_TOKEN", "unit-test-workflow-secret")
+    with pytest.raises(HTTPException) as invalid:
+        verificar_token_workflow("Bearer wrong-token")
+    assert invalid.value.status_code == 401
+
+    assert verificar_token_workflow("Bearer unit-test-workflow-secret") is None
+
+
+def test_automatic_workflow_claim_obeys_enabled_days():
+    engine = create_engine("sqlite:///:memory:")
+    models.Base.metadata.create_all(engine)
+
+    with Session(engine) as db:
+        db.add(models.ConfiguracionConsultas(id=1, activa=True, dias_habilitados=[0, 1, 2, 3, 4]))
+        db.commit()
+        claim = schemas.WorkflowClaimConsulta(
+            clave_idempotencia="AUTO:2026-10-04:12:00",
+            token_lanzamiento="launch-token-sunday",
+            tipo="AUTOMATICA",
+            fecha_local="2026-10-04",
+            hora_local="12:00",
+        )
+
+        result = reclamar_barrido(claim, _=None, db=db)
+
+        assert result["debe_ejecutar"] is False
+        assert result["motivo"] == "DIA_DESHABILITADO"
+        assert db.query(models.EjecucionBarrido).count() == 0
+
+
+def test_workflow_radicado_step_persists_result_and_retries_without_duplicate_api_call(monkeypatch):
+    engine = create_engine("sqlite:///:memory:")
+    models.Base.metadata.create_all(engine)
+    api_calls = []
+    monkeypatch.setattr(
+        "app.routers.workflows.ejecutar_consulta_api_radicado",
+        lambda db, radicado: api_calls.append(radicado.id)
+        or {"estado": "ok", "actuaciones_nuevas": [{"actuacion": "Nueva"}]},
+    )
+
+    with Session(engine) as db:
+        owner = models.Usuario(
+            email="sweep-step-owner@example.test",
+            password_hash="hash",
+            nombre_completo="Firm owner",
+            whatsapp_numero="0000000003",
+            rol=models.RolUsuario.ABOGADO_ADMIN,
+            estado=models.EstadoUsuario.ACTIVO,
+        )
+        db.add(owner)
+        admin = models.Usuario(
+            email="sweep-detail-admin@example.test",
+            password_hash="hash",
+            nombre_completo="Admin",
+            whatsapp_numero="0000000004",
+            rol=models.RolUsuario.ADMIN,
+            estado=models.EstadoUsuario.ACTIVO,
+        )
+        db.add(admin)
+        db.flush()
+        radicado = models.Radicado(
+            numero="12345678901234567890123",
+            creado_por_id=owner.id,
+        )
+        db.add(radicado)
+        ejecucion = models.EjecucionBarrido(
+            id="run-step-1",
+            clave_idempotencia="MANUAL:run-step-1",
+            token_lanzamiento="launch-step-1",
+            tipo="MANUAL",
+            estado="EN_PROCESO",
+            inicio=datetime.utcnow(),
+            total_radicados=1,
+        )
+        db.add(ejecucion)
+        db.commit()
+
+        first = ejecutar_consulta_barrido_radicado(
+            ejecucion.id, radicado.id, _=None, db=db
+        )
+        repeated = ejecutar_consulta_barrido_radicado(
+            ejecucion.id, radicado.id, _=None, db=db
+        )
+
+        assert first["estado"] == "COMPLETADA"
+        assert first["actuaciones_nuevas"] == 1
+        assert repeated["repetida"] is True
+        assert api_calls == [radicado.id]
+        assert db.query(models.ConsultaRadicado).filter_by(radicado_id=radicado.id).count() == 1
+        db.refresh(ejecucion)
+        assert ejecucion.procesados == 1
+        assert ejecucion.actuaciones_nuevas == 1
+        detalle = detalle_ejecucion_consultas(ejecucion.id, db=db, admin=admin)
+        assert detalle["radicados"][0]["numero"] == radicado.numero
+        assert detalle["radicados"][0]["estado"] == "COMPLETADA"
+        assert detalle["radicados"][0]["actuaciones_nuevas"] == 1
+        assert detalle["radicados"][0]["error"] is None
 
 
 def test_process_associations_cannot_cross_saas_or_firm_boundary():
@@ -539,7 +755,7 @@ def test_initial_rama_lookup_persists_process_id(monkeypatch):
         monkeypatch.setattr(
             rama_judicial_api,
             "_obtener_actuaciones",
-            lambda id_proceso, limite=None: [],
+            lambda id_proceso, limite=None, claves_conocidas=None: [],
         )
 
         result = rama_judicial_api.ejecutar_consulta_api_radicado(db, radicado)
@@ -548,6 +764,147 @@ def test_initial_rama_lookup_persists_process_id(monkeypatch):
         assert result["estado"] == "ok"
         assert radicado.id_proceso_rama == "123"
         assert db.query(models.Radicado).filter_by(id=radicado_id).one().id_proceso_rama == "123"
+
+
+def test_known_rama_process_skips_lookup_and_merges_only_new_actions(monkeypatch):
+    engine = create_engine("sqlite:///:memory:")
+    models.Base.metadata.create_all(engine)
+
+    with Session(engine) as db:
+        owner = models.Usuario(
+            email="rama-known-id-owner@example.test",
+            password_hash="hash",
+            nombre_completo="Firm lawyer",
+            whatsapp_numero="0000000132",
+            rol=models.RolUsuario.ABOGADO_ADMIN,
+            estado=models.EstadoUsuario.ACTIVO,
+        )
+        db.add(owner)
+        db.flush()
+        radicado = models.Radicado(
+            numero="12345678901234567890123",
+            creado_por_id=owner.id,
+            id_proceso_rama="123",
+            estado_consulta="ok",
+        )
+        db.add(radicado)
+        db.flush()
+        db.add(
+            models.Actuacion(
+                radicado_id=radicado.id,
+                orden=1,
+                fecha_actuacion="01/10/2026",
+                actuacion="Existente",
+                anotacion="",
+                fecha_inicia_termino="",
+                fecha_finaliza_termino="",
+                fecha_registro="01/10/2026",
+                es_fijacion=False,
+            )
+        )
+        db.commit()
+
+        def unexpected_number_lookup(numero):
+            raise AssertionError("No debe buscarse de nuevo un proceso con idProceso guardado.")
+
+        fetched_process_ids = []
+
+        def fetch_actuaciones(id_proceso, limite=None, claves_conocidas=None):
+            fetched_process_ids.append(id_proceso)
+            return [
+                {
+                    "fechaActuacion": "2026-10-02T00:00:00Z",
+                    "actuacion": "Nueva",
+                    "anotacion": "",
+                    "fechaInicial": "",
+                    "fechaFinal": "",
+                    "fechaRegistro": "2026-10-02T00:00:00Z",
+                    "es_fijacion": False,
+                },
+                {
+                    "fechaActuacion": "2026-10-02T00:00:00Z",
+                    "actuacion": "Nueva",
+                    "anotacion": "",
+                    "fechaInicial": "",
+                    "fechaFinal": "",
+                    "fechaRegistro": "2026-10-02T00:00:00Z",
+                    "es_fijacion": False,
+                },
+                {
+                    "fechaActuacion": "2026-10-01T00:00:00Z",
+                    "actuacion": "Existente",
+                    "anotacion": "",
+                    "fechaInicial": "",
+                    "fechaFinal": "",
+                    "fechaRegistro": "2026-10-01T00:00:00Z",
+                    "es_fijacion": False,
+                },
+            ]
+
+        monkeypatch.setattr(rama_judicial_api, "_obtener_proceso", unexpected_number_lookup)
+        monkeypatch.setattr(rama_judicial_api, "_obtener_actuaciones", fetch_actuaciones)
+
+        result = rama_judicial_api.ejecutar_consulta_api_radicado(db, radicado)
+
+        assert result["estado"] == "ok"
+        assert fetched_process_ids == [123]
+        assert len(result["actuaciones_nuevas"]) == 1
+        assert result["actuaciones_nuevas"][0]["actuacion"] == "Nueva"
+        assert [(action.orden, action.actuacion) for action in db.query(models.Actuacion).filter_by(
+            radicado_id=radicado.id
+        ).order_by(models.Actuacion.orden)] == [(1, "Nueva"), (2, "Existente")]
+
+        repeated_result = rama_judicial_api.ejecutar_consulta_api_radicado(db, radicado)
+
+        assert repeated_result["estado"] == "ok"
+        assert repeated_result["actuaciones_nuevas"] == []
+        assert fetched_process_ids == [123, 123]
+        assert db.query(models.Actuacion).filter_by(radicado_id=radicado.id).count() == 2
+
+
+def test_rama_actuation_pagination_stops_at_first_known_action(monkeypatch):
+    pages = {
+        1: {
+            "actuaciones": [
+                {"fechaActuacion": "2026-10-04T00:00:00Z", "actuacion": "Nueva 1"},
+                {"fechaActuacion": "2026-10-03T00:00:00Z", "actuacion": "Nueva 2"},
+            ],
+            "paginacion": {"cantidadPaginas": 3},
+        },
+        2: {
+            "actuaciones": [
+                {"fechaActuacion": "2026-10-02T00:00:00Z", "actuacion": "Nueva 3"},
+                {"fechaActuacion": "2026-10-01T00:00:00Z", "actuacion": "Conocida"},
+                {"fechaActuacion": "2026-09-30T00:00:00Z", "actuacion": "Más antigua"},
+            ],
+            "paginacion": {"cantidadPaginas": 3},
+        },
+    }
+    requested_pages = []
+
+    def fake_get_json(ruta, parametros):
+        requested_pages.append(parametros["pagina"])
+        return pages[parametros["pagina"]]
+
+    known_action = {
+        "fechaActuacion": "2026-10-01T00:00:00Z",
+        "actuacion": "Conocida",
+    }
+    known_keys = {rama_judicial_api._clave_actuacion_api(known_action)}
+    monkeypatch.setattr(rama_judicial_api, "_obtener_json", fake_get_json)
+
+    result = rama_judicial_api._obtener_actuaciones(
+        123,
+        claves_conocidas=known_keys,
+    )
+
+    assert requested_pages == [1, 2]
+    assert [action["actuacion"] for action in result] == [
+        "Nueva 1",
+        "Nueva 2",
+        "Nueva 3",
+        "Conocida",
+    ]
 
 
 def test_manual_radicado_retry_reuses_original_arguments_and_consulta_id(monkeypatch):

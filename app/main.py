@@ -22,7 +22,7 @@ from app.email_service import enviar_correo
 from app.site_content import PUBLIC_CONTENT_PAGES
 from app.routers import admin
 from app.security import obtener_usuario_actual
-from app.routers import admin, tareas, expedientes
+from app.routers import admin, tareas, expedientes, workflows
 from app.tasks import procesar_recordatorios_tareas
 from app.radicados import obtener_o_vincular_radicado
 from app.firm_access import require_roles
@@ -75,6 +75,7 @@ app = FastAPI(
 app.include_router(admin.router)
 app.include_router(tareas.router)
 app.include_router(expedientes.router)
+app.include_router(workflows.router)
 
 
 def get_cors_origins() -> list[str]:
@@ -206,6 +207,9 @@ def crear_datos_iniciales():
             db.commit()
         if not db.query(models.ConfiguracionSaas).filter_by(id=1).first():
             db.add(models.ConfiguracionSaas(id=1, mostrar_planes=True))
+            db.commit()
+        if not db.query(models.ConfiguracionConsultas).filter_by(id=1).first():
+            db.add(models.ConfiguracionConsultas(id=1, activa=False, dias_habilitados=[0, 1, 2, 3, 4]))
             db.commit()
         admin_email = os.getenv("ADMIN_EMAIL", "admin@sistema.local")
         admin_password = os.getenv("ADMIN_PASSWORD")

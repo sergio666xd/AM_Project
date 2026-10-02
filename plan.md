@@ -10,7 +10,7 @@ Implementar en Vercel dos lanzadores durables: consultas periódicas de radicado
 - [X] No se almacenará una lista de IDs dentro de Usuario. La lista visible como `usuario.radicados` se persistirá mediante una relación Usuario-Radicado.
 - [ ] Confirmar antes de migrar la clave de deduplicación: fuente judicial + número normalizado + ámbito permitido. Propuesta: ficha compartida dentro de la firma y cada cuenta SaaS en su propio ámbito.
 - [X] Cada barrido consulta una vez cada ficha canónica de su ámbito. No se asume que la API de Rama tenga consulta masiva: cada radicado requiere llamadas propias.
-- [X] Horario visible para el admin: 12:00 y 17:00, hora de Colombia. Vercel Cron usa UTC: `0 17 * * 1-5` y `0 22 * * 1-5`, respectivamente. Hobby puede invocarlos en cualquier momento dentro de la hora programada (precisión de hasta ±59 minutos). Las horas quedan fijas en el despliegue; el admin puede activar el barrido y elegir días. Cambiar las horas desde la UI requiere otro scheduler/plan.
+- [X] Horario visible para el admin: 12:00 y 17:00, hora de Colombia. Vercel Cron usa UTC: `0 17 * * *` y `0 22 * * *`, respectivamente. Cada Cron corre una vez diaria en Hobby; la configuración DB filtra los días elegidos. Hobby puede invocarlos en cualquier momento dentro de la hora programada (precisión de hasta ±59 minutos). Las horas quedan fijas en el despliegue; cambiar las horas desde la UI requiere otro scheduler/plan.
 - [X] Las tareas y subtareas conservan su responsable actual. Compartir la ficha del radicado no comparte tareas ni notas internas.
 
 ## Base ya validada
@@ -36,19 +36,23 @@ Implementar en Vercel dos lanzadores durables: consultas periódicas de radicado
 
 ### 2. Sincronización idempotente con Rama Judicial
 
-- [ ] Normalizar el estado inicial a `SIN_CONSULTAR`. Para una ficha nueva o sin `idProceso`, buscar por número, guardar el ID y luego descargar actuaciones.
-- [ ] En las siguientes consultas, ir directamente a actuaciones por `idProceso`; repetir la búsqueda por número solo si falta ese ID.
-- [ ] Tratar los estados no encontrado, privado y error de API sin marcar como sincronización correcta ni bloquear el resto del lote.
-- [ ] Consultar primero las actuaciones recientes, paginar hasta el punto ya sincronizado cuando el orden de la API lo permita y deduplicar con clave estable en base de datos. Definir una reconciliación ocasional por si la API agrega actuaciones antiguas.
-- [ ] Aplicar concurrencia limitada, backoff y resultados independientes por radicado para no saturar Rama ni perder el resto del lote por un fallo.
+- [x] Tratar `sin consultar` legacy como `SIN_CONSULTAR`; para una ficha nueva o sin `idProceso`, buscar por número y persistir el ID antes de descargar actuaciones.
+- [x] Si la ficha ya tiene `idProceso`, consultar actuaciones directamente sin buscar de nuevo por número.
+- [x] Mantener estados no encontrado, privado y error de API distintos de una consulta correcta; el fallo de un radicado no impide que la tarea por radicado informe su resultado.
+- [x] Consultar actuaciones recientes y, en una sincronización incremental, paginar hasta la primera actuación ya conocida cuando se mantiene el orden reciente-primero de la API.
+- [x] Fusionar el delta con el historial usando una clave estable y serializar la escritura por radicado con lock de fila en PostgreSQL para evitar sobrescrituras/duplicados concurrentes.
 
 ### 3. Lanzador de consultas periódicas
 
-- [ ] Registrar dos Cron protegidos en Vercel para los slots de Hobby: lunes a viernes, `0 17 * * 1-5` y `0 22 * * 1-5` (UTC). El handler valida secreto, día y slot antes de iniciar un Workflow.
-- [ ] Guardar en la DB la configuración del barrido: activo/inactivo y días habilitados. El Cron diario consulta esa configuración y no ejecuta si el día está deshabilitado.
-- [ ] El Workflow crea/actualiza un registro de ejecución, obtiene los radicados canónicos del ámbito y coordina su consulta. Añadir idempotencia por fecha/slot, prevención de solapamiento por radicado, progreso y errores.
-- [ ] Llamar a FastAPI mediante comunicación interna autenticada. El endpoint debe ejecutar el servicio de consulta/persistencia directamente, no encolar las tareas Celery actuales.
-- [ ] Añadir al panel ADMIN configuración de días/estado, última y próxima ejecución, progreso, errores y botón `Consultar ahora`. El botón usa el mismo flujo marcado como manual.
+- [x] Registrar dos Cron protegidos en Vercel para los slots de Hobby: diarios, `0 17 * * *` y `0 22 * * *` (UTC). El handler valida secreto y slot; el backend filtra días deshabilitados antes de crear el Workflow.
+- [x] Guardar en la DB la configuración del barrido: activo/inactivo y días habilitados. El Cron diario consulta esa configuración y no ejecuta si el día está deshabilitado.
+- [x] El Workflow crea/actualiza un registro de ejecución, obtiene los radicados canónicos del ámbito y coordina su consulta. Tiene idempotencia por fecha/slot, prevención de solapamiento por radicado, leases, progreso y errores.
+- [x] Llamar a FastAPI mediante el binding privado y autenticación de servicio. El endpoint ejecuta la consulta/persistencia directamente, no encola Celery.
+- [x] Limitar concurrencia a cinco radicados y aislar fallos por expediente para que no detengan el resto.
+- [ ] Definir y verificar política explícita de backoff/reintentos y límites de intentos por radicado.
+- [ ] Programar reconciliaciones completas ocasionales del historial de actuaciones para detectar correcciones o registros antiguos agregados por Rama.
+- [x] Añadir al panel ADMIN configuración de días/estado, última y próxima ejecución, progreso, errores por radicado y botón `Consultar ahora`. El botón usa el mismo flujo marcado como manual.
+- [ ] Configurar `CRON_SECRET` y el mismo `WORKFLOW_SERVICE_TOKEN` en Production; confirmar el binding generado `BACKEND_SERVICE_URL`, obtener autorización del usuario para push y verificar los Cron tras su confirmación de redeploy.
 
 ### 4. Cruce y envío de novedades
 
@@ -107,7 +111,7 @@ Implementar en Vercel dos lanzadores durables: consultas periódicas de radicado
 
 - [ ] No existen fichas duplicadas dentro del ámbito acordado y la base impide recrearlas bajo concurrencia.
 - [ ] `SIN_CONSULTAR` hace la búsqueda inicial y guarda `idProceso`; las consultas posteriores omiten esa búsqueda.
-- [ ] Los Cron procesan lunes a viernes en los slots visibles 12:00/17:00 Colombia (`0 17 * * 1-5` y `0 22 * * 1-5` UTC) dentro de la ventana permitida por Hobby; admin puede habilitar días y ejecutar manualmente.
+- [ ] Los Cron consultan configuración diaria en los slots visibles 12:00/17:00 Colombia (`0 17 * * *` y `0 22 * * *` UTC), procesan solo los días habilitados y permiten ejecución manual dentro de la ventana de Hobby.
 - [ ] Si un proceso trae varias actuaciones nuevas, se informa el total y solo se detalla la más reciente.
 - [ ] Si varios procesos del mismo barrido tienen novedades, cada usuario recibe un único mensaje consolidado por canal, con resumen independiente por proceso y sin incluir procesos sin novedades.
 - [ ] Usuarios no CLIENTE controlan email y WhatsApp por separado para cada tipo; CLIENTE recibe todas sus alertas aplicables en su canal obligatorio elegido, sin filtros por tipo.

@@ -1,6 +1,6 @@
 import enum
 from datetime import datetime
-from sqlalchemy import Boolean, Column, DateTime, Enum, ForeignKey, Index, Integer, JSON, String, Table, Text, event, select
+from sqlalchemy import Boolean, Column, DateTime, Enum, ForeignKey, Index, Integer, JSON, String, Table, Text, UniqueConstraint, event, select
 from sqlalchemy.orm import relationship, synonym
 from app.database import Base
 
@@ -48,6 +48,60 @@ class ConfiguracionSaas(Base):
 
     id = Column(Integer, primary_key=True, default=1)
     mostrar_planes = Column(Boolean, nullable=False, default=False)
+
+
+class ConfiguracionConsultas(Base):
+    __tablename__ = "configuracion_consultas"
+
+    id = Column(Integer, primary_key=True, default=1)
+    activa = Column(Boolean, nullable=False, default=False)
+    dias_habilitados = Column(JSON, nullable=False, default=lambda: [0, 1, 2, 3, 4])
+    actualizado_por_id = Column(Integer, ForeignKey("usuarios.id", ondelete="SET NULL"), nullable=True)
+    updated_at = Column(DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow)
+    ejecucion_activa_id = Column(String(36), nullable=True)
+    lease_hasta = Column(DateTime, nullable=True)
+
+
+class EjecucionBarrido(Base):
+    __tablename__ = "ejecuciones_barrido"
+    __table_args__ = (
+        UniqueConstraint("clave_idempotencia", name="uq_ejecuciones_barrido_clave"),
+        Index("ix_ejecuciones_barrido_estado_inicio", "estado", "inicio"),
+    )
+
+    id = Column(String(36), primary_key=True)
+    clave_idempotencia = Column(String(80), nullable=False)
+    token_lanzamiento = Column(String(80), nullable=False)
+    tipo = Column(String(20), nullable=False)
+    estado = Column(String(24), nullable=False, default="EN_PROCESO")
+    solicitada_por_id = Column(Integer, ForeignKey("usuarios.id", ondelete="SET NULL"), nullable=True)
+    inicio = Column(DateTime, nullable=False, default=datetime.utcnow)
+    finalizacion = Column(DateTime, nullable=True)
+    lease_hasta = Column(DateTime, nullable=True)
+    total_radicados = Column(Integer, nullable=False, default=0)
+    procesados = Column(Integer, nullable=False, default=0)
+    errores = Column(Integer, nullable=False, default=0)
+    actuaciones_nuevas = Column(Integer, nullable=False, default=0)
+
+
+class EjecucionRadicado(Base):
+    __tablename__ = "ejecuciones_radicados"
+    __table_args__ = (
+        UniqueConstraint("ejecucion_id", "radicado_id", name="uq_ejecucion_radicado"),
+        Index("ix_ejecuciones_radicados_estado", "estado"),
+    )
+
+    id = Column(Integer, primary_key=True, index=True)
+    ejecucion_id = Column(String(36), ForeignKey("ejecuciones_barrido.id", ondelete="CASCADE"), nullable=False)
+    radicado_id = Column(Integer, ForeignKey("radicados.id", ondelete="CASCADE"), nullable=False)
+    consulta_id = Column(Integer, ForeignKey("consultas_radicados.id", ondelete="SET NULL"), nullable=True)
+    estado = Column(String(24), nullable=False, default="EN_PROCESO")
+    inicio = Column(DateTime, nullable=False, default=datetime.utcnow)
+    finalizacion = Column(DateTime, nullable=True)
+    lease_hasta = Column(DateTime, nullable=True)
+    actuaciones_nuevas = Column(Integer, nullable=False, default=0)
+    error = Column(Text, nullable=True)
+
 
 class ContenidoPagina(Base):
     """Structured public-page content edited by platform administrators."""

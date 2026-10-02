@@ -56,6 +56,28 @@ class ConfiguracionSaasOut(BaseModel):
 class ConfiguracionSaasUpdate(BaseModel):
     mostrar_planes: bool
 
+
+class ConfiguracionConsultasOut(BaseModel):
+    activa: bool
+    dias_habilitados: list[int]
+    horas_colombia: list[str] = ["12:00", "17:00"]
+    proxima_ejecucion: datetime | None = None
+    updated_at: datetime | None = None
+
+
+class ConfiguracionConsultasUpdate(BaseModel):
+    activa: bool
+    dias_habilitados: list[int]
+
+
+class WorkflowClaimConsulta(BaseModel):
+    clave_idempotencia: str
+    token_lanzamiento: str
+    tipo: Literal["AUTOMATICA", "MANUAL"]
+    fecha_local: str
+    hora_local: Literal["12:00", "17:00", "MANUAL"]
+    solicitada_por_id: int | None = None
+
 class ContenidoPaginaUpdate(BaseModel):
     contenido: dict[str, Any]
 
