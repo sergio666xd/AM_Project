@@ -1,23 +1,10 @@
-import { timingSafeEqual } from "node:crypto";
 import { start } from "workflow/api";
 import { deliverNotifications } from "@/workflows/consultation-sweep";
-
-function authorized(request: Request): boolean {
-  const expected = process.env.WORKFLOW_SERVICE_TOKEN;
-  const authorization = request.headers.get("authorization") ?? "";
-  if (!expected) return false;
-  const received = authorization.startsWith("Bearer ")
-    ? authorization.slice("Bearer ".length)
-    : "";
-  const left = Buffer.from(received);
-  const right = Buffer.from(expected);
-  return left.length === right.length && timingSafeEqual(left, right);
-}
+import { workflowAuthFailure, workflowUnauthorized } from "@/lib/workflow-service-auth";
 
 export async function POST(request: Request) {
-  if (!authorized(request)) {
-    return Response.json({ detail: "Credencial interna inválida." }, { status: 401 });
-  }
+  const authFailure = workflowAuthFailure(request);
+  if (authFailure) return workflowUnauthorized(authFailure);
   let body: { entrega_ids?: number[] };
   try {
     body = (await request.json()) as typeof body;

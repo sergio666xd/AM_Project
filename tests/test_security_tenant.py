@@ -2015,11 +2015,21 @@ def test_integration_connection_diagnostics_do_not_send_or_expose_secrets(monkey
         def json():
             return {"workflow_run_id": "diagnostic-run"}
 
+    class WorkflowAuthFailure:
+        ok = False
+        status_code = 401
+        headers = {"content-type": "application/json"}
+
+        @staticmethod
+        def json():
+            return {"code": "WORKFLOW_SERVICE_TOKEN_MISMATCH"}
+
     workflow_requests = []
+    workflow_responses = iter([WorkflowResponse(), WorkflowAuthFailure()])
     monkeypatch.setattr(
         admin_router.requests,
         "post",
-        lambda url, **kwargs: workflow_requests.append((url, kwargs)) or WorkflowResponse(),
+        lambda url, **kwargs: workflow_requests.append((url, kwargs)) or next(workflow_responses),
     )
 
     class FakeSMTP:
@@ -2073,6 +2083,13 @@ def test_integration_connection_diagnostics_do_not_send_or_expose_secrets(monkey
     assert workflow_requests[0][0].endswith("/workflow-internal/diagnosticos")
     assert workflow_requests[0][1]["headers"]["Authorization"].startswith("Bearer ")
     assert "unit-test-private-token" not in str(workflow_result)
+
+    rejected_workflow = probar_conexion_integracion(
+        schemas.DiagnosticoIntegracion(integracion="WORKFLOW"),
+        admin=admin,
+    )
+    assert rejected_workflow["causa"] == "WORKFLOW_SERVICE_TOKEN_MISMATCH"
+    assert "unit-test-private-token" not in str(rejected_workflow)
 
     smtp_result = probar_conexion_integracion(
         schemas.DiagnosticoIntegracion(integracion="SMTP"),
@@ -3253,13 +3270,22 @@ def test_reminder_401_is_visible_and_recovered_by_reconciler(monkeypatch, caplog
     monkeypatch.setattr(celery_tasks, "SessionLocal", sessionmaker(bind=engine))
 
     class LaunchResponse:
-        def __init__(self, ok, status_code, headers=None):
+        def __init__(self, ok, status_code, headers=None, code=None):
             self.ok = ok
             self.status_code = status_code
             self.headers = headers or {}
+            self.code = code
+
+        def json(self):
+            return {"code": self.code}
 
     responses = iter([
-        LaunchResponse(False, 401, {"content-type": "application/json"}),
+        LaunchResponse(
+            False,
+            401,
+            {"content-type": "application/json"},
+            "WORKFLOW_SERVICE_TOKEN_MISMATCH",
+        ),
         LaunchResponse(False, 401, {"content-type": "text/html; charset=utf-8"}),
         LaunchResponse(True, 202),
     ])
@@ -3298,7 +3324,7 @@ def test_reminder_401_is_visible_and_recovered_by_reconciler(monkeypatch, caplog
     failed = celery_tasks.procesar_recordatorios_tareas()
     assert failed["recordatorios_programados"] == 0
     assert failed["errores"] == 1
-    assert "launcher rechazó WORKFLOW_SERVICE_TOKEN" in caplog.text
+    assert "WORKFLOW_SERVICE_TOKEN_MISMATCH" in caplog.text
     with Session(engine) as db:
         reminder = db.query(models.RecordatorioTarea).filter_by(id=reminder_id).one()
         assert reminder.workflow_version_lanzada == 0
@@ -3308,7 +3334,7 @@ def test_reminder_401_is_visible_and_recovered_by_reconciler(monkeypatch, caplog
     protection_failed = celery_tasks.procesar_recordatorios_tareas()
     assert protection_failed["recordatorios_programados"] == 0
     assert protection_failed["errores"] == 1
-    assert "probable Deployment Protection" in caplog.text
+    assert "DEPLOYMENT_PROTECTION_OR_PROXY" in caplog.text
 
     recovered = celery_tasks.procesar_recordatorios_tareas()
     assert recovered["recordatorios_programados"] == 1

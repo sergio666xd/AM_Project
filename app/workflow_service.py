@@ -16,7 +16,7 @@ def workflow_frontend_url() -> str:
 
 
 def workflow_service_headers() -> dict[str, str]:
-    token = os.getenv("WORKFLOW_SERVICE_TOKEN", "")
+    token = os.getenv("WORKFLOW_SERVICE_TOKEN", "").strip()
     headers = {"Authorization": f"Bearer {token}"} if token else {}
     bypass = os.getenv("VERCEL_AUTOMATION_BYPASS_SECRET", "")
     if bypass:

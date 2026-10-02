@@ -56,7 +56,7 @@ type SweepRadicadoDetail = {
 type SweepDetails = { ejecucion: SweepRun; radicados: SweepRadicadoDetail[] };
 type RadicadoOption = { id: number; numero: string; ambito: string };
 type IntegrationName = "RAMA" | "WORKFLOW" | "SMTP" | "WHATSAPP";
-type IntegrationResult = { estado: string; detalle?: string; codigo_http?: number; workflow_run_id?: string };
+type IntegrationResult = { estado: string; detalle?: string; codigo_http?: number; workflow_run_id?: string; causa?: string };
 type OperationsData = {
   vision: Vision;
   redis: RedisStatus;
@@ -606,7 +606,7 @@ export default function AdminOperationsPage() {
                   <div key={integration} className="flex items-center justify-between gap-3 border border-border px-3 py-2">
                     <div className="min-w-0">
                       <p className="text-sm font-medium">{label}</p>
-                      <p role="status" className="truncate text-xs text-foreground-muted">{integrationResults[integration]?.estado ?? "Sin comprobar"}</p>
+                      <p role="status" className="truncate text-xs text-foreground-muted">{integrationResults[integration] ? [integrationResults[integration]?.estado, integrationResults[integration]?.causa].filter(Boolean).join(" · ") : "Sin comprobar"}</p>
                     </div>
                     <button type="button" onClick={() => void checkIntegration(integration)} disabled={checkingIntegration !== null} aria-label={`Comprobar ${label}`} title={`Comprobar ${label}`} className="grid size-9 shrink-0 place-items-center rounded-md border border-border hover:bg-surface-hover disabled:opacity-50">
                       <RefreshCw className={`size-4 ${checkingIntegration === integration ? "animate-spin" : ""}`} />

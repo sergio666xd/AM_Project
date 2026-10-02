@@ -1135,6 +1135,20 @@ def probar_conexion_integracion(
         except requests.RequestException:
             return {"integracion": "WORKFLOW", "estado": "FALLO", "detalle": "No fue posible contactar el servicio Workflow."}
         if not response.ok:
+            if response.status_code == 401:
+                code = None
+                if "json" in response.headers.get("content-type", "").lower():
+                    try:
+                        code = response.json().get("code")
+                    except (ValueError, AttributeError):
+                        pass
+                if code not in {
+                    "WORKFLOW_SERVICE_TOKEN_MISSING",
+                    "AUTHORIZATION_HEADER_MISSING",
+                    "WORKFLOW_SERVICE_TOKEN_MISMATCH",
+                }:
+                    code = "DEPLOYMENT_PROTECTION_OR_PROXY"
+                return {"integracion": "WORKFLOW", "estado": "FALLO", "codigo_http": 401, "causa": code}
             return {"integracion": "WORKFLOW", "estado": "FALLO", "codigo_http": response.status_code}
         try:
             resultado = response.json()
