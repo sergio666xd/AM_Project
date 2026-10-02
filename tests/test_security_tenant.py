@@ -23,6 +23,7 @@ from app.notification_policy import (
     plan_whatsapp_habilitado,
     whatsapp_habilitado,
 )
+from app.workflow_service import workflow_frontend_url, workflow_service_headers
 from app.radicados import (
     iniciar_consulta_nuevo_radicado,
     obtener_o_vincular_radicado,
@@ -1923,6 +1924,22 @@ def test_admin_manual_radicado_picker_search_returns_bounded_metadata():
         assert result[0]["numero"] == "12345000000000000000001"
         assert result[0]["ambito"] == "FIRMA"
         assert set(result[0]) == {"id", "numero", "ambito"}
+
+
+def test_workflow_frontend_url_uses_vercel_deployment_without_reverse_binding(monkeypatch):
+    monkeypatch.delenv("WORKFLOW_FRONTEND_URL", raising=False)
+    monkeypatch.delenv("NODE_ENV", raising=False)
+    monkeypatch.setenv("VERCEL_URL", "project-git-test-workflows.vercel.app")
+    monkeypatch.setenv("WORKFLOW_SERVICE_TOKEN", "unit-test-workflow-token")
+    monkeypatch.setenv("VERCEL_AUTOMATION_BYPASS_SECRET", "unit-test-bypass-secret")
+
+    assert workflow_frontend_url() == "https://project-git-test-workflows.vercel.app"
+    headers = workflow_service_headers()
+    assert headers["Authorization"] == "Bearer unit-test-workflow-token"
+    assert headers["x-vercel-protection-bypass"] == "unit-test-bypass-secret"
+
+    monkeypatch.setenv("WORKFLOW_FRONTEND_URL", "https://override.example.test/")
+    assert workflow_frontend_url() == "https://override.example.test"
 
 
 def test_admin_real_integration_send_requires_confirmation_and_is_audited(monkeypatch):

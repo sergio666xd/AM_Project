@@ -1,7 +1,6 @@
 """Schedule durable Workflows for task reminders and reconcile failed starts."""
 
 import logging
-import os
 from datetime import datetime, timedelta, timezone
 from urllib.parse import urljoin
 
@@ -9,6 +8,7 @@ import requests
 from sqlalchemy.orm import Session
 
 from app import models
+from app.workflow_service import workflow_frontend_url, workflow_service_headers
 
 logger = logging.getLogger(__name__)
 
@@ -58,12 +58,10 @@ def iniciar_workflow_recordatorio(db: Session, recordatorio_id: int) -> bool:
         db.rollback()
         return False
 
-    base_url = os.getenv("WORKFLOW_FRONTEND_URL") or (
-        "http://localhost:3000" if os.getenv("NODE_ENV") == "development" else ""
-    )
-    token = os.getenv("WORKFLOW_SERVICE_TOKEN", "")
-    if not base_url or not token:
-        logger.error("No se pudo iniciar Workflow de recordatorio: falta el binding o token de servicio.")
+    base_url = workflow_frontend_url()
+    headers = workflow_service_headers()
+    if not base_url or "Authorization" not in headers:
+        logger.error("No se pudo iniciar Workflow de recordatorio: falta la URL o el token de servicio.")
         db.rollback()
         return False
 
@@ -71,7 +69,7 @@ def iniciar_workflow_recordatorio(db: Session, recordatorio_id: int) -> bool:
     try:
         response = requests.post(
             urljoin(base_url.rstrip("/") + "/", "workflow-internal/recordatorios"),
-            headers={"Authorization": f"Bearer {token}"},
+            headers=headers,
             json={
                 "recordatorio_id": recordatorio.id,
                 "version": version,

@@ -16,15 +16,7 @@
       "backend": {
         "root": "./",
         "entrypoint": "app.main:app",
-        "framework": "fastapi",
-        "bindings": [
-          {
-            "type": "service",
-            "service": "frontend",
-            "format": "url",
-            "env": "WORKFLOW_FRONTEND_URL"
-          }
-        ]
+        "framework": "fastapi"
       }
     },
     "crons": [

@@ -37,6 +37,7 @@ from app.migrate_radicados_canonicos import migrar as migrar_radicados_canonicos
 from app.migrate_radicados_canonicos import previsualizar as previsualizar_migracion_radicados
 from app.rama_judicial_api import API_BASE_URL
 from app.whatsapp import WHATSAPP_API_URL, WHATSAPP_TOKEN, enviar_mensaje_whatsapp
+from app.workflow_service import workflow_frontend_url, workflow_service_headers
 import json
 
 
@@ -1083,7 +1084,7 @@ def obtener_estado_configuracion_integraciones(
         and WHATSAPP_TOKEN != "TU_TOKEN_AQUI"
     )
     workflow_configurado = bool(
-        (os.getenv("WORKFLOW_FRONTEND_URL") or os.getenv("NODE_ENV") == "development")
+        workflow_frontend_url()
         and os.getenv("WORKFLOW_SERVICE_TOKEN")
     )
     return {
@@ -1120,16 +1121,14 @@ def probar_conexion_integracion(
         return {"integracion": "RAMA", "estado": "CONECTADA", "codigo_http": codigo}
 
     if datos.integracion == "WORKFLOW":
-        base_url = os.getenv("WORKFLOW_FRONTEND_URL") or (
-            "http://localhost:3000" if os.getenv("NODE_ENV") == "development" else ""
-        )
-        token = os.getenv("WORKFLOW_SERVICE_TOKEN", "")
-        if not base_url or not token:
+        base_url = workflow_frontend_url()
+        headers = workflow_service_headers()
+        if not base_url or "Authorization" not in headers:
             return {"integracion": "WORKFLOW", "estado": "FALTAN_VARIABLES"}
         try:
             response = requests.post(
                 urljoin(base_url.rstrip("/") + "/", "workflow-internal/diagnosticos"),
-                headers={"Authorization": f"Bearer {token}"},
+                headers=headers,
                 json={},
                 timeout=10,
             )

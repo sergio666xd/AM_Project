@@ -73,7 +73,7 @@ La operación local usa `Celery + Redis`. Para recordatorios, Celery Beat y el e
 ### Workflows de consultas judiciales
 
 - El servicio frontend llama al backend por el binding privado `BACKEND_SERVICE_URL` definido en `vercel.json`; no configures ese URL manualmente en Vercel.
-- El backend inicia Flows en el frontend por el binding privado `WORKFLOW_FRONTEND_URL` definido en `vercel.json`.
+- El backend inicia Flows en el frontend mediante `VERCEL_URL`, que apunta al deployment público de frontend. Puedes fijar `WORKFLOW_FRONTEND_URL` como override si usas otro dominio. Si Preview tiene Deployment Protection, habilita `VERCEL_AUTOMATION_BYPASS_SECRET` para las llamadas de servicio; el código lo envía solo como header y nunca lo registra.
 - Configura `WORKFLOW_SERVICE_TOKEN` en los entornos runtime de frontend y backend con el mismo valor aleatorio. FastAPI lo usa para proteger `/api/internal/workflows/*`.
 - Configura `CRON_SECRET` en el frontend de Production. Vercel lo envía como `Authorization: Bearer ...` a los dos Cron. Los Cron solo corren en Production; cada uno invoca una vez al día y la DB filtra los días seleccionados.
 - Para ejecutar workflows con `next dev`, configura `WORKFLOW_BACKEND_URL=http://localhost:8000` en `frontend-saas/.env.local` y el mismo `WORKFLOW_SERVICE_TOKEN` en el backend local. No reutilices un token real de producción en desarrollo.

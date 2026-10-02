@@ -2,7 +2,6 @@
 
 import hashlib
 import logging
-import os
 from urllib.parse import urljoin
 
 import requests
@@ -10,6 +9,7 @@ from sqlalchemy.orm import Session
 
 from app import models
 from app.notification_policy import canales_habilitados
+from app.workflow_service import workflow_frontend_url, workflow_service_headers
 
 logger = logging.getLogger(__name__)
 
@@ -64,17 +64,15 @@ def crear_entrega_canal(
 def _iniciar_workflow(entrega_ids: list[int]) -> None:
     if not entrega_ids:
         return
-    base_url = os.getenv("WORKFLOW_FRONTEND_URL") or (
-        "http://localhost:3000" if os.getenv("NODE_ENV") == "development" else ""
-    )
-    token = os.getenv("WORKFLOW_SERVICE_TOKEN", "")
-    if not base_url or not token:
-        logger.error("No se pudo iniciar Workflow de notificaciones: falta el binding o token de servicio.")
+    base_url = workflow_frontend_url()
+    headers = workflow_service_headers()
+    if not base_url or "Authorization" not in headers:
+        logger.error("No se pudo iniciar Workflow de notificaciones: falta la URL o el token de servicio.")
         return
     try:
         response = requests.post(
             urljoin(base_url.rstrip("/") + "/", "workflow-internal/notificaciones"),
-            headers={"Authorization": f"Bearer {token}"},
+            headers=headers,
             json={"entrega_ids": sorted(set(entrega_ids))},
             timeout=10,
         )
