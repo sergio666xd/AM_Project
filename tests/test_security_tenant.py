@@ -3247,17 +3247,22 @@ def test_due_reminders_use_workflow_delivery_and_complete_after_send(monkeypatch
         assert db.query(models.EntregaNotificacion).filter_by(id=delivery_id).one().intentos == 0
 
 
-def test_reminder_launch_failure_is_recovered_by_reconciler(monkeypatch):
+def test_reminder_401_is_visible_and_recovered_by_reconciler(monkeypatch, caplog):
     engine = create_engine("sqlite:///:memory:")
     models.Base.metadata.create_all(engine)
     monkeypatch.setattr(celery_tasks, "SessionLocal", sessionmaker(bind=engine))
 
     class LaunchResponse:
-        def __init__(self, ok, status_code):
+        def __init__(self, ok, status_code, headers=None):
             self.ok = ok
             self.status_code = status_code
+            self.headers = headers or {}
 
-    responses = iter([LaunchResponse(False, 503), LaunchResponse(True, 202)])
+    responses = iter([
+        LaunchResponse(False, 401, {"content-type": "application/json"}),
+        LaunchResponse(False, 401, {"content-type": "text/html; charset=utf-8"}),
+        LaunchResponse(True, 202),
+    ])
     launches = []
     monkeypatch.setattr(
         "app.reminder_workflow.requests.post",
@@ -3293,16 +3298,26 @@ def test_reminder_launch_failure_is_recovered_by_reconciler(monkeypatch):
     failed = celery_tasks.procesar_recordatorios_tareas()
     assert failed["recordatorios_programados"] == 0
     assert failed["errores"] == 1
+    assert "launcher rechazó WORKFLOW_SERVICE_TOKEN" in caplog.text
     with Session(engine) as db:
-        assert db.query(models.RecordatorioTarea).filter_by(id=reminder_id).one().workflow_version_lanzada == 0
+        reminder = db.query(models.RecordatorioTarea).filter_by(id=reminder_id).one()
+        assert reminder.workflow_version_lanzada == 0
+        assert reminder.workflow_pendiente_lanzamiento is True
+        assert schemas.RecordatorioTareaOut.model_validate(reminder).workflow_pendiente_lanzamiento is True
+
+    protection_failed = celery_tasks.procesar_recordatorios_tareas()
+    assert protection_failed["recordatorios_programados"] == 0
+    assert protection_failed["errores"] == 1
+    assert "probable Deployment Protection" in caplog.text
 
     recovered = celery_tasks.procesar_recordatorios_tareas()
     assert recovered["recordatorios_programados"] == 1
     assert recovered["errores"] == 0
-    assert len(launches) == 2
+    assert len(launches) == 3
     with Session(engine) as db:
         reminder = db.query(models.RecordatorioTarea).filter_by(id=reminder_id).one()
         assert reminder.workflow_version_lanzada == reminder.version == 1
+        assert reminder.workflow_pendiente_lanzamiento is False
 
 
 def test_reminder_versions_follow_schedule_and_task_mutations(monkeypatch):

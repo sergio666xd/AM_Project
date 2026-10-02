@@ -764,3 +764,11 @@ class RecordatorioTarea(Base):
         "Tarea",
         back_populates="recordatorios",
     )
+
+    @property
+    def workflow_pendiente_lanzamiento(self) -> bool:
+        return (
+            self.activo
+            and self.enviado_en is None
+            and self.workflow_version_lanzada != self.version
+        )

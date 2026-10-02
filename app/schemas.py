@@ -437,6 +437,7 @@ class RecordatorioTareaOut(BaseModel):
     fecha_hora: Optional[datetime] = None
     anticipacion_minutos: Optional[int] = None
     enviado_en: Optional[datetime] = None
+    workflow_pendiente_lanzamiento: bool = False
 
     @field_serializer("fecha_hora", "enviado_en")
     def serialize_utc_datetime(self, value: Optional[datetime]) -> Optional[datetime]:

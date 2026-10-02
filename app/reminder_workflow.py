@@ -78,7 +78,16 @@ def iniciar_workflow_recordatorio(db: Session, recordatorio_id: int) -> bool:
             timeout=10,
         )
         if not response.ok:
-            logger.error("El launcher de recordatorios respondió HTTP %s.", response.status_code)
+            if response.status_code == 401:
+                content_type = getattr(response, "headers", {}).get("content-type", "").lower()
+                reason = (
+                    "probable Deployment Protection; revisa VERCEL_AUTOMATION_BYPASS_SECRET"
+                    if "html" in content_type or "text/" in content_type
+                    else "el launcher rechazó WORKFLOW_SERVICE_TOKEN"
+                )
+                logger.error("El launcher de recordatorios respondió HTTP 401 (%s).", reason)
+            else:
+                logger.error("El launcher de recordatorios respondió HTTP %s.", response.status_code)
             db.rollback()
             return False
     except requests.RequestException:
