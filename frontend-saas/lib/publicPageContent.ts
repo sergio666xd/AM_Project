@@ -1,6 +1,5 @@
+import { API_URL } from "@/lib/api";
 import type { PublicPageSlug } from "@/lib/sitePageDefaults";
-
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
 function mergeContent<T>(defaults: T, override: unknown): T {
   if (Array.isArray(override)) return override as T;
