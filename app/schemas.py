@@ -183,6 +183,7 @@ class UsuarioAdminCreate(BaseModel):
 class UsuarioAdminUpdate(BaseModel):
     nombre_completo: Optional[str] = None
     whatsapp_numero: Optional[str] = None
+    rol: Optional[RolUsuario] = None
     plan_id: Optional[int] = None
     creado_por_abogado_id: Optional[int] = None
 
@@ -207,6 +208,7 @@ class UsuarioOut(BaseModel):
     notificaciones_email: bool = True
     notificaciones_whatsapp: bool = False
     created_at: Optional[datetime] = None
+    ultimo_acceso: Optional[datetime] = None
 
     class Config:
         from_attributes = True

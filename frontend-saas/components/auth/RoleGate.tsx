@@ -3,6 +3,7 @@
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useSession } from "@/context/SessionContext";
+import { LoadingState } from "@/components/ui/LoadingState";
 
 type Role = "ADMIN" | "ABOGADO" | "ABOGADO_ADMIN" | "CLIENTE";
 
@@ -25,7 +26,7 @@ export function RoleGate({ roles, children }: { roles: Role[]; children: React.R
   }, [loading, roles, router, user]);
 
   if (loading || !user || user.debe_cambiar_password || !roles.includes(user.rol as Role)) {
-    return <div className="grid min-h-screen place-items-center text-sm text-[#002060]/70">Validando acceso…</div>;
+    return <div className="grid min-h-screen place-items-center px-6"><div className="w-full max-w-sm"><LoadingState label="Validando tu acceso" rows={2} /></div></div>;
   }
   return <>{children}</>;
 }

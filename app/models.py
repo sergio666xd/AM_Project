@@ -34,6 +34,7 @@ def preferencias_notificacion_por_defecto() -> dict:
 class EstadoUsuario(str, enum.Enum):
     PENDIENTE_APROBACION = "PENDIENTE_APROBACION"
     ACTIVO = "ACTIVO"
+    SUSPENDIDO = "SUSPENDIDO"
     RECHAZADO = "RECHAZADO"
 
 
@@ -154,6 +155,7 @@ class Usuario(Base):
     )
     canal_notificacion_cliente = Column(String(16), nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
+    ultimo_acceso = Column(DateTime, nullable=True)
 
     tareas = relationship(
         "Tarea",
@@ -466,6 +468,10 @@ class EventoAuditoria(Base):
     accion = Column(String(100), nullable=False, index=True)
     tipo_recurso = Column(String(80), nullable=False)
     recurso_id = Column(String(64), nullable=True)
+    endpoint = Column(String(500), nullable=True)
+    metodo = Column(String(16), nullable=True)
+    metadata_json = Column(Text, nullable=True)
+    error_tecnico = Column(Text, nullable=True)
     created_at = Column(DateTime, nullable=False, default=datetime.utcnow, index=True)
 
 class Actuacion(Base):

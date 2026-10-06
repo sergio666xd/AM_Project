@@ -66,6 +66,27 @@ def require_roles(actor: object, allowed_roles: set[str] | list[str], action: st
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=f"No tienes permiso para {action}.")
 
 
+def require_task_manager(
+    actor: object,
+    task: models.Tarea,
+    action: str,
+    db=None,
+) -> None:
+    """Require staff access and ownership of a task or its assigned process."""
+    require_roles(actor, {"ABOGADO", "ABOGADO_ADMIN", "ADMIN"}, action=action)
+    if has_firm_wide_access(actor) or getattr(task, "usuario_id", None) == getattr(actor, "id", None):
+        return
+    process_id = getattr(task, "proceso_id", None)
+    if db is not None and process_id is not None:
+        assigned_process = db.query(models.Proceso.id).filter(
+            models.Proceso.id == process_id,
+            models.Proceso.id.in_(lawyer_process_ids(db, actor)),
+        ).first()
+        if assigned_process:
+            return
+    raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=f"No tienes permiso para {action}.")
+
+
 def require_process_access(
     actor: object,
     responsible_lawyer_id: int,

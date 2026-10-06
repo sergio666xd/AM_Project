@@ -28,7 +28,11 @@ from app.radicados import (
 )
 from app.notification_policy import PREFERENCIA_PLAN_WHATSAPP, plan_whatsapp_habilitado
 from app.firm_access import require_roles
-from app.audit import registrar_evento_auditoria
+from app.audit import (
+    establecer_contexto_solicitud_auditoria,
+    limpiar_contexto_solicitud_auditoria,
+    registrar_evento_auditoria,
+)
 from app.firm_access import has_firm_wide_access, lawyer_process_ids, lawyer_scope_id
 
 # Crear las tablas en la BD
@@ -40,6 +44,7 @@ def actualizar_esquema_planes() -> None:
     with engine.begin() as conexion:
         conexion.execute(text("ALTER TYPE rolusuario ADD VALUE IF NOT EXISTS 'ABOGADO_ADMIN'"))
         conexion.execute(text("ALTER TYPE rolusuario ADD VALUE IF NOT EXISTS 'CLIENTE'"))
+        conexion.execute(text("ALTER TYPE estadousuario ADD VALUE IF NOT EXISTS 'SUSPENDIDO'"))
         conexion.execute(text("ALTER TABLE planes ADD COLUMN IF NOT EXISTS limite_ultimas_actuaciones INTEGER DEFAULT 5"))
         conexion.execute(text("ALTER TABLE planes ADD COLUMN IF NOT EXISTS notificaciones_whatsapp_procesos BOOLEAN NOT NULL DEFAULT FALSE"))
         conexion.execute(text("ALTER TABLE planes ADD COLUMN IF NOT EXISTS notificaciones_whatsapp_tareas BOOLEAN NOT NULL DEFAULT FALSE"))
@@ -47,6 +52,7 @@ def actualizar_esquema_planes() -> None:
         conexion.execute(text("ALTER TABLE usuarios ADD COLUMN IF NOT EXISTS debe_cambiar_password BOOLEAN NOT NULL DEFAULT FALSE"))
         conexion.execute(text("ALTER TABLE usuarios ADD COLUMN IF NOT EXISTS notificaciones_email BOOLEAN NOT NULL DEFAULT TRUE"))
         conexion.execute(text("ALTER TABLE usuarios ADD COLUMN IF NOT EXISTS notificaciones_whatsapp BOOLEAN NOT NULL DEFAULT FALSE"))
+        conexion.execute(text("ALTER TABLE usuarios ADD COLUMN IF NOT EXISTS ultimo_acceso TIMESTAMP"))
         conexion.execute(text("ALTER TABLE usuarios ADD COLUMN IF NOT EXISTS preferencias_notificacion JSON NOT NULL DEFAULT '{}'::json"))
         conexion.execute(text("ALTER TABLE usuarios ADD COLUMN IF NOT EXISTS canal_notificacion_cliente VARCHAR(16)"))
         conexion.execute(text("""
@@ -76,6 +82,10 @@ def actualizar_esquema_planes() -> None:
         conexion.execute(text("ALTER TABLE recordatorios_tareas ADD COLUMN IF NOT EXISTS version INTEGER NOT NULL DEFAULT 1"))
         conexion.execute(text("ALTER TABLE recordatorios_tareas ADD COLUMN IF NOT EXISTS workflow_version_lanzada INTEGER NOT NULL DEFAULT 0"))
         conexion.execute(text("ALTER TABLE entregas_notificacion ADD COLUMN IF NOT EXISTS recordatorio_version INTEGER"))
+        conexion.execute(text("ALTER TABLE eventos_auditoria ADD COLUMN IF NOT EXISTS endpoint VARCHAR(500)"))
+        conexion.execute(text("ALTER TABLE eventos_auditoria ADD COLUMN IF NOT EXISTS metodo VARCHAR(16)"))
+        conexion.execute(text("ALTER TABLE eventos_auditoria ADD COLUMN IF NOT EXISTS metadata_json TEXT"))
+        conexion.execute(text("ALTER TABLE eventos_auditoria ADD COLUMN IF NOT EXISTS error_tecnico TEXT"))
         conexion.execute(text("ALTER TABLE subtareas ADD COLUMN IF NOT EXISTS cliente_id INTEGER"))
         conexion.execute(text("ALTER TABLE subtareas ADD COLUMN IF NOT EXISTS asignada_cliente BOOLEAN NOT NULL DEFAULT FALSE"))
         conexion.execute(text("ALTER TABLE subtareas ADD COLUMN IF NOT EXISTS proceso_id INTEGER REFERENCES procesos(id)"))
@@ -100,6 +110,15 @@ app = FastAPI(
     description="API Multi-Tenant para gestión de radicados y alertas de WhatsApp",
     version="1.0.0",
 )
+
+
+@app.middleware("http")
+async def registrar_contexto_tecnico_auditoria(request: Request, call_next):
+    token = establecer_contexto_solicitud_auditoria(request.method, request.url.path)
+    try:
+        return await call_next(request)
+    finally:
+        limpiar_contexto_solicitud_auditoria(token)
 
 app.include_router(admin.router)
 app.include_router(tareas.router)
@@ -366,9 +385,14 @@ def login(
             detail="Tu cuenta aún no ha sido aprobada. Espera la verificación de tu Tarjeta Profesional.",
         )
 
+    if usuario.estado == models.EstadoUsuario.SUSPENDIDO:
+        raise HTTPException(status_code=403, detail="Tu cuenta está suspendida. Contacta al administrador de la plataforma.")
+
     if usuario.estado == models.EstadoUsuario.RECHAZADO:
         raise HTTPException(status_code=403, detail="Tu solicitud de registro fue rechazada.")
 
+    usuario.ultimo_acceso = datetime.utcnow()
+    db.commit()
     access_token = security.create_access_token(data={"sub": str(usuario.id)})
     return {"access_token": access_token, "token_type": "bearer", "debe_cambiar_password": usuario.debe_cambiar_password}
 

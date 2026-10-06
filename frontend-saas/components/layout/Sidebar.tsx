@@ -207,7 +207,7 @@ export default function Sidebar({ variant }: SidebarProps) {
       const isActive = getIsActive(pathname, item.href, variant);
       const Icon = item.icon;
       return (
-        <Link key={item.href} href={item.href} onClick={() => setMobileOpen(false)} className={`flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors ${isActive ? "bg-primary/10 text-primary" : "text-foreground-secondary hover:bg-surface-hover"}`}>
+        <Link key={item.href} href={item.href} onClick={() => setMobileOpen(false)} aria-current={isActive ? "page" : undefined} className={`flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors ${isActive ? "bg-primary/10 text-primary" : "text-foreground-secondary hover:bg-surface-hover"}`}>
           <Icon className="size-4 shrink-0" />{item.label}
         </Link>
       );
@@ -231,7 +231,7 @@ export default function Sidebar({ variant }: SidebarProps) {
     }
 
     return (
-      <nav className="flex-1 space-y-1 p-4">
+      <nav aria-label="Navegación principal" className="flex-1 space-y-1 p-4">
         {menuItems.map(renderItem)}
       </nav>
     );
@@ -354,6 +354,8 @@ export default function Sidebar({ variant }: SidebarProps) {
         <button
           type="button"
           onClick={() => setMobileOpen(true)}
+          aria-expanded={mobileOpen}
+          aria-controls="app-navigation"
           className="flex h-10 w-10 items-center justify-center rounded-lg text-foreground-secondary transition-colors hover:bg-surface-hover"
           aria-label="Abrir menú"
         >
@@ -390,6 +392,8 @@ export default function Sidebar({ variant }: SidebarProps) {
 
       {/* Sidebar */}
       <aside
+        id="app-navigation"
+        aria-label={variant === "platform-admin" ? "Navegación administrativa" : "Navegación principal"}
         className={`fixed inset-y-0 left-0 z-50 flex h-screen w-[var(--sidebar-width)] flex-col border-r border-border bg-surface transition-transform duration-200 ${
           mobileOpen
             ? "translate-x-0"

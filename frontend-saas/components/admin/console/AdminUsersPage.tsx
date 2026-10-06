@@ -1,11 +1,12 @@
 "use client";
 
 import { FormEvent, useEffect, useMemo, useState } from "react";
-import { KeyRound, Pencil, Plus, RefreshCw, Search, X } from "lucide-react";
+import Link from "next/link";
+import { KeyRound, Pencil, Plus, RefreshCw, Search, Trash2, X } from "lucide-react";
 import { fetchApi } from "@/lib/api";
 
-type Role = "ABOGADO_ADMIN" | "ABOGADO" | "CLIENTE";
-type Status = "ACTIVO" | "PENDIENTE_APROBACION" | "RECHAZADO";
+type Role = "ABOGADO_ADMIN" | "ABOGADO" | "CLIENTE" | "ADMIN";
+type Status = "ACTIVO" | "SUSPENDIDO" | "PENDIENTE_APROBACION" | "RECHAZADO";
 type Plan = { id: number; nombre: string; activo: boolean };
 type User = {
   id: number;
@@ -18,7 +19,7 @@ type User = {
   creado_por_abogado_id?: number | null;
   debe_cambiar_password?: boolean;
 };
-type Scope = "GLOBAL" | "FIRMA" | "SAAS";
+type Scope = "FIRMA" | "CLIENTES" | "SAAS" | "ADMIN";
 type FormState = {
   nombre_completo: string;
   email: string;
@@ -39,18 +40,20 @@ const initialForm: FormState = {
 };
 const roleLabels: Record<Role, string> = {
   ABOGADO_ADMIN: "Abogado de la firma",
-  ABOGADO: "Abogado SaaS",
+  ABOGADO: "Abogado SaaS · Plataforma",
   CLIENTE: "Cliente",
+  ADMIN: "Administrador de plataforma",
 };
 const stateLabels: Record<Status, string> = {
   ACTIVO: "Activo",
+  SUSPENDIDO: "Suspendido",
   PENDIENTE_APROBACION: "Pendiente",
-  RECHAZADO: "Suspendido",
+  RECHAZADO: "Rechazado",
 };
 
 async function loadOptions(token: string) {
   const [users, plans] = await Promise.all([
-    fetchApi("/api/admin/usuarios", { method: "GET", token }),
+    fetchApi("/api/admin/usuarios?incluir_administradores=true", { method: "GET", token }),
     fetchApi("/api/admin/planes", { method: "GET", token }),
   ]);
   return { users: users as User[], plans: plans as Plan[] };
@@ -59,7 +62,7 @@ async function loadOptions(token: string) {
 export default function AdminUsersPage() {
   const [users, setUsers] = useState<User[]>([]);
   const [plans, setPlans] = useState<Plan[]>([]);
-  const [scope, setScope] = useState<Scope>("GLOBAL");
+  const [scope, setScope] = useState<Scope>("FIRMA");
   const [role, setRole] = useState("TODOS");
   const [status, setStatus] = useState("TODOS");
   const [search, setSearch] = useState("");
@@ -121,18 +124,11 @@ export default function AdminUsersPage() {
   const visible = useMemo(
     () =>
       users.filter((user) => {
-        const firmOwnerIds = new Set(
-          users
-            .filter((item) => item.rol === "ABOGADO_ADMIN")
-            .map((item) => item.id),
-        );
         const inScope =
-          scope === "GLOBAL" ||
           (scope === "SAAS" && user.rol === "ABOGADO") ||
-          (scope === "FIRMA" &&
-            (user.rol === "ABOGADO_ADMIN" ||
-              (user.rol === "CLIENTE" &&
-                firmOwnerIds.has(user.creado_por_abogado_id || -1))));
+          (scope === "FIRMA" && user.rol === "ABOGADO_ADMIN") ||
+          (scope === "CLIENTES" && user.rol === "CLIENTE") ||
+          (scope === "ADMIN" && user.rol === "ADMIN");
         const matchesRole = role === "TODOS" || user.rol === role;
         const matchesStatus = status === "TODOS" || user.estado === status;
         const term = search.trim().toLowerCase();
@@ -148,7 +144,8 @@ export default function AdminUsersPage() {
 
   function openCreate() {
     setEditing(null);
-    setForm({ ...initialForm, plan_id: plans[0] ? String(plans[0].id) : "" });
+    const rol = scope === "SAAS" ? "ABOGADO" : scope === "CLIENTES" ? "CLIENTE" : "ABOGADO_ADMIN";
+    setForm({ ...initialForm, rol, plan_id: plans[0] ? String(plans[0].id) : "" });
     setFormOpen(true);
     setError("");
   }
@@ -179,6 +176,7 @@ export default function AdminUsersPage() {
         ? {
             nombre_completo: form.nombre_completo.trim(),
             whatsapp_numero: form.whatsapp_numero.trim(),
+            rol: form.rol,
             ...(form.rol === "ABOGADO" && form.plan_id
               ? { plan_id: Number(form.plan_id) }
               : {}),
@@ -234,10 +232,9 @@ export default function AdminUsersPage() {
     setError("");
     setNotice("");
     try {
-      await fetchApi("/api/admin/usuarios/estado-masivo", {
+      await fetchApi(`/api/admin/usuarios/${user.id}/estado?estado=${next}`, {
         method: "PATCH",
         token,
-        body: JSON.stringify({ usuario_ids: [user.id], estado: next }),
       });
       setNotice(`${user.nombre_completo}: ${stateLabels[next].toLowerCase()}.`);
       await reload();
@@ -247,6 +244,22 @@ export default function AdminUsersPage() {
           ? cause.message
           : "No fue posible cambiar el estado.",
       );
+    } finally {
+      setWorking(false);
+    }
+  }
+
+  async function deleteUser(user: User) {
+    if (!window.confirm(`¿Eliminar la cuenta de ${user.nombre_completo}? Si tiene procesos, tareas, solicitudes o documentos vinculados, el sistema conservará el historial y rechazará la eliminación.`)) return;
+    setWorking(true);
+    setError("");
+    setNotice("");
+    try {
+      const result = await fetchApi(`/api/admin/usuarios/${user.id}`, { method: "DELETE", token });
+      setNotice(result.mensaje || "Cuenta eliminada.");
+      await reload();
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "No fue posible eliminar la cuenta.");
     } finally {
       setWorking(false);
     }
@@ -297,14 +310,14 @@ export default function AdminUsersPage() {
           >
             <RefreshCw className="size-4" />
           </button>
-          <button
+          {scope !== "ADMIN" && <button
             type="button"
             onClick={openCreate}
             className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground"
           >
             <Plus className="size-4" />
             Crear usuario
-          </button>
+          </button>}
         </div>
       </header>
       {error && (
@@ -330,9 +343,10 @@ export default function AdminUsersPage() {
       >
         {(
           [
-            { id: "GLOBAL", label: "Global" },
             { id: "FIRMA", label: "Firma" },
-            { id: "SAAS", label: "SaaS individual" },
+            { id: "CLIENTES", label: "Clientes" },
+            { id: "SAAS", label: "Abogados SaaS" },
+            { id: "ADMIN", label: "Administradores" },
           ] as const
         ).map((item) => (
           <button
@@ -414,7 +428,7 @@ export default function AdminUsersPage() {
                 >
                   <td className="px-4 py-3">
                     <p className="font-medium text-foreground">
-                      {user.nombre_completo}
+                      <Link className="hover:text-primary hover:underline" href={`/gestion-procesos/admin/usuarios/${user.id}`}>{user.nombre_completo}</Link>
                     </p>
                     <p className="mt-0.5 text-xs text-foreground-muted">
                       {user.email} · {user.whatsapp_numero || "Sin WhatsApp"}
@@ -440,6 +454,7 @@ export default function AdminUsersPage() {
                   </td>
                   <td className="px-4 py-3">
                     <div className="flex justify-end gap-1">
+                      {user.rol !== "ADMIN" && <>
                       <button
                         type="button"
                         onClick={() => openEdit(user)}
@@ -457,19 +472,21 @@ export default function AdminUsersPage() {
                       >
                         <KeyRound className="size-4" />
                       </button>
-                      <button
+                      {user.estado === "PENDIENTE_APROBACION" ? <Link href="/gestion-procesos/admin/solicitudes" className="inline-flex h-9 items-center rounded-md border border-border px-2.5 text-xs hover:bg-surface-hover">Revisar solicitud</Link> : <button
                         type="button"
                         disabled={working}
                         onClick={() =>
                           void changeStatus(
                             user,
-                            user.estado === "ACTIVO" ? "RECHAZADO" : "ACTIVO",
+                            user.estado === "ACTIVO" ? "SUSPENDIDO" : "ACTIVO",
                           )
                         }
                         className="rounded-md border border-border px-2.5 text-xs hover:bg-surface-hover disabled:opacity-50"
                       >
                         {user.estado === "ACTIVO" ? "Suspender" : "Activar"}
-                      </button>
+                      </button>}
+                      <button type="button" disabled={working} onClick={() => void deleteUser(user)} aria-label={`Eliminar ${user.nombre_completo}`} title="Eliminar cuenta" className="grid size-9 place-items-center rounded-md border border-danger/30 text-danger hover:bg-danger-light disabled:opacity-50"><Trash2 className="size-4" /></button>
+                      </>}
                     </div>
                   </td>
                 </tr>
@@ -503,9 +520,11 @@ export default function AdminUsersPage() {
               <div>
                 <p className="text-xs font-semibold uppercase tracking-wide text-primary">
                   {scope === "SAAS"
-                    ? "SaaS individual"
+                    ? "Abogados SaaS"
                     : scope === "FIRMA"
                       ? "Firma"
+                      : scope === "CLIENTES"
+                        ? "Clientes"
                       : "Ámbito global"}
                 </p>
                 <h2 className="mt-1 text-lg font-semibold">
@@ -521,9 +540,8 @@ export default function AdminUsersPage() {
                 <X className="size-4" />
               </button>
             </header>
-            {!editing && (
-              <label className="block text-sm font-medium">
-                Tipo de cuenta
+            <label className="block text-sm font-medium">
+                {editing ? "Perfil" : "Tipo de cuenta"}
                 <select
                   value={form.rol}
                   onChange={(event) =>
@@ -540,8 +558,8 @@ export default function AdminUsersPage() {
                   <option value="CLIENTE">Cliente</option>
                   <option value="ABOGADO">Abogado SaaS</option>
                 </select>
-              </label>
-            )}
+                {editing && <span className="mt-1 block text-xs text-foreground-muted">El rol solo cambia si la cuenta no tiene procesos, tareas ni documentos vinculados.</span>}
+            </label>
             <label className="block text-sm font-medium">
               Nombre completo
               <input

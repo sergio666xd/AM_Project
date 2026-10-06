@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { RotateCcw, Save } from "lucide-react";
 import { SITE_PAGE_DEFAULTS, SITE_PAGE_LABELS, type PublicPageSlug } from "@/lib/sitePageDefaults";
 import { fetchApi } from "@/lib/api";
+import { RichTextInput } from "@/components/marketing/RichTextInput";
 type JsonValue = string | number | boolean | null | JsonValue[] | { [key: string]: JsonValue };
 type ContentPage = { slug: PublicPageSlug; nombre: string; contenido: JsonValue | null; updated_at: string | null };
 
@@ -87,13 +88,10 @@ function ContentField({
     return <label className="block text-sm font-medium text-foreground">{humanLabel(name)}<input type="number" value={value} onChange={(event) => onChange(Number(event.target.value))} className="mt-1 w-full rounded-md border border-border bg-background px-3 py-2 font-normal" /></label>;
   }
 
-  const textValue = value ?? "";
+  const textValue = typeof value === "string" ? value : "";
   const longText = textValue.length > 90 || name.toLowerCase().includes("description") || name === "body" || name === "answer";
   return (
-    <label className="block text-sm font-medium text-foreground">
-      {humanLabel(name)}
-      {longText ? <textarea rows={textValue.length > 180 ? 5 : 3} maxLength={5000} value={textValue} onChange={(event) => onChange(event.target.value)} className="mt-1 w-full resize-y rounded-md border border-border bg-background px-3 py-2 font-normal" /> : <input maxLength={500} value={textValue} onChange={(event) => onChange(event.target.value)} className="mt-1 w-full rounded-md border border-border bg-background px-3 py-2 font-normal" />}
-    </label>
+    <RichTextInput label={humanLabel(name)} value={textValue} onChange={onChange} multiline={longText} />
   );
 }
 

@@ -1,4 +1,4 @@
-// import { API_URL } from "@/lib/api";
+import { API_URL } from "@/lib/api";
 import type { PublicPageSlug } from "@/lib/sitePageDefaults";
 
 function mergeContent<T>(defaults: T, override: unknown): T {
@@ -18,7 +18,8 @@ function mergeContent<T>(defaults: T, override: unknown): T {
 
 export async function loadPublicPageContent<T>(slug: PublicPageSlug, defaults: T): Promise<T> {
   try {
-    const response = await fetch(`https://alejandramunozabogada.vercel.app/api/contenido-publico/${slug}`, { cache: "no-store" });
+    const apiBaseUrl = API_URL.replace(/\/$/, "");
+    const response = await fetch(`${apiBaseUrl}/api/contenido-publico/${encodeURIComponent(slug)}`, { cache: "no-store" });
     if (!response.ok) return defaults;
     const data: { contenido?: unknown } = await response.json();
     return mergeContent(defaults, data.contenido);

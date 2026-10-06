@@ -1,4 +1,5 @@
 import os
+import re
 import smtplib
 from uuid import uuid4
 from urllib.error import HTTPError, URLError
@@ -7,11 +8,12 @@ from urllib.request import Request, urlopen
 
 import requests
 from email_validator import EmailNotValidError, validate_email
-from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile, status
+from fastapi import APIRouter, Body, Depends, File, Form, HTTPException, Request, UploadFile, status
 from botocore.exceptions import BotoCoreError, ClientError
-from datetime import datetime, timedelta, timezone
+from datetime import date, datetime, timedelta, timezone
 from zoneinfo import ZoneInfo
 from sqlalchemy import and_, func, or_
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app import models, schemas, security, storage
@@ -245,100 +247,588 @@ def restaurar_contenido_publico_admin(
 def listar_eventos_auditoria(
     limit: int = 100,
     offset: int = 0,
+    usuario: str | None = None,
+    accion: str | None = None,
+    modulo: str | None = None,
+    fecha_desde: date | None = None,
+    fecha_hasta: date | None = None,
+    resultado: str | None = None,
     db: Session = Depends(get_db),
     admin: models.Usuario = Depends(verificar_admin),
 ):
     limit = max(1, min(limit, 200))
     offset = max(0, offset)
+    query = (
+        db.query(models.EventoAuditoria, models.Usuario.nombre_completo)
+        .outerjoin(models.Usuario, models.Usuario.id == models.EventoAuditoria.actor_id)
+    )
+    if usuario:
+        term = f"%{usuario.strip()}%"
+        query = query.filter(or_(models.Usuario.nombre_completo.ilike(term), models.EventoAuditoria.actor_id.cast(models.String).ilike(term)))
+    if accion:
+        query = query.filter(models.EventoAuditoria.accion == accion)
+    if modulo:
+        tipos_recurso = AUDIT_RESOURCE_MODULES.get(modulo)
+        if tipos_recurso:
+            query = query.filter(models.EventoAuditoria.tipo_recurso.in_(tipos_recurso))
+        elif modulo == "Sistema":
+            recursos_con_modulo = tuple(resource for resources in AUDIT_RESOURCE_MODULES.values() for resource in resources)
+            query = query.filter(~models.EventoAuditoria.tipo_recurso.in_(recursos_con_modulo))
+        else:
+            return []
+    if fecha_desde:
+        query = query.filter(models.EventoAuditoria.created_at >= datetime.combine(fecha_desde, datetime.min.time()))
+    if fecha_hasta:
+        query = query.filter(models.EventoAuditoria.created_at < datetime.combine(fecha_hasta + timedelta(days=1), datetime.min.time()))
+    if resultado:
+        normalized_result = resultado.upper()
+        if normalized_result not in {"REGISTRADO", "ERROR"}:
+            return []
+        if normalized_result == "ERROR":
+            query = query.filter(models.EventoAuditoria.error_tecnico.is_not(None))
+        else:
+            query = query.filter(models.EventoAuditoria.error_tecnico.is_(None))
     eventos = (
-        db.query(models.EventoAuditoria)
+        query
         .order_by(models.EventoAuditoria.created_at.desc(), models.EventoAuditoria.id.desc())
         .offset(offset)
         .limit(limit)
         .all()
     )
-    return [
-        {
+    results = []
+    for evento, actor_name in eventos:
+        description, resource_label = _dashboard_activity_description(evento.accion, evento.tipo_recurso)
+        modulo_label = AUDIT_RESOURCE_MODULE_LABELS.get(evento.tipo_recurso, "Sistema")
+        try:
+            metadata = json.loads(evento.metadata_json) if evento.metadata_json else None
+        except (TypeError, ValueError):
+            metadata = evento.metadata_json
+        results.append({
             "id": evento.id,
             "actor_id": evento.actor_id,
+            "actor": actor_name or "Sistema",
             "accion": evento.accion,
             "tipo_recurso": evento.tipo_recurso,
+            "modulo": modulo_label,
             "recurso_id": evento.recurso_id,
             "created_at": evento.created_at,
-        }
-        for evento in eventos
-    ]
+            "descripcion": f"{actor_name or 'El sistema'} {description}.",
+            "recurso": resource_label,
+            "resultado": "ERROR" if evento.error_tecnico else "REGISTRADO",
+            "href": _dashboard_activity_href(evento.tipo_recurso, evento.recurso_id),
+            # Estos campos no se registran todavía en EventoAuditoria; null es explícito y no inventado.
+            "detalle_tecnico": {
+                "endpoint": evento.endpoint,
+                "metodo": evento.metodo,
+                "recurso": evento.tipo_recurso,
+                "id": evento.recurso_id,
+                "metadata": metadata,
+                "error": evento.error_tecnico,
+            },
+        })
+    return results
 
 
 # ============================================================
 # DASHBOARD
 # ============================================================
 
+def _dashboard_iso(value: datetime | None) -> str | None:
+    if value is None:
+        return None
+    if value.tzinfo is None:
+        value = value.replace(tzinfo=timezone.utc)
+    return value.astimezone(timezone.utc).isoformat()
+
+
+def _dashboard_activity_description(action: str, resource_type: str) -> tuple[str, str]:
+    resource = {
+        "usuario": "un usuario",
+        "solicitud_registro": "una solicitud de registro",
+        "proceso": "un proceso",
+        "proceso_cliente": "un cliente del proceso",
+        "proceso_radicado": "un radicado del proceso",
+        "radicado": "un radicado",
+        "tarea": "una tarea",
+        "documento_proceso": "un documento",
+        "solicitud_documento": "una solicitud de documento",
+        "pagina_publica": "una página pública",
+        "plan": "un plan",
+    }.get(resource_type.lower(), "un registro")
+    known_actions = {
+        "admin.usuario.crear": "creó un usuario",
+        "abogado.crear": "creó un abogado",
+        "cliente.crear": "creó un cliente",
+        "admin.solicitud.aprobar": "aprobó una solicitud de registro",
+        "admin.solicitud.rechazar": "rechazó una solicitud de registro",
+        "proceso.crear": "creó un proceso",
+        "proceso.actualizar": "actualizó un proceso",
+        "proceso.archivar": "archivó un proceso",
+        "proceso.restaurar": "restauró un proceso",
+        "documento.cargar": "cargó un documento",
+        "documento.solicitar": "solicitó un documento",
+        "tarea.crear": "creó una tarea",
+        "tarea.actualizar": "actualizó una tarea",
+        "tarea.completar": "completó una tarea",
+        "radicado.crear": "agregó un radicado",
+        "radicado.vincular": "vinculó un radicado",
+    }
+    description = known_actions.get(action)
+    if description is None:
+        if "radicado" in action and any(word in action for word in ("consulta", "consultar")):
+            description = "consultó un radicado"
+        elif action.endswith(".aprobar"):
+            description = f"aprobó {resource}"
+        elif action.endswith(".rechazar"):
+            description = f"rechazó {resource}"
+        elif action.endswith(".actualizar"):
+            description = f"actualizó {resource}"
+        elif action.endswith(".crear") or action.endswith(".cargar"):
+            description = f"registró {resource}"
+        elif action.endswith(".eliminar") or action.endswith(".retirar"):
+            description = f"retiró {resource}"
+        elif action.endswith(".enviar"):
+            description = f"envió {resource}"
+        else:
+            description = f"realizó una acción sobre {resource}"
+    return description, resource.capitalize()
+
+
+def _dashboard_activity_href(resource_type: str, resource_id: str | None) -> str:
+    resource = resource_type.lower()
+    if resource == "usuario" and resource_id and resource_id.isdigit():
+        return f"/gestion-procesos/admin/usuarios/{resource_id}"
+    if resource in {"solicitud_registro"}:
+        return "/gestion-procesos/admin/solicitudes"
+    if resource in {"proceso", "proceso_cliente", "proceso_radicado"}:
+        return "/gestion-procesos/admin/procesos"
+    if resource in {"radicado"}:
+        return "/gestion-procesos/admin/radicados"
+    if resource in {"tarea", "subtarea", "recordatorio_tarea"}:
+        return "/gestion-procesos/admin/tareas"
+    if resource in {"documento_proceso", "solicitud_documento"}:
+        return "/gestion-procesos/admin/documentos"
+    if resource == "pagina_publica":
+        return "/gestion-procesos/admin/contenido"
+    if resource == "plan":
+        return "/gestion-procesos/admin/planes"
+    return "/gestion-procesos/admin/auditoria"
+
 @router.get("/dashboard")
 def obtener_dashboard_admin(
     db: Session = Depends(get_db),
     admin: models.Usuario = Depends(verificar_admin),
 ):
-    total_usuarios = (
-        db.query(models.Usuario)
+    roles_firma = (models.RolUsuario.ABOGADO_ADMIN, models.RolUsuario.ADMIN)
+    estados_tarea_activa = (models.EstadoTarea.PENDIENTE, models.EstadoTarea.EN_CURSO)
+    ahora = datetime.now(timezone.utc).replace(tzinfo=None)
+
+    cuentas = db.query(models.Usuario).filter(models.Usuario.rol != models.RolUsuario.ADMIN)
+    usuarios_activos = cuentas.filter(models.Usuario.estado == models.EstadoUsuario.ACTIVO).count()
+    usuarios_pendientes = cuentas.filter(models.Usuario.estado == models.EstadoUsuario.PENDIENTE_APROBACION).count()
+    usuarios_rechazados = cuentas.filter(models.Usuario.estado == models.EstadoUsuario.RECHAZADO).count()
+    solicitudes_registro = db.query(models.SolicitudRegistro).count()
+    solicitudes_perfil = db.query(models.SolicitudEdicionPerfilCliente).filter(
+        models.SolicitudEdicionPerfilCliente.estado == "PENDIENTE"
+    ).count()
+
+    procesos_activos_firma = (
+        db.query(models.Proceso)
+        .join(models.Usuario, models.Usuario.id == models.Proceso.abogado_id)
+        .filter(models.Usuario.rol.in_(roles_firma), models.Proceso.archivado_en.is_(None))
+    )
+    procesos_activos_saas = (
+        db.query(models.Proceso)
+        .join(models.Usuario, models.Usuario.id == models.Proceso.abogado_id)
+        .filter(models.Usuario.rol == models.RolUsuario.ABOGADO, models.Proceso.archivado_en.is_(None))
+    )
+    procesos_firma_count = procesos_activos_firma.count()
+    procesos_saas_count = procesos_activos_saas.count()
+
+    tareas_activas = (
+        db.query(models.Tarea)
+        .filter(models.Tarea.estado.in_(estados_tarea_activa))
+        .filter(or_(models.Tarea.proceso_id.is_(None), models.Tarea.proceso.has(models.Proceso.archivado_en.is_(None))))
+    )
+    tareas_pendientes = tareas_activas.count()
+    tareas_firma = (
+        db.query(models.Tarea)
+        .join(models.Usuario, models.Usuario.id == models.Tarea.usuario_id)
+        .filter(models.Usuario.rol.in_(roles_firma), models.Tarea.estado.in_(estados_tarea_activa))
+        .filter(or_(models.Tarea.proceso_id.is_(None), models.Tarea.proceso.has(models.Proceso.archivado_en.is_(None))))
+    )
+    tareas_vencidas = tareas_firma.filter(models.Tarea.fecha_limite < ahora).count()
+
+    documentos_pendientes = (
+        db.query(models.SolicitudDocumento)
+        .join(models.Proceso, models.Proceso.id == models.SolicitudDocumento.proceso_id)
+        .filter(models.SolicitudDocumento.atendida_en.is_(None), models.Proceso.archivado_en.is_(None))
+        .count()
+    )
+    errores_consulta = db.query(models.ConsultaRadicado).filter(models.ConsultaRadicado.estado == "ERROR").count()
+    notificaciones_criticas = db.query(models.EntregaNotificacion).filter(
+        models.EntregaNotificacion.estado == "ERROR",
+        models.EntregaNotificacion.intentos >= 3,
+    ).count()
+    errores_operativos = errores_consulta + notificaciones_criticas
+    total_alertas = (
+        solicitudes_registro
+        + solicitudes_perfil
+        + tareas_vencidas
+        + documentos_pendientes
+        + errores_operativos
+    )
+
+    radicados_firma = _filtrar_radicados_por_sector(db.query(models.Radicado), "FIRMA").count()
+    radicados_saas = _filtrar_radicados_por_sector(db.query(models.Radicado), "SAAS").count()
+    tareas_firma_count = (
+        db.query(models.Tarea)
+        .join(models.Usuario, models.Usuario.id == models.Tarea.usuario_id)
+        .filter(models.Usuario.rol.in_(roles_firma))
+        .filter(or_(models.Tarea.proceso_id.is_(None), models.Tarea.proceso.has(models.Proceso.archivado_en.is_(None))))
+        .count()
+    )
+    tareas_saas_count = (
+        db.query(models.Tarea)
+        .join(models.Usuario, models.Usuario.id == models.Tarea.usuario_id)
+        .filter(models.Usuario.rol == models.RolUsuario.ABOGADO)
+        .filter(or_(models.Tarea.proceso_id.is_(None), models.Tarea.proceso.has(models.Proceso.archivado_en.is_(None))))
+        .count()
+    )
+    documentos_firma = (
+        db.query(models.DocumentoProceso)
+        .join(models.Proceso, models.Proceso.id == models.DocumentoProceso.proceso_id)
+        .join(models.Usuario, models.Usuario.id == models.Proceso.abogado_id)
+        .filter(models.Usuario.rol.in_(roles_firma), models.Proceso.archivado_en.is_(None))
+        .count()
+    )
+
+    proceso_ids = [row[0] for row in (
+        db.query(models.Proceso.id)
+        .join(models.Usuario, models.Usuario.id == models.Proceso.abogado_id)
+        .filter(models.Usuario.rol.in_(roles_firma), models.Proceso.archivado_en.is_(None))
+        .order_by(models.Proceso.created_at.desc(), models.Proceso.id.desc())
+        .all()
+    )]
+    procesos_riesgo_query = (
+        db.query(models.Tarea.proceso_id)
+        .join(models.Proceso, models.Proceso.id == models.Tarea.proceso_id)
+        .join(models.Usuario, models.Usuario.id == models.Proceso.abogado_id)
         .filter(
-            models.Usuario.rol == models.RolUsuario.ABOGADO
+            models.Usuario.rol.in_(roles_firma),
+            models.Proceso.archivado_en.is_(None),
+            models.Tarea.estado.in_(estados_tarea_activa),
+            or_(models.Tarea.fecha_limite < ahora, models.Tarea.prioridad == models.PrioridadTarea.URGENTE),
         )
-        .count()
+        .distinct()
     )
+    procesos_riesgo_count = procesos_riesgo_query.count()
 
-    usuarios_activos = (
-        db.query(models.Usuario)
-        .filter(
-            models.Usuario.rol != models.RolUsuario.ADMIN,
-            models.Usuario.estado == models.EstadoUsuario.ACTIVO,
+    procesos = []
+    if proceso_ids:
+        process_rows = (
+            db.query(
+                models.Proceso.id,
+                models.Proceso.nombre,
+                models.Proceso.created_at,
+                models.Usuario.nombre_completo,
+            )
+            .join(models.Usuario, models.Usuario.id == models.Proceso.abogado_id)
+            .filter(models.Proceso.id.in_(proceso_ids))
+            .all()
         )
-        .count()
+        task_rows = db.query(
+            models.Tarea.proceso_id,
+            models.Tarea.id,
+            models.Tarea.titulo,
+            models.Tarea.estado,
+            models.Tarea.prioridad,
+            models.Tarea.fecha_limite,
+            models.Tarea.updated_at,
+        ).filter(models.Tarea.proceso_id.in_(proceso_ids)).all()
+        tasks_by_process: dict[int, list] = {}
+        for row in task_rows:
+            tasks_by_process.setdefault(row.proceso_id, []).append(row)
+        clients_by_process: dict[int, list[str]] = {}
+        for process_id, client_name in db.query(
+            models.ProcesoCliente.proceso_id, models.Usuario.nombre_completo
+        ).join(models.Usuario, models.Usuario.id == models.ProcesoCliente.cliente_id).filter(
+            models.ProcesoCliente.proceso_id.in_(proceso_ids)
+        ).order_by(models.ProcesoCliente.proceso_id, models.Usuario.nombre_completo).all():
+            clients_by_process.setdefault(process_id, []).append(client_name)
+        docs_by_process = dict(db.query(
+            models.DocumentoProceso.proceso_id,
+            func.max(models.DocumentoProceso.created_at),
+        ).filter(models.DocumentoProceso.proceso_id.in_(proceso_ids)).group_by(models.DocumentoProceso.proceso_id).all())
+
+        for process_id, name, created_at, lawyer_name in process_rows:
+            all_tasks = tasks_by_process.get(process_id, [])
+            open_tasks = [task for task in all_tasks if task.estado in estados_tarea_activa]
+            overdue = [task for task in open_tasks if task.fecha_limite and task.fecha_limite < ahora]
+            urgent = [task for task in open_tasks if task.prioridad == models.PrioridadTarea.URGENTE]
+            open_tasks.sort(key=lambda task: (task.fecha_limite is None, task.fecha_limite or datetime.max, task.id))
+            activity_dates = [created_at]
+            activity_dates.extend(task.updated_at for task in all_tasks if task.updated_at)
+            if docs_by_process.get(process_id):
+                activity_dates.append(docs_by_process[process_id])
+            client_names = clients_by_process.get(process_id, [])
+            risk_label = "Tarea vencida" if overdue else "Tarea urgente" if urgent else None
+            procesos.append({
+                "id": process_id,
+                "nombre": name,
+                "cliente": client_names[0] if client_names else None,
+                "clientes": len(client_names),
+                "responsable": lawyer_name,
+                "estado": "ACTIVO",
+                "ultima_actividad": _dashboard_iso(max(activity_dates) if activity_dates else None),
+                "riesgo": risk_label,
+                "proxima_accion": open_tasks[0].titulo if open_tasks else None,
+                "vencido": bool(overdue),
+                "en_atencion": bool(open_tasks),
+                "sin_actividad": not all_tasks and not docs_by_process.get(process_id),
+            })
+        procesos.sort(key=lambda item: (
+            item["riesgo"] is None,
+            not item["en_atencion"],
+            item["ultima_actividad"] or "",
+        ))
+
+    eventos = (
+        db.query(models.EventoAuditoria, models.Usuario.nombre_completo)
+        .outerjoin(models.Usuario, models.Usuario.id == models.EventoAuditoria.actor_id)
+        .order_by(models.EventoAuditoria.created_at.desc(), models.EventoAuditoria.id.desc())
+        .limit(12)
+        .all()
     )
-
-    usuarios_pendientes = (
-        db.query(models.Usuario)
-        .filter(
-            models.Usuario.rol == models.RolUsuario.ABOGADO,
-            models.Usuario.estado == models.EstadoUsuario.PENDIENTE_APROBACION,
-        )
-        .count()
+    actividad = []
+    for event, actor_name in eventos:
+        description, resource_label = _dashboard_activity_description(event.accion, event.tipo_recurso)
+        actividad.append({
+            "id": f"audit-{event.id}",
+            "actor": actor_name or "Sistema",
+            "descripcion": description,
+            "recurso": resource_label,
+            "fecha": _dashboard_iso(event.created_at),
+            "href": _dashboard_activity_href(event.tipo_recurso, event.recurso_id),
+            "tipo": "normal",
+        })
+    consultas_recientes = (
+        db.query(models.ConsultaRadicado)
+        .filter(models.ConsultaRadicado.estado.in_(("COMPLETADA", "ERROR")))
+        .order_by(models.ConsultaRadicado.finalizacion.desc(), models.ConsultaRadicado.inicio.desc())
+        .limit(8)
+        .all()
     )
+    for consulta in consultas_recientes:
+        fecha = consulta.finalizacion or consulta.inicio
+        numero = consulta.radicado.numero if consulta.radicado else "radicado"
+        actividad.append({
+            "id": f"consulta-{consulta.id}",
+            "actor": "Sistema",
+            "descripcion": "detectó un error en una consulta judicial" if consulta.estado == "ERROR" else "completó una consulta judicial",
+            "recurso": f"Radicado {numero}",
+            "fecha": _dashboard_iso(fecha),
+            "href": "/gestion-procesos/admin/operacion",
+            "tipo": "error" if consulta.estado == "ERROR" else "normal",
+        })
+    actividad.sort(key=lambda item: item["fecha"] or "", reverse=True)
 
-    usuarios_rechazados = (
-        db.query(models.Usuario)
-        .filter(
-            models.Usuario.rol == models.RolUsuario.ABOGADO,
-            models.Usuario.estado == models.EstadoUsuario.RECHAZADO,
-        )
-        .count()
-    )
-
-    total_radicados = db.query(models.Radicado).count()
-
-    total_planes = db.query(models.Plan).count()
-
-    planes_activos = (
-        db.query(models.Plan)
-        .filter(models.Plan.activo == True)
-        .count()
-    )
+    atencion = [
+        {"key": "registro", "label": "Solicitudes de registro", "count": solicitudes_registro, "href": "/gestion-procesos/admin/solicitudes", "tone": "warning"},
+        {"key": "aprobacion", "label": "Usuarios pendientes de aprobación", "count": usuarios_pendientes, "href": "/gestion-procesos/admin/usuarios", "tone": "warning"},
+        {"key": "perfil", "label": "Solicitudes de perfil por revisar", "count": solicitudes_perfil, "href": "/gestion-procesos/admin/solicitudes-perfil", "tone": "warning"},
+        {"key": "procesos", "label": "Procesos con tareas de riesgo", "count": procesos_riesgo_count, "href": "/gestion-procesos/admin/procesos", "tone": "danger"},
+        {"key": "tareas", "label": "Tareas vencidas", "count": tareas_vencidas, "href": "/gestion-procesos/admin/tareas", "tone": "danger"},
+        {"key": "documentos", "label": "Documentos pendientes de revisión", "count": documentos_pendientes, "href": "/gestion-procesos/admin/documentos", "tone": "warning"},
+        {"key": "consultas", "label": "Consultas judiciales con error", "count": errores_consulta, "href": "/gestion-procesos/admin/operacion", "tone": "danger"},
+        {"key": "notificaciones", "label": "Notificaciones críticas sin entregar", "count": notificaciones_criticas, "href": "/gestion-procesos/admin/operacion", "tone": "danger"},
+    ]
 
     return {
         "usuarios": {
-            "total": total_usuarios,
+            "total": db.query(models.Usuario).filter(models.Usuario.rol == models.RolUsuario.ABOGADO).count(),
             "activos": usuarios_activos,
-            "pendientes": usuarios_pendientes,
-            "rechazados": usuarios_rechazados,
+            "pendientes": db.query(models.Usuario).filter(
+                models.Usuario.rol == models.RolUsuario.ABOGADO,
+                models.Usuario.estado == models.EstadoUsuario.PENDIENTE_APROBACION,
+            ).count(),
+            "rechazados": db.query(models.Usuario).filter(
+                models.Usuario.rol == models.RolUsuario.ABOGADO,
+                models.Usuario.estado == models.EstadoUsuario.RECHAZADO,
+            ).count(),
         },
         "radicados": {
-            "total": total_radicados,
+            "total": db.query(models.Radicado).count(),
         },
         "planes": {
-            "total": total_planes,
-            "activos": planes_activos,
+            "total": db.query(models.Plan).count(),
+            "activos": db.query(models.Plan).filter(models.Plan.activo.is_(True)).count(),
         },
+        "resumen": {
+            "usuarios_activos": usuarios_activos,
+            "usuarios_pendientes_aprobacion": usuarios_pendientes,
+            "solicitudes_pendientes": solicitudes_registro + solicitudes_perfil,
+            "procesos_activos": procesos_firma_count + procesos_saas_count,
+            "tareas_pendientes": tareas_pendientes,
+            "documentos_pendientes": documentos_pendientes,
+            "alertas": total_alertas,
+            "errores_operativos": errores_operativos,
+            "notificaciones_criticas": notificaciones_criticas,
+        },
+        "firma": {
+            "procesos": procesos_firma_count,
+            "radicados": radicados_firma,
+            "tareas": tareas_firma_count,
+            "documentos": documentos_firma,
+        },
+        "saas": {
+            "abogados": db.query(models.Usuario).filter(models.Usuario.rol == models.RolUsuario.ABOGADO).count(),
+            "procesos": procesos_saas_count,
+            "radicados": radicados_saas,
+            "tareas": tareas_saas_count,
+        },
+        "atencion": atencion,
+        "actividad": actividad[:8],
+        "procesos_criticos": procesos,
     }
+
+
+def _alertas_admin(db: Session) -> list[dict]:
+    """Construye alertas desde pendientes y errores reales ya persistidos."""
+    ahora = datetime.now(timezone.utc).replace(tzinfo=None)
+    roles_firma = (models.RolUsuario.ABOGADO_ADMIN, models.RolUsuario.ADMIN)
+    alertas: list[dict] = []
+
+    def agregar(alert_id: str, tipo: str, prioridad: str, fecha, descripcion: str, recurso: str, href: str, accion: str, descartable: bool = False):
+        alertas.append({
+            "id": alert_id, "tipo": tipo, "prioridad": prioridad,
+            "fecha": _dashboard_iso(fecha), "descripcion": descripcion,
+            "recurso": recurso, "href": href, "accion_recomendada": accion,
+            "estado": "ACTIVA", "descartable": descartable,
+        })
+
+    solicitudes = db.query(models.SolicitudRegistro, models.Usuario.nombre_completo).join(
+        models.Usuario, models.Usuario.id == models.SolicitudRegistro.usuario_id
+    ).filter(models.Usuario.estado == models.EstadoUsuario.PENDIENTE_APROBACION).all()
+    for solicitud, nombre in solicitudes:
+        agregar(f"registro:{solicitud.usuario_id}", "Pendiente", "Media", solicitud.fecha_solicitud,
+                f"Solicitud de registro de {nombre}", nombre, "/gestion-procesos/admin/solicitudes", "Revisar solicitud")
+
+    perfiles = db.query(models.SolicitudEdicionPerfilCliente).filter(
+        models.SolicitudEdicionPerfilCliente.estado == "PENDIENTE"
+    ).all()
+    for solicitud in perfiles:
+        agregar(f"perfil:{solicitud.id}", "Pendiente", "Media", solicitud.solicitada_en,
+                f"Solicitud de cambio de perfil de {solicitud.cliente.nombre_completo if solicitud.cliente else 'cliente'}",
+                "Solicitud de perfil", "/gestion-procesos/admin/solicitudes-perfil", "Revisar solicitud")
+
+    tasks = db.query(models.Tarea).join(models.Usuario, models.Usuario.id == models.Tarea.usuario_id).filter(
+        models.Usuario.rol.in_(roles_firma),
+        models.Tarea.estado.in_((models.EstadoTarea.PENDIENTE, models.EstadoTarea.EN_CURSO)),
+        models.Tarea.fecha_limite.is_not(None), models.Tarea.fecha_limite < ahora,
+        or_(models.Tarea.proceso_id.is_(None), models.Tarea.proceso.has(models.Proceso.archivado_en.is_(None))),
+    ).all()
+    for tarea in tasks:
+        agregar(f"tarea_vencida:{tarea.id}", "Riesgo", "Alta", tarea.fecha_limite,
+                f"Tarea vencida: {tarea.titulo}", tarea.proceso.nombre if tarea.proceso else "Tarea",
+                f"/gestion-procesos/admin/tareas", "Revisar tarea")
+
+    tareas_urgentes = db.query(models.Tarea).join(models.Usuario, models.Usuario.id == models.Tarea.usuario_id).filter(
+        models.Usuario.rol.in_(roles_firma),
+        models.Tarea.estado.in_((models.EstadoTarea.PENDIENTE, models.EstadoTarea.EN_CURSO)),
+        models.Tarea.prioridad == models.PrioridadTarea.URGENTE,
+        or_(models.Tarea.fecha_limite.is_(None), models.Tarea.fecha_limite >= ahora),
+        or_(models.Tarea.proceso_id.is_(None), models.Tarea.proceso.has(models.Proceso.archivado_en.is_(None))),
+    ).all()
+    for tarea in tareas_urgentes:
+        agregar(f"tarea_urgente:{tarea.id}", "Advertencia", "Media", tarea.fecha_limite or tarea.created_at,
+                f"Tarea urgente pendiente: {tarea.titulo}", tarea.proceso.nombre if tarea.proceso else "Tarea",
+                "/gestion-procesos/admin/tareas", "Revisar tarea")
+
+    documentos = db.query(models.SolicitudDocumento).join(
+        models.Proceso, models.Proceso.id == models.SolicitudDocumento.proceso_id
+    ).filter(models.SolicitudDocumento.atendida_en.is_(None), models.Proceso.archivado_en.is_(None)).all()
+    for solicitud in documentos:
+        agregar(f"documento:{solicitud.id}", "Pendiente", "Media", solicitud.created_at,
+                f"Documento pendiente: {solicitud.titulo}", solicitud.proceso.nombre,
+                "/gestion-procesos/admin/documentos", "Revisar documento")
+
+    consultas = db.query(models.ConsultaRadicado).filter(models.ConsultaRadicado.estado == "ERROR").all()
+    for consulta in consultas:
+        numero = consulta.radicado.numero if consulta.radicado else "radicado"
+        agregar(f"consulta:{consulta.id}", "Error", "Alta", consulta.finalizacion or consulta.inicio,
+                f"Falló la consulta judicial del radicado {numero}", f"Radicado {numero}",
+                "/gestion-procesos/admin/operacion", "Revisar consulta")
+
+    entregas = db.query(models.EntregaNotificacion).filter(
+        models.EntregaNotificacion.estado == "ERROR", models.EntregaNotificacion.intentos >= 3
+    ).all()
+    for entrega in entregas:
+        agregar(f"notificacion:{entrega.id}", "Error", "Alta", entrega.created_at,
+                f"No se pudo entregar una notificación tras {entrega.intentos} intentos",
+                entrega.asunto, "/gestion-procesos/admin/operacion", "Revisar entrega")
+
+    acciones_importantes = {
+        "proceso.archivar": ("Proceso archivado", "/gestion-procesos/admin/procesos"),
+        "proceso.restaurar": ("Proceso restaurado", "/gestion-procesos/admin/procesos"),
+        "proceso.crear": ("Proceso creado", "/gestion-procesos/admin/procesos"),
+        "admin.usuario.crear": ("Usuario creado", "/gestion-procesos/admin/usuarios"),
+        "admin.contenido.restaurar": ("Contenido público restaurado", "/gestion-procesos/admin/contenido"),
+    }
+    eventos = db.query(models.EventoAuditoria).filter(
+        models.EventoAuditoria.accion.in_(tuple(acciones_importantes))
+    ).order_by(models.EventoAuditoria.id.desc()).limit(30).all()
+    for evento in eventos:
+        descripcion, href = acciones_importantes[evento.accion]
+        agregar(f"evento:{evento.id}", "Evento", "Baja", evento.created_at,
+                descripcion, f"{evento.tipo_recurso} {evento.recurso_id or ''}".strip(), href,
+                "Abrir registro", descartable=True)
+
+    disposition_events = db.query(models.EventoAuditoria).filter(
+        models.EventoAuditoria.tipo_recurso == "alerta",
+        models.EventoAuditoria.accion.in_(("admin.alerta.atender", "admin.alerta.descartar")),
+    ).order_by(models.EventoAuditoria.id.desc()).all()
+    dispositions: dict[str, str] = {}
+    for event in disposition_events:
+        if event.recurso_id and event.recurso_id not in dispositions:
+            dispositions[event.recurso_id] = "ATENDIDA" if event.accion.endswith("atender") else "DESCARTADA"
+    for alerta in alertas:
+        alerta["estado"] = dispositions.get(alerta["id"], "ACTIVA")
+    prioridad_orden = {"Alta": 0, "Media": 1, "Baja": 2}
+    alertas.sort(key=lambda item: (
+        prioridad_orden[item["prioridad"]],
+        -datetime.fromisoformat(item["fecha"]).timestamp() if item["fecha"] else 0,
+    ))
+    return alertas
+
+
+@router.get("/alertas")
+def listar_alertas_admin(
+    db: Session = Depends(get_db),
+    admin: models.Usuario = Depends(verificar_admin),
+):
+    return _alertas_admin(db)
+
+
+@router.patch("/alertas/{alerta_id}/estado")
+def actualizar_estado_alerta_admin(
+    alerta_id: str,
+    datos: dict = Body(...),
+    db: Session = Depends(get_db),
+    admin: models.Usuario = Depends(verificar_admin),
+):
+    nuevo_estado = datos.get("estado")
+    if nuevo_estado not in ("ATENDIDA", "DESCARTADA"):
+        raise HTTPException(status_code=400, detail="Estado de alerta no válido.")
+    alerta = next((item for item in _alertas_admin(db) if item["id"] == alerta_id), None)
+    if alerta is None:
+        raise HTTPException(status_code=404, detail="La alerta ya no está activa o no existe.")
+    if nuevo_estado == "DESCARTADA" and not alerta["descartable"]:
+        raise HTTPException(status_code=400, detail="Esta alerta debe resolverse desde el recurso relacionado.")
+    accion = "admin.alerta.atender" if nuevo_estado == "ATENDIDA" else "admin.alerta.descartar"
+    registrar_evento_auditoria(db, admin, accion, "alerta", alerta_id)
+    db.commit()
+    return {"id": alerta_id, "estado": nuevo_estado}
 
 
 @router.get("/vision-global")
@@ -409,7 +899,96 @@ def listar_inventario_global(
     if recurso == "procesos":
         query = db.query(models.Proceso).join(models.Usuario, models.Usuario.id == models.Proceso.abogado_id).filter(models.Usuario.rol.in_(roles))
         query = query.filter(models.Proceso.archivado_en.is_not(None) if archivados else models.Proceso.archivado_en.is_(None))
-        return [{"id": p.id, "owner_id": p.abogado_id, "owner_rol": p.abogado.rol.value, "nombre": p.nombre, "descripcion": p.descripcion, "archivado_en": p.archivado_en, "abogado": p.abogado.nombre_completo, "radicados": len(p.radicados), "clientes": len(p.clientes), "created_at": p.created_at} for p in query.order_by(models.Proceso.created_at.desc()).limit(limite).all()]
+        procesos = query.order_by(models.Proceso.created_at.desc()).limit(limite).all()
+        resultado = []
+        for proceso in procesos:
+            actividad = []
+            actividad.extend(tarea.updated_at for tarea in proceso.tareas if tarea.updated_at)
+            actividad.extend(documento.created_at for documento in proceso.documentos if documento.created_at)
+            actividad.extend(
+                fecha
+                for (fecha,) in db.query(
+                    func.coalesce(models.ConsultaRadicado.finalizacion, models.ConsultaRadicado.inicio)
+                ).join(models.Radicado, models.Radicado.id == models.ConsultaRadicado.radicado_id)
+                .join(models.ProcesoRadicado, models.ProcesoRadicado.radicado_id == models.Radicado.id)
+                .filter(models.ProcesoRadicado.proceso_id == proceso.id)
+                .all()
+                if fecha
+            )
+            actividad.extend(
+                fecha
+                for (fecha,) in db.query(models.EventoAuditoria.created_at).filter(
+                    models.EventoAuditoria.tipo_recurso == "proceso",
+                    models.EventoAuditoria.recurso_id == str(proceso.id),
+                    ~models.EventoAuditoria.accion.endswith(".crear"),
+                ).all()
+                if fecha
+            )
+            tareas_activas = [
+                tarea for tarea in proceso.tareas
+                if tarea.estado in (models.EstadoTarea.PENDIENTE, models.EstadoTarea.EN_CURSO)
+            ]
+            tareas_vencidas = [
+                tarea for tarea in tareas_activas
+                if tarea.fecha_limite and tarea.fecha_limite < datetime.now(timezone.utc).replace(tzinfo=None)
+            ]
+            documentos_pendientes = sum(
+                1 for solicitud in proceso.solicitudes_documento if solicitud.atendida_en is None
+            )
+            errores_consulta = db.query(models.ConsultaRadicado.id).join(
+                models.Radicado, models.Radicado.id == models.ConsultaRadicado.radicado_id
+            ).join(
+                models.ProcesoRadicado, models.ProcesoRadicado.radicado_id == models.Radicado.id
+            ).filter(
+                models.ProcesoRadicado.proceso_id == proceso.id,
+                models.ConsultaRadicado.estado == "ERROR",
+            ).count()
+            responsable_activo = bool(
+                proceso.abogado and proceso.abogado.estado == models.EstadoUsuario.ACTIVO
+            )
+            sin_actividad = not actividad
+            archived = proceso.archivado_en is not None
+            if archived:
+                salud = "ARCHIVADO"
+            elif tareas_vencidas or errores_consulta or not responsable_activo:
+                salud = "RIESGO"
+            elif sin_actividad or documentos_pendientes:
+                salud = "ATENCION"
+            else:
+                salud = "NORMAL"
+            senales = []
+            if sin_actividad:
+                senales.append("Sin actividad")
+            if tareas_vencidas:
+                senales.append(f"{len(tareas_vencidas)} tarea(s) vencida(s)")
+            if documentos_pendientes:
+                senales.append(f"{documentos_pendientes} documento(s) pendiente(s)")
+            if errores_consulta:
+                senales.append(f"{errores_consulta} consulta(s) con error")
+            if not responsable_activo:
+                senales.append("Sin responsable activo")
+            resultado.append({
+                "id": proceso.id,
+                "owner_id": proceso.abogado_id,
+                "owner_rol": proceso.abogado.rol.value,
+                "nombre": proceso.nombre,
+                "descripcion": proceso.descripcion,
+                "archivado_en": proceso.archivado_en,
+                "abogado": proceso.abogado.nombre_completo,
+                "radicados": len(proceso.radicados),
+                "clientes": len(proceso.clientes),
+                "cliente": proceso.clientes[0].cliente.nombre_completo if proceso.clientes else None,
+                "ultima_actividad": max(actividad).isoformat() if actividad else None,
+                "salud": salud,
+                "senales_salud": senales,
+                "tareas_vencidas": len(tareas_vencidas),
+                "documentos_pendientes": documentos_pendientes,
+                "consultas_con_error": errores_consulta,
+                "sin_responsable": not responsable_activo,
+                "sin_actividad": sin_actividad,
+                "created_at": proceso.created_at,
+            })
+        return resultado
     if recurso == "radicados":
         query = _filtrar_radicados_por_sector(db.query(models.Radicado), sector)
         return [{"id": r.id, "owner_id": r.creado_por_id, "numero": r.numero, "abogado": r.creador.nombre_completo, "estado_consulta": r.estado_consulta, "actuaciones": len(r.actuaciones), "consultado_en": r.consultado_en} for r in query.order_by(models.Radicado.created_at.desc()).limit(limite).all()]
@@ -1233,15 +1812,14 @@ def enviar_mensaje_prueba_integracion(
     response_model=list[schemas.UsuarioOut],
 )
 def listar_usuarios(
+    incluir_administradores: bool = False,
     db: Session = Depends(get_db),
     admin: models.Usuario = Depends(verificar_admin),
 ):
-    usuarios = (
-        db.query(models.Usuario)
-        .filter(models.Usuario.rol != models.RolUsuario.ADMIN)
-        .order_by(models.Usuario.created_at.desc())
-        .all()
-    )
+    query = db.query(models.Usuario)
+    if not incluir_administradores:
+        query = query.filter(models.Usuario.rol != models.RolUsuario.ADMIN)
+    usuarios = query.order_by(models.Usuario.created_at.desc()).all()
 
     return usuarios
 
@@ -1294,6 +1872,23 @@ def crear_usuario_admin(
     return usuario
 
 
+@router.patch("/usuarios/estado-masivo")
+def cambiar_estado_usuarios_masivo(datos: schemas.AccionMasivaUsuarios, db: Session = Depends(get_db), admin: models.Usuario = Depends(verificar_admin)):
+    ids = list(set(datos.usuario_ids))
+    if not ids:
+        raise HTTPException(status_code=400, detail="Selecciona al menos un usuario.")
+    objetivos = db.query(models.Usuario.id).filter(
+        models.Usuario.id.in_(ids), models.Usuario.rol != models.RolUsuario.ADMIN
+    ).all()
+    total = db.query(models.Usuario).filter(
+        models.Usuario.id.in_(ids), models.Usuario.rol != models.RolUsuario.ADMIN
+    ).update({models.Usuario.estado: datos.estado}, synchronize_session=False)
+    for (usuario_id,) in objetivos:
+        registrar_evento_auditoria(db, admin, f"admin.usuario.estado.{datos.estado.value}", "usuario", usuario_id)
+    db.commit()
+    return {"mensaje": f"{total} usuario(s) actualizado(s).", "total": total}
+
+
 @router.patch("/usuarios/{usuario_id}", response_model=schemas.UsuarioOut)
 def actualizar_usuario_admin(
     usuario_id: int, datos: schemas.UsuarioAdminUpdate,
@@ -1302,6 +1897,41 @@ def actualizar_usuario_admin(
     usuario = db.query(models.Usuario).filter(models.Usuario.id == usuario_id, models.Usuario.rol != models.RolUsuario.ADMIN).first()
     if not usuario:
         raise HTTPException(status_code=404, detail="Usuario no encontrado.")
+    if datos.rol is not None and datos.rol != usuario.rol:
+        if datos.rol == models.RolUsuario.ADMIN:
+            raise HTTPException(status_code=400, detail="No se puede asignar el rol administrador desde esta pantalla.")
+        has_processes = db.query(models.Proceso.id).filter(models.Proceso.abogado_id == usuario.id).first()
+        has_collaborations = db.query(models.ProcesoColaborador.proceso_id).filter(models.ProcesoColaborador.abogado_id == usuario.id).first()
+        has_client_processes = db.query(models.ProcesoCliente.proceso_id).filter(models.ProcesoCliente.cliente_id == usuario.id).first()
+        has_tasks = db.query(models.Tarea.id).filter(or_(models.Tarea.usuario_id == usuario.id, models.Tarea.cliente_id == usuario.id)).first()
+        has_documents = db.query(models.DocumentoProceso.id).filter(models.DocumentoProceso.cliente_id == usuario.id).first()
+        has_document_requests = db.query(models.SolicitudDocumento.id).filter(models.SolicitudDocumento.cliente_id == usuario.id).first()
+        has_profile_requests = db.query(models.SolicitudEdicionPerfilCliente.id).filter(models.SolicitudEdicionPerfilCliente.cliente_id == usuario.id).first()
+        if any((has_processes, has_collaborations, has_client_processes, has_tasks, has_documents, has_document_requests, has_profile_requests)) or usuario.solicitud_registro:
+            raise HTTPException(status_code=400, detail="No se puede cambiar el rol porque la cuenta ya tiene información asociada.")
+        if usuario.estado != models.EstadoUsuario.ACTIVO:
+            raise HTTPException(status_code=400, detail="Solo se puede cambiar el rol de una cuenta activa.")
+        if datos.rol == models.RolUsuario.ABOGADO:
+            selected_plan = datos.plan_id or usuario.plan_id
+            if not selected_plan or not db.query(models.Plan).filter(models.Plan.id == selected_plan, models.Plan.activo.is_(True)).first():
+                raise HTTPException(status_code=400, detail="Selecciona un plan SaaS activo para este abogado.")
+            usuario.plan_id = selected_plan
+            usuario.creado_por_abogado_id = None
+        elif datos.rol == models.RolUsuario.ABOGADO_ADMIN:
+            usuario.plan_id = None
+            usuario.creado_por_abogado_id = None
+        elif datos.rol == models.RolUsuario.CLIENTE:
+            owner_id = datos.creado_por_abogado_id or usuario.creado_por_abogado_id
+            owner = db.query(models.Usuario).filter(
+                models.Usuario.id == owner_id,
+                models.Usuario.rol == models.RolUsuario.ABOGADO_ADMIN,
+                models.Usuario.estado == models.EstadoUsuario.ACTIVO,
+            ).first()
+            if not owner:
+                raise HTTPException(status_code=400, detail="Selecciona un abogado activo de la firma como responsable.")
+            usuario.plan_id = None
+            usuario.creado_por_abogado_id = owner.id
+        usuario.rol = datos.rol
     if datos.nombre_completo is not None:
         if not datos.nombre_completo.strip():
             raise HTTPException(status_code=400, detail="El nombre completo es obligatorio.")
@@ -1320,21 +1950,6 @@ def actualizar_usuario_admin(
     registrar_evento_auditoria(db, admin, "admin.usuario.actualizar", "usuario", usuario.id)
     db.commit(); db.refresh(usuario)
     return usuario
-
-
-@router.patch("/usuarios/estado-masivo")
-def cambiar_estado_usuarios_masivo(datos: schemas.AccionMasivaUsuarios, db: Session = Depends(get_db), admin: models.Usuario = Depends(verificar_admin)):
-    ids = list(set(datos.usuario_ids))
-    if not ids:
-        raise HTTPException(status_code=400, detail="Selecciona al menos un usuario.")
-    objetivos = db.query(models.Usuario.id).filter(
-        models.Usuario.id.in_(ids), models.Usuario.rol != models.RolUsuario.ADMIN
-    ).all()
-    total = db.query(models.Usuario).filter(models.Usuario.id.in_(ids), models.Usuario.rol != models.RolUsuario.ADMIN).update({models.Usuario.estado: datos.estado}, synchronize_session=False)
-    for (usuario_id,) in objetivos:
-        registrar_evento_auditoria(db, admin, f"admin.usuario.estado.{datos.estado.value}", "usuario", usuario_id)
-    db.commit()
-    return {"mensaje": f"{total} usuario(s) actualizado(s).", "total": total}
 
 
 @router.patch("/usuarios/{usuario_id}/forzar-cambio-password")
@@ -1708,71 +2323,122 @@ def obtener_usuario_admin(
     usuario_actual: models.Usuario = Depends(verificar_admin),
     db: Session = Depends(get_db),
 ):
-    usuario = (
-        db.query(models.Usuario)
-        .filter(
-            models.Usuario.id == usuario_id,
-            models.Usuario.rol == models.RolUsuario.ABOGADO,
-        )
-        .first()
-    )
-
+    usuario = db.query(models.Usuario).filter(models.Usuario.id == usuario_id).first()
     if not usuario:
-        raise HTTPException(
-            status_code=404,
-            detail="Usuario no encontrado.",
-        )
+        raise HTTPException(status_code=404, detail="Usuario no encontrado.")
 
-    radicados = (
-        db.query(models.Radicado)
-        .join(models.Radicado.usuarios_vinculados)
-        .filter(models.Usuario.id == usuario.id)
-        .order_by(models.Radicado.created_at.desc())
-        .all()
+    procesos_query = db.query(models.Proceso)
+    if usuario.rol in (models.RolUsuario.ABOGADO_ADMIN, models.RolUsuario.ABOGADO):
+        procesos_query = procesos_query.filter(models.Proceso.abogado_id == usuario.id)
+        colaboraciones = db.query(models.ProcesoColaborador.proceso_id).filter(
+            models.ProcesoColaborador.abogado_id == usuario.id
+        ).all()
+        colaboration_ids = [row[0] for row in colaboraciones]
+        if colaboration_ids:
+            procesos_query = db.query(models.Proceso).filter(
+                or_(models.Proceso.abogado_id == usuario.id, models.Proceso.id.in_(colaboration_ids))
+            )
+    elif usuario.rol == models.RolUsuario.CLIENTE:
+        procesos_query = procesos_query.join(
+            models.ProcesoCliente, models.ProcesoCliente.proceso_id == models.Proceso.id
+        ).filter(models.ProcesoCliente.cliente_id == usuario.id)
+    else:
+        procesos_query = procesos_query.filter(models.Proceso.id == -1)
+    procesos = procesos_query.order_by(models.Proceso.created_at.desc()).limit(100).all()
+    proceso_ids = [proceso.id for proceso in procesos]
+
+    tareas = db.query(models.Tarea).filter(or_(
+        models.Tarea.usuario_id == usuario.id,
+        models.Tarea.cliente_id == usuario.id,
+    )).order_by(models.Tarea.created_at.desc()).limit(100).all()
+
+    documentos_query = db.query(models.DocumentoProceso).filter(
+        models.DocumentoProceso.cliente_id == usuario.id
     )
+    if proceso_ids:
+        documentos_query = db.query(models.DocumentoProceso).filter(or_(
+            models.DocumentoProceso.cliente_id == usuario.id,
+            models.DocumentoProceso.proceso_id.in_(proceso_ids),
+        ))
+    documentos = documentos_query.order_by(models.DocumentoProceso.created_at.desc()).limit(100).all()
+
+    solicitudes = []
+    if usuario.solicitud_registro:
+        solicitud = usuario.solicitud_registro
+        solicitudes.append({
+            "id": solicitud.id, "tipo": "Registro profesional", "estado": usuario.estado.value,
+            "fecha": solicitud.fecha_solicitud, "href": "/gestion-procesos/admin/solicitudes",
+        })
+    solicitudes_perfil = db.query(models.SolicitudEdicionPerfilCliente).filter(
+        models.SolicitudEdicionPerfilCliente.cliente_id == usuario.id
+    ).order_by(models.SolicitudEdicionPerfilCliente.solicitada_en.desc()).limit(50).all()
+    solicitudes.extend({
+        "id": solicitud.id, "tipo": "Edición de perfil", "estado": solicitud.estado,
+        "fecha": solicitud.solicitada_en, "href": "/gestion-procesos/admin/solicitudes-perfil",
+    } for solicitud in solicitudes_perfil)
+    solicitudes_documento_query = db.query(models.SolicitudDocumento).filter(
+        models.SolicitudDocumento.cliente_id == usuario.id
+    )
+    if proceso_ids:
+        solicitudes_documento_query = db.query(models.SolicitudDocumento).filter(or_(
+            models.SolicitudDocumento.cliente_id == usuario.id,
+            models.SolicitudDocumento.proceso_id.in_(proceso_ids),
+        ))
+    for solicitud in solicitudes_documento_query.order_by(models.SolicitudDocumento.created_at.desc()).limit(50).all():
+        solicitudes.append({
+            "id": solicitud.id, "tipo": f"Documento: {solicitud.titulo}",
+            "estado": "Atendida" if solicitud.atendida_en else "Pendiente",
+            "fecha": solicitud.created_at, "href": "/gestion-procesos/admin/documentos",
+        })
+
+    activity_rows = db.query(models.EventoAuditoria).filter(
+        models.EventoAuditoria.actor_id == usuario.id
+    ).order_by(models.EventoAuditoria.created_at.desc(), models.EventoAuditoria.id.desc()).limit(30).all()
+    actividad = []
+    for evento in activity_rows:
+        descripcion, recurso = _dashboard_activity_description(evento.accion, evento.tipo_recurso)
+        actividad.append({
+            "id": evento.id, "accion": evento.accion, "descripcion": descripcion,
+            "recurso": recurso, "fecha": evento.created_at,
+            "href": _dashboard_activity_href(evento.tipo_recurso, evento.recurso_id),
+        })
 
     return {
         "id": usuario.id,
-        "email": usuario.email,
         "nombre_completo": usuario.nombre_completo,
+        "email": usuario.email,
         "whatsapp_numero": usuario.whatsapp_numero,
-        "rol": usuario.rol,
-        "estado": usuario.estado,
+        "rol": usuario.rol.value,
+        "estado": usuario.estado.value,
+        "debe_cambiar_password": usuario.debe_cambiar_password,
         "created_at": usuario.created_at,
-
-        "plan": (
-            {
-                "id": usuario.plan.id,
-                "nombre": usuario.plan.nombre,
-                "limite_radicados": usuario.plan.limite_radicados,
-                "precio_mensual": usuario.plan.precio_mensual,
-                "limite_ultimas_actuaciones": usuario.plan.limite_ultimas_actuaciones,
-                "notificaciones_whatsapp_procesos": usuario.plan.notificaciones_whatsapp_procesos,
-                "notificaciones_whatsapp_tareas": usuario.plan.notificaciones_whatsapp_tareas,
-                "activo": getattr(usuario.plan, "activo", True),
-            }
-            if usuario.plan
-            else None
-        ),
-
-        "total_radicados": len(radicados),
-
-        "radicados": [
-            {
-                "id": radicado.id,
-                "numero": radicado.numero,
-                "estado_consulta": radicado.estado_consulta,
-                "despacho_departamento": radicado.despacho_departamento,
-                "demandante": radicado.demandante,
-                "demandado": radicado.demandado,
-                "consultado_en": radicado.consultado_en,
-                "alerta_enviada": radicado.alerta_enviada,
-                "detalle_pendiente": radicado.detalle_pendiente,
-                "created_at": radicado.created_at,
-                "total_actuaciones": len(radicado.actuaciones),
-            }
-            for radicado in radicados
-        ],
+        "ultimo_acceso": usuario.ultimo_acceso,
+        "plan": {"id": usuario.plan.id, "nombre": usuario.plan.nombre} if usuario.plan else None,
+        "responsable": {
+            "id": usuario.creado_por_abogado.id,
+            "nombre": usuario.creado_por_abogado.nombre_completo,
+        } if usuario.creado_por_abogado else None,
+        "procesos": [{
+            "id": proceso.id, "nombre": proceso.nombre, "estado": "Archivado" if proceso.archivado_en else "Activo",
+            "abogado": proceso.abogado.nombre_completo if proceso.abogado else None,
+            "href": "/gestion-procesos/admin/procesos",
+        } for proceso in procesos],
+        "tareas": [{
+            "id": tarea.id, "titulo": tarea.titulo, "estado": tarea.estado.value,
+            "fecha_limite": tarea.fecha_limite, "proceso": tarea.proceso.nombre if tarea.proceso else None,
+            "href": "/gestion-procesos/admin/tareas",
+        } for tarea in tareas],
+        "documentos": [{
+            "id": documento.id, "nombre": documento.nombre_archivo,
+            "fecha": documento.created_at, "proceso": documento.proceso.nombre if documento.proceso else None,
+            "href": "/gestion-procesos/admin/documentos",
+        } for documento in documentos],
+        "solicitudes": solicitudes,
+        "actividad": actividad,
+        "totales": {
+            "procesos": len(procesos), "tareas": len(tareas),
+            "documentos": len(documentos), "solicitudes": len(solicitudes),
+        },
     }
 
 
@@ -1845,7 +2511,7 @@ def cambiar_estado_usuario(
         db.query(models.Usuario)
         .filter(
             models.Usuario.id == usuario_id,
-            models.Usuario.rol == models.RolUsuario.ABOGADO,
+            models.Usuario.rol != models.RolUsuario.ADMIN,
         )
         .first()
     )
@@ -1856,6 +2522,13 @@ def cambiar_estado_usuario(
             detail="Usuario no encontrado.",
         )
 
+    if usuario.estado == models.EstadoUsuario.PENDIENTE_APROBACION:
+        raise HTTPException(status_code=409, detail="Revisa la solicitud de registro para decidir el estado de esta cuenta.")
+    if estado == models.EstadoUsuario.PENDIENTE_APROBACION:
+        raise HTTPException(status_code=400, detail="Usa el flujo de revisión de solicitudes para dejar una cuenta pendiente.")
+    if estado not in (models.EstadoUsuario.ACTIVO, models.EstadoUsuario.SUSPENDIDO, models.EstadoUsuario.RECHAZADO):
+        raise HTTPException(status_code=400, detail="Estado de cuenta no permitido.")
+
     usuario.estado = estado
 
     registrar_evento_auditoria(db, usuario_actual, f"admin.usuario.estado.{estado.value}", "usuario", usuario.id)
@@ -1864,5 +2537,75 @@ def cambiar_estado_usuario(
 
     return {
         "mensaje": "Estado del usuario actualizado correctamente.",
-        "estado": usuario.estado,
+        "estado": usuario.estado.value,
     }
+
+
+@router.delete("/usuarios/{usuario_id}")
+def eliminar_usuario_admin(
+    usuario_id: int,
+    usuario_actual: models.Usuario = Depends(verificar_admin),
+    db: Session = Depends(get_db),
+):
+    usuario = db.query(models.Usuario).filter(models.Usuario.id == usuario_id).first()
+    if not usuario:
+        raise HTTPException(status_code=404, detail="Usuario no encontrado.")
+    if usuario.rol == models.RolUsuario.ADMIN:
+        raise HTTPException(status_code=403, detail="Las cuentas administradoras de plataforma no se eliminan desde este módulo.")
+
+    referencias = {
+        "cuentas que tienen esta cuenta como responsable": db.query(models.Usuario.id).filter(
+            models.Usuario.creado_por_abogado_id == usuario_id
+        ).first(),
+        "radicados creados o vinculados": db.query(models.Radicado.id).filter(
+            or_(models.Radicado.creado_por_id == usuario_id, models.Radicado.usuarios_vinculados.any(models.Usuario.id == usuario_id))
+        ).first(),
+        "solicitudes de registro": db.query(models.SolicitudRegistro.id).filter(
+            models.SolicitudRegistro.usuario_id == usuario_id
+        ).first(),
+        "solicitudes de perfil": db.query(models.SolicitudEdicionPerfilCliente.id).filter(
+            models.SolicitudEdicionPerfilCliente.cliente_id == usuario_id
+        ).first(),
+        "procesos como abogado": db.query(models.Proceso.id).filter(
+            models.Proceso.abogado_id == usuario_id
+        ).first(),
+        "colaboraciones o procesos como cliente": db.query(models.ProcesoColaborador.proceso_id).filter(
+            models.ProcesoColaborador.abogado_id == usuario_id
+        ).first() or db.query(models.ProcesoCliente.proceso_id).filter(
+            models.ProcesoCliente.cliente_id == usuario_id
+        ).first(),
+        "tareas o subtareas": db.query(models.Tarea.id).filter(
+            or_(models.Tarea.usuario_id == usuario_id, models.Tarea.cliente_id == usuario_id)
+        ).first() or db.query(models.Subtarea.id).filter(models.Subtarea.cliente_id == usuario_id).first(),
+        "solicitudes o documentos": db.query(models.SolicitudDocumento.id).filter(
+            models.SolicitudDocumento.cliente_id == usuario_id
+        ).first() or db.query(models.DocumentoProceso.id).filter(
+            models.DocumentoProceso.cliente_id == usuario_id
+        ).first(),
+        "notificaciones o entregas": db.query(models.NotificacionProceso.id).filter(
+            or_(models.NotificacionProceso.abogado_id == usuario_id, models.NotificacionProceso.cliente_id == usuario_id)
+        ).first() or db.query(models.EntregaNotificacion.id).filter(
+            models.EntregaNotificacion.usuario_id == usuario_id
+        ).first() or db.query(models.EntregaNotificacionActuacion.id).filter(
+            models.EntregaNotificacionActuacion.usuario_id == usuario_id
+        ).first(),
+    }
+    vinculadas = [label for label, record in referencias.items() if record]
+    if vinculadas:
+        detalle = ", ".join(vinculadas)
+        raise HTTPException(
+            status_code=409,
+            detail=f"No se puede eliminar esta cuenta porque conserva historial: {detalle}. Suspéndela para mantener esos datos.",
+        )
+
+    registrar_evento_auditoria(db, usuario_actual, "admin.usuario.eliminar", "usuario", usuario.id)
+    db.delete(usuario)
+    try:
+        db.commit()
+    except IntegrityError as error:
+        db.rollback()
+        raise HTTPException(
+            status_code=409,
+            detail="La cuenta conserva registros relacionados y no se eliminó. Suspéndela para proteger el historial.",
+        ) from error
+    return {"mensaje": "Cuenta eliminada. Los registros de auditoría se conservaron."}

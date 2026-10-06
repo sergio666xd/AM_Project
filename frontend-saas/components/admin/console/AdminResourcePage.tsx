@@ -32,6 +32,8 @@ type Row = Record<string, unknown> & {
   estado?: string;
   fecha_limite?: string | null;
   archivado_en?: string | null;
+  salud?: string;
+  senales_salud?: string[];
 };
 type User = { id: number; nombre_completo: string; rol: string };
 type FormState = {
@@ -143,6 +145,7 @@ async function loadOptions(sector: Sector, token: string) {
 
 function display(value: unknown) {
   if (value === null || value === undefined || value === "") return "—";
+  if (Array.isArray(value)) return value.length ? value.join(" · ") : "Ninguna";
   if (typeof value === "boolean") return value ? "Sí" : "No";
   if (
     typeof value === "string" &&
@@ -249,7 +252,7 @@ export default function AdminResourcePage({ sector }: { sector: Sector }) {
       rows.filter((row) => {
         const matchesState =
           state === "TODOS" ||
-          String(row.estado ?? row.estado_consulta ?? "") === state;
+          String(row.estado ?? row.estado_consulta ?? row.salud ?? "") === state;
         const matchesQuery =
           !query ||
           Object.values(row).some((value) =>
@@ -264,7 +267,7 @@ export default function AdminResourcePage({ sector }: { sector: Sector }) {
   const states = [
     ...new Set(
       rows
-        .map((row) => String(row.estado ?? row.estado_consulta ?? ""))
+        .map((row) => String(row.estado ?? row.estado_consulta ?? row.salud ?? ""))
         .filter(Boolean),
     ),
   ];
@@ -685,9 +688,9 @@ export default function AdminResourcePage({ sector }: { sector: Sector }) {
       ? [
           { key: "nombre", label: "Proceso" },
           { key: "abogado", label: "Responsable" },
-          { key: "radicados", label: "Radicados" },
-          { key: "clientes", label: "Clientes" },
-          { key: "created_at", label: "Creado" },
+          { key: "ultima_actividad", label: "Última actividad" },
+          { key: "salud", label: "Salud" },
+          { key: "senales_salud", label: "Señales" },
         ]
       : resource === "radicados"
         ? [
@@ -860,7 +863,23 @@ export default function AdminResourcePage({ sector }: { sector: Sector }) {
                       key={column.key}
                       className="max-w-60 truncate px-4 py-3 text-foreground-secondary"
                     >
-                      {display(row[column.key])}
+                      {column.key === "salud" ? (
+                        <span
+                          className={`inline-flex rounded-full px-2 py-1 text-xs font-semibold ${
+                            row.salud === "RIESGO"
+                              ? "bg-danger-light text-danger"
+                              : row.salud === "ATENCION"
+                                ? "bg-warning-light text-warning"
+                                : row.salud === "ARCHIVADO"
+                                  ? "bg-surface-secondary text-foreground-muted"
+                                  : "bg-success-light text-success"
+                          }`}
+                        >
+                          {row.salud === "ATENCION" ? "Atención" : row.salud === "RIESGO" ? "Riesgo" : row.salud === "ARCHIVADO" ? "Archivado" : "Normal"}
+                        </span>
+                      ) : (
+                        display(row[column.key])
+                      )}
                     </td>
                   ))}
                   <td className="px-4 py-3">

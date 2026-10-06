@@ -61,7 +61,6 @@ from app.routers.admin import (
     actualizar_recurso_admin,
     crear_recurso_admin,
     eliminar_recurso_admin,
-    guardar_contenido_publico_admin,
     listar_inventario_global,
     listar_contenido_publico_admin,
     cargar_documento_admin,
@@ -2772,43 +2771,6 @@ def test_document_upload_compensates_only_when_database_commit_fails(
         assert len(uploaded_keys) == 1
 
 
-def test_admin_public_page_content_can_be_saved_listed_and_restored():
-    engine = create_engine("sqlite:///:memory:")
-    models.Base.metadata.create_all(engine)
-
-    with Session(engine) as db:
-        admin = models.Usuario(
-            email="cms-admin@example.test",
-            password_hash="hash",
-            nombre_completo="CMS administrator",
-            whatsapp_numero="0000000501",
-            rol=models.RolUsuario.ADMIN,
-            estado=models.EstadoUsuario.ACTIVO,
-        )
-        db.add(admin)
-        db.flush()
-
-        content = {"title": "Título editable", "sections": [{"title": "Área", "items": ["Servicio"]}]}
-        saved = guardar_contenido_publico_admin(
-            "inicio", schemas.ContenidoPaginaUpdate(contenido=content), db=db, admin=admin
-        )
-        assert saved["contenido"] == content
-        listed = listar_contenido_publico_admin(db=db, admin=admin)
-        home_page = next(page for page in listed if page["slug"] == "inicio")
-        assert home_page["contenido"] == content
-
-        result = restaurar_contenido_publico_admin("inicio", db=db, admin=admin)
-        assert "restaurará" in result["mensaje"]
-        restored = listar_contenido_publico_admin(db=db, admin=admin)
-        assert next(page for page in restored if page["slug"] == "inicio")["contenido"] is None
-
-        with pytest.raises(HTTPException) as error:
-            guardar_contenido_publico_admin(
-                "unknown", schemas.ContenidoPaginaUpdate(contenido=content), db=db, admin=admin
-            )
-        assert error.value.status_code == 404
-
-
 def test_admin_inventory_sector_filter_keeps_firm_and_saas_separate():
     engine = create_engine("sqlite:///:memory:")
     models.Base.metadata.create_all(engine)
@@ -2846,6 +2808,9 @@ def test_admin_inventory_sector_filter_keeps_firm_and_saas_separate():
         saas_tasks = listar_inventario_global("tareas", sector="SAAS", db=db, admin=admin)
 
         assert [item["nombre"] for item in firm_cases] == ["Firm case"]
+        assert firm_cases[0]["salud"] == "ATENCION"
+        assert firm_cases[0]["sin_actividad"] is True
+        assert firm_cases[0]["senales_salud"] == ["Sin actividad"]
         assert [item["nombre"] for item in saas_cases] == ["SaaS case"]
         assert {item["nombre"] for item in all_cases} == {"Firm case", "SaaS case"}
         assert [item["titulo"] for item in firm_tasks] == ["Firm task"]

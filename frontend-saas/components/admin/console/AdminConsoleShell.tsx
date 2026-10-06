@@ -6,6 +6,7 @@ import Image from "next/image";
 import { usePathname } from "next/navigation";
 import {
   Activity,
+  Bell,
   BookOpenText,
   CalendarDays,
   ChevronRight,
@@ -23,6 +24,7 @@ import {
   X,
 } from "lucide-react";
 import { useSession } from "@/context/SessionContext";
+import Breadcrumbs from "@/components/layout/Breadcrumbs";
 
 type Item = { label: string; href: string; icon: typeof LayoutDashboard };
 type Section = { title: string; scope: string; links: Item[] };
@@ -36,6 +38,11 @@ const sections: Section[] = [
         label: "Resumen",
         href: "/gestion-procesos/admin",
         icon: LayoutDashboard,
+      },
+      {
+        label: "Alertas",
+        href: "/gestion-procesos/admin/alertas",
+        icon: Bell,
       },
       {
         label: "Usuarios",
@@ -304,14 +311,12 @@ export default function AdminConsoleShell({
         </div>
       </aside>
       <main className="min-h-screen pt-16 md:ml-70 md:pt-0">
-        <div className="border-b border-border bg-surface px-5 py-3 md:px-8">
-          <p className="text-xs text-(--foreground-muted)">
-            Panel Administrativo <span className="px-1">/</span> Ámbito activo
-          </p>
+        <header className="sticky top-0 z-30 border-b border-border bg-surface/95 px-5 py-3 backdrop-blur md:px-8">
+          <Breadcrumbs />
           <p className="mt-0.5 text-sm font-semibold text-foreground">
             {scope}
           </p>
-        </div>
+        </header>
         <div className="p-5 md:p-8">{children}</div>
       </main>
     </div>

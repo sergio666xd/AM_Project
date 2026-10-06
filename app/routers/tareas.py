@@ -11,6 +11,7 @@ from app.firm_access import (
     has_firm_wide_access,
     lawyer_process_ids,
     lawyer_scope_id,
+    require_task_manager,
     require_roles,
 )
 from app.security import obtener_usuario_actual
@@ -129,20 +130,6 @@ def subtarea_cliente_permitida(subtarea_id: int, cliente_id: int, db: Session) -
         models.Subtarea.cliente_id == cliente_id,
         models.Subtarea.asignada_cliente == True,
     ).first() is not None
-
-
-def require_task_manager(usuario: models.Usuario, tarea: models.Tarea, action: str, db: Session | None = None) -> None:
-    require_roles(usuario, ["ABOGADO", "ABOGADO_ADMIN", "ADMIN"], action=action)
-    if has_firm_wide_access(usuario) or tarea.usuario_id == usuario.id:
-        return
-    if db is not None and tarea.proceso_id is not None:
-        assigned_process = db.query(models.Proceso.id).filter(
-            models.Proceso.id == tarea.proceso_id,
-            models.Proceso.id.in_(lawyer_process_ids(db, usuario)),
-        ).first()
-        if assigned_process:
-            return
-    raise HTTPException(status_code=403, detail=f"No tienes permiso para {action}.")
 
 
 def validar_actualizacion_tarea(datos: schemas.TareaUpdate, tarea: models.Tarea, usuario: models.Usuario, db: Session | None = None) -> None:
