@@ -9,10 +9,26 @@ type JsonValue = string | number | boolean | null | JsonValue[] | { [key: string
 type ContentPage = { slug: PublicPageSlug; nombre: string; ruta: string; contenido: JsonValue | null; updated_at: string | null };
 
 async function fetchPages(token: string): Promise<ContentPage[]> {
-  return fetchApi("/api/admin/contenido", { method: "GET", token });
+  const result: unknown = await fetchApi("/api/admin/contenido", { method: "GET", token });
+  if (!Array.isArray(result)) throw new Error("La API no devolvió una lista de páginas públicas.");
+  const validSlugs = new Set(Object.keys(SITE_PAGE_DEFAULTS));
+  return result.flatMap((value): ContentPage[] => {
+    if (!value || typeof value !== "object") return [];
+    const page = value as Record<string, unknown>;
+    if (typeof page.slug !== "string" || !validSlugs.has(page.slug)) return [];
+    const slug = page.slug as PublicPageSlug;
+    return [{
+      slug,
+      nombre: typeof page.nombre === "string" ? page.nombre : SITE_PAGE_LABELS[slug],
+      ruta: typeof page.ruta === "string" ? page.ruta : SITE_PAGE_DEFAULTS[slug].route,
+      contenido: page.contenido == null ? null : page.contenido as JsonValue,
+      updated_at: typeof page.updated_at === "string" ? page.updated_at : null,
+    }];
+  });
 }
 
 function cloneValue(value: unknown): JsonValue {
+  if (value === undefined) return null;
   return JSON.parse(JSON.stringify(value)) as JsonValue;
 }
 
