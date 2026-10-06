@@ -108,7 +108,15 @@ function Metric({
   );
 }
 
-export default function AdminOperationsPage() {
+type OperationsSection = "resumen" | "consultas" | "integraciones" | "notificaciones";
+const SECTION_COPY: Record<OperationsSection, { title: string; description: string }> = {
+  resumen: { title: "Operación", description: "Estado general de servicios y colas." },
+  consultas: { title: "Consultas judiciales", description: "Programa, ejecuta y revisa las consultas de radicados." },
+  integraciones: { title: "Integraciones", description: "Configura y comprueba los servicios conectados." },
+  notificaciones: { title: "Notificaciones", description: "Previsualiza el correo de novedades judiciales." },
+};
+
+export default function AdminOperationsPage({ section = "resumen" }: { section?: OperationsSection }) {
   const [data, setData] = useState<OperationsData | null>(null);
   const [loading, setLoading] = useState(true);
   const [savingSchedule, setSavingSchedule] = useState(false);
@@ -340,10 +348,10 @@ export default function AdminOperationsPage() {
           <p className="text-xs font-semibold uppercase tracking-wide text-primary">
             Panel Administrativo · Global
           </p>
-          <h1 className="mt-1 text-2xl font-semibold text-foreground">
+          <h1 className={`mt-1 text-2xl font-semibold text-foreground ${section === "resumen" ? "" : "hidden"}`}>
             Operación
           </h1>
-          <p className="mt-1 text-sm text-foreground-muted">
+          <p className={`mt-1 text-sm text-foreground-muted ${section === "resumen" ? "" : "hidden"}`}>
             Estado de servicios y colas disponibles en el backend.
           </p>
         </div>
@@ -357,6 +365,12 @@ export default function AdminOperationsPage() {
           <RefreshCw className={`size-4 ${loading ? "animate-spin" : ""}`} />
         </button>
       </header>
+      {section !== "resumen" && (
+        <div>
+          <h1 className="text-2xl font-semibold text-foreground">{SECTION_COPY[section].title}</h1>
+          <p className="mt-1 text-sm text-foreground-muted">{SECTION_COPY[section].description}</p>
+        </div>
+      )}
       {error && (
         <p
           role="alert"
@@ -372,7 +386,7 @@ export default function AdminOperationsPage() {
       ) : (
         data && (
           <>
-            <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+            {section === "resumen" && <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
               <Metric
                 icon={ServerCog}
                 label="Motor de tareas"
@@ -394,8 +408,8 @@ export default function AdminOperationsPage() {
                     : "text-success"
                 }
               />
-            </section>
-            <section className="space-y-4 border-t border-border pt-5">
+            </section>}
+            {section === "consultas" && <section className="space-y-4 border-t border-border pt-5">
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <div className="flex items-center gap-3">
                   <CalendarDays className="size-5 text-primary" />
@@ -564,8 +578,8 @@ export default function AdminOperationsPage() {
                   </table>
                 )}
               </div>
-            </section>
-            <section className="grid gap-4 border-t border-border pt-5 sm:grid-cols-2">
+            </section>}
+            {section === "resumen" && <section className="grid gap-4 border-t border-border pt-5 sm:grid-cols-2">
               <div className="rounded-lg border border-border bg-surface p-5">
                 <div className="flex items-center gap-3">
                   <FileText className="size-5 text-primary" />
@@ -589,8 +603,8 @@ export default function AdminOperationsPage() {
                   </div>
                 </div>
               </div>
-            </section>
-            <section className="space-y-4 border-t border-border pt-5">
+            </section>}
+            {section === "integraciones" && <section className="space-y-4 border-t border-border pt-5">
               <div>
                 <h2 className="font-semibold">Diagnóstico de integraciones</h2>
                 <p className="mt-1 text-sm text-foreground-muted">Las comprobaciones no envían mensajes. El envío de prueba requiere destinatario y confirmación.</p>
@@ -649,13 +663,49 @@ export default function AdminOperationsPage() {
                   Confirmo que autorizo un envío real al destinatario indicado. La acción quedará auditada.
                 </label>
               </form>
-            </section>
-            <p className="flex items-start gap-2 text-xs text-foreground-muted">
+            </section>}
+            {section === "notificaciones" && <section className="space-y-4 border-t border-border pt-5">
+              <div>
+                <h2 className="font-semibold">Vista previa: notificación de actuación</h2>
+                <p className="mt-1 text-sm text-foreground-muted">Ejemplo visual con datos ficticios; esta vista no envía mensajes.</p>
+              </div>
+              <div className="rounded-lg border border-border bg-surface-muted p-4">
+                <div className="mb-3">
+                  <h3 className="text-sm font-semibold">Vista previa: notificación de actuación</h3>
+                  <p className="mt-1 text-xs text-foreground-muted">Ejemplo visual; los datos del expediente son ficticios y no se envía ningún mensaje.</p>
+                </div>
+                <div className="mx-auto max-w-xl overflow-hidden rounded-xl border border-[#e4e8ef] bg-white font-sans text-[#26364f] shadow-sm">
+                  <div className="border-b-[3px] border-[#ccb56b] px-6 py-5 text-center">
+                    <img src="https://www.alejandramunozabogada.com/AM_logo_Recurso%202_Landscape_web.png" alt="Alejandra Muñoz | Abogada y Asociados" className="mx-auto h-auto w-full max-w-[230px]" />
+                  </div>
+                  <div className="px-6 py-7 text-sm leading-6">
+                    <p className="font-semibold text-[#002060]">Novedad en uno de tus procesos</p>
+                    <p className="mt-3"><strong>Radicado:</strong> 05001311001220250035600</p>
+                    <p><strong>Fecha:</strong> 6 de octubre de 2026</p>
+                    <div className="mt-4 rounded-md border-l-4 border-[#ccb56b] bg-[#f7f8fb] px-4 py-3">
+                      <p className="font-semibold text-[#002060]">Actuación registrada</p>
+                      <p className="mt-1">Auto ordena correr traslado a las partes por el término legal.</p>
+                    </div>
+                    <p className="mt-5">Ingresa al sistema para consultar el detalle y las actuaciones del proceso.</p>
+                  </div>
+                  <div className="border-t border-[#e5e9f0] bg-[#f7f8fb] px-6 py-5 text-xs leading-5 text-[#526078]">
+                    <p>Este es un mensaje generado automáticamente por nuestro sistema.</p>
+                    <p className="font-bold text-[#002060]">Por favor, no responda a este correo.</p>
+                    <p className="mt-2">Consultas: <a className="text-[#002060]" href="mailto:contacto@alejandramunozabogada.com">contacto@alejandramunozabogada.com</a> · <a className="text-[#002060]" href="mailto:pqr@alejandramunozabogada.com">pqr@alejandramunozabogada.com</a></p>
+                    <p>WhatsApp: <a className="text-[#002060]" href="https://wa.me/573508809878">350 880 9878</a></p>
+                    <p className="mt-3 font-bold text-[#002060]">Sistema de Gestión de Procesos</p>
+                    <p>Sabaneta, Antioquia, Colombia</p>
+                    <p className="mt-2 text-[#748096]">© 2026 • Alejandra Muñoz | Abogada y Asociados. Todos los derechos reservados.</p>
+                  </div>
+                </div>
+              </div>
+            </section>}
+            {section === "resumen" && <p className="flex items-start gap-2 text-xs text-foreground-muted">
               <CheckCircle2 className="mt-0.5 size-4 shrink-0" />
               Las consultas, notificaciones y recordatorios se ejecutan como
               Vercel Workflows durables; la lista de ejecuciones se lee desde
               la base de datos.
-            </p>
+            </p>}
           </>
         )
       )}

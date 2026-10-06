@@ -438,6 +438,8 @@ class SubtareaOut(BaseModel):
 
 class RecordatorioTareaCreate(BaseModel):
     canal: CanalRecordatorio = CanalRecordatorio.WHATSAPP
+    notificar_email: bool = False
+    notificar_whatsapp: bool = True
     fecha_hora: Optional[datetime] = None
     anticipacion_minutos: Optional[int] = None
     activo: bool = True
@@ -453,6 +455,8 @@ class RecordatorioTareaOut(BaseModel):
     id: int
     tarea_id: int
     canal: CanalRecordatorio
+    notificar_email: bool = False
+    notificar_whatsapp: bool = True
     activo: bool
     fecha_hora: Optional[datetime] = None
     anticipacion_minutos: Optional[int] = None

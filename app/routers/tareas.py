@@ -16,6 +16,7 @@ from app.firm_access import (
 )
 from app.security import obtener_usuario_actual
 from app.notification_service import emitir_notificacion_workflow
+from app.notification_policy import plan_whatsapp_habilitado
 from app.reminder_workflow import iniciar_workflow_recordatorio, normalizar_utc_naive
 
 
@@ -799,10 +800,22 @@ def crear_recordatorio(
     recordatorio = models.RecordatorioTarea(
         tarea_id=tarea.id,
         canal=datos.canal,
+        notificar_email=datos.notificar_email,
+        notificar_whatsapp=datos.notificar_whatsapp,
         activo=datos.activo,
         fecha_hora=normalizar_utc_naive(datos.fecha_hora),
         anticipacion_minutos=datos.anticipacion_minutos,
     )
+
+    if not recordatorio.notificar_email and not recordatorio.notificar_whatsapp:
+        raise HTTPException(status_code=400, detail="Selecciona al menos un canal de notificación.")
+    if recordatorio.notificar_whatsapp:
+        if not usuario_actual.whatsapp_numero.strip():
+            raise HTTPException(status_code=400, detail="Configura un número de WhatsApp antes de activar ese canal.")
+        if usuario_actual.rol == models.RolUsuario.ABOGADO and not plan_whatsapp_habilitado(
+            usuario_actual, "notificaciones_whatsapp_tareas"
+        ):
+            raise HTTPException(status_code=403, detail="Tu plan no permite notificaciones de tareas por WhatsApp.")
 
     db.add(recordatorio)
     db.flush()

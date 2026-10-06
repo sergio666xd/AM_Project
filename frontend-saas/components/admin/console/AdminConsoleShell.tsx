@@ -18,6 +18,7 @@ import {
   LogOut,
   Menu,
   ScrollText,
+  ServerCog,
   Users,
   UserCheck,
   UserRound,
@@ -29,6 +30,13 @@ import { AdminAlertBell } from "@/components/admin/console/AdminAlertBell";
 
 type Item = { label: string; href: string; icon: typeof LayoutDashboard };
 type Section = { title: string; scope: string; links: Item[] };
+
+const operationsLinks: Item[] = [
+  { label: "Resumen", href: "/gestion-procesos/admin/operacion", icon: Activity },
+  { label: "Consultas judiciales", href: "/gestion-procesos/admin/operacion/consultas", icon: CalendarDays },
+  { label: "Integraciones", href: "/gestion-procesos/admin/operacion/integraciones", icon: ServerCog },
+  { label: "Notificaciones", href: "/gestion-procesos/admin/operacion/notificaciones", icon: Bell },
+];
 
 const sections: Section[] = [
   {
@@ -194,17 +202,37 @@ export default function AdminConsoleShell({
         {section.links.map(({ label, href, icon: Icon }) => {
           const isActive = pathname === href || pathname.startsWith(`${href}/`);
           return (
-            <Link
-              key={`${section.title}-${href}`}
-              href={href}
-              onClick={() => setMobileOpen(false)}
-              aria-current={isActive ? "page" : undefined}
-              className={`flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition ${isActive ? "bg-primary/10 text-primary" : "text-(--foreground-secondary) hover:bg-surface-hover"}`}
-            >
-              <Icon className="size-4 shrink-0" />
-              {label}
-              {isActive && <ChevronRight className="ml-auto size-4" />}
-            </Link>
+            <div key={`${section.title}-${href}`}>
+              <Link
+                href={href}
+                onClick={() => setMobileOpen(false)}
+                aria-current={pathname === href ? "page" : undefined}
+                className={`flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition ${isActive ? "bg-primary/10 text-primary" : "text-(--foreground-secondary) hover:bg-surface-hover"}`}
+              >
+                <Icon className="size-4 shrink-0" />
+                {label}
+                {isActive && <ChevronRight className="ml-auto size-4" />}
+              </Link>
+              {href === "/gestion-procesos/admin/operacion" && isActive && (
+                <div className="ml-5 space-y-1 border-l border-border py-1 pl-3">
+                  {operationsLinks.map(({ label: childLabel, href: childHref, icon: ChildIcon }) => {
+                    const childActive = pathname === childHref;
+                    return (
+                      <Link
+                        key={childHref}
+                        href={childHref}
+                        onClick={() => setMobileOpen(false)}
+                        aria-current={childActive ? "page" : undefined}
+                        className={`flex items-center gap-2 rounded-md px-2 py-2 text-xs font-medium transition ${childActive ? "bg-primary/10 text-primary" : "text-(--foreground-secondary) hover:bg-surface-hover"}`}
+                      >
+                        <ChildIcon className="size-3.5 shrink-0" />
+                        {childLabel}
+                      </Link>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
           );
         })}
       </section>

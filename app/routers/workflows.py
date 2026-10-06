@@ -15,6 +15,7 @@ from app.email_service import enviar_correo
 from app.notification_policy import (
     abogados_notificables_para_radicado,
     canales_habilitados,
+    canales_recordatorio_seleccionados,
     clientes_notificables_para_radicado,
 )
 from app.notification_service import emitir_notificacion_workflow
@@ -669,7 +670,15 @@ def enviar_entrega_notificacion_workflow(
             return {"estado": "OMITIDA", "motivo": entrega.error}
 
     usuario = db.query(models.Usuario).filter_by(id=entrega.usuario_id).first()
-    if not usuario or entrega.canal not in canales_habilitados(usuario, entrega.tipo):
+    canal_habilitado = (
+        entrega.canal in canales_recordatorio_seleccionados(
+            usuario,
+            db.query(models.RecordatorioTarea).filter_by(id=entrega.recordatorio_id).first(),
+        )
+        if entrega.tipo == "RECORDATORIOS" and entrega.recordatorio_id is not None
+        else usuario is not None and entrega.canal in canales_habilitados(usuario, entrega.tipo)
+    )
+    if not usuario or not canal_habilitado:
         entrega.estado = "OMITIDA"
         entrega.error = "El destinatario ya no tiene habilitado este canal."
         entrega.lease_hasta = None

@@ -124,6 +124,28 @@ def canales_habilitados(
     return tuple(resultado)
 
 
+def canales_recordatorio_seleccionados(
+    usuario: models.Usuario | None,
+    recordatorio: models.RecordatorioTarea | None,
+) -> tuple[str, ...]:
+    """Canales elegidos para un recordatorio, respetando disponibilidad y plan."""
+    if usuario is None or recordatorio is None or usuario.estado != models.EstadoUsuario.ACTIVO:
+        return ()
+    resultado = []
+    if recordatorio.notificar_email and usuario.email:
+        resultado.append("EMAIL")
+    rol = usuario.rol.value if hasattr(usuario.rol, "value") else str(usuario.rol)
+    if (
+        recordatorio.notificar_whatsapp
+        and usuario.whatsapp_numero.strip()
+        and rol in {"ABOGADO", "ADMIN", "ABOGADO_ADMIN", "CLIENTE"}
+    ):
+        feature = PREFERENCIA_PLAN_WHATSAPP["RECORDATORIOS"]
+        if usuario.rol != models.RolUsuario.ABOGADO or plan_whatsapp_habilitado(usuario, feature):
+            resultado.append("WHATSAPP")
+    return tuple(resultado)
+
+
 def whatsapp_habilitado(usuario: models.Usuario | None) -> bool:
     if usuario is None or not usuario.notificaciones_whatsapp or not usuario.whatsapp_numero:
         return False

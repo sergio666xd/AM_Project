@@ -8,7 +8,7 @@ from html import escape
 from app.integration_settings import get_integration_settings
 
 
-_LOGO_URL = "https://www.alejandramunozabogada.com/AM_logo_Recurso%202_Landscape_web.svg"
+_LOGO_URL = "https://www.alejandramunozabogada.com/AM_logo_Recurso%202_Landscape_web.png"
 _NAVY = "#002060"
 _GOLD = "#ccb56b"
 

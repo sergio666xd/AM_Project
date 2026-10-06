@@ -756,6 +756,9 @@ class RecordatorioTarea(Base):
         default=CanalRecordatorio.WHATSAPP,
     )
 
+    notificar_email = Column(Boolean, nullable=False, default=False)
+    notificar_whatsapp = Column(Boolean, nullable=False, default=True)
+
     activo = Column(
         Boolean,
         nullable=False,

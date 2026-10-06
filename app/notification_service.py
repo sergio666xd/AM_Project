@@ -8,7 +8,7 @@ import requests
 from sqlalchemy.orm import Session
 
 from app import models
-from app.notification_policy import canales_habilitados
+from app.notification_policy import canales_habilitados, canales_recordatorio_seleccionados
 from app.workflow_service import workflow_frontend_url, workflow_service_headers
 
 logger = logging.getLogger(__name__)
@@ -95,7 +95,16 @@ def emitir_notificacion_workflow(
     recordatorio_version: int | None = None,
     actuacion_ids: list[int] | None = None,
 ) -> list[int]:
-    canales = canales_habilitados(usuario, tipo, emisor=emisor)
+    recordatorio = (
+        db.query(models.RecordatorioTarea).filter_by(id=recordatorio_id).first()
+        if tipo == "RECORDATORIOS" and recordatorio_id is not None
+        else None
+    )
+    canales = (
+        canales_recordatorio_seleccionados(usuario, recordatorio)
+        if tipo == "RECORDATORIOS" and recordatorio_id is not None
+        else canales_habilitados(usuario, tipo, emisor=emisor)
+    )
     if not canales:
         if usuario.rol == models.RolUsuario.CLIENTE:
             canal = usuario.canal_notificacion_cliente or "SIN_CANAL"

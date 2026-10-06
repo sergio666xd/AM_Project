@@ -47,6 +47,8 @@ type Recordatorio = {
   id: number;
   tarea_id: number;
   canal: "WHATSAPP";
+  notificar_email: boolean;
+  notificar_whatsapp: boolean;
   activo: boolean;
   fecha_hora?: string | null;
   anticipacion_minutos?: number | null;
@@ -216,8 +218,10 @@ export default function TareaDetalleAbogadoPage() {
   const [subtaskActuationId, setSubtaskActuationId] = useState("");
   const [subtaskAssignedToClient, setSubtaskAssignedToClient] = useState(false);
   const [subtaskClientId, setSubtaskClientId] = useState("");
-  const [subtaskNotifyEmail, setSubtaskNotifyEmail] = useState(true);
-  const [subtaskNotifyWhatsapp, setSubtaskNotifyWhatsapp] = useState(true);
+  const [subtaskNotifyEmail, setSubtaskNotifyEmail] = useState(false);
+  const [subtaskNotifyWhatsapp, setSubtaskNotifyWhatsapp] = useState(false);
+  const [reminderNotifyEmail, setReminderNotifyEmail] = useState(false);
+  const [reminderNotifyWhatsapp, setReminderNotifyWhatsapp] = useState(false);
 
   const [showReminderForm, setShowReminderForm] = useState(false);
 
@@ -307,7 +311,7 @@ export default function TareaDetalleAbogadoPage() {
       setLoading(true);
       setError("");
 
-      const [taskData, radicadosData, processData, clientData] =
+      const [taskData, radicadosData, processData, clientData, userData] =
         await Promise.all([
           fetchApi(`/api/tareas/${tareaId}`, {
             method: "GET",
@@ -320,7 +324,22 @@ export default function TareaDetalleAbogadoPage() {
           }),
           fetchApi("/api/expedientes/procesos", { method: "GET", token }),
           fetchApi("/api/expedientes/clientes", { method: "GET", token }),
+          fetchApi("/api/auth/me", { method: "GET", token }),
         ]);
+
+      const preferencias = userData.preferencias_notificacion ?? {};
+      const canalesSubtareas = preferencias.SUBTAREAS ?? {
+        email: userData.notificaciones_email ?? true,
+        whatsapp: userData.notificaciones_whatsapp ?? false,
+      };
+      const canalesRecordatorios = preferencias.RECORDATORIOS ?? {
+        email: userData.notificaciones_email ?? true,
+        whatsapp: userData.notificaciones_whatsapp ?? false,
+      };
+      setSubtaskNotifyEmail(Boolean(canalesSubtareas.email));
+      setSubtaskNotifyWhatsapp(Boolean(canalesSubtareas.whatsapp));
+      setReminderNotifyEmail(Boolean(canalesRecordatorios.email));
+      setReminderNotifyWhatsapp(Boolean(canalesRecordatorios.whatsapp));
 
       setTarea(taskData);
 
@@ -576,6 +595,11 @@ export default function TareaDetalleAbogadoPage() {
   async function createReminder() {
     if (!tarea || !token) return;
 
+    if (!reminderNotifyEmail && !reminderNotifyWhatsapp) {
+      setError("Selecciona al menos un canal de notificación.");
+      return;
+    }
+
     if (reminderMode === "FECHA" && !reminderDate) {
       setError("Selecciona la fecha y hora del recordatorio.");
       return;
@@ -592,6 +616,8 @@ export default function TareaDetalleAbogadoPage() {
 
       const body: Record<string, unknown> = {
         canal: "WHATSAPP",
+        notificar_email: reminderNotifyEmail,
+        notificar_whatsapp: reminderNotifyWhatsapp,
         activo: true,
       };
 
@@ -1319,13 +1345,17 @@ export default function TareaDetalleAbogadoPage() {
             {/* NUEVO RECORDATORIO */}
             {showReminderForm && (
               <div className="mt-5 rounded-lg border border-border bg-surface-muted p-4">
-                <div className="mb-4 flex items-center gap-2">
-                  <MessageCircle size={18} className="text-success" />
-
-                  <span className="text-sm font-semibold text-foreground">
-                    WhatsApp
-                  </span>
-                </div>
+                <fieldset className="mb-4 flex flex-wrap gap-x-6 gap-y-2">
+                  <legend className="mb-2 text-sm font-semibold text-foreground">Canales de notificación</legend>
+                  <label className="flex items-center gap-2 text-sm text-foreground-secondary">
+                    <input type="checkbox" checked={reminderNotifyEmail} onChange={(event) => setReminderNotifyEmail(event.target.checked)} />
+                    <Mail className="size-4" /> Correo electrónico
+                  </label>
+                  <label className="flex items-center gap-2 text-sm text-foreground-secondary">
+                    <input type="checkbox" checked={reminderNotifyWhatsapp} onChange={(event) => setReminderNotifyWhatsapp(event.target.checked)} />
+                    <MessageCircle className="size-4" /> WhatsApp
+                  </label>
+                </fieldset>
 
                 <div className="grid gap-4 sm:grid-cols-2">
                   <div>
@@ -1419,12 +1449,16 @@ export default function TareaDetalleAbogadoPage() {
                   className="flex items-center justify-between rounded-lg border border-border bg-surface px-4 py-3"
                 >
                   <div className="flex items-center gap-3">
-                    <MessageCircle size={17} />
+                    {reminder.notificar_email && <Mail size={17} />}
+                    {reminder.notificar_whatsapp && <MessageCircle size={17} />}
                   </div>
 
                   <div>
                     <p className="text-sm font-semibold text-foreground">
-                      WhatsApp
+                      {[
+                        reminder.notificar_email && "Correo",
+                        reminder.notificar_whatsapp && "WhatsApp",
+                      ].filter(Boolean).join(" y ")}
                     </p>
 
                     <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-foreground-muted">
