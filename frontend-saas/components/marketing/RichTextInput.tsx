@@ -81,11 +81,13 @@ const BLOCK_TAGS = new Set(["DIV", "P", "BLOCKQUOTE", "UL", "OL"]);
 
 function serializeChildren(node: ParentNode): string {
   let result = "";
+  let previousBlockWasEmpty = false;
   for (const child of Array.from(node.childNodes)) {
     const isBlock = child instanceof HTMLElement && BLOCK_TAGS.has(child.tagName);
     const content = nodeToMarkdown(child);
-    if (isBlock && result && !result.endsWith("\n")) result += "\n";
+    if (isBlock && (result || previousBlockWasEmpty) && (!result.endsWith("\n") || previousBlockWasEmpty)) result += "\n";
     result += content;
+    previousBlockWasEmpty = isBlock && content === "";
   }
   return result;
 }
