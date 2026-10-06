@@ -107,7 +107,12 @@ async function processRadicado(executionId: string, radicadoId: number): Promise
     );
     const result = (await response.json()) as RadicadoResult;
     if (result.estado === "ERROR") {
-      throw new Error(`Consulta fallida para radicado ${radicadoId}`);
+      const detalle = result.resultado?.estado;
+      throw new Error(
+        detalle
+          ? `Consulta fallida para radicado ${radicadoId}: ${detalle}`
+          : `Consulta fallida para radicado ${radicadoId}`,
+      );
     }
     return result;
   } catch (error) {

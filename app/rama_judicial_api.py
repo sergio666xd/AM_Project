@@ -2,6 +2,7 @@
 
 import json
 import re
+import time
 from collections import Counter
 from datetime import datetime
 from urllib.error import HTTPError, URLError
@@ -15,6 +16,8 @@ from app import models
 
 API_BASE_URL = "https://consultaprocesos.ramajudicial.gov.co:448/api/v2"
 API_TIMEOUT_SECONDS = 30
+API_RETRYABLE_STATUSES = {429, 502, 503, 504}
+API_MAX_ATTEMPTS = 3
 API_HEADERS = {
     "Accept": "application/json",
     "User-Agent": "GestionProcesosSaaS/1.0",
@@ -71,17 +74,27 @@ def _obtener_json(ruta: str, parametros: dict | None = None) -> dict:
     if parametros:
         url = f"{url}?{urlencode(parametros)}"
 
-    try:
-        request = Request(url, headers=API_HEADERS)
-        with urlopen(request, timeout=API_TIMEOUT_SECONDS) as respuesta:
-            return json.loads(respuesta.read().decode("utf-8-sig"))
-    except HTTPError as exc:
-        raise RamaJudicialAPIError(f"HTTP {exc.code} al consultar la API") from exc
-    except URLError as exc:
-        raise RamaJudicialAPIError(f"No fue posible conectar con la API: {exc.reason}") from exc
-    except (UnicodeDecodeError, json.JSONDecodeError) as exc:
-        raise RamaJudicialAPIError("La API devolvió una respuesta no válida") from exc
+    for intento in range(1, API_MAX_ATTEMPTS + 1):
+        try:
+            request = Request(url, headers=API_HEADERS)
+            with urlopen(request, timeout=API_TIMEOUT_SECONDS) as respuesta:
+                return json.loads(respuesta.read().decode("utf-8-sig"))
+        except HTTPError as exc:
+            if exc.code in API_RETRYABLE_STATUSES and intento < API_MAX_ATTEMPTS:
+                retry_after = exc.headers.get("Retry-After")
+                try:
+                    espera = min(max(float(retry_after), 0), 10) if retry_after else intento * 2
+                except ValueError:
+                    espera = intento * 2
+                time.sleep(espera)
+                continue
+            raise RamaJudicialAPIError(f"HTTP {exc.code} al consultar la API") from exc
+        except URLError as exc:
+            raise RamaJudicialAPIError(f"No fue posible conectar con la API: {exc.reason}") from exc
+        except (UnicodeDecodeError, json.JSONDecodeError) as exc:
+            raise RamaJudicialAPIError("La API devolvio una respuesta no valida") from exc
 
+    raise RamaJudicialAPIError("No fue posible consultar la API")
 
 def _obtener_proceso(numero_radicado: str) -> dict | None:
     """Busca el proceso exacto, recorriendo las páginas de resultados si existen."""
