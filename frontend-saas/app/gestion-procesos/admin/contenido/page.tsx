@@ -89,7 +89,7 @@ function ContentField({
   }
 
   const textValue = typeof value === "string" ? value : "";
-  const longText = textValue.length > 90 || name.toLowerCase().includes("description") || name === "body" || name === "answer";
+  const longText = textValue.length > 90 || name.toLowerCase().includes("description") || ["body", "answer", "intro", "text", "quote"].includes(name);
   return (
     <RichTextInput label={humanLabel(name)} value={textValue} onChange={onChange} multiline={longText} />
   );
