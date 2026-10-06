@@ -67,20 +67,33 @@ function markdownToHtml(value: string): string {
         quoteLines.push(markdownInlineToHtml(lines[index].replace(/^\s*>\s?/, "")));
         index += 1;
       }
-      blocks.push(`<blockquote>${quoteLines.join("<br>")}</blockquote>`);
+      blocks.push(`<blockquote>${quoteLines.map((quoteLine) => `<div>${quoteLine || "<br>"}</div>`).join("")}</blockquote>`);
       continue;
     }
 
-    blocks.push(markdownInlineToHtml(line) || "<br>");
+    blocks.push(`<div>${markdownInlineToHtml(line) || "<br>"}</div>`);
     index += 1;
   }
-  return blocks.join("<br>");
+  return blocks.join("");
+}
+
+const BLOCK_TAGS = new Set(["DIV", "P", "BLOCKQUOTE", "UL", "OL"]);
+
+function serializeChildren(node: ParentNode): string {
+  let result = "";
+  for (const child of Array.from(node.childNodes)) {
+    const isBlock = child instanceof HTMLElement && BLOCK_TAGS.has(child.tagName);
+    const content = nodeToMarkdown(child);
+    if (isBlock && result && !result.endsWith("\n")) result += "\n";
+    result += content;
+  }
+  return result;
 }
 
 function nodeToMarkdown(node: Node): string {
   if (node.nodeType === Node.TEXT_NODE) return node.textContent ?? "";
   if (!(node instanceof HTMLElement)) return "";
-  const content = Array.from(node.childNodes).map(nodeToMarkdown).join("");
+  const content = serializeChildren(node);
   switch (node.tagName) {
     case "B": case "STRONG": return `**${content}**`;
     case "I": case "EM": return `*${content}*`;
@@ -95,8 +108,11 @@ function nodeToMarkdown(node: Node): string {
     case "LI": return content.trim();
     case "UL": return Array.from(node.children).map((item) => `- ${nodeToMarkdown(item)}`).join("\n");
     case "OL": return Array.from(node.children).map((item, index) => `${index + 1}. ${nodeToMarkdown(item)}`).join("\n");
-    case "BLOCKQUOTE": return content.trim().split(/\n+/).map((line) => `> ${line}`).join("\n");
-    case "DIV": case "P": return `${content}\n`;
+    case "BLOCKQUOTE": return content.replace(/\n+$/, "").split("\n").map((line) => `> ${line}`).join("\n");
+    case "DIV": case "P":
+      return node.childNodes.length === 1 && node.firstChild instanceof HTMLBRElement
+        ? ""
+        : content.replace(/\n+$/, "");
     default: return content;
   }
 }
@@ -165,7 +181,7 @@ export function RichTextInput({
   function emitChange() {
     const editor = editorRef.current;
     if (!editor) return;
-    const next = nodeToMarkdown(editor).replace(/\n+$/, "");
+    const next = serializeChildren(editor);
     lastEmittedValue.current = next;
     onChange(next);
     requestAnimationFrame(updateActiveFormats);
