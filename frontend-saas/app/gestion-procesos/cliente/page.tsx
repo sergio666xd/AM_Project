@@ -36,18 +36,33 @@ export default function ClientePage() {
   const [procesos, setProcesos] = useState<Proceso[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [focusedRadicadoId, setFocusedRadicadoId] = useState<number | null>(null);
 
   useEffect(() => {
     if (sessionLoading || !token) return;
     let active = true;
     cargarProcesos(token)
-      .then((data) => { if (active) setProcesos(Array.isArray(data) ? data : []); })
+      .then((data) => {
+        if (!active) return;
+        setProcesos(Array.isArray(data) ? data : []);
+        const requestedId = Number(new URLSearchParams(window.location.search).get("radicado"));
+        if (Number.isInteger(requestedId) && requestedId > 0) setFocusedRadicadoId(requestedId);
+      })
       .catch((cause: unknown) => {
         if (active) setError(cause instanceof Error ? cause.message : "No fue posible cargar tus procesos.");
       })
       .finally(() => { if (active) setLoading(false); });
     return () => { active = false; };
   }, [sessionLoading, token]);
+
+  useEffect(() => {
+    if (!focusedRadicadoId || !procesos.length) return;
+    const element = document.getElementById(`radicado-${focusedRadicadoId}`);
+    if (element instanceof HTMLDetailsElement) {
+      element.open = true;
+      element.scrollIntoView({ behavior: "smooth", block: "center" });
+    }
+  }, [focusedRadicadoId, procesos]);
 
   async function actualizar() {
     if (!token) return;
@@ -103,7 +118,7 @@ export default function ClientePage() {
                 {proceso.radicados.map((radicado) => {
                   const ultimasActuaciones = [...radicado.actuaciones].slice(-3).reverse();
                   return (
-                    <details key={radicado.id} className="group px-5 py-3">
+                    <details id={`radicado-${radicado.id}`} key={radicado.id} className={`group px-5 py-3 ${focusedRadicadoId === radicado.id ? "bg-primary/5" : ""}`}>
                       <summary className="flex cursor-pointer list-none flex-wrap items-center justify-between gap-3 text-sm">
                         <span className="font-mono font-medium text-foreground">{radicado.numero}</span>
                         <span className="text-(--foreground-muted)">{radicado.estado_consulta || "Sin estado"}</span>

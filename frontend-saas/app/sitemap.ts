@@ -20,7 +20,8 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const visiblePages = await Promise.all(publicPages.map(async ({ slug, ...page }) => {
     if (!slug) return page;
     const content = await loadPublicPageContent(slug as PublicPageSlug, SITE_PAGE_DEFAULTS[slug]);
-    return (content as { seo?: { noIndex?: boolean } }).seo?.noIndex ? null : page;
+    const typedContent = content as { seo?: { noIndex?: boolean }; route?: string };
+    return typedContent.seo?.noIndex ? null : { ...page, path: typedContent.route || page.path };
   }));
 
   return visiblePages.filter((page) => page !== null).map(({ path, changeFrequency, priority }) => ({

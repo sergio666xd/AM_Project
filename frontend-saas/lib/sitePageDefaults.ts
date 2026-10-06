@@ -11,6 +11,7 @@ export const SITE_PAGE_LABELS: Record<string, string> = {
 
 export const SITE_PAGE_DEFAULTS = {
   inicio: {
+    route: "/",
     seo: { title: "Abogada en Sabaneta y asesoría jurídica", description: "Asesoría jurídica preventiva, estratégica y cercana para personas, familias y empresas en Sabaneta y toda Colombia.", keywords: "abogada en Sabaneta, asesoría jurídica, abogados en Colombia", noIndex: false },
     heroEyebrow: "Prevención · estrategia · representación",
     heroTitle: "Decisiones jurídicas bien informadas.",
@@ -35,6 +36,7 @@ export const SITE_PAGE_DEFAULTS = {
     aboutLink: "Quiénes somos",
   },
   "quienes-somos": {
+    route: "/quienes-somos",
     seo: { title: "Quiénes somos | Firma jurídica", description: "Conozca el equipo y la forma de trabajo de Alejandra Muñoz Abogada y Asociados: derecho claro, preventivo y cercano.", keywords: "firma jurídica, abogada, asesoría legal Colombia", noIndex: false },
     eyebrow: "Nuestra firma",
     title: "Quiénes somos",
@@ -46,6 +48,7 @@ export const SITE_PAGE_DEFAULTS = {
     ],
   },
   "areas-de-practica": {
+    route: "/areas-de-practica",
     seo: { title: "Áreas de práctica jurídica", description: "Asesoría en derecho de familia, empresarial, contractual, inmobiliario, propiedad horizontal y derecho público en Colombia.", keywords: "derecho de familia, derecho empresarial, contratos, propiedad horizontal, derecho administrativo", noIndex: false },
     eyebrow: "Áreas de práctica especializadas",
     title: "Asesoría integral que entiende el contexto de su decisión.",
@@ -75,6 +78,7 @@ export const SITE_PAGE_DEFAULTS = {
     closingCta: "Consulta preliminar",
   },
   filosofia: {
+    route: "/filosofia",
     seo: { title: "Nuestra filosofía de trabajo", description: "Conozca nuestro enfoque jurídico basado en la prevención, la estrategia y la representación responsable.", keywords: "prevención jurídica, estrategia legal, representación jurídica", noIndex: false },
     eyebrow: "Nuestra filosofía de trabajo",
     title: "Prevenir. Estructurar. Defender.",
@@ -95,6 +99,7 @@ export const SITE_PAGE_DEFAULTS = {
     ],
   },
   contacto: {
+    route: "/contacto",
     seo: { title: "Contacto y consulta jurídica", description: "Solicite orientación jurídica presencial en Sabaneta o virtual desde cualquier lugar de Colombia.", keywords: "consulta jurídica, abogada Sabaneta, contacto abogado Colombia", noIndex: false },
     eyebrow: "¿Tiene una decisión jurídica por tomar?",
     title: "Consulte antes de firmar, negociar o comprar.",
@@ -115,6 +120,7 @@ export const SITE_PAGE_DEFAULTS = {
     ],
   },
   "poliza-juridica": {
+    route: "/poliza-juridica",
     seo: { title: "Póliza jurídica para personas y empresas", description: "Acompañamiento jurídico continuo y ajustado a las necesidades de su organización o familia.", keywords: "póliza jurídica, asesoría jurídica mensual, acompañamiento legal empresas", noIndex: false },
     eyebrow: "Acompañamiento jurídico continuo",
     title: "Póliza Jurídica: prevención y respaldo cuando lo necesita.",
@@ -136,6 +142,7 @@ export const SITE_PAGE_DEFAULTS = {
     closingCta: "Consultar información adicional",
   },
   "politica-de-privacidad": {
+    route: "/politica-de-privacidad",
     seo: { title: "Política de privacidad", description: "Consulte cómo Alejandra Muñoz Abogada y Asociados protege y trata los datos personales de quienes usan este sitio.", keywords: "política de privacidad, protección de datos personales", noIndex: false },
     title: "Política de privacidad",
     updatedAt: "27 de septiembre de 2026",
@@ -148,6 +155,7 @@ export const SITE_PAGE_DEFAULTS = {
     ],
   },
   "tratamiento-de-datos": {
+    route: "/tratamiento-de-datos",
     seo: { title: "Política de tratamiento de datos personales", description: "Conozca sus derechos y las finalidades, procedimientos y canales para ejercerlos respecto de sus datos personales.", keywords: "tratamiento de datos personales, Ley 1581 de 2012, derechos del titular", noIndex: false },
     title: "Política de tratamiento de datos personales",
     updatedAt: "27 de septiembre de 2026",

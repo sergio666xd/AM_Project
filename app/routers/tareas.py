@@ -18,12 +18,23 @@ from app.security import obtener_usuario_actual
 from app.notification_service import emitir_notificacion_workflow
 from app.notification_policy import plan_whatsapp_habilitado
 from app.reminder_workflow import iniciar_workflow_recordatorio, normalizar_utc_naive
+from app.workflow_service import public_site_url
 
 
 router = APIRouter(
     prefix="/api/tareas",
     tags=["Tareas"],
 )
+
+
+def _url_tarea_notificacion(usuario: models.Usuario, tarea_id: int) -> str:
+    if usuario.rol == models.RolUsuario.CLIENTE:
+        ruta = f"/gestion-procesos/cliente/tareas?tarea={tarea_id}#tarea-{tarea_id}"
+    elif usuario.rol == models.RolUsuario.ABOGADO:
+        ruta = f"/gestion-procesos/dashboard/tareas/{tarea_id}"
+    else:
+        ruta = f"/gestion-procesos/abogado/tareas/{tarea_id}"
+    return f"{public_site_url()}{ruta}"
 
 
 def _versionar_recordatorios_pendientes(tarea: models.Tarea) -> list[int]:
@@ -310,7 +321,12 @@ def notificar_subtarea_asignada(
     cliente = db.query(models.Usuario).filter_by(id=subtarea.cliente_id).first()
     if cliente is None:
         return
-    mensaje = f"{usuario.nombre_completo} le ha asignado la subtarea: {subtarea.titulo}."
+    tarea = db.query(models.Tarea).filter_by(id=subtarea.tarea_id).first()
+    tarea_id = tarea.id if tarea else subtarea.tarea_id
+    mensaje = (
+        f"{usuario.nombre_completo} le ha asignado la subtarea: {subtarea.titulo}.\n"
+        f"Abrir tarea: {_url_tarea_notificacion(cliente, tarea_id)}"
+    )
     emitir_notificacion_workflow(
         db,
         cliente,
@@ -436,7 +452,10 @@ def crear_tarea(
     if tarea.cliente_id:
         cliente = db.query(models.Usuario).filter_by(id=tarea.cliente_id).first()
         if cliente:
-            mensaje = f"{usuario_actual.nombre_completo} le ha asignado una tarea: {tarea.titulo}."
+            mensaje = (
+                f"{usuario_actual.nombre_completo} le ha asignado una tarea: {tarea.titulo}.\n"
+                f"Abrir tarea: {_url_tarea_notificacion(cliente, tarea.id)}"
+            )
             emitir_notificacion_workflow(
                 db,
                 cliente,

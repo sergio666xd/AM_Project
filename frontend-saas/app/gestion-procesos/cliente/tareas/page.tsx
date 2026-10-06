@@ -34,13 +34,17 @@ export default function TareasClientePage() {
   const [workingSubtaskId, setWorkingSubtaskId] = useState<number | null>(null);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
+  const [focusedTaskId, setFocusedTaskId] = useState<number | null>(null);
 
   useEffect(() => {
     if (sessionLoading || !token) return;
     let active = true;
     loadTasks(token)
       .then((result) => {
-        if (active) setTasks(result);
+        if (!active) return;
+        setTasks(result);
+        const requestedId = Number(new URLSearchParams(window.location.search).get("tarea"));
+        if (Number.isInteger(requestedId) && requestedId > 0) setFocusedTaskId(requestedId);
       })
       .catch((cause: unknown) => {
         if (active)
@@ -57,6 +61,11 @@ export default function TareasClientePage() {
       active = false;
     };
   }, [sessionLoading, token]);
+
+  useEffect(() => {
+    if (!focusedTaskId || !tasks.length) return;
+    document.getElementById(`tarea-${focusedTaskId}`)?.scrollIntoView({ behavior: "smooth", block: "center" });
+  }, [focusedTaskId, tasks]);
 
   async function refresh() {
     if (!token) return;
@@ -234,7 +243,8 @@ export default function TareasClientePage() {
                 {openTasks.map((task) => (
                   <li
                     key={task.id}
-                    className="flex flex-wrap items-center justify-between gap-4 px-4 py-3"
+                    id={`tarea-${task.id}`}
+                    className={`flex flex-wrap items-center justify-between gap-4 px-4 py-3 ${focusedTaskId === task.id ? "bg-primary/5" : ""}`}
                   >
                     <div className="min-w-0">
                       <p className="font-medium text-foreground">

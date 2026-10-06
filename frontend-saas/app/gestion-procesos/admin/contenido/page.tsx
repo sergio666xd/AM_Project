@@ -6,7 +6,7 @@ import { SITE_PAGE_DEFAULTS, SITE_PAGE_LABELS, type PublicPageSlug } from "@/lib
 import { fetchApi } from "@/lib/api";
 import { RichTextInput } from "@/components/marketing/RichTextInput";
 type JsonValue = string | number | boolean | null | JsonValue[] | { [key: string]: JsonValue };
-type ContentPage = { slug: PublicPageSlug; nombre: string; contenido: JsonValue | null; updated_at: string | null };
+type ContentPage = { slug: PublicPageSlug; nombre: string; ruta: string; contenido: JsonValue | null; updated_at: string | null };
 
 async function fetchPages(token: string): Promise<ContentPage[]> {
   return fetchApi("/api/admin/contenido", { method: "GET", token });
@@ -33,7 +33,7 @@ function mergeContent(defaults: JsonValue, override: JsonValue): JsonValue {
 
 function humanLabel(value: string) {
   const labels: Record<string, string> = {
-    seo: "SEO y buscadores", keywords: "Palabras clave", noIndex: "Ocultar de buscadores",
+    route: "Ruta pública", seo: "SEO y buscadores", keywords: "Palabras clave", noIndex: "Ocultar de buscadores",
     heroEyebrow: "Antetítulo principal", heroTitle: "Título principal", heroDescription: "Descripción principal",
     heroCta: "Texto del botón", heroAside: "Texto destacado", servicesEyebrow: "Antetítulo de servicios",
     servicesTitle: "Título de servicios", servicesLink: "Enlace de áreas", preventionEyebrow: "Antetítulo preventivo",
@@ -105,6 +105,9 @@ function ContentField({
   }
 
   const textValue = typeof value === "string" ? value : "";
+  if (name === "route") {
+    return <label className="block text-sm font-medium text-foreground">{humanLabel(name)}<input value={textValue} onChange={(event) => onChange(event.target.value)} placeholder="/firma/nosotros" className="mt-1 w-full rounded-md border border-border bg-background px-3 py-2 font-normal" /><span className="mt-1 block text-xs text-muted-foreground">Empieza con / y usa minúsculas, números y guiones. Las rutas anteriores seguirán funcionando.</span></label>;
+  }
   const longText = textValue.length > 90 || name.toLowerCase().includes("description") || ["body", "answer", "intro", "text", "quote"].includes(name);
   return (
     <RichTextInput label={humanLabel(name)} value={textValue} onChange={onChange} multiline={longText} />

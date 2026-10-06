@@ -19,7 +19,8 @@ export async function generatePublicPageMetadata<T extends { seo?: PageSeo }>(
   const title = seo.title?.trim() || "Alejandra Muñoz Abogada y Asociados";
   const description = seo.description?.trim()
     || "Asesoría jurídica preventiva, estratégica y cercana en Sabaneta y toda Colombia.";
-  const canonical = pathname === "/" ? "/" : pathname;
+  const canonicalRoute = (content as T & { route?: string }).route?.trim() || pathname;
+  const canonical = canonicalRoute === "/" ? "/" : canonicalRoute.replace(/\/$/, "");
   const keywords = seo.keywords?.split(",").map((keyword) => keyword.trim()).filter(Boolean);
 
   return {

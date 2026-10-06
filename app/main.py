@@ -17,7 +17,7 @@ from botocore.exceptions import BotoCoreError, ClientError
 from app.database import engine, Base, get_db
 from app import models, schemas, security, storage
 from app.email_service import enviar_correo
-from app.site_content import PUBLIC_CONTENT_PAGES
+from app.site_content import PUBLIC_CONTENT_PAGES, PUBLIC_PAGE_ROUTES
 from app.routers import admin
 from app.security import obtener_usuario_actual
 from app.routers import admin, tareas, expedientes, workflows
@@ -248,6 +248,18 @@ def obtener_contenido_publico(slug: str, db: Session = Depends(get_db)):
     if page is None:
         raise HTTPException(status_code=404, detail="La página usa su contenido base.")
     return {"slug": page.slug, "contenido": page.contenido, "updated_at": page.updated_at}
+
+
+@app.get("/api/contenido-publico/ruta/resolver")
+def resolver_ruta_contenido_publico(ruta: str, db: Session = Depends(get_db)):
+    normalized = ruta.rstrip("/") or "/"
+    for slug, default_route in PUBLIC_PAGE_ROUTES.items():
+        page = db.query(models.ContenidoPagina).filter_by(slug=slug).first()
+        saved_route = (page.contenido or {}).get("route") if page and isinstance(page.contenido, dict) else None
+        current_route = saved_route or default_route
+        if normalized == current_route:
+            return {"slug": slug, "ruta": current_route}
+    raise HTTPException(status_code=404, detail="Ruta de contenido pÃºblico no encontrada.")
 
 
 @app.get("/api/planes-publicos", response_model=list[schemas.PlanOut])

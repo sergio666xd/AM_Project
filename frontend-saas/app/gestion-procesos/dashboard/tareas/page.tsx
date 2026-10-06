@@ -273,7 +273,6 @@ export default function TareasPage() {
     if (sessionLoading) return;
 
     if (!token) {
-      router.replace("/auth/login");
       return;
     }
 

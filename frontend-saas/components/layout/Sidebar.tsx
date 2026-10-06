@@ -207,7 +207,7 @@ export default function Sidebar({ variant }: SidebarProps) {
       const isActive = getIsActive(pathname, item.href, variant);
       const Icon = item.icon;
       return (
-        <Link key={item.href} href={item.href} onClick={() => setMobileOpen(false)} aria-current={isActive ? "page" : undefined} className={`flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors ${isActive ? "bg-primary/10 text-primary" : "text-foreground-secondary hover:bg-surface-hover"}`}>
+        <Link key={item.href} href={item.href} prefetch={item.href !== "/gestion-procesos/admin/contenido"} onClick={(event) => { setMobileOpen(false); if (item.href === "/gestion-procesos/admin/contenido") { event.preventDefault(); window.location.assign(item.href); } }} aria-current={isActive ? "page" : undefined} className={`flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors ${isActive ? "bg-primary/10 text-primary" : "text-foreground-secondary hover:bg-surface-hover"}`}>
           <Icon className="size-4 shrink-0" />{item.label}
         </Link>
       );

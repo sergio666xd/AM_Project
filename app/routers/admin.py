@@ -27,7 +27,7 @@ from app.document_validation import (
 )
 from app.security import obtener_usuario_actual
 from app.firm_access import require_roles
-from app.site_content import PUBLIC_CONTENT_PAGES
+from app.site_content import PUBLIC_CONTENT_PAGES, PUBLIC_PAGE_ROUTES
 from app.radicados import (
     ambito_radicado_usuario,
     iniciar_consulta_nuevo_radicado,
@@ -195,11 +195,15 @@ def listar_contenido_publico_admin(
         page.slug: page
         for page in db.query(models.ContenidoPagina).all()
     }
+    def configured_route(slug):
+        contenido = saved[slug].contenido if slug in saved else None
+        return contenido.get("route", PUBLIC_PAGE_ROUTES[slug]) if isinstance(contenido, dict) else PUBLIC_PAGE_ROUTES[slug]
     return [
         {
             "slug": slug,
             "nombre": label,
             "contenido": saved[slug].contenido if slug in saved else None,
+            "ruta": configured_route(slug),
             "updated_at": saved[slug].updated_at if slug in saved else None,
         }
         for slug, label in PUBLIC_CONTENT_PAGES.items()
@@ -213,7 +217,22 @@ def guardar_contenido_publico_admin(
     admin: models.Usuario = Depends(verificar_admin),
 ):
     if slug not in PUBLIC_CONTENT_PAGES:
-        raise HTTPException(status_code=404, detail="Página pública no disponible para edición.")
+        raise HTTPException(status_code=404, detail="PÃ¡gina pÃºblica no disponible para ediciÃ³n.")
+    if not isinstance(datos.contenido, dict):
+        raise HTTPException(status_code=400, detail="El contenido debe ser un objeto.")
+    route = datos.contenido.get("route")
+    if not isinstance(route, str) or not re.fullmatch(r"/(?:[a-z0-9]+(?:-[a-z0-9]+)*)(?:/[a-z0-9]+(?:-[a-z0-9]+)*)*|/", route):
+        raise HTTPException(status_code=400, detail="La ruta debe comenzar con / y usar minÃºsculas, nÃºmeros y guiones.")
+    if route != "/" and any(route == reserved or route.startswith(f"{reserved}/") for reserved in ("/api", "/gestion-procesos", "/_next", "/robots.txt", "/sitemap.xml", "/favicon.ico")):
+        raise HTTPException(status_code=400, detail="La ruta elegida estÃ¡ reservada para el sistema.")
+    for other_slug in PUBLIC_CONTENT_PAGES:
+        if other_slug == slug:
+            continue
+        other_page = db.query(models.ContenidoPagina).filter_by(slug=other_slug).first()
+        other_content = other_page.contenido if other_page else None
+        other_route = other_content.get("route", PUBLIC_PAGE_ROUTES[other_slug]) if isinstance(other_content, dict) else PUBLIC_PAGE_ROUTES[other_slug]
+        if route == other_route or route == PUBLIC_PAGE_ROUTES[other_slug]:
+            raise HTTPException(status_code=409, detail="Esa ruta ya estÃ¡ asignada a otra pÃ¡gina.")
     if len(json.dumps(datos.contenido, ensure_ascii=False)) > 250_000:
         raise HTTPException(status_code=413, detail="El contenido de la página supera el tamaño permitido.")
     page = db.query(models.ContenidoPagina).filter_by(slug=slug).first()
@@ -226,7 +245,7 @@ def guardar_contenido_publico_admin(
     registrar_evento_auditoria(db, admin, "admin.contenido.guardar", "pagina_publica", slug)
     db.commit()
     db.refresh(page)
-    return {"slug": page.slug, "contenido": page.contenido, "updated_at": page.updated_at}
+    return {"slug": page.slug, "contenido": page.contenido, "ruta": route, "updated_at": page.updated_at}
 
 @router.delete("/contenido/{slug}")
 def restaurar_contenido_publico_admin(

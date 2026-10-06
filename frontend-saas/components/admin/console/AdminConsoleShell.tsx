@@ -205,7 +205,16 @@ export default function AdminConsoleShell({
             <div key={`${section.title}-${href}`}>
               <Link
                 href={href}
-                onClick={() => setMobileOpen(false)}
+                prefetch={href !== "/gestion-procesos/admin/contenido"}
+                onClick={(event) => {
+                  setMobileOpen(false);
+                  if (href === "/gestion-procesos/admin/contenido") {
+                    // Bypass the App Router transition for the CMS route. Next 16.3
+                    // can fail while consuming a prefetched RSC navigation payload.
+                    event.preventDefault();
+                    window.location.assign(href);
+                  }
+                }}
                 aria-current={pathname === href ? "page" : undefined}
                 className={`flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition ${isActive ? "bg-primary/10 text-primary" : "text-(--foreground-secondary) hover:bg-surface-hover"}`}
               >

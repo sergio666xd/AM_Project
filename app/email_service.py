@@ -1,6 +1,7 @@
 """Entrega de correo transaccional mediante SMTP configurado por entorno."""
 
 import smtplib
+import re
 from datetime import date
 from email.message import EmailMessage
 from email.policy import SMTP
@@ -15,7 +16,18 @@ _GOLD = "#ccb56b"
 
 def _html_correo(cuerpo: str) -> str:
     """Envuelve el contenido del mensaje con el diseño común de la firma."""
-    contenido = "<br>\n".join(escape(line) for line in cuerpo.splitlines())
+    lineas = []
+    for line in cuerpo.splitlines():
+        match = re.fullmatch(r"Abrir (radicado|tarea):\s*(https?://\S+)", line.strip())
+        if match:
+            tipo, url = match.groups()
+            label = "Ver radicado" if tipo == "radicado" else "Ver tarea"
+            lineas.append(
+                f'<a href="{escape(url, quote=True)}" style="display:inline-block;margin:5px 0;padding:10px 16px;background:{_NAVY};color:#ffffff;text-decoration:none;border-radius:6px;font-weight:bold;">{label}</a>'
+            )
+        else:
+            lineas.append(escape(line))
+    contenido = "<br>\n".join(lineas)
     anio = date.today().year
     return f"""<!doctype html>
 <html lang="es"><head><meta charset="utf-8"></head>

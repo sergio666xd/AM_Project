@@ -202,7 +202,6 @@ export default function RadicadosPage() {
     }
 
     if (!token) {
-      router.replace("/auth/login");
       return;
     }
 

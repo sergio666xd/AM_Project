@@ -239,7 +239,6 @@ export default function DetalleRadicadoPage() {
     }
 
     if (!token) {
-      router.replace("/auth/login");
       return;
     }
 

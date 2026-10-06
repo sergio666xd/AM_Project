@@ -40,6 +40,22 @@ def workflow_frontend_url() -> str:
     return ""
 
 
+def public_site_url() -> str:
+    """Return the canonical frontend origin used in user-facing notifications."""
+    configured = (
+        os.getenv("PUBLIC_SITE_URL", "").strip()
+        or os.getenv("NEXT_PUBLIC_SITE_URL", "").strip()
+        or os.getenv("VERCEL_PROJECT_PRODUCTION_URL", "").strip()
+    )
+    if not configured and os.getenv("NODE_ENV") == "development":
+        configured = "http://localhost:3000"
+    if not configured:
+        configured = "https://www.alejandramunozabogada.com"
+    if not configured.startswith(("http://", "https://")):
+        configured = f"https://{configured}"
+    return configured.rstrip("/")
+
+
 def workflow_service_headers() -> dict[str, str]:
     token = os.getenv("WORKFLOW_SERVICE_TOKEN", "").strip()
     headers = {"Authorization": f"Bearer {token}"} if token else {}

@@ -27,6 +27,7 @@ from app.reminder_workflow import (
 )
 from app.monthly_summary import enviar_resumen_mensual
 from app.whatsapp import enviar_mensaje_whatsapp
+from app.workflow_service import public_site_url
 
 
 router = APIRouter(
@@ -263,6 +264,7 @@ def _agregar_actuaciones_a_grupo(
             {
                 "proceso": proceso.nombre if proceso else None,
                 "radicado": radicado.numero,
+                "detalle_url": _url_radicado(usuario, radicado.id),
                 "actuaciones": {},
             },
         )
@@ -285,8 +287,20 @@ def _cuerpo_novedades(secciones: list[dict]) -> str:
         )
         if reciente.get("anotacion"):
             bloque += f"\nAnotación: {reciente['anotacion']}"
+        if seccion.get("detalle_url"):
+            bloque += f"\nAbrir radicado: {seccion['detalle_url']}"
         bloques.append(bloque)
     return "Novedades judiciales\n\n" + "\n\n".join(bloques)
+
+
+def _url_radicado(usuario: models.Usuario, radicado_id: int) -> str:
+    if usuario.rol == models.RolUsuario.CLIENTE:
+        ruta = f"/gestion-procesos/cliente?radicado={radicado_id}#radicado-{radicado_id}"
+    elif usuario.rol == models.RolUsuario.ABOGADO:
+        ruta = f"/gestion-procesos/dashboard/radicados/{radicado_id}"
+    else:
+        ruta = f"/gestion-procesos/abogado/radicados/{radicado_id}"
+    return f"{public_site_url()}{ruta}"
 
 
 @router.post("/consultas/{ejecucion_id}/notificaciones/preparar")
@@ -352,6 +366,7 @@ def preparar_notificaciones_actuaciones(
                 omitida = _cuerpo_novedades([{
                     "proceso": proceso.nombre,
                     "radicado": radicado.numero,
+                    "detalle_url": _url_radicado(cliente, radicado.id),
                     "actuaciones": {actuacion["id"]: actuacion for actuacion in nuevas},
                 }])
                 emitir_notificacion_workflow(
@@ -588,10 +603,17 @@ def preparar_recordatorio_workflow(
             "programado_para": momento.replace(tzinfo=timezone.utc).isoformat(),
         }
 
+    if usuario.rol == models.RolUsuario.ABOGADO:
+        tarea_path = f"/gestion-procesos/dashboard/tareas/{tarea.id}"
+    elif usuario.rol == models.RolUsuario.CLIENTE:
+        tarea_path = f"/gestion-procesos/cliente/tareas?tarea={tarea.id}#tarea-{tarea.id}"
+    else:
+        tarea_path = f"/gestion-procesos/abogado/tareas/{tarea.id}"
     mensaje = f"📌 *Recordatorio de tarea*\n\n*{tarea.titulo}*"
     if tarea.fecha_limite:
         fecha_limite = normalizar_utc_naive(tarea.fecha_limite)
         mensaje += f"\nFecha límite: {fecha_limite.strftime('%d/%m/%Y %H:%M')}"
+    mensaje += f"\nAbrir tarea: {public_site_url()}{tarea_path}"
     entrega_ids = emitir_notificacion_workflow(
         db,
         usuario,

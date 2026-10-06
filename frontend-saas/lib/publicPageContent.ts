@@ -2,6 +2,26 @@ import { API_URL } from "@/lib/api";
 import { connection } from "next/server";
 import type { PublicPageSlug } from "@/lib/sitePageDefaults";
 
+export async function resolvePublicPageRoute(route: string): Promise<{ slug: PublicPageSlug; ruta: string } | null> {
+  try {
+    await connection();
+    const configuredBaseUrl = process.env.BACKEND_SERVICE_URL || API_URL;
+    if (!configuredBaseUrl) return null;
+    const apiBase = new URL(configuredBaseUrl);
+    const basePath = apiBase.pathname.replace(/\/+$/, "");
+    const apiPath = basePath.endsWith("/api") ? basePath : `${basePath}/api`;
+    apiBase.pathname = `${apiPath}/contenido-publico/ruta/resolver`;
+    apiBase.search = new URLSearchParams({ ruta: route }).toString();
+    apiBase.hash = "";
+    const response = await fetch(apiBase, { cache: "no-store" });
+    if (!response.ok) return null;
+    return await response.json();
+  } catch (error) {
+    console.error("[publicPageContent] No se pudo resolver la ruta pública.", error);
+    return null;
+  }
+}
+
 function mergeContent<T>(defaults: T, override: unknown): T {
   if (Array.isArray(override)) return override as T;
   if (

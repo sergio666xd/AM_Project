@@ -289,7 +289,7 @@ export default function AdminDashboard() {
       <Card title="Acciones rápidas" description="Accede directamente a las tareas administrativas frecuentes.">
         <div className="flex flex-wrap gap-2">
           {quickActions.map((action) => (
-            <Link key={action.href} href={action.href} className="inline-flex min-h-10 items-center gap-2 rounded-lg bg-primary px-3 py-2 text-sm font-semibold text-primary-foreground transition-colors hover:bg-primary-hover">
+            <Link key={action.href} href={action.href} prefetch={action.href !== "/gestion-procesos/admin/contenido"} onClick={(event) => { if (action.href === "/gestion-procesos/admin/contenido") { event.preventDefault(); window.location.assign(action.href); } }} className="inline-flex min-h-10 items-center gap-2 rounded-lg bg-primary px-3 py-2 text-sm font-semibold text-primary-foreground transition-colors hover:bg-primary-hover">
               {action.label}<ArrowRight aria-hidden="true" className="size-4" />
             </Link>
           ))}

@@ -687,6 +687,7 @@ export default function AdminOperationsPage({ section = "resumen" }: { section?:
                       <p className="mt-1">Auto ordena correr traslado a las partes por el término legal.</p>
                     </div>
                     <p className="mt-5">Ingresa al sistema para consultar el detalle y las actuaciones del proceso.</p>
+                    <span className="mt-4 inline-block rounded-md bg-[#002060] px-4 py-2 font-semibold text-white">Ver radicado</span>
                   </div>
                   <div className="border-t border-[#e5e9f0] bg-[#f7f8fb] px-6 py-5 text-xs leading-5 text-[#526078]">
                     <p>Este es un mensaje generado automáticamente por nuestro sistema.</p>
