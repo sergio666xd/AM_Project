@@ -4,6 +4,7 @@ import { FormEvent, useState } from "react";
 import { KeyRound, Save, ShieldCheck } from "lucide-react";
 import { useSession } from "@/context/SessionContext";
 import { fetchApi } from "@/lib/api";
+import { SecurityChangePanel } from "@/app/gestion-procesos/abogado/configuracion/page";
 
 export default function AdminAccountPage() {
   const { user, token, refreshUser } = useSession();
@@ -31,9 +32,7 @@ export default function AdminAccountPage() {
         method: "PATCH",
         token,
         body: JSON.stringify({
-          email: email ?? user?.email,
           nombre_completo: (name ?? user?.nombre_completo ?? "").trim(),
-          whatsapp_numero: (whatsapp ?? user?.whatsapp_numero ?? "").trim(),
         }),
       });
       await refreshUser();
@@ -101,6 +100,11 @@ export default function AdminAccountPage() {
           Actualiza el correo de acceso y protege tu contraseña.
         </p>
       </header>
+      <section className="grid gap-4 md:grid-cols-3">
+        <SecurityChangePanel action="email" title="Cambiar correo" token={token} whatsappAvailable={Boolean(user?.whatsapp_numero)} onComplete={refreshUser} />
+        <SecurityChangePanel action="whatsapp" title="Cambiar WhatsApp" token={token} whatsappAvailable={Boolean(user?.whatsapp_numero)} onComplete={refreshUser} />
+        <SecurityChangePanel action="password" title="Cambiar contraseña" token={token} whatsappAvailable={Boolean(user?.whatsapp_numero)} onComplete={refreshUser} />
+      </section>
       <section className="space-y-4 border-t border-border pt-5">
         <div className="flex items-center gap-3">
           <ShieldCheck className="size-5 text-primary" />
@@ -145,7 +149,7 @@ export default function AdminAccountPage() {
               type="email"
               autoComplete="email"
               value={email ?? user?.email ?? ""}
-              onChange={(event) => setEmail(event.target.value)}
+              disabled
               className="mt-1 w-full rounded-md border border-border bg-surface px-3 py-2.5"
             />
           </label>
@@ -153,7 +157,7 @@ export default function AdminAccountPage() {
             WhatsApp
             <input
               value={whatsapp ?? user?.whatsapp_numero ?? ""}
-              onChange={(event) => setWhatsapp(event.target.value)}
+              disabled
               className="mt-1 w-full rounded-md border border-border bg-surface px-3 py-2.5"
             />
           </label>
@@ -169,7 +173,7 @@ export default function AdminAccountPage() {
           </div>
         </form>
       </section>
-      <section className="space-y-4 border-t border-border pt-5">
+      <section className="hidden space-y-4 border-t border-border pt-5">
         <div className="flex items-center gap-3">
           <KeyRound className="size-5 text-primary" />
           <div>

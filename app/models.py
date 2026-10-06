@@ -196,6 +196,22 @@ class Usuario(Base):
     procesos = relationship("Proceso", back_populates="abogado", cascade="all, delete-orphan")
 
 
+class CodigoSeguridadUsuario(Base):
+    __tablename__ = "codigos_seguridad_usuario"
+
+    id = Column(String(36), primary_key=True)
+    usuario_id = Column(Integer, ForeignKey("usuarios.id", ondelete="CASCADE"), nullable=False, index=True)
+    accion = Column(String(16), nullable=False)
+    canal = Column(String(16), nullable=False)
+    codigo_hash = Column(String(64), nullable=False)
+    valor_pendiente = Column(Text, nullable=True)
+    expira_en = Column(DateTime, nullable=False)
+    reenviar_desde = Column(DateTime, nullable=False)
+    intentos = Column(Integer, nullable=False, default=0)
+    consumido_en = Column(DateTime, nullable=True)
+    creado_en = Column(DateTime, nullable=False, default=datetime.utcnow)
+
+
 class SolicitudRegistro(Base):
     __tablename__ = "solicitudes_registro"
 

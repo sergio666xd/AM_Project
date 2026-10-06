@@ -276,6 +276,22 @@ class PerfilUpdate(BaseModel):
     whatsapp_numero: Optional[str] = None
 
 
+class SolicitarCodigoSeguridad(BaseModel):
+    accion: Literal["email", "whatsapp", "password"]
+    canal: Literal["EMAIL", "WHATSAPP"]
+    valor: str | None = Field(default=None, max_length=320)
+    password_actual: str | None = Field(default=None, max_length=128)
+    password_nueva: str | None = Field(default=None, min_length=8, max_length=72)
+
+
+class ReenviarCodigoSeguridad(BaseModel):
+    canal: Literal["EMAIL", "WHATSAPP"]
+
+
+class VerificarCodigoSeguridad(BaseModel):
+    codigo: str = Field(min_length=6, max_length=6, pattern=r"^\d{6}$")
+
+
 class SolicitudEdicionPerfilClienteCreate(BaseModel):
     email: EmailStr
     nombre_completo: str
