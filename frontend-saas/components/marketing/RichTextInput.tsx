@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, type KeyboardEvent } from "react";
+import { useLayoutEffect, useRef, type KeyboardEvent } from "react";
 
 type FormatAction = "bold" | "italic" | "underline" | "strike" | "link" | "list";
 
@@ -13,6 +13,50 @@ const toolbar: { action: FormatAction; label: string; title: string }[] = [
   { action: "list", label: "• Lista", title: "Lista con viñetas" },
 ];
 
+function safeHref(href: string): boolean {
+  const value = href.trim();
+  return (value.startsWith("/") && !value.startsWith("//")) || /^(https:\/\/|mailto:|tel:)/i.test(value);
+}
+
+function escapeHtml(value: string): string {
+  return value.replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;").replaceAll('"', "&quot;");
+}
+
+function markdownToHtml(value: string): string {
+  return value.split(/\r?\n/).map((line) => {
+    const listItem = line.match(/^\s*[-*]\s+(.+)$/);
+    let html = escapeHtml(listItem ? listItem[1] : line);
+    html = html.replace(/\[([^\]]+)\]\(([^)]+)\)/g, (match, label: string, href: string) => safeHref(href) ? `<a href="${escapeHtml(href)}">${label}</a>` : match);
+    html = html.replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>");
+    html = html.replace(/__([^_]+)__/g, "<u>$1</u>");
+    html = html.replace(/~~([^~]+)~~/g, "<s>$1</s>");
+    html = html.replace(/\*([^*]+)\*/g, "<em>$1</em>");
+    html = html.replace(/_([^_]+)_/g, "<em>$1</em>");
+    return listItem ? `<ul><li>${html}</li></ul>` : html || "<br>";
+  }).join("<br>");
+}
+
+function nodeToMarkdown(node: Node): string {
+  if (node.nodeType === Node.TEXT_NODE) return node.textContent ?? "";
+  if (!(node instanceof HTMLElement)) return "";
+  const content = Array.from(node.childNodes).map(nodeToMarkdown).join("");
+  switch (node.tagName) {
+    case "B": case "STRONG": return `**${content}**`;
+    case "I": case "EM": return `*${content}*`;
+    case "U": return `__${content}__`;
+    case "S": case "STRIKE": case "DEL": return `~~${content}~~`;
+    case "A": {
+      const href = node.getAttribute("href") ?? "";
+      return safeHref(href) ? `[${content}](${href})` : content;
+    }
+    case "BR": return "\n";
+    case "LI": return `- ${content.trim()}`;
+    case "UL": case "OL": return Array.from(node.children).map(nodeToMarkdown).join("\n");
+    case "DIV": case "P": return `${content}\n`;
+    default: return content;
+  }
+}
+
 export function RichTextInput({
   label,
   value,
@@ -24,51 +68,50 @@ export function RichTextInput({
   onChange: (value: string) => void;
   multiline: boolean;
 }) {
-  const inputRef = useRef<HTMLInputElement | HTMLTextAreaElement>(null);
+  const editorRef = useRef<HTMLDivElement>(null);
+  const lastEmittedValue = useRef<string | null>(null);
 
-  function apply(action: FormatAction) {
-    const input = inputRef.current;
-    if (!input) return;
-    const start = input.selectionStart ?? value.length;
-    const end = input.selectionEnd ?? start;
-    const selected = value.slice(start, end);
-    let before = "";
-    let after = "";
-    let replacement = selected;
-
-    if (action === "link") {
-      const href = window.prompt("Dirección del enlace (ruta interna o HTTPS):", "https://");
-      if (!href) return;
-      replacement = `[${selected || "texto del enlace"}](${href})`;
-    } else if (action === "list") {
-      const lineStart = value.lastIndexOf("\n", Math.max(0, start - 1)) + 1;
-      onChange(`${value.slice(0, lineStart)}- ${value.slice(lineStart)}`);
-      requestAnimationFrame(() => {
-        inputRef.current?.focus();
-        inputRef.current?.setSelectionRange(start + 2, end + 2);
-      });
+  useLayoutEffect(() => {
+    const editor = editorRef.current;
+    if (!editor) return;
+    if (lastEmittedValue.current === value) {
+      lastEmittedValue.current = null;
       return;
-    } else {
-      const marks: Record<Exclude<FormatAction, "link" | "list">, [string, string]> = {
-        bold: ["**", "**"], italic: ["*", "*"], underline: ["__", "__"], strike: ["~~", "~~"],
-      };
-      [before, after] = marks[action];
-      replacement = selected || "texto";
     }
+    editor.innerHTML = markdownToHtml(value);
+  }, [value]);
 
-    const next = `${value.slice(0, start)}${before}${replacement}${after}${value.slice(end)}`;
+  function emitChange() {
+    const editor = editorRef.current;
+    if (!editor) return;
+    const next = nodeToMarkdown(editor).replace(/\n+$/, "");
+    lastEmittedValue.current = next;
     onChange(next);
-    const selectionStart = start + before.length;
-    const selectionEnd = selectionStart + replacement.length;
-    requestAnimationFrame(() => {
-      inputRef.current?.focus();
-      inputRef.current?.setSelectionRange(selectionStart, selectionEnd);
-    });
   }
 
-  function onKeyDown(event: KeyboardEvent<HTMLInputElement | HTMLTextAreaElement>) {
+  function apply(action: FormatAction) {
+    const editor = editorRef.current;
+    if (!editor) return;
+    editor.focus();
+    if (action === "link") {
+      const href = window.prompt("Dirección del enlace (ruta interna o HTTPS):", "https://");
+      if (!href || !safeHref(href)) return;
+      document.execCommand("createLink", false, href.trim());
+    } else if (action === "list") {
+      document.execCommand("insertUnorderedList");
+    } else {
+      const commands: Record<Exclude<FormatAction, "link" | "list">, string> = {
+        bold: "bold", italic: "italic", underline: "underline", strike: "strikeThrough",
+      };
+      document.execCommand(commands[action]);
+    }
+    emitChange();
+  }
+
+  function onKeyDown(event: KeyboardEvent<HTMLDivElement>) {
     if (!(event.ctrlKey || event.metaKey)) return;
-    const action = event.key.toLowerCase() === "b" ? "bold" : event.key.toLowerCase() === "i" ? "italic" : null;
+    const key = event.key.toLowerCase();
+    const action: FormatAction | null = key === "b" ? "bold" : key === "i" ? "italic" : key === "u" ? "underline" : null;
     if (action) {
       event.preventDefault();
       apply(action);
@@ -93,15 +136,21 @@ export function RichTextInput({
               {item.label}
             </button>
           ))}
-          <span className="self-center px-1 text-[11px] font-normal text-foreground-muted">Selecciona texto y aplica formato</span>
+          <span className="self-center px-1 text-[11px] font-normal text-foreground-muted">Selecciona el texto y aplica formato</span>
         </div>
-        {multiline ? (
-          <textarea ref={(element) => { inputRef.current = element; }} rows={value.length > 180 ? 5 : 3} maxLength={5000} value={value} onChange={(event) => onChange(event.target.value)} onKeyDown={onKeyDown} className="w-full resize-y bg-transparent px-3 py-2 font-normal outline-none" />
-        ) : (
-          <input ref={(element) => { inputRef.current = element; }} maxLength={500} value={value} onChange={(event) => onChange(event.target.value)} onKeyDown={onKeyDown} className="w-full bg-transparent px-3 py-2 font-normal outline-none" />
-        )}
+        <div
+          ref={editorRef}
+          contentEditable
+          suppressContentEditableWarning
+          role="textbox"
+          aria-label={label}
+          aria-multiline={multiline}
+          onInput={emitChange}
+          onKeyDown={onKeyDown}
+          className={`min-h-10 w-full px-3 py-2 font-normal outline-none [&_a]:text-primary [&_a]:underline [&_li]:ml-5 [&_li]:list-disc ${multiline ? "min-h-24 whitespace-pre-wrap" : "whitespace-nowrap"}`}
+        />
       </div>
-      <p className="mt-1 text-xs font-normal text-foreground-muted">El formato se conserva al guardar. También puedes usar Ctrl+B y Ctrl+I.</p>
+      <p className="mt-1 text-xs font-normal text-foreground-muted">El texto se muestra con su formato. También puedes usar Ctrl+B y Ctrl+I.</p>
     </div>
   );
 }

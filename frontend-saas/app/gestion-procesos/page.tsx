@@ -29,7 +29,6 @@ export default function GestionProcesosPage() {
               <a href="/gestion-procesos/auth/login" className="mt-7 inline-flex rounded-lg border border-white/50 px-5 py-3 font-semibold hover:bg-white/10">Ingresar a mi cuenta</a>
             </div>
             <div className="rounded-2xl border border-[#ccb56b]/60 bg-white/10 p-6 sm:p-8">
-              <h2 className="text-xl font-semibold">Planes disponibles</h2>
               <PlansAvailability />
             </div>
           </div>

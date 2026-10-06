@@ -102,6 +102,9 @@ export default function ContenidoPublicoAdminPage() {
   const [draft, setDraft] = useState<JsonValue>(cloneValue(SITE_PAGE_DEFAULTS.inicio));
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [mostrarPlanes, setMostrarPlanes] = useState(false);
+  const [configLoading, setConfigLoading] = useState(true);
+  const [configSaving, setConfigSaving] = useState(false);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
 
@@ -119,7 +122,10 @@ export default function ContenidoPublicoAdminPage() {
       })
       .catch((cause: unknown) => { if (active) setError(cause instanceof Error ? cause.message : "No fue posible cargar las páginas."); })
       .finally(() => { if (active) setLoading(false); });
-    return () => { active = false; };
+    fetchApi("/api/admin/configuracion", { method: "GET", token })
+      .then((config: { mostrar_planes: boolean }) => { if (active) setMostrarPlanes(config.mostrar_planes); })
+      .catch((cause: unknown) => { if (active) setError(cause instanceof Error ? cause.message : "No fue posible cargar la oferta pública."); })
+      .finally(() => { if (active) setConfigLoading(false); });    return () => { active = false; };
   }, [token]);
 
   const selectedPage = pages.find((page) => page.slug === selectedSlug);
@@ -170,6 +176,24 @@ export default function ContenidoPublicoAdminPage() {
     }
   }
 
+  async function updateOfferVisibility(nextValue: boolean) {
+    setConfigSaving(true);
+    setError("");
+    setNotice("");
+    try {
+      const config = await fetchApi("/api/admin/configuracion", {
+        method: "PUT",
+        token,
+        body: JSON.stringify({ mostrar_planes: nextValue }),
+      });
+      setMostrarPlanes(config.mostrar_planes);
+      setNotice(config.mostrar_planes ? "Los planes ya están visibles en Gestión de Procesos." : "La página mostrará Próximamente en lugar de los planes.");
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "No fue posible actualizar la oferta pública.");
+    } finally {
+      setConfigSaving(false);
+    }
+  }
   return (
     <section className="mx-auto max-w-6xl space-y-5 px-4 py-6 sm:px-6 lg:px-8">
       <header className="flex flex-wrap items-end justify-between gap-4">
@@ -178,7 +202,19 @@ export default function ContenidoPublicoAdminPage() {
       </header>
       {error && <p role="alert" className="rounded-lg border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive">{error}</p>}
       {notice && <p role="status" className="rounded-lg border border-emerald-500/30 bg-emerald-500/10 p-3 text-sm text-emerald-700">{notice}</p>}
-      <div className="grid gap-5 lg:grid-cols-[240px_minmax(0,1fr)]">
+      <section className="flex flex-wrap items-center justify-between gap-4 rounded-lg border border-border bg-card p-4">
+        <div>
+          <h2 className="font-semibold text-foreground">Oferta de Gestión de Procesos</h2>
+          <p className="mt-1 text-sm text-foreground-muted">Controla si la página pública muestra los planes o el mensaje Próximamente.</p>
+        </div>
+        <label className="inline-flex cursor-pointer items-center gap-3 text-sm font-medium text-foreground">
+          <span>{mostrarPlanes ? "Mostrar planes" : "Mostrar Próximamente"}</span>
+          <input type="checkbox" role="switch" aria-label="Mostrar planes en la página pública de Gestión de Procesos" checked={mostrarPlanes} disabled={configLoading || configSaving} onChange={(event) => void updateOfferVisibility(event.target.checked)} className="peer sr-only" />
+          <span aria-hidden="true" className={`relative h-6 w-11 rounded-full transition-colors after:absolute after:left-0.5 after:top-0.5 after:size-5 after:rounded-full after:bg-white after:transition-transform peer-focus-visible:outline-none peer-focus-visible:ring-2 peer-focus-visible:ring-primary peer-disabled:opacity-50 ${mostrarPlanes ? "bg-primary after:translate-x-5" : "bg-border"}`} />
+          {configLoading && <span className="text-xs text-foreground-muted">Cargando…</span>}
+          {configSaving && <span className="text-xs text-foreground-muted">Guardando…</span>}
+        </label>
+      </section>      <div className="grid gap-5 lg:grid-cols-[240px_minmax(0,1fr)]">
         <nav aria-label="Páginas públicas" className="h-fit rounded-lg border border-border bg-card p-2">
           {pages.map((page) => <button key={page.slug} type="button" onClick={() => selectPage(page.slug)} aria-current={selectedSlug === page.slug ? "page" : undefined} className={`flex w-full items-center justify-between rounded-md px-3 py-2.5 text-left text-sm ${selectedSlug === page.slug ? "bg-primary/10 font-semibold text-primary" : "text-foreground-secondary hover:bg-muted"}`}><span>{page.nombre}</span><span className={`size-2 rounded-full ${page.contenido ? "bg-emerald-600" : "bg-muted-foreground/40"}`} aria-label={page.contenido ? "Personalizada" : "Contenido base"} /></button>)}
         </nav>

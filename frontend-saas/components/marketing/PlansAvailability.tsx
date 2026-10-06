@@ -13,6 +13,7 @@ type Plan = {
 export function PlansAvailability() {
   const [mostrarPlanes, setMostrarPlanes] = useState(false);
   const [planes, setPlanes] = useState<Plan[]>([]);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     async function cargarOferta() {
@@ -21,14 +22,16 @@ export function PlansAvailability() {
         if (!configuracion.mostrar_planes) return;
         const disponibles = await fetch(`${API_URL}/api/planes-publicos`).then((response) => response.ok ? response.json() : []);
         setMostrarPlanes(true); setPlanes(disponibles);
-      } catch { /* Si la API no responde se conserva la lista de espera. */ }
+      } catch { /* Si la API no responde se conserva el estado de próximamente. */ }
+      finally { setLoading(false); }
     }
     cargarOferta();
   }, []);
 
-  if (!mostrarPlanes) return <InterestForm />;
+  if (loading) return <p role="status" className="mt-6 text-sm text-white/75">Cargando oferta...</p>;
+  if (!mostrarPlanes) return <><h2 className="text-xl font-semibold">Próximamente</h2><p className="mt-2 text-sm text-white/75">Estamos preparando los planes para abogados.</p><InterestForm /></>;
 
-  return <div id="planes" className="mt-8 grid gap-4 sm:grid-cols-2">
+  return <><h2 className="text-xl font-semibold">Planes disponibles</h2><div id="planes" className="mt-6 grid gap-4 sm:grid-cols-2">
     {planes.map((plan) => <article key={plan.id} className="rounded-2xl border border-[#ccb56b]/60 bg-white/10 p-5">
       <h2 className="text-xl font-semibold">{plan.nombre}</h2>
       <p className="mt-1 text-sm text-white/80">{plan.precio_mensual === 0 ? "Gratis" : `$${plan.precio_mensual.toLocaleString("es-CO")} / mes`}</p>
@@ -40,5 +43,5 @@ export function PlansAvailability() {
       </ul>
       <a href={`/gestion-procesos/auth/registro?plan_id=${plan.id}`} className="mt-5 inline-block font-semibold underline decoration-[#ccb56b] decoration-2 underline-offset-4">Elegir este plan →</a>
     </article>)}
-  </div>;
+  </div></>;
 }
