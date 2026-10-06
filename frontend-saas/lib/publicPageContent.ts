@@ -18,12 +18,21 @@ function mergeContent<T>(defaults: T, override: unknown): T {
 
 export async function loadPublicPageContent<T>(slug: PublicPageSlug, defaults: T): Promise<T> {
   try {
-    const apiBaseUrl = API_URL.replace(/\/$/, "");
+    // Vercel's service binding is server-only; browser requests continue using the /api rewrite.
+    const apiBaseUrl = (process.env.BACKEND_SERVICE_URL || API_URL).replace(/\/+$/, "");
+    if (!apiBaseUrl) {
+      console.error(`[publicPageContent] No hay una URL de API configurada para cargar "${slug}".`);
+      return defaults;
+    }
     const response = await fetch(`${apiBaseUrl}/api/contenido-publico/${encodeURIComponent(slug)}`, { cache: "no-store" });
-    if (!response.ok) return defaults;
+    if (!response.ok) {
+      console.error(`[publicPageContent] La API respondió ${response.status} al cargar "${slug}".`);
+      return defaults;
+    }
     const data: { contenido?: unknown } = await response.json();
     return mergeContent(defaults, data.contenido);
-  } catch {
+  } catch (error) {
+    console.error(`[publicPageContent] No se pudo cargar "${slug}" desde la API.`, error);
     return defaults;
   }
 }
