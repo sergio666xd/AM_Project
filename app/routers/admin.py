@@ -8,7 +8,7 @@ from urllib.request import Request, urlopen
 
 import requests
 from email_validator import EmailNotValidError, validate_email
-from fastapi import APIRouter, Body, Depends, File, Form, HTTPException, Request, UploadFile, status
+from fastapi import APIRouter, Body, Depends, File, Form, HTTPException, Query, Request, UploadFile, status
 from botocore.exceptions import BotoCoreError, ClientError
 from datetime import date, datetime, timedelta, timezone
 from zoneinfo import ZoneInfo
@@ -38,7 +38,8 @@ from app.radicados import (
 from app.migrate_radicados_canonicos import migrar as migrar_radicados_canonicos
 from app.migrate_radicados_canonicos import previsualizar as previsualizar_migracion_radicados
 from app.rama_judicial_api import API_BASE_URL
-from app.whatsapp import WHATSAPP_API_URL, WHATSAPP_TOKEN, enviar_mensaje_whatsapp
+from app.whatsapp import enviar_mensaje_whatsapp
+from app.integration_settings import encrypt_secret, get_integration_settings
 from app.workflow_service import (
     workflow_401_reason,
     workflow_frontend_url,
@@ -241,6 +242,25 @@ def restaurar_contenido_publico_admin(
     registrar_evento_auditoria(db, admin, "admin.contenido.restaurar", "pagina_publica", slug)
     db.commit()
     return {"mensaje": "Se restaurará el contenido base de la página."}
+
+
+# Resource groups consumed by the admin audit filters and event serializer.
+AUDIT_RESOURCE_MODULES = {
+    "Usuarios": ("usuario", "solicitud_registro"),
+    "Procesos": ("proceso", "proceso_cliente", "proceso_radicado"),
+    "Radicados": ("radicado",),
+    "Tareas": ("tarea", "subtarea", "recordatorio_tarea"),
+    "Documentos": ("documento_proceso", "solicitud_documento"),
+    "Planes": ("plan",),
+    "Contenido público": ("pagina_publica",),
+    "Alertas": ("alerta",),
+    "Configuración": ("configuracion_consultas", "configuracion_integraciones", "configuracion_saas"),
+}
+AUDIT_RESOURCE_MODULE_LABELS = {
+    resource: module
+    for module, resources in AUDIT_RESOURCE_MODULES.items()
+    for resource in resources
+}
 
 
 @router.get("/auditoria")
@@ -786,12 +806,16 @@ def _alertas_admin(db: Session) -> list[dict]:
 
     disposition_events = db.query(models.EventoAuditoria).filter(
         models.EventoAuditoria.tipo_recurso == "alerta",
-        models.EventoAuditoria.accion.in_(("admin.alerta.atender", "admin.alerta.descartar")),
+        models.EventoAuditoria.accion.in_(("admin.alerta.atender", "admin.alerta.descartar", "admin.alerta.eliminar")),
     ).order_by(models.EventoAuditoria.id.desc()).all()
     dispositions: dict[str, str] = {}
     for event in disposition_events:
         if event.recurso_id and event.recurso_id not in dispositions:
-            dispositions[event.recurso_id] = "ATENDIDA" if event.accion.endswith("atender") else "DESCARTADA"
+            dispositions[event.recurso_id] = (
+                "ATENDIDA" if event.accion.endswith("atender")
+                else "ELIMINADA" if event.accion.endswith("eliminar")
+                else "DESCARTADA"
+            )
     for alerta in alertas:
         alerta["estado"] = dispositions.get(alerta["id"], "ACTIVA")
     prioridad_orden = {"Alta": 0, "Media": 1, "Baja": 2}
@@ -804,10 +828,53 @@ def _alertas_admin(db: Session) -> list[dict]:
 
 @router.get("/alertas")
 def listar_alertas_admin(
+    limite: int | None = Query(default=None, ge=1, le=500),
     db: Session = Depends(get_db),
     admin: models.Usuario = Depends(verificar_admin),
 ):
-    return _alertas_admin(db)
+    alertas = _alertas_admin(db)
+    if limite is not None:
+        alertas = [alerta for alerta in alertas if alerta["estado"] != "ELIMINADA"]
+        alertas.sort(key=lambda item: datetime.fromisoformat(item["fecha"]).timestamp() if item["fecha"] else 0, reverse=True)
+        return alertas[:limite]
+    return alertas
+
+
+@router.delete("/alertas")
+def eliminar_todas_alertas_admin(
+    db: Session = Depends(get_db),
+    admin: models.Usuario = Depends(verificar_admin),
+):
+    alertas = _alertas_admin(db)
+    por_eliminar = [alerta for alerta in alertas if alerta["estado"] != "ELIMINADA"]
+    for alerta in por_eliminar:
+        registrar_evento_auditoria(db, admin, "admin.alerta.eliminar", "alerta", alerta["id"])
+    db.commit()
+    return {"eliminadas": len(por_eliminar)}
+
+
+@router.post("/alertas/acciones")
+def ejecutar_accion_masiva_alertas_admin(
+    datos: schemas.AlertasAccionMasiva,
+    db: Session = Depends(get_db),
+    admin: models.Usuario = Depends(verificar_admin),
+):
+    actuales = {alerta["id"]: alerta for alerta in _alertas_admin(db)}
+    ids = list(dict.fromkeys(datos.alerta_ids))
+    faltantes = [alerta_id for alerta_id in ids if alerta_id not in actuales]
+    if faltantes:
+        raise HTTPException(status_code=409, detail="Algunas alertas ya no existen; actualiza la lista.")
+    if datos.estado == "DESCARTADA" and any(not actuales[alerta_id]["descartable"] for alerta_id in ids):
+        raise HTTPException(status_code=400, detail="La selección incluye alertas que deben resolverse desde su recurso.")
+    accion = {
+        "ATENDIDA": "admin.alerta.atender",
+        "DESCARTADA": "admin.alerta.descartar",
+        "ELIMINADA": "admin.alerta.eliminar",
+    }[datos.estado]
+    for alerta_id in ids:
+        registrar_evento_auditoria(db, admin, accion, "alerta", alerta_id)
+    db.commit()
+    return {"actualizadas": len(ids), "estado": datos.estado}
 
 
 @router.patch("/alertas/{alerta_id}/estado")
@@ -1656,15 +1723,83 @@ def detalle_ejecucion_consultas(
     }
 
 
+def _estado_integraciones_admin() -> dict:
+    settings = get_integration_settings()
+    smtp_configurado = bool(settings["smtp_host"] and settings["smtp_from"])
+    whatsapp_configurado = bool(
+        str(settings["whatsapp_api_url"] or "").startswith(("https://", "http://"))
+        and settings["whatsapp_token"]
+        and settings["whatsapp_token"] != "TU_TOKEN_AQUI"
+    )
+    return {
+        "smtp_host": settings["smtp_host"] or "",
+        "smtp_port": settings["smtp_port"],
+        "smtp_from": settings["smtp_from"] or "",
+        "smtp_starttls": bool(settings["smtp_starttls"]),
+        "smtp_user": settings["smtp_user"] or "",
+        "smtp_password_configurada": bool(settings["smtp_password"]),
+        "whatsapp_api_url": settings["whatsapp_api_url"] or "",
+        "whatsapp_token_configurado": bool(settings["whatsapp_token"]),
+        "smtp_configurado": smtp_configurado,
+        "whatsapp_configurado": whatsapp_configurado,
+    }
+
+
+@router.get("/integraciones/configuracion")
+def obtener_configuracion_integraciones_admin(
+    admin: models.Usuario = Depends(verificar_admin),
+):
+    return _estado_integraciones_admin()
+
+
+@router.put("/integraciones/configuracion")
+def actualizar_configuracion_integraciones_admin(
+    datos: schemas.ConfiguracionIntegracionesUpdate,
+    db: Session = Depends(get_db),
+    admin: models.Usuario = Depends(verificar_admin),
+):
+    if datos.whatsapp_api_url and not datos.whatsapp_api_url.startswith(("https://", "http://")):
+        raise HTTPException(status_code=400, detail="La URL de WhatsApp debe usar HTTP o HTTPS.")
+    if datos.borrar_smtp_password and datos.smtp_password:
+        raise HTTPException(status_code=400, detail="No puedes guardar y borrar la clave SMTP en la misma solicitud.")
+    if datos.borrar_whatsapp_token and datos.whatsapp_token:
+        raise HTTPException(status_code=400, detail="No puedes guardar y borrar el token de WhatsApp en la misma solicitud.")
+
+    config = db.query(models.ConfiguracionIntegraciones).filter_by(id=1).with_for_update().first()
+    if config is None:
+        config = models.ConfiguracionIntegraciones(id=1)
+        db.add(config)
+    for field in ("smtp_host", "smtp_port", "smtp_from", "smtp_starttls", "smtp_user"):
+        value = getattr(datos, field)
+        if value is not None:
+            setattr(config, field, value.strip() if isinstance(value, str) else value)
+    if datos.whatsapp_api_url is not None:
+        config.whatsapp_api_url_encrypted = encrypt_secret(datos.whatsapp_api_url.strip())
+    if datos.smtp_password is not None:
+        config.smtp_password_encrypted = encrypt_secret(datos.smtp_password)
+    elif datos.borrar_smtp_password:
+        config.smtp_password_encrypted = encrypt_secret("")
+    if datos.whatsapp_token is not None:
+        config.whatsapp_token_encrypted = encrypt_secret(datos.whatsapp_token)
+    elif datos.borrar_whatsapp_token:
+        config.whatsapp_token_encrypted = encrypt_secret("")
+
+    config.actualizado_por_id = admin.id
+    registrar_evento_auditoria(db, admin, "admin.integraciones.configuracion.actualizar", "configuracion_integraciones", 1)
+    db.commit()
+    return _estado_integraciones_admin()
+
+
 @router.get("/diagnosticos/configuracion")
 def obtener_estado_configuracion_integraciones(
     admin: models.Usuario = Depends(verificar_admin),
 ):
-    smtp_configurado = bool(os.getenv("SMTP_HOST") and os.getenv("SMTP_FROM"))
+    settings = get_integration_settings()
+    smtp_configurado = bool(settings["smtp_host"] and settings["smtp_from"])
     whatsapp_configurado = bool(
-        WHATSAPP_API_URL.startswith(("https://", "http://"))
-        and WHATSAPP_TOKEN
-        and WHATSAPP_TOKEN != "TU_TOKEN_AQUI"
+        str(settings["whatsapp_api_url"] or "").startswith(("https://", "http://"))
+        and settings["whatsapp_token"]
+        and settings["whatsapp_token"] != "TU_TOKEN_AQUI"
     )
     workflow_configurado = bool(
         workflow_frontend_url()
@@ -1736,24 +1871,26 @@ def probar_conexion_integracion(
         return {"integracion": "WORKFLOW", "estado": "ACEPTADO", "workflow_run_id": resultado.get("workflow_run_id")}
 
     if datos.integracion == "SMTP":
-        host = os.getenv("SMTP_HOST")
-        remitente = os.getenv("SMTP_FROM")
+        settings = get_integration_settings()
+        host = settings["smtp_host"]
+        remitente = settings["smtp_from"]
         if not host or not remitente:
             return {"integracion": "SMTP", "estado": "FALTAN_VARIABLES"}
         try:
-            with smtplib.SMTP(host, int(os.getenv("SMTP_PORT", "587")), timeout=8) as servidor:
+            with smtplib.SMTP(host, int(settings["smtp_port"] or 587), timeout=8) as servidor:
                 servidor.ehlo()
-                if os.getenv("SMTP_STARTTLS", "true").lower() == "true":
+                if settings["smtp_starttls"]:
                     servidor.starttls()
                     servidor.ehlo()
         except (OSError, smtplib.SMTPException, ValueError):
             return {"integracion": "SMTP", "estado": "FALLO", "detalle": "No fue posible establecer la conexión SMTP."}
         return {"integracion": "SMTP", "estado": "CONECTADO", "detalle": "Conexión verificada; no se envió correo."}
 
+    settings = get_integration_settings()
     configurado = bool(
-        WHATSAPP_API_URL.startswith(("https://", "http://"))
-        and WHATSAPP_TOKEN
-        and WHATSAPP_TOKEN != "TU_TOKEN_AQUI"
+        str(settings["whatsapp_api_url"] or "").startswith(("https://", "http://"))
+        and settings["whatsapp_token"]
+        and settings["whatsapp_token"] != "TU_TOKEN_AQUI"
     )
     return {
         "integracion": "WHATSAPP",

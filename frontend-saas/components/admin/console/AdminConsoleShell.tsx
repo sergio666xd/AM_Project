@@ -25,6 +25,7 @@ import {
 } from "lucide-react";
 import { useSession } from "@/context/SessionContext";
 import Breadcrumbs from "@/components/layout/Breadcrumbs";
+import { AdminAlertBell } from "@/components/admin/console/AdminAlertBell";
 
 type Item = { label: string; href: string; icon: typeof LayoutDashboard };
 type Section = { title: string; scope: string; links: Item[] };
@@ -176,7 +177,7 @@ export default function AdminConsoleShell({
   children: ReactNode;
 }) {
   const pathname = usePathname();
-  const { user, logout } = useSession();
+  const { user, logout, token } = useSession();
   const [mobileOpen, setMobileOpen] = useState(false);
   const scope = activeScope(pathname);
 
@@ -312,10 +313,13 @@ export default function AdminConsoleShell({
       </aside>
       <main className="min-h-screen pt-16 md:ml-70 md:pt-0">
         <header className="sticky top-0 z-30 border-b border-border bg-surface/95 px-5 py-3 backdrop-blur md:px-8">
-          <Breadcrumbs />
-          <p className="mt-0.5 text-sm font-semibold text-foreground">
-            {scope}
-          </p>
+          <div className="flex items-center justify-between gap-4">
+            <div className="min-w-0">
+              <Breadcrumbs />
+              <p className="mt-0.5 text-sm font-semibold text-foreground">{scope}</p>
+            </div>
+            <AdminAlertBell token={token} />
+          </div>
         </header>
         <div className="p-5 md:p-8">{children}</div>
       </main>

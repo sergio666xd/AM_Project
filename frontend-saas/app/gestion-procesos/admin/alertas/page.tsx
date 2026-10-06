@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { Bell, Check, ExternalLink, RefreshCw, X } from "lucide-react";
+import { Bell, Check, ExternalLink, RefreshCw, Trash2, X } from "lucide-react";
 import { fetchApi } from "@/lib/api";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
@@ -11,7 +11,7 @@ import { EmptyState } from "@/components/ui/EmptyState";
 import { LoadingState } from "@/components/ui/LoadingState";
 import { FilterBar } from "@/components/ui/FilterBar";
 
-type AlertState = "ACTIVA" | "ATENDIDA" | "DESCARTADA";
+type AlertState = "ACTIVA" | "ATENDIDA" | "DESCARTADA" | "ELIMINADA";
 type AlertItem = {
   id: string;
   tipo: string;
@@ -24,25 +24,28 @@ type AlertItem = {
   estado: AlertState;
   descartable: boolean;
 };
-type Filter = "Todas" | "Activas" | "Pendientes" | "Advertencias" | "Errores" | "Riesgos" | "Eventos" | "Atendidas";
+type Filter = "Todas" | "Activas" | "Pendientes" | "Advertencias" | "Errores" | "Riesgos" | "Eventos" | "Atendidas" | "Eliminadas";
 
-const filters: Filter[] = ["Todas", "Activas", "Pendientes", "Advertencias", "Errores", "Riesgos", "Eventos", "Atendidas"];
+const filters: Filter[] = ["Todas", "Activas", "Pendientes", "Advertencias", "Errores", "Riesgos", "Eventos", "Atendidas", "Eliminadas"];
 const priorityTone = { Alta: "risk", Media: "attention", Baja: "normal" } as const;
 
 export default function AdminAlertsPage() {
   const [items, setItems] = useState<AlertItem[]>([]);
   const [filter, setFilter] = useState<Filter>("Activas");
   const [loading, setLoading] = useState(true);
-  const [busyId, setBusyId] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [error, setError] = useState("");
   const token = typeof window === "undefined" ? "" : localStorage.getItem("token") || "";
 
-  const load = useCallback(async () => {
+  const load = useCallback(async (showLoading = false) => {
     if (!token) return;
-    setLoading(true);
-    setError("");
+    if (showLoading) setLoading(true);
     try {
-      setItems(await fetchApi("/api/admin/alertas", { method: "GET", token }));
+      const result: AlertItem[] = await fetchApi("/api/admin/alertas", { method: "GET", token });
+      setItems(result);
+      setSelectedIds((current) => current.filter((id) => result.some((item) => item.id === id)));
+      setError("");
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "No fue posible cargar las alertas.");
     } finally {
@@ -51,35 +54,58 @@ export default function AdminAlertsPage() {
   }, [token]);
 
   useEffect(() => {
-    if (!token) return;
-    let active = true;
-    fetchApi("/api/admin/alertas", { method: "GET", token })
-      .then((result) => { if (active) setItems(result); })
-      .catch((cause: unknown) => {
-        if (active) setError(cause instanceof Error ? cause.message : "No fue posible cargar las alertas.");
-      })
-      .finally(() => { if (active) setLoading(false); });
-    return () => { active = false; };
-  }, [token]);
+    const initialLoad = window.setTimeout(() => void load(true), 0);
+    const timer = window.setInterval(() => {
+      if (document.visibilityState === "visible") void load();
+    }, 10_000);
+    const handleVisibility = () => {
+      if (document.visibilityState === "visible") void load();
+    };
+    document.addEventListener("visibilitychange", handleVisibility);
+    return () => {
+      window.clearTimeout(initialLoad);
+      window.clearInterval(timer);
+      document.removeEventListener("visibilitychange", handleVisibility);
+    };
+  }, [load]);
 
-  async function updateState(alert: AlertItem, estado: "ATENDIDA" | "DESCARTADA") {
-    setBusyId(alert.id);
+  async function applyBulkAction(estado: "ATENDIDA" | "DESCARTADA" | "ELIMINADA", ids = selectedIds) {
+    if (!ids.length) return;
+    setBusy(true);
     setError("");
     try {
-      await fetchApi(`/api/admin/alertas/${encodeURIComponent(alert.id)}/estado`, {
-        method: "PATCH", token, body: JSON.stringify({ estado }),
+      await fetchApi("/api/admin/alertas/acciones", {
+        method: "POST", token, body: JSON.stringify({ alerta_ids: ids, estado }),
       });
-      setItems((current) => current.map((item) => item.id === alert.id ? { ...item, estado } : item));
+      setSelectedIds([]);
+      await load();
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : "No fue posible actualizar la alerta.");
+      setError(cause instanceof Error ? cause.message : "No fue posible actualizar las alertas.");
     } finally {
-      setBusyId(null);
+      setBusy(false);
+    }
+  }
+
+  async function deleteAll() {
+    const pendingDeleteCount = items.filter((item) => item.estado !== "ELIMINADA").length;
+    if (!pendingDeleteCount || !window.confirm(`¿Eliminar todas las ${pendingDeleteCount} alertas de la lista?`)) return;
+    setBusy(true);
+    setError("");
+    try {
+      await fetchApi("/api/admin/alertas", { method: "DELETE", token });
+      setSelectedIds([]);
+      await load();
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "No fue posible eliminar todas las alertas.");
+    } finally {
+      setBusy(false);
     }
   }
 
   const visible = useMemo(() => items.filter((item) => {
     if (filter === "Activas") return item.estado === "ACTIVA";
-    if (filter === "Atendidas") return item.estado !== "ACTIVA";
+    if (filter === "Atendidas") return item.estado === "ATENDIDA" || item.estado === "DESCARTADA";
+    if (filter === "Eliminadas") return item.estado === "ELIMINADA";
     if (filter === "Pendientes") return item.tipo === "Pendiente";
     if (filter === "Advertencias") return item.tipo === "Advertencia";
     if (filter === "Errores") return item.tipo === "Error";
@@ -87,7 +113,17 @@ export default function AdminAlertsPage() {
     if (filter === "Eventos") return item.tipo === "Evento";
     return true;
   }), [filter, items]);
+  const visibleIds = visible.map((item) => item.id);
+  const allVisibleSelected = visibleIds.length > 0 && visibleIds.every((id) => selectedIds.includes(id));
+  const selectedItems = items.filter((item) => selectedIds.includes(item.id));
+  const canDiscardSelection = selectedItems.length > 0 && selectedItems.every((item) => item.descartable);
   const activeCount = items.filter((item) => item.estado === "ACTIVA").length;
+
+  function toggleAllVisible() {
+    setSelectedIds((current) => allVisibleSelected
+      ? current.filter((id) => !visibleIds.includes(id))
+      : [...new Set([...current, ...visibleIds])]);
+  }
 
   return (
     <div className="space-y-6 p-6">
@@ -97,9 +133,10 @@ export default function AdminAlertsPage() {
           <h1 className="mt-1 flex items-center gap-2 text-2xl font-semibold"><Bell className="size-6" /> Alertas</h1>
           <p className="mt-2 text-sm text-foreground-muted">Pendientes, riesgos y eventos importantes de la operación.</p>
         </div>
-        <Button variant="secondary" onClick={() => void load()} disabled={loading}>
-          <RefreshCw className="mr-2 size-4" /> Actualizar
-        </Button>
+        <div className="flex gap-2">
+          <Button variant="secondary" onClick={() => void load(true)} disabled={loading || busy}><RefreshCw className="mr-2 size-4" /> Actualizar</Button>
+          <Button variant="danger" onClick={() => void deleteAll()} disabled={!items.length || busy}><Trash2 className="mr-2 size-4" /> Eliminar todas</Button>
+        </div>
       </header>
 
       <div className="grid gap-3 sm:grid-cols-3">
@@ -114,29 +151,42 @@ export default function AdminAlertsPage() {
         </div>
       </FilterBar>
 
+      {selectedIds.length > 0 && <div className="flex flex-wrap items-center gap-2 rounded-lg border border-border bg-surface p-3">
+        <span className="mr-auto text-sm font-medium">{selectedIds.length} seleccionadas</span>
+        <Button size="sm" onClick={() => void applyBulkAction("ATENDIDA")} disabled={busy}><Check className="mr-1 size-4" /> Marcar atendidas</Button>
+        <Button size="sm" variant="secondary" onClick={() => void applyBulkAction("DESCARTADA")} disabled={busy || !canDiscardSelection}><X className="mr-1 size-4" /> Descartar</Button>
+        <Button size="sm" variant="danger" onClick={() => void applyBulkAction("ELIMINADA")} disabled={busy}><Trash2 className="mr-1 size-4" /> Eliminar selección</Button>
+      </div>}
+
       {error && <div role="alert" className="rounded-lg border border-danger/30 bg-danger-light p-3 text-sm text-danger">{error}</div>}
       {loading ? <LoadingState label="Cargando alertas" rows={5} /> : visible.length === 0 ? (
         <EmptyState title={filter === "Activas" ? "Todo está al día" : "No hay alertas en esta vista"} description="Las alertas aparecen cuando hay pendientes o eventos reales que requieren atención." />
       ) : (
-        <div className="space-y-3">
-          {visible.map((item) => (
-            <Card key={item.id} className="flex flex-col gap-4 p-4 md:flex-row md:items-center md:justify-between">
-              <div className="min-w-0 flex-1">
-                <div className="flex flex-wrap items-center gap-2">
-                  <Badge tone={priorityTone[item.prioridad]}>{item.prioridad}</Badge>
-                  <Badge tone={item.estado === "ACTIVA" ? "pending" : item.estado === "ATENDIDA" ? "completed" : "archived"}>{item.estado === "ACTIVA" ? item.tipo : item.estado === "ATENDIDA" ? "Atendida" : "Descartada"}</Badge>
-                  {item.fecha && <time className="text-xs text-foreground-muted" dateTime={item.fecha}>{new Date(item.fecha).toLocaleString("es-CO")}</time>}
-                </div>
-                <h2 className="mt-2 font-semibold">{item.descripcion}</h2>
-                <p className="mt-1 text-sm text-foreground-muted">{item.recurso} · Acción recomendada: {item.accion_recomendada}</p>
-              </div>
-              <div className="flex flex-wrap gap-2">
-                <Link className="inline-flex min-h-8 items-center justify-center gap-1 rounded-lg bg-surface-hover px-3 text-xs font-semibold text-foreground hover:brightness-95" href={item.href}><ExternalLink className="size-4" /> Abrir recurso</Link>
-                {item.estado === "ACTIVA" && <Button size="sm" onClick={() => void updateState(item, "ATENDIDA")} disabled={busyId === item.id}><Check className="mr-1 size-4" /> Marcar atendida</Button>}
-                {item.estado === "ACTIVA" && item.descartable && <Button size="sm" variant="ghost" onClick={() => void updateState(item, "DESCARTADA")} disabled={busyId === item.id}><X className="mr-1 size-4" /> Descartar</Button>}
-              </div>
-            </Card>
-          ))}
+        <div className="overflow-x-auto rounded-lg border border-border bg-surface">
+          <table className="w-full min-w-[900px] border-collapse text-left text-sm">
+            <thead className="bg-surface-secondary text-xs uppercase text-foreground-muted">
+              <tr>
+                <th className="w-12 px-3 py-3"><input type="checkbox" aria-label="Seleccionar todas las alertas visibles" checked={allVisibleSelected} onChange={toggleAllVisible} /></th>
+                <th className="px-3 py-3">Alerta</th><th className="px-3 py-3">Prioridad</th><th className="px-3 py-3">Estado</th><th className="px-3 py-3">Fecha</th><th className="px-3 py-3">Recurso</th><th className="px-3 py-3">Acciones</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-border">
+              {visible.map((item) => <tr key={item.id} className="align-top hover:bg-surface-hover/50">
+                <td className="px-3 py-3"><input type="checkbox" aria-label={`Seleccionar ${item.descripcion}`} checked={selectedIds.includes(item.id)} onChange={() => setSelectedIds((current) => current.includes(item.id) ? current.filter((id) => id !== item.id) : [...current, item.id])} /></td>
+                <td className="max-w-md px-3 py-3"><p className="font-semibold">{item.descripcion}</p><p className="mt-1 text-xs text-foreground-muted">{item.accion_recomendada}</p></td>
+                <td className="px-3 py-3"><Badge tone={priorityTone[item.prioridad]}>{item.prioridad}</Badge></td>
+                <td className="px-3 py-3"><Badge tone={item.estado === "ACTIVA" ? "pending" : item.estado === "ATENDIDA" ? "completed" : "archived"}>{item.estado === "ACTIVA" ? item.tipo : item.estado === "ATENDIDA" ? "Atendida" : item.estado === "DESCARTADA" ? "Descartada" : "Eliminada"}</Badge></td>
+                <td className="whitespace-nowrap px-3 py-3 text-xs text-foreground-muted">{item.fecha ? <time dateTime={item.fecha}>{new Date(item.fecha).toLocaleString("es-CO")}</time> : "—"}</td>
+                <td className="px-3 py-3">{item.recurso}</td>
+                <td className="px-3 py-3"><div className="flex flex-wrap gap-1">
+                  <Link className="inline-flex min-h-8 items-center gap-1 rounded-md bg-surface-hover px-2 text-xs font-semibold" href={item.href}><ExternalLink className="size-3.5" /> Abrir</Link>
+                  {item.estado === "ACTIVA" && <button type="button" onClick={() => void applyBulkAction("ATENDIDA", [item.id])} disabled={busy} title="Marcar atendida" aria-label="Marcar atendida" className="grid size-8 place-items-center rounded-md hover:bg-surface-hover disabled:opacity-50"><Check className="size-4" /></button>}
+                  {item.estado === "ACTIVA" && item.descartable && <button type="button" onClick={() => void applyBulkAction("DESCARTADA", [item.id])} disabled={busy} title="Descartar" aria-label="Descartar" className="grid size-8 place-items-center rounded-md hover:bg-surface-hover disabled:opacity-50"><X className="size-4" /></button>}
+                  {item.estado !== "ELIMINADA" && <button type="button" onClick={() => void applyBulkAction("ELIMINADA", [item.id])} disabled={busy} title="Eliminar" aria-label="Eliminar" className="grid size-8 place-items-center rounded-md text-danger hover:bg-danger-light disabled:opacity-50"><Trash2 className="size-4" /></button>}
+                </div></td>
+              </tr>)}
+            </tbody>
+          </table>
         </div>
       )}
     </div>

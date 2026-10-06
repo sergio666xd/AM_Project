@@ -1,6 +1,5 @@
 import type { MetadataRoute } from "next";
-
-const siteUrl = (process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000").replace(/\/$/, "");
+import { SITE_URL } from "@/lib/siteUrl";
 
 export default function robots(): MetadataRoute.Robots {
   return {
@@ -13,6 +12,6 @@ export default function robots(): MetadataRoute.Robots {
         "/gestion-procesos/auth/",
       ],
     },
-    sitemap: `${siteUrl}/sitemap.xml`,
+    sitemap: new URL("/sitemap.xml", SITE_URL).toString(),
   };
 }

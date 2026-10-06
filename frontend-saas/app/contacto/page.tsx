@@ -3,6 +3,11 @@ import { Clock, Mail, MapPin, MessageCircle, type LucideIcon } from "lucide-reac
 import { MarketingLayout } from "@/components/marketing/MarketingLayout";
 import { loadPublicPageContent } from "@/lib/publicPageContent";
 import { SITE_PAGE_DEFAULTS } from "@/lib/sitePageDefaults";
+import { generatePublicPageMetadata } from "@/lib/pageSeo";
+
+export function generateMetadata() {
+  return generatePublicPageMetadata("contacto", SITE_PAGE_DEFAULTS.contacto, "/contacto");
+}
 
 const contactIcons: Record<string, LucideIcon> = { location: MapPin, clock: Clock, email: Mail };
 const emailUrl = "mailto:alejandramunozabg@outlook.com?subject=Consulta%20jur%C3%ADdica";

@@ -16,6 +16,7 @@ import {
   ServerCog,
 } from "lucide-react";
 import { fetchApi } from "@/lib/api";
+import { IntegrationSettingsPanel } from "@/components/admin/console/IntegrationSettingsPanel";
 
 type Vision = {
   resumen: {
@@ -594,6 +595,7 @@ export default function AdminOperationsPage() {
                 <h2 className="font-semibold">Diagnóstico de integraciones</h2>
                 <p className="mt-1 text-sm text-foreground-muted">Las comprobaciones no envían mensajes. El envío de prueba requiere destinatario y confirmación.</p>
               </div>
+              <IntegrationSettingsPanel token={token} />
               <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
                 {([
                   ["RAMA", "Rama Judicial"],

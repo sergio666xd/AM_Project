@@ -2,6 +2,11 @@ import { renderRichText } from "@/components/marketing/RichText";
 import { MarketingLayout } from "@/components/marketing/MarketingLayout";
 import { loadPublicPageContent } from "@/lib/publicPageContent";
 import { SITE_PAGE_DEFAULTS } from "@/lib/sitePageDefaults";
+import { generatePublicPageMetadata } from "@/lib/pageSeo";
+
+export function generateMetadata() {
+  return generatePublicPageMetadata("quienes-somos", SITE_PAGE_DEFAULTS["quienes-somos"], "/quienes-somos");
+}
 
 export default async function QuienesSomos() {
 	const content = await loadPublicPageContent("quienes-somos", SITE_PAGE_DEFAULTS["quienes-somos"]);

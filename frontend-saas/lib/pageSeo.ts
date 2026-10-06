@@ -1,0 +1,41 @@
+import type { Metadata } from "next";
+import { loadPublicPageContent } from "@/lib/publicPageContent";
+import type { PublicPageSlug } from "@/lib/sitePageDefaults";
+
+type PageSeo = {
+  title?: string;
+  description?: string;
+  keywords?: string;
+  noIndex?: boolean;
+};
+
+export async function generatePublicPageMetadata<T extends { seo?: PageSeo }>(
+  slug: PublicPageSlug,
+  defaults: T,
+  pathname: string,
+): Promise<Metadata> {
+  const content = await loadPublicPageContent(slug, defaults);
+  const seo = content.seo ?? defaults.seo ?? {};
+  const title = seo.title?.trim() || "Alejandra Muñoz Abogada y Asociados";
+  const description = seo.description?.trim()
+    || "Asesoría jurídica preventiva, estratégica y cercana en Sabaneta y toda Colombia.";
+  const canonical = pathname === "/" ? "/" : pathname;
+  const keywords = seo.keywords?.split(",").map((keyword) => keyword.trim()).filter(Boolean);
+
+  return {
+    title,
+    description,
+    ...(keywords?.length ? { keywords } : {}),
+    alternates: { canonical },
+    openGraph: {
+      type: "website",
+      locale: "es_CO",
+      siteName: "Alejandra Muñoz Abogada y Asociados",
+      title,
+      description,
+      url: canonical,
+    },
+    twitter: { card: "summary", title, description },
+    robots: { index: !seo.noIndex, follow: !seo.noIndex },
+  };
+}

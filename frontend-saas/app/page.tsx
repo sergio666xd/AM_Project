@@ -4,6 +4,11 @@ import { ArrowRight, BriefcaseBusiness, Building2, HeartHandshake, Landmark, Sca
 import { MarketingLayout } from "@/components/marketing/MarketingLayout";
 import { loadPublicPageContent } from "@/lib/publicPageContent";
 import { SITE_PAGE_DEFAULTS } from "@/lib/sitePageDefaults";
+import { generatePublicPageMetadata } from "@/lib/pageSeo";
+
+export function generateMetadata() {
+  return generatePublicPageMetadata("inicio", SITE_PAGE_DEFAULTS.inicio, "/");
+}
 
 export default async function Home() {
   const content = await loadPublicPageContent("inicio", SITE_PAGE_DEFAULTS.inicio);

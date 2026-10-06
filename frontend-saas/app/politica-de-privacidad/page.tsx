@@ -1,6 +1,11 @@
 import { LegalPage, type LegalSection } from "@/components/marketing/LegalPage";
 import { loadPublicPageContent } from "@/lib/publicPageContent";
 import { SITE_PAGE_DEFAULTS } from "@/lib/sitePageDefaults";
+import { generatePublicPageMetadata } from "@/lib/pageSeo";
+
+export function generateMetadata() {
+  return generatePublicPageMetadata("politica-de-privacidad", SITE_PAGE_DEFAULTS["politica-de-privacidad"], "/politica-de-privacidad");
+}
 
 // Contenido editable. Complete los datos entre corchetes antes de publicar.
 export default async function PoliticaPrivacidad() {

@@ -1,5 +1,4 @@
 import { renderRichText } from "@/components/marketing/RichText";
-import type { Metadata } from "next";
 import {
   ClipboardCheck,
   FileText,
@@ -11,11 +10,11 @@ import {
 import { MarketingLayout } from "@/components/marketing/MarketingLayout";
 import { loadPublicPageContent } from "@/lib/publicPageContent";
 import { SITE_PAGE_DEFAULTS } from "@/lib/sitePageDefaults";
+import { generatePublicPageMetadata } from "@/lib/pageSeo";
 
-export const metadata: Metadata = {
-  title: "Póliza Jurídica | Alejandra Muñoz",
-  description: "Acompañamiento jurídico recurrente y ajustado a las necesidades de su organización.",
-};
+export function generateMetadata() {
+  return generatePublicPageMetadata("poliza-juridica", SITE_PAGE_DEFAULTS["poliza-juridica"], "/poliza-juridica");
+}
 
 const whatsappUrl = "https://wa.me/573508809878?text=Hola%2C%20quiero%20conocer%20la%20P%C3%B3liza%20Jur%C3%ADdica%20y%20solicitar%20un%20estudio%20para%20mi%20caso.";
 

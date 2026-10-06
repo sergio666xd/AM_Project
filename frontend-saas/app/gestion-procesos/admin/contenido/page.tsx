@@ -16,8 +16,24 @@ function cloneValue(value: unknown): JsonValue {
   return JSON.parse(JSON.stringify(value)) as JsonValue;
 }
 
+function mergeContent(defaults: JsonValue, override: JsonValue): JsonValue {
+  if (Array.isArray(override)) return override;
+  if (
+    defaults !== null && typeof defaults === "object" && !Array.isArray(defaults) &&
+    override !== null && typeof override === "object" && !Array.isArray(override)
+  ) {
+    const merged: Record<string, JsonValue> = { ...defaults };
+    for (const [key, value] of Object.entries(override)) {
+      merged[key] = key in merged ? mergeContent(merged[key], value) : value;
+    }
+    return merged;
+  }
+  return override ?? defaults;
+}
+
 function humanLabel(value: string) {
   const labels: Record<string, string> = {
+    seo: "SEO y buscadores", keywords: "Palabras clave", noIndex: "Ocultar de buscadores",
     heroEyebrow: "Antetítulo principal", heroTitle: "Título principal", heroDescription: "Descripción principal",
     heroCta: "Texto del botón", heroAside: "Texto destacado", servicesEyebrow: "Antetítulo de servicios",
     servicesTitle: "Título de servicios", servicesLink: "Enlace de áreas", preventionEyebrow: "Antetítulo preventivo",
@@ -117,7 +133,7 @@ export default function ContenidoPublicoAdminPage() {
         const first = result[0];
         if (first) {
           setSelectedSlug(first.slug);
-          setDraft(cloneValue(first.contenido ?? SITE_PAGE_DEFAULTS[first.slug]));
+          setDraft(mergeContent(cloneValue(SITE_PAGE_DEFAULTS[first.slug]), cloneValue(first.contenido)));
         }
       })
       .catch((cause: unknown) => { if (active) setError(cause instanceof Error ? cause.message : "No fue posible cargar las páginas."); })
@@ -129,13 +145,16 @@ export default function ContenidoPublicoAdminPage() {
   }, [token]);
 
   const selectedPage = pages.find((page) => page.slug === selectedSlug);
-  const savedContent = selectedPage?.contenido ?? SITE_PAGE_DEFAULTS[selectedSlug];
+  const savedContent = mergeContent(
+    cloneValue(SITE_PAGE_DEFAULTS[selectedSlug]),
+    cloneValue(selectedPage?.contenido),
+  );
   const dirty = JSON.stringify(draft) !== JSON.stringify(savedContent);
 
   function selectPage(slug: PublicPageSlug) {
     setSelectedSlug(slug);
     const page = pages.find((item) => item.slug === slug);
-    setDraft(cloneValue(page?.contenido ?? SITE_PAGE_DEFAULTS[slug]));
+    setDraft(mergeContent(cloneValue(SITE_PAGE_DEFAULTS[slug]), cloneValue(page?.contenido)));
     setError("");
     setNotice("");
   }

@@ -57,6 +57,19 @@ class ConfiguracionSaasUpdate(BaseModel):
     mostrar_planes: bool
 
 
+class ConfiguracionIntegracionesUpdate(BaseModel):
+    smtp_host: str | None = Field(default=None, max_length=255)
+    smtp_port: int | None = Field(default=None, ge=1, le=65535)
+    smtp_from: str | None = Field(default=None, max_length=320)
+    smtp_starttls: bool | None = None
+    smtp_user: str | None = Field(default=None, max_length=320)
+    smtp_password: str | None = Field(default=None, max_length=4096)
+    borrar_smtp_password: bool = False
+    whatsapp_api_url: str | None = Field(default=None, max_length=2000)
+    whatsapp_token: str | None = Field(default=None, max_length=4096)
+    borrar_whatsapp_token: bool = False
+
+
 class ConfiguracionConsultasOut(BaseModel):
     activa: bool
     dias_habilitados: list[int]
@@ -148,6 +161,11 @@ class DiagnosticoEnvioPrueba(BaseModel):
 
 class DiagnosticoIntegracion(BaseModel):
     integracion: Literal["RAMA", "WORKFLOW", "SMTP", "WHATSAPP"]
+
+
+class AlertasAccionMasiva(BaseModel):
+    alerta_ids: list[str] = Field(min_length=1, max_length=5000)
+    estado: Literal["ATENDIDA", "DESCARTADA", "ELIMINADA"]
 
 
 class AplicarMigracionRadicados(BaseModel):

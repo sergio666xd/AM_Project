@@ -3,6 +3,11 @@ import { Compass, FileCheck2, Search, UserCheck, type LucideIcon } from "lucide-
 import { MarketingLayout } from "@/components/marketing/MarketingLayout";
 import { loadPublicPageContent } from "@/lib/publicPageContent";
 import { SITE_PAGE_DEFAULTS } from "@/lib/sitePageDefaults";
+import { generatePublicPageMetadata } from "@/lib/pageSeo";
+
+export function generateMetadata() {
+  return generatePublicPageMetadata("filosofia", SITE_PAGE_DEFAULTS.filosofia, "/filosofia");
+}
 
 const stepIcons: LucideIcon[] = [Search, Compass, FileCheck2, UserCheck];
 

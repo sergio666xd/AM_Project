@@ -69,6 +69,23 @@ class ConfiguracionSaas(Base):
     mostrar_planes = Column(Boolean, nullable=False, default=False)
 
 
+class ConfiguracionIntegraciones(Base):
+    """Credenciales globales SMTP y WhatsApp cifradas en la base de datos."""
+    __tablename__ = "configuracion_integraciones"
+
+    id = Column(Integer, primary_key=True, default=1)
+    smtp_host = Column(String(255), nullable=True)
+    smtp_port = Column(Integer, nullable=True)
+    smtp_from = Column(String(320), nullable=True)
+    smtp_starttls = Column(Boolean, nullable=True)
+    smtp_user = Column(String(320), nullable=True)
+    smtp_password_encrypted = Column(Text, nullable=True)
+    whatsapp_api_url_encrypted = Column(Text, nullable=True)
+    whatsapp_token_encrypted = Column(Text, nullable=True)
+    actualizado_por_id = Column(Integer, ForeignKey("usuarios.id", ondelete="SET NULL"), nullable=True)
+    updated_at = Column(DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+
 class ConfiguracionConsultas(Base):
     __tablename__ = "configuracion_consultas"
 
