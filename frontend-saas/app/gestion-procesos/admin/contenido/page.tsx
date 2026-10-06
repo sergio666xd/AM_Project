@@ -74,12 +74,14 @@ function ContentField({
   template,
   onChange,
   depth = 0,
+  inSeo = false,
 }: {
   name: string;
   value: JsonValue;
   template?: JsonValue;
   onChange: (value: JsonValue) => void;
   depth?: number;
+  inSeo?: boolean;
 }) {
   if (Array.isArray(value)) {
     const itemTemplate = value[0] ?? (Array.isArray(template) ? template[0] : undefined) ?? "";
@@ -89,7 +91,7 @@ function ContentField({
         {value.map((item, index) => (
           <fieldset key={index} className="space-y-2 rounded-md border border-border/70 bg-surface-secondary/40 p-3">
             <legend className="px-1 text-xs font-medium text-foreground-muted">{humanLabel(name)} {index + 1}</legend>
-            <ContentField name={typeof item === "object" && item && !Array.isArray(item) ? "Elemento" : name} value={item} template={itemTemplate} depth={depth + 1} onChange={(next) => onChange(value.map((entry, current) => current === index ? next : entry))} />
+            <ContentField name={typeof item === "object" && item && !Array.isArray(item) ? "Elemento" : name} value={item} template={itemTemplate} depth={depth + 1} inSeo={inSeo} onChange={(next) => onChange(value.map((entry, current) => current === index ? next : entry))} />
             <button type="button" onClick={() => onChange(value.filter((_, current) => current !== index))} className="text-xs font-medium text-red-700 hover:underline">Quitar elemento</button>
           </fieldset>
         ))}
@@ -106,7 +108,7 @@ function ContentField({
       <fieldset className={`min-w-0 space-y-3 rounded-lg border border-border p-3 ${depth ? "bg-surface-secondary/20" : ""}`}>
         {depth > 0 && <legend className="px-1 text-sm font-semibold text-foreground">{humanLabel(name)}</legend>}
         {Object.entries(value).map(([key, child]) => (
-          <ContentField key={key} name={key} value={child} template={templateObject[key] ?? child} depth={depth + 1} onChange={(next) => onChange({ ...value, [key]: next })} />
+          <ContentField key={key} name={key} value={child} template={templateObject[key] ?? child} depth={depth + 1} inSeo={inSeo || key.toLowerCase() === "seo"} onChange={(next) => onChange({ ...value, [key]: next })} />
         ))}
       </fieldset>
     );
@@ -125,6 +127,12 @@ function ContentField({
     return <label className="block text-sm font-medium text-foreground">{humanLabel(name)}<input value={textValue} onChange={(event) => onChange(event.target.value)} placeholder="/firma/nosotros" className="mt-1 w-full rounded-md border border-border bg-background px-3 py-2 font-normal" /><span className="mt-1 block text-xs text-muted-foreground">Empieza con / y usa minúsculas, números y guiones. Las rutas anteriores seguirán funcionando.</span></label>;
   }
   const longText = textValue.length > 90 || name.toLowerCase().includes("description") || ["body", "answer", "intro", "text", "quote"].includes(name);
+  const normalizedName = name.toLowerCase();
+  const isTitle = normalizedName === "title" || normalizedName.endsWith("title");
+  const isIconKey = normalizedName === "icon" || normalizedName === "iconkey" || normalizedName === "icon_key";
+  if (inSeo || isTitle || isIconKey) {
+    return <label className="block text-sm font-medium text-foreground">{humanLabel(name)}{longText ? <textarea value={textValue} onChange={(event) => onChange(event.target.value)} rows={4} className="mt-1 w-full rounded-md border border-border bg-background px-3 py-2 font-normal" /> : <input value={textValue} onChange={(event) => onChange(event.target.value)} className="mt-1 w-full rounded-md border border-border bg-background px-3 py-2 font-normal" />}</label>;
+  }
   return (
     <RichTextInput label={humanLabel(name)} value={textValue} onChange={onChange} multiline={longText} />
   );

@@ -141,6 +141,7 @@ export function RichTextInput({
   const editorRef = useRef<HTMLDivElement>(null);
   const lastEmittedValue = useRef<string | null>(null);
   const [activeFormats, setActiveFormats] = useState<Set<FormatAction>>(() => new Set());
+  const [focused, setFocused] = useState(false);
 
   useLayoutEffect(() => {
     const editor = editorRef.current;
@@ -262,7 +263,7 @@ export function RichTextInput({
     <div className="block min-w-0 text-sm font-medium text-foreground">
       <span>{label}</span>
       <div className="mt-1 overflow-hidden rounded-md border border-border bg-background focus-within:ring-2 focus-within:ring-primary/40">
-        <div role="toolbar" aria-label={`Formato para ${label}`} className="flex flex-wrap gap-1 border-b border-border bg-surface-secondary/40 p-1">
+        {focused && <div role="toolbar" aria-label={`Formato para ${label}`} className="flex flex-wrap gap-1 border-b border-border bg-surface-secondary/40 p-1">
           {toolbar.map((item) => {
             const Icon = item.icon;
             const active = activeFormats.has(item.action);
@@ -286,7 +287,7 @@ export function RichTextInput({
           <span aria-live="polite" className="self-center px-1 text-[11px] font-normal text-foreground-muted">
             {activeLabels.length ? `Activo en el cursor: ${activeLabels.join(", ")}` : "Sin formato activo en el cursor"}
           </span>
-        </div>
+        </div>}
         <div
           ref={editorRef}
           contentEditable
@@ -298,7 +299,8 @@ export function RichTextInput({
           onKeyDown={onKeyDown}
           onKeyUp={updateActiveFormats}
           onMouseUp={updateActiveFormats}
-          onFocus={updateActiveFormats}
+          onFocus={() => { setFocused(true); updateActiveFormats(); }}
+          onBlur={() => setFocused(false)}
           className={`min-h-10 w-full px-3 py-2 font-normal outline-none [&_a]:text-primary [&_a]:underline [&_blockquote]:border-l-2 [&_blockquote]:border-primary [&_blockquote]:pl-3 [&_blockquote]:italic [&_code]:rounded [&_code]:bg-surface-secondary [&_code]:px-1 [&_code]:font-mono [&_li]:ml-5 [&_li]:list-disc [&_ol_li]:list-decimal ${multiline ? "min-h-24 whitespace-pre-wrap" : "whitespace-nowrap"}`}
         />
       </div>
