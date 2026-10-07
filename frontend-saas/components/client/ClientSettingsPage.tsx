@@ -4,6 +4,7 @@ import { FormEvent, useState } from "react";
 import { Bell, Mail, MessageCircle, Save } from "lucide-react";
 import { useSession } from "@/context/SessionContext";
 import { fetchApi } from "@/lib/api";
+import ClientPasswordChange from "@/components/client/ClientPasswordChange";
 
 export default function ClientSettingsPage() {
   const { user, token, refreshUser } = useSession();
@@ -65,5 +66,7 @@ export default function ClientSettingsPage() {
       </fieldset>
       <button type="submit" disabled={saving || !token} className="inline-flex items-center gap-2 rounded-md bg-primary px-4 py-2.5 text-sm font-semibold text-primary-foreground disabled:opacity-50"><Save className="size-4" />{saving ? "Guardando…" : "Guardar canal"}</button>
     </form>
+    {user?.id && <ClientPasswordChange token={token} whatsappAvailable={Boolean(user.whatsapp_numero)} />}
+    <div className="border-t border-border pt-5 text-sm text-(--foreground-muted)"><p>Los cambios de nombre, correo o WhatsApp se solicitan desde <a className="font-medium text-primary" href="/gestion-procesos/cliente/perfil">Mi perfil</a> y requieren revisión del despacho.</p><p className="mt-2">Puedes revisar sesiones y políticas de privacidad con el administrador de la plataforma.</p></div>
   </section>;
 }

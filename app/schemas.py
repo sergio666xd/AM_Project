@@ -554,6 +554,15 @@ class ComunicacionProcesoCreate(BaseModel):
     cliente_id: int | None = None
 
 
+class ComunicacionClienteCreate(BaseModel):
+    asunto: str = Field(min_length=1, max_length=255)
+    contenido: str = Field(min_length=1, max_length=12000)
+
+
+class NotificacionesClienteLeidasUpdate(BaseModel):
+    ids: list[str] = Field(min_length=1, max_length=500)
+
+
 class DocumentoRevisionUpdate(BaseModel):
     estado_revision: Literal["EN_REVISION", "APROBADO", "REQUIERE_CORRECCION", "RECHAZADO"]
     comentario_revision: str = Field(default="", max_length=4000)

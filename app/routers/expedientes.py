@@ -306,6 +306,52 @@ def _notificar_clientes_proceso(
                    f"ACCION_PROCESO:{proceso.id}:{uuid4().hex}", emisor=actor)
 
 
+def _estado_proceso_cliente(proceso: models.Proceso) -> tuple[str, str]:
+    estados = [(link.radicado.estado_consulta or "").casefold() for link in proceso.radicados if link.radicado]
+    if not estados:
+        return "En preparación", "El despacho está organizando la información del proceso."
+    if any(estado.startswith("error") for estado in estados):
+        return "En seguimiento", "El despacho está verificando una actualización judicial."
+    if any(estado == "ok" for estado in estados):
+        return "En trámite", "El despacho realiza seguimiento a las novedades de este proceso."
+    return "En seguimiento", "El despacho está revisando la información judicial disponible."
+
+
+def _obtener_proceso_cliente(proceso_id: int, cliente: models.Usuario, db: Session) -> models.Proceso:
+    proceso = db.query(models.Proceso).join(models.ProcesoCliente).filter(
+        models.Proceso.id == proceso_id,
+        models.ProcesoCliente.cliente_id == cliente.id,
+        models.Proceso.archivado_en.is_(None),
+    ).first()
+    if not proceso:
+        raise HTTPException(status_code=404, detail="Proceso no encontrado.")
+    return proceso
+
+
+def _timeline_cliente_visible(proceso: models.Proceso, db: Session, cliente_id: int) -> list[dict]:
+    """Return only customer-visible events and omit scraped/internal annotations."""
+    timeline = _timeline_proceso(proceso, db, cliente_id=cliente_id)
+    radicado_ids = [link.radicado_id for link in proceso.radicados]
+    ultimas_actuaciones = set()
+    if radicado_ids:
+        actuaciones = db.query(models.Actuacion).filter(models.Actuacion.radicado_id.in_(radicado_ids)).order_by(
+            models.Actuacion.radicado_id, models.Actuacion.orden.desc(), models.Actuacion.id.desc(),
+        ).all()
+        vistos = set()
+        for actuacion in actuaciones:
+            if actuacion.radicado_id not in vistos:
+                vistos.add(actuacion.radicado_id)
+                ultimas_actuaciones.add(actuacion.id)
+    for item in timeline:
+        if item.get("tipo") == "ACTUACION":
+            if item.get("recurso_id") not in ultimas_actuaciones:
+                item["_ocultar_cliente"] = True
+            item["descripcion"] = "Se registró una actuación en el radicado."
+            item.pop("anotacion", None)
+        item.pop("visibilidad", None)
+    return [item for item in timeline if not item.pop("_ocultar_cliente", False)]
+
+
 @router.post("/abogados", status_code=status.HTTP_201_CREATED)
 def crear_abogado_admin(datos: schemas.AbogadoAdminCreate, db: Session = Depends(get_db), usuario: models.Usuario = Depends(security.obtener_usuario_actual)):
     require_roles(usuario, ["ADMIN"], action="crear abogados administradores")
@@ -1149,14 +1195,53 @@ def listar_procesos(db: Session = Depends(get_db), usuario: models.Usuario = Dep
                                 else {}
                             ),
                         }
-                        for actuacion in sorted(enlace.radicado.actuaciones, key=lambda item: item.orden)
+                        for actuacion in (
+                            sorted(enlace.radicado.actuaciones, key=lambda item: (item.orden, item.id))[-1:]
+                            if usuario.rol == models.RolUsuario.CLIENTE
+                            else sorted(enlace.radicado.actuaciones, key=lambda item: (item.orden, item.id))
+                        )
                     ],
                 }
                 for enlace in proceso.radicados
                 if enlace.radicado
             ],
         }
-        if usuario.rol != models.RolUsuario.CLIENTE:
+        if usuario.rol == models.RolUsuario.CLIENTE:
+            tareas_cliente = db.query(models.Tarea).filter(
+                models.Tarea.proceso_id == proceso.id,
+                models.Tarea.cliente_id == usuario.id,
+            ).all()
+            pendientes_cliente = [tarea for tarea in tareas_cliente if tarea.estado in (models.EstadoTarea.PENDIENTE, models.EstadoTarea.EN_CURSO)]
+            solicitudes_cliente = db.query(models.SolicitudDocumento).filter_by(
+                proceso_id=proceso.id, cliente_id=usuario.id, atendida_en=None,
+            ).all()
+            proximos_eventos = db.query(models.EventoAgenda).filter(
+                models.EventoAgenda.proceso_id == proceso.id,
+                models.EventoAgenda.cliente_id == usuario.id,
+                models.EventoAgenda.estado == "PROGRAMADO",
+                models.EventoAgenda.fecha_inicio >= datetime.utcnow(),
+            ).order_by(models.EventoAgenda.fecha_inicio.asc()).all()
+            estado_visible, explicacion_estado = _estado_proceso_cliente(proceso)
+            timeline_cliente = _timeline_cliente_visible(proceso, db, usuario.id)
+            proximas_fechas = [
+                (event.fecha_inicio, event.titulo) for event in proximos_eventos
+            ] + [
+                (task.fecha_limite, task.titulo)
+                for task in pendientes_cliente
+                if task.fecha_limite and task.fecha_limite >= datetime.utcnow()
+            ]
+            proxima_fecha, proxima_titulo = min(proximas_fechas, key=lambda item: item[0]) if proximas_fechas else (None, None)
+            item.update({
+                "responsable": {"id": proceso.abogado.id, "nombre_completo": proceso.abogado.nombre_completo},
+                "estado_visible": estado_visible,
+                "explicacion_estado": explicacion_estado,
+                "tareas_pendientes": len(pendientes_cliente),
+                "documentos_pendientes": len(solicitudes_cliente),
+                "ultima_actividad": timeline_cliente[0]["fecha"].isoformat() if timeline_cliente and timeline_cliente[0].get("fecha") else proceso.created_at.isoformat(),
+                "proxima_actividad": proxima_fecha.isoformat() if proxima_fecha else None,
+                "proxima_actividad_titulo": proxima_titulo,
+            })
+        else:
             tareas = db.query(models.Tarea).filter_by(proceso_id=proceso.id).all()
             solicitudes = db.query(models.SolicitudDocumento).filter_by(proceso_id=proceso.id).all()
             documentos = db.query(models.DocumentoProceso).filter_by(proceso_id=proceso.id).all()
@@ -1302,16 +1387,244 @@ def timeline_proceso_cliente(proceso_id: int, db: Session = Depends(get_db), usu
     ).first()
     if not proceso:
         raise HTTPException(status_code=404, detail="Proceso no encontrado.")
-    return _timeline_proceso(proceso, db, cliente_id=usuario.id)
+    return _timeline_cliente_visible(proceso, db, usuario.id)
+
+
+@router.get("/cliente/procesos/{proceso_id}")
+def detalle_proceso_cliente(proceso_id: int, db: Session = Depends(get_db), usuario: models.Usuario = Depends(security.obtener_usuario_actual)):
+    require_roles(usuario, ["CLIENTE"], action="consultar su proceso")
+    proceso = _obtener_proceso_cliente(proceso_id, usuario, db)
+    tareas = db.query(models.Tarea).filter_by(proceso_id=proceso.id, cliente_id=usuario.id).order_by(models.Tarea.fecha_limite.asc()).all()
+    solicitudes = db.query(models.SolicitudDocumento).filter_by(proceso_id=proceso.id, cliente_id=usuario.id).order_by(models.SolicitudDocumento.created_at.desc()).all()
+    documentos = db.query(models.DocumentoProceso).filter_by(proceso_id=proceso.id, cliente_id=usuario.id).order_by(models.DocumentoProceso.created_at.desc()).all()
+    eventos = db.query(models.EventoAgenda).filter_by(proceso_id=proceso.id, cliente_id=usuario.id).order_by(models.EventoAgenda.fecha_inicio.asc()).all()
+    comunicaciones = db.query(models.ComunicacionProceso).filter_by(
+        proceso_id=proceso.id, cliente_id=usuario.id, visibilidad="CLIENTE",
+    ).order_by(models.ComunicacionProceso.created_at.desc()).limit(300).all()
+    comunicaciones.reverse()
+    ahora = datetime.utcnow()
+    for mensaje in comunicaciones:
+        if mensaje.actor_id != usuario.id and mensaje.leido_en is None:
+            mensaje.leido_en = ahora
+    db.commit()
+    estado_visible, explicacion = _estado_proceso_cliente(proceso)
+    return {
+        "id": proceso.id,
+        "nombre": proceso.nombre,
+        "descripcion": proceso.descripcion,
+        "estado_visible": estado_visible,
+        "explicacion_estado": explicacion,
+        "responsable": {
+            "nombre_completo": proceso.abogado.nombre_completo,
+            "cargo": "Abogado responsable",
+            "email": proceso.abogado.email,
+            "whatsapp_numero": proceso.abogado.whatsapp_numero or None,
+        },
+        "radicados": [{
+            "id": link.radicado.id,
+            "numero": link.radicado.numero,
+            "estado_visible": "En seguimiento" if (link.radicado.estado_consulta or "").casefold() == "ok" else "En revisión",
+            "actuaciones": [{"id": a.id, "fecha": a.fecha_actuacion, "descripcion": a.actuacion} for a in sorted(link.radicado.actuaciones, key=lambda action: (action.orden, action.id))[-1:]],
+        } for link in proceso.radicados if link.radicado],
+        "tareas": [{"id": task.id, "titulo": task.titulo, "descripcion": task.descripcion, "estado": task.estado.value, "prioridad": task.prioridad.value, "fecha_limite": task.fecha_limite, "radicado_id": task.radicado_id, "actuacion_id": task.actuacion_id} for task in tareas],
+        "solicitudes_documento": [{"id": request.id, "titulo": request.titulo, "instrucciones": request.instrucciones, "fecha_limite": request.fecha_limite, "atendida_en": request.atendida_en, "created_at": request.created_at} for request in solicitudes],
+        "documentos": [{"id": document.id, "solicitud_id": document.solicitud_id, "nombre_archivo": document.nombre_archivo, "mime_type": document.mime_type, "estado_revision": document.estado_revision, "comentario_revision": document.comentario_revision, "created_at": document.created_at} for document in documentos],
+        "eventos": [{"id": event.id, "titulo": event.titulo, "descripcion": event.descripcion, "tipo": event.tipo, "estado": event.estado, "fecha_inicio": event.fecha_inicio, "fecha_fin": event.fecha_fin} for event in eventos],
+        "comunicaciones": [{"id": message.id, "asunto": message.asunto, "contenido": message.contenido, "remitente": message.actor.nombre_completo if message.actor else "Despacho", "es_mio": message.actor_id == usuario.id, "leido_en": message.leido_en, "created_at": message.created_at} for message in comunicaciones],
+        "timeline": _timeline_cliente_visible(proceso, db, usuario.id),
+        "ultima_actividad": max((item["fecha"] for item in _timeline_cliente_visible(proceso, db, usuario.id) if item.get("fecha")), default=proceso.created_at),
+    }
+
+
+@router.get("/cliente/agenda")
+def agenda_cliente(dias: int = 90, db: Session = Depends(get_db), usuario: models.Usuario = Depends(security.obtener_usuario_actual)):
+    require_roles(usuario, ["CLIENTE"], action="consultar su calendario")
+    if dias < 1 or dias > 365:
+        raise HTTPException(status_code=400, detail="El rango del calendario debe estar entre 1 y 365 días.")
+    desde = datetime.utcnow() - timedelta(days=30)
+    hasta = datetime.utcnow() + timedelta(days=dias)
+    eventos = db.query(models.EventoAgenda).join(models.ProcesoCliente, models.ProcesoCliente.proceso_id == models.EventoAgenda.proceso_id).join(
+        models.Proceso, models.Proceso.id == models.EventoAgenda.proceso_id,
+    ).filter(
+        models.ProcesoCliente.cliente_id == usuario.id,
+        models.EventoAgenda.cliente_id == usuario.id,
+        models.EventoAgenda.estado == "PROGRAMADO",
+        models.EventoAgenda.fecha_inicio >= desde,
+        models.EventoAgenda.fecha_inicio <= hasta,
+        models.Proceso.archivado_en.is_(None),
+    ).order_by(models.EventoAgenda.fecha_inicio.asc()).all()
+    tareas = db.query(models.Tarea).join(models.Proceso, models.Proceso.id == models.Tarea.proceso_id).join(
+        models.ProcesoCliente, models.ProcesoCliente.proceso_id == models.Proceso.id,
+    ).filter(
+        models.Tarea.cliente_id == usuario.id,
+        models.Tarea.estado.in_((models.EstadoTarea.PENDIENTE, models.EstadoTarea.EN_CURSO)),
+        models.Tarea.fecha_limite >= desde,
+        models.Tarea.fecha_limite <= hasta,
+        models.ProcesoCliente.cliente_id == usuario.id,
+        models.Proceso.archivado_en.is_(None),
+    ).order_by(models.Tarea.fecha_limite.asc()).all()
+    return {
+        "eventos": [{"id": event.id, "titulo": event.titulo, "descripcion": event.descripcion, "tipo": event.tipo, "fecha_inicio": event.fecha_inicio, "fecha_fin": event.fecha_fin, "proceso_id": event.proceso_id, "proceso": event.proceso.nombre} for event in eventos],
+        "tareas": [{"id": task.id, "titulo": task.titulo, "fecha_limite": task.fecha_limite, "proceso_id": task.proceso_id, "proceso": task.proceso.nombre} for task in tareas],
+    }
+
+
+@router.get("/cliente/actividad")
+def actividad_cliente(db: Session = Depends(get_db), usuario: models.Usuario = Depends(security.obtener_usuario_actual)):
+    require_roles(usuario, ["CLIENTE"], action="consultar actividad compartida")
+    procesos = db.query(models.Proceso).join(models.ProcesoCliente).filter(
+        models.ProcesoCliente.cliente_id == usuario.id,
+        models.Proceso.archivado_en.is_(None),
+    ).all()
+    items = []
+    for proceso in procesos:
+        for entry in _timeline_cliente_visible(proceso, db, usuario.id):
+            fecha = entry.get("fecha")
+            items.append({
+                "id": entry["id"], "tipo": entry["tipo"], "titulo": entry["titulo"],
+                "descripcion": entry.get("descripcion"), "fecha": fecha.isoformat() if fecha else None,
+                "proceso": proceso.nombre,
+                "href": f"/gestion-procesos/cliente/procesos/{proceso.id}#actividad",
+            })
+    return sorted(items, key=lambda item: item["fecha"] or "", reverse=True)[:30]
+
+
+def _notificaciones_cliente(db: Session, cliente: models.Usuario) -> list[dict]:
+    procesos = db.query(models.Proceso).join(models.ProcesoCliente).filter(
+        models.ProcesoCliente.cliente_id == cliente.id,
+        models.Proceso.archivado_en.is_(None),
+    ).all()
+    proceso_por_id = {process.id: process for process in procesos}
+    if not proceso_por_id:
+        return []
+    ids = list(proceso_por_id)
+    items: list[dict] = []
+    tareas = db.query(models.Tarea).filter(
+        models.Tarea.proceso_id.in_(ids), models.Tarea.cliente_id == cliente.id,
+    ).all()
+    for task in tareas:
+        items.append({"id": f"tarea:{task.id}", "tipo": "Tarea", "categoria": "TAREA", "titulo": task.titulo,
+                      "descripcion": "Tienes una tarea pendiente" if task.estado != models.EstadoTarea.COMPLETADA else "Tarea completada",
+                      "fecha": task.fecha_limite or task.created_at, "proceso": proceso_por_id[task.proceso_id].nombre,
+                      "href": f"/gestion-procesos/cliente/tareas?tarea={task.id}#tarea-{task.id}"})
+    solicitudes = db.query(models.SolicitudDocumento).filter_by(cliente_id=cliente.id).filter(
+        models.SolicitudDocumento.proceso_id.in_(ids),
+    ).all()
+    for request in solicitudes:
+        items.append({"id": f"solicitud:{request.id}", "tipo": "Documento", "categoria": "DOCUMENTO",
+                      "titulo": request.titulo, "descripcion": "Solicitud pendiente de entrega" if request.atendida_en is None else "Documento entregado al despacho",
+                      "fecha": request.atendida_en or request.created_at, "proceso": proceso_por_id[request.proceso_id].nombre,
+                      "href": f"/gestion-procesos/cliente/documentos#solicitud-{request.id}"})
+    documentos = db.query(models.DocumentoProceso).filter_by(cliente_id=cliente.id).filter(
+        models.DocumentoProceso.proceso_id.in_(ids),
+    ).all()
+    for document in documentos:
+        items.append({"id": f"documento:{document.id}:{document.estado_revision}", "tipo": "Documento", "categoria": "DOCUMENTO",
+                      "titulo": document.nombre_archivo, "descripcion": f"Estado de revisión: {document.estado_revision.replace('_', ' ').lower()}",
+                      "fecha": document.revisado_en or document.created_at, "proceso": proceso_por_id[document.proceso_id].nombre,
+                      "href": f"/gestion-procesos/cliente/procesos/{document.proceso_id}#documentos"})
+    eventos = db.query(models.EventoAgenda).filter(
+        models.EventoAgenda.proceso_id.in_(ids), models.EventoAgenda.cliente_id == cliente.id,
+        models.EventoAgenda.estado == "PROGRAMADO",
+    ).all()
+    for event in eventos:
+        items.append({"id": f"evento:{event.id}", "tipo": "Evento", "categoria": "EVENTO", "titulo": event.titulo,
+                      "descripcion": "Evento programado", "fecha": event.fecha_inicio, "proceso": proceso_por_id[event.proceso_id].nombre,
+                      "href": "/gestion-procesos/cliente/calendario"})
+    mensajes = db.query(models.ComunicacionProceso).filter(
+        models.ComunicacionProceso.proceso_id.in_(ids), models.ComunicacionProceso.cliente_id == cliente.id,
+        models.ComunicacionProceso.visibilidad == "CLIENTE",
+    ).all()
+    for message in mensajes:
+        items.append({"id": f"mensaje:{message.id}", "tipo": "Mensaje", "categoria": "MENSAJE",
+                      "titulo": message.asunto, "descripcion": f"Nuevo mensaje de {message.actor.nombre_completo if message.actor else 'tu contacto'}" if message.actor_id != cliente.id else "Mensaje enviado al despacho",
+                      "fecha": message.created_at, "proceso": proceso_por_id[message.proceso_id].nombre,
+                      "href": f"/gestion-procesos/cliente/procesos/{message.proceso_id}#comunicacion"})
+    avisos = db.query(models.NotificacionProceso).filter(
+        models.NotificacionProceso.proceso_id.in_(ids), models.NotificacionProceso.cliente_id == cliente.id,
+    ).all()
+    for notice in avisos:
+        items.append({"id": f"aviso:{notice.id}", "tipo": "Actualización", "categoria": "PROCESO",
+                      "titulo": notice.asunto, "descripcion": notice.cuerpo[:500], "fecha": notice.created_at,
+                      "proceso": proceso_por_id[notice.proceso_id].nombre,
+                      "href": f"/gestion-procesos/cliente/procesos/{notice.proceso_id}#actividad"})
+    leidos = {entry.notificacion_id for entry in db.query(models.LecturaNotificacionCliente).filter_by(usuario_id=cliente.id).all()}
+    for item in items:
+        item["leida"] = item["id"] in leidos
+        item["fecha"] = item["fecha"].isoformat() if item["fecha"] else None
+    return sorted(items, key=lambda item: item["fecha"] or "", reverse=True)[:500]
+
+
+@router.get("/cliente/notificaciones")
+def listar_notificaciones_cliente(db: Session = Depends(get_db), usuario: models.Usuario = Depends(security.obtener_usuario_actual)):
+    require_roles(usuario, ["CLIENTE"], action="consultar sus notificaciones")
+    return _notificaciones_cliente(db, usuario)
+
+
+@router.post("/cliente/notificaciones/leer")
+def leer_notificaciones_cliente(datos: schemas.NotificacionesClienteLeidasUpdate, db: Session = Depends(get_db), usuario: models.Usuario = Depends(security.obtener_usuario_actual)):
+    require_roles(usuario, ["CLIENTE"], action="actualizar sus notificaciones")
+    actuales = {item["id"] for item in _notificaciones_cliente(db, usuario)}
+    ids_leidos = {item.notificacion_id for item in db.query(models.LecturaNotificacionCliente).filter_by(usuario_id=usuario.id).all()}
+    nuevos = list(dict.fromkeys(item for item in datos.ids if item in actuales and item not in ids_leidos))
+    db.add_all(models.LecturaNotificacionCliente(usuario_id=usuario.id, notificacion_id=item) for item in nuevos)
+    db.commit()
+    return {"leidas": len(nuevos)}
+
+
+@router.post("/cliente/notificaciones/leer-todas")
+def leer_todas_notificaciones_cliente(db: Session = Depends(get_db), usuario: models.Usuario = Depends(security.obtener_usuario_actual)):
+    require_roles(usuario, ["CLIENTE"], action="actualizar sus notificaciones")
+    actuales = {item["id"] for item in _notificaciones_cliente(db, usuario)}
+    leidos = {item.notificacion_id for item in db.query(models.LecturaNotificacionCliente).filter_by(usuario_id=usuario.id).all()}
+    nuevos = actuales - leidos
+    db.add_all(models.LecturaNotificacionCliente(usuario_id=usuario.id, notificacion_id=item) for item in nuevos)
+    db.commit()
+    return {"leidas": len(nuevos)}
+
+
+@router.post("/cliente/procesos/{proceso_id}/comunicaciones", status_code=status.HTTP_201_CREATED)
+def enviar_mensaje_cliente(proceso_id: int, datos: schemas.ComunicacionClienteCreate, db: Session = Depends(get_db), usuario: models.Usuario = Depends(security.obtener_usuario_actual)):
+    require_roles(usuario, ["CLIENTE"], action="enviar un mensaje sobre su proceso")
+    proceso = _obtener_proceso_cliente(proceso_id, usuario, db)
+    asunto = datos.asunto.strip()
+    contenido = datos.contenido.strip()
+    if not asunto or not contenido:
+        raise HTTPException(status_code=400, detail="Escribe un asunto y un mensaje antes de enviarlo.")
+    mensaje = models.ComunicacionProceso(
+        proceso_id=proceso.id, actor_id=usuario.id, cliente_id=usuario.id,
+        visibilidad="CLIENTE", canal="INTERNO", asunto=asunto, contenido=contenido,
+    )
+    db.add(mensaje)
+    db.flush()
+    registrar_evento_auditoria(db, usuario, "cliente.comunicacion.enviar", "proceso", proceso.id)
+    db.commit()
+    db.refresh(mensaje)
+    _notificar(
+        db, proceso.abogado, f"Mensaje de {usuario.nombre_completo}: {asunto}",
+        f"Hola {proceso.abogado.nombre_completo},\n\n{usuario.nombre_completo} te envió un mensaje sobre el proceso {proceso.nombre}.\n\nAsunto: {asunto}\nFecha: {mensaje.created_at.strftime('%d/%m/%Y %H:%M UTC')}\nMensaje:\n{contenido}\n\nAbrir enlace: Ver conversación | {public_site_url()}/gestion-procesos/abogado/procesos/{proceso.id}#comunicaciones",
+        "RESUMENES", f"COMUNICACION_CLIENTE:{mensaje.id}", emisor=usuario,
+    )
+    return {"id": mensaje.id, "mensaje": "Tu mensaje fue enviado al despacho."}
 
 
 @router.get("/procesos/{proceso_id}/comunicaciones")
 def listar_comunicaciones_proceso(proceso_id: int, db: Session = Depends(get_db), usuario: models.Usuario = Depends(security.obtener_usuario_actual)):
     _abogado(usuario)
     proceso = _proceso_abogado(proceso_id, usuario, db)
+    incoming = db.query(models.ComunicacionProceso).filter(
+        models.ComunicacionProceso.proceso_id == proceso.id,
+        models.ComunicacionProceso.visibilidad == "CLIENTE",
+        models.ComunicacionProceso.actor_id != usuario.id,
+        models.ComunicacionProceso.leido_en.is_(None),
+    ).all()
+    for message in incoming:
+        message.leido_en = datetime.utcnow()
+    if incoming:
+        db.commit()
     return [{"id": item.id, "asunto": item.asunto, "contenido": item.contenido, "visibilidad": item.visibilidad,
              "canal": item.canal, "cliente_id": item.cliente_id, "cliente": item.cliente.nombre_completo if item.cliente else None,
-             "actor": item.actor.nombre_completo if item.actor else None, "created_at": item.created_at}
+             "actor": item.actor.nombre_completo if item.actor else None, "created_at": item.created_at, "leido_en": item.leido_en}
             for item in db.query(models.ComunicacionProceso).filter_by(proceso_id=proceso.id).order_by(models.ComunicacionProceso.created_at.desc()).all()]
 
 

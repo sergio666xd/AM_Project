@@ -104,6 +104,7 @@ def actualizar_esquema_planes() -> None:
         conexion.execute(text("ALTER TABLE documentos_proceso ADD COLUMN IF NOT EXISTS revisado_por_id INTEGER REFERENCES usuarios(id) ON DELETE SET NULL"))
         conexion.execute(text("ALTER TABLE documentos_proceso ADD COLUMN IF NOT EXISTS revisado_en TIMESTAMP"))
         conexion.execute(text("ALTER TABLE solicitudes_documento ADD COLUMN IF NOT EXISTS fecha_limite TIMESTAMP"))
+        conexion.execute(text("ALTER TABLE comunicaciones_proceso ADD COLUMN IF NOT EXISTS leido_en TIMESTAMP"))
 
 ALLOWED_CARD_TYPES = {"application/pdf", "image/jpeg", "image/png"}
 ALLOWED_CARD_EXTENSIONS = {".pdf", ".jpg", ".jpeg", ".png"}

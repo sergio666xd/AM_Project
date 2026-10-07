@@ -1,6 +1,7 @@
 "use client";
 
 import { apiRequest } from "@/lib/api";
+import Link from "next/link";
 
 import { ChangeEvent, useEffect, useState } from "react";
 import { AlertCircle, CheckCircle2, Download, FileText, FileUp, RefreshCw, Upload } from "lucide-react";
@@ -25,9 +26,12 @@ type Request = {
 
 type Document = {
 	id: number;
+	solicitud_id: number;
 	proceso: string;
 	nombre_archivo: string;
 	mime_type: string;
+	estado_revision: string;
+	comentario_revision?: string | null;
 	created_at: string;
 };
 
@@ -142,6 +146,14 @@ export default function DocumentosClientePage() {
 		}
 	}
 
+	const documentGroups = [
+		{ key: "EN_REVISION", title: "En revisión" },
+		{ key: "RECIBIDO", title: "Recibidos" },
+		{ key: "APROBADO", title: "Aprobados" },
+		{ key: "REQUIERE_CORRECCION", title: "Requieren corrección" },
+		{ key: "RECHAZADO", title: "No aprobados" },
+	];
+
 	return (
 		<section className="mx-auto max-w-5xl space-y-6">
 			<header className="flex flex-wrap items-end justify-between gap-4">
@@ -162,7 +174,7 @@ export default function DocumentosClientePage() {
 				<section className="space-y-3">
 					<div><h2 className="font-semibold text-foreground">Solicitudes pendientes</h2><p className="mt-1 text-sm text-(--foreground-muted)">Entrega los archivos solicitados por tu abogado.</p></div>
 					{data.solicitudes.filter((item) => !item.atendida_en).length ? data.solicitudes.filter((item) => !item.atendida_en).map((request) => (
-						<article key={request.id} className="rounded-lg border border-border bg-surface p-4 sm:p-5">
+						<article id={`solicitud-${request.id}`} key={request.id} className="rounded-lg border border-border bg-surface p-4 sm:p-5">
 							<div className="flex flex-wrap items-start justify-between gap-3">
 								<div><p className="text-xs text-(--foreground-muted)">{request.proceso}</p><h3 className="mt-1 font-medium text-foreground">{request.titulo}</h3>{request.instrucciones && <p className="mt-1 text-sm text-(--foreground-muted)">{request.instrucciones}</p>}</div>
 								<span className="rounded-md bg-amber-500/10 px-2.5 py-1 text-xs text-amber-700">Pendiente</span>
@@ -178,12 +190,7 @@ export default function DocumentosClientePage() {
 
 				<section className="space-y-3">
 					<div><h2 className="font-semibold text-foreground">Documentos entregados</h2><p className="mt-1 text-sm text-(--foreground-muted)">Archivos asociados a tus procesos.</p></div>
-					{data.documentos.length ? <div className="overflow-hidden rounded-lg border border-border bg-surface">
-						{data.documentos.map((document, index) => <div key={document.id} className={`flex flex-wrap items-center justify-between gap-4 px-4 py-3 ${index ? "border-t border-border" : ""}`}>
-							<div className="flex min-w-0 items-center gap-3"><FileText className="size-5 shrink-0 text-[var(--primary)]" /><div className="min-w-0"><p className="truncate text-sm font-medium text-foreground">{document.nombre_archivo}</p><p className="mt-0.5 truncate text-xs text-(--foreground-muted)">{document.proceso} · {new Date(document.created_at).toLocaleDateString("es-CO")}</p></div></div>
-							<button type="button" onClick={() => void download(document)} disabled={downloadingId !== null} aria-label={`Descargar ${document.nombre_archivo}`} className="inline-flex items-center gap-2 rounded-md border border-border px-3 py-2 text-sm text-foreground hover:bg-surface-hover disabled:opacity-50"><Download className="size-4" />{downloadingId === document.id ? "Descargando..." : "Descargar"}</button>
-						</div>)}
-					</div> : <div className="rounded-lg border border-dashed border-border px-5 py-8 text-center text-sm text-(--foreground-muted)"><FileText className="mx-auto mb-2 size-6" />Aún no has entregado documentos.</div>}
+					{data.documentos.length ? <div className="space-y-4">{documentGroups.map((group) => { const documents = data.documentos.filter((document) => (document.estado_revision || "RECIBIDO") === group.key); return documents.length ? <section key={group.key} className="overflow-hidden rounded-lg border border-border bg-surface"><h3 className="border-b border-border px-4 py-3 text-sm font-semibold">{group.title} <span className="text-(--foreground-muted)">({documents.length})</span></h3>{documents.map((document, index) => <div key={document.id} className={`flex flex-wrap items-center justify-between gap-4 px-4 py-3 ${index ? "border-t border-border" : ""}`}><div className="flex min-w-0 items-center gap-3"><FileText className="size-5 shrink-0 text-[var(--primary)]" /><div className="min-w-0"><p className="truncate text-sm font-medium text-foreground">{document.nombre_archivo}</p><p className="mt-0.5 truncate text-xs text-(--foreground-muted)">{document.proceso} · {new Date(document.created_at).toLocaleDateString("es-CO")}</p>{document.comentario_revision && <p className="mt-1 text-sm text-amber-800">Comentario: {document.comentario_revision}</p>}</div></div><div className="flex gap-2"><Link href={`/gestion-procesos/cliente/documentos#solicitud-${document.solicitud_id}`} className="inline-flex items-center rounded-md border border-border px-3 py-2 text-sm hover:bg-surface-hover">{document.estado_revision === "REQUIERE_CORRECCION" ? "Reemplazar" : "Ver solicitud"}</Link><button type="button" onClick={() => void download(document)} disabled={downloadingId !== null} aria-label={`Descargar ${document.nombre_archivo}`} className="inline-flex items-center gap-2 rounded-md border border-border px-3 py-2 text-sm text-foreground hover:bg-surface-hover disabled:opacity-50"><Download className="size-4" />{downloadingId === document.id ? "Descargando..." : "Descargar"}</button></div></div>)}</section> : null; })}</div> : <div className="rounded-lg border border-dashed border-border px-5 py-8 text-center text-sm text-(--foreground-muted)"><FileText className="mx-auto mb-2 size-6" />Aún no has entregado documentos.</div>}
 				</section>
 			</>}
 		</section>

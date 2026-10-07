@@ -9,6 +9,7 @@ import TaskMonthCalendar, {
 } from "@/components/calendar/TaskMonthCalendar";
 
 type Task = CalendarTask & {
+  proceso_id?: number | null;
   descripcion?: string | null;
   completada_en?: string | null;
   subtareas: {
@@ -21,6 +22,7 @@ type Task = CalendarTask & {
     actuacion_id?: number | null;
   }[];
 };
+type ClientProcess = { id: number; nombre: string };
 
 function fechaLocalParaInput(value?: string | null) {
   if (!value) return "";
@@ -30,6 +32,10 @@ function fechaLocalParaInput(value?: string | null) {
   return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
 }
 
+function isOverdue(value?: string | null) {
+  return Boolean(value && Date.parse(value) < Date.now());
+}
+
 async function loadTasks(token: string): Promise<Task[]> {
   return fetchApi("/api/tareas", { method: "GET", token });
 }
@@ -37,6 +43,7 @@ async function loadTasks(token: string): Promise<Task[]> {
 export default function TareasClientePage() {
   const { token, loading: sessionLoading } = useSession();
   const [tasks, setTasks] = useState<Task[]>([]);
+  const [processes, setProcesses] = useState<ClientProcess[]>([]);
   const [loading, setLoading] = useState(true);
   const [workingId, setWorkingId] = useState<number | null>(null);
   const [workingSubtaskId, setWorkingSubtaskId] = useState<number | null>(null);
@@ -49,10 +56,11 @@ export default function TareasClientePage() {
   useEffect(() => {
     if (sessionLoading || !token) return;
     let active = true;
-    loadTasks(token)
-      .then((result) => {
+    Promise.all([loadTasks(token), fetchApi("/api/expedientes/procesos", { token }) as Promise<ClientProcess[]>])
+      .then(([result, processList]) => {
         if (!active) return;
         setTasks(result);
+        setProcesses(processList);
         const requestedId = Number(new URLSearchParams(window.location.search).get("tarea"));
         if (Number.isInteger(requestedId) && requestedId > 0) setFocusedTaskId(requestedId);
       })
@@ -202,6 +210,8 @@ export default function TareasClientePage() {
       ),
     [tasks],
   );
+  const completedTasks = tasks.filter((task) => task.estado === "COMPLETADA");
+  const processNames = new Map(processes.map((process) => [process.id, process.nombre]));
   const calendarTasks: CalendarTask[] = tasks
     .filter((task) => task.fecha_limite)
     .map((task) => ({
@@ -210,7 +220,7 @@ export default function TareasClientePage() {
       estado: task.estado,
       prioridad: task.prioridad,
       fecha_limite: task.fecha_limite,
-      href: undefined,
+      href: `/gestion-procesos/cliente/tareas?tarea=${task.id}#tarea-${task.id}`,
     }));
 
   return (
@@ -288,6 +298,10 @@ export default function TareasClientePage() {
                           {task.descripcion}
                         </p>
                       )}
+                      <p className="mt-1 text-xs text-(--foreground-muted)">
+                        {task.proceso_id ? <>Proceso: <a className="text-primary underline" href={`/gestion-procesos/cliente/procesos/${task.proceso_id}`}>{processNames.get(task.proceso_id) || "Ver proceso"}</a></> : "Tarea general del despacho"}
+                        {isOverdue(task.fecha_limite) ? <span className="ml-2 font-semibold text-danger">Vencida</span> : task.fecha_limite ? <span className="ml-2 text-primary">Próxima</span> : null}
+                      </p>
                       {task.subtareas.filter((subtask) => !subtask.completada)
                         .length > 0 && (
                         <ul className="mt-3 space-y-2 border-l-2 border-border pl-3">
@@ -361,6 +375,10 @@ export default function TareasClientePage() {
                 No tienes tareas pendientes.
               </p>
             )}
+          </section>
+          <section className="overflow-hidden rounded-lg border border-border bg-surface">
+            <header className="flex items-center justify-between border-b border-border px-4 py-3"><div><h2 className="font-semibold">Completadas</h2><p className="text-xs text-(--foreground-muted)">{completedTasks.length} tarea(s)</p></div><Check className="size-5 text-success"/></header>
+            {completedTasks.length ? <ul className="divide-y divide-border">{completedTasks.map((task) => <li key={task.id} className="px-4 py-3"><p className="font-medium">{task.titulo}</p><p className="mt-1 text-xs text-(--foreground-muted)">{task.proceso_id ? processNames.get(task.proceso_id) || "Proceso relacionado" : "Tarea general"} · Completada</p></li>)}</ul> : <p className="px-4 py-6 text-sm text-(--foreground-muted)">Aún no has completado tareas.</p>}
           </section>
         </>
       )}

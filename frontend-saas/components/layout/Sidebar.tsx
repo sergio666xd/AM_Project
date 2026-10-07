@@ -123,13 +123,18 @@ const lawyerMenuItems = (isSaas: boolean) => [
   { label: "Notificaciones", href: "/gestion-procesos/abogado/notificaciones", icon: Bell },
 ];
 
-const clientMenuItems: MenuItem[] = [
-  { label: "Mis procesos", href: "/gestion-procesos/cliente", icon: FolderOpen },
-  { label: "Mis tareas", href: "/gestion-procesos/cliente/tareas", icon: ListChecks },
-  { label: "Documentos", href: "/gestion-procesos/cliente/documentos", icon: FolderOpen },
-  { label: "Mi perfil", href: "/gestion-procesos/cliente/perfil", icon: User },
-  { label: "Configuración", href: "/gestion-procesos/cliente/configuracion", icon: Settings },
-];
+  const clientMenuItems: MenuItem[] = [
+    { label: "Inicio", href: "/gestion-procesos/cliente", icon: LayoutDashboard },
+    { label: "Mis procesos", href: "/gestion-procesos/cliente/procesos", icon: FolderOpen },
+    { label: "Mis tareas", href: "/gestion-procesos/cliente/tareas", icon: ListChecks },
+    { label: "Documentos y solicitudes", href: "/gestion-procesos/cliente/documentos", icon: FileText },
+    { label: "Calendario", href: "/gestion-procesos/cliente/calendario", icon: CalendarDays },
+    { label: "Notificaciones", href: "/gestion-procesos/cliente/notificaciones", icon: Bell },
+    { label: "Mensajes", href: "/gestion-procesos/cliente/mensajes", icon: UserCheck },
+    { label: "Ayuda", href: "/gestion-procesos/cliente/ayuda", icon: ScrollText },
+    { label: "Mi perfil", href: "/gestion-procesos/cliente/perfil", icon: User },
+    { label: "Configuración", href: "/gestion-procesos/cliente/configuracion", icon: Settings },
+  ];
 
 export default function Sidebar({ variant }: SidebarProps) {
   const pathname = usePathname();

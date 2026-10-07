@@ -488,6 +488,7 @@ class ComunicacionProceso(Base):
     asunto = Column(String(255), nullable=False)
     contenido = Column(Text, nullable=False)
     created_at = Column(DateTime, nullable=False, default=datetime.utcnow, index=True)
+    leido_en = Column(DateTime, nullable=True)
     proceso = relationship("Proceso")
     actor = relationship("Usuario", foreign_keys=[actor_id])
     cliente = relationship("Usuario", foreign_keys=[cliente_id])
@@ -500,6 +501,16 @@ class LecturaNotificacionAbogado(Base):
     id = Column(Integer, primary_key=True, index=True)
     usuario_id = Column(Integer, ForeignKey("usuarios.id", ondelete="CASCADE"), nullable=False, index=True)
     notificacion_id = Column(String(120), nullable=False, index=True)
+    leida_en = Column(DateTime, nullable=False, default=datetime.utcnow)
+
+
+class LecturaNotificacionCliente(Base):
+    __tablename__ = "lecturas_notificacion_cliente"
+    __table_args__ = (UniqueConstraint("usuario_id", "notificacion_id", name="uq_lectura_notificacion_cliente"),)
+
+    id = Column(Integer, primary_key=True, index=True)
+    usuario_id = Column(Integer, ForeignKey("usuarios.id", ondelete="CASCADE"), nullable=False, index=True)
+    notificacion_id = Column(String(160), nullable=False, index=True)
     leida_en = Column(DateTime, nullable=False, default=datetime.utcnow)
 
 
