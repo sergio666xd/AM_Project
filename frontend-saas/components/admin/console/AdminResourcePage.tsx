@@ -6,6 +6,7 @@ import {
   ArchiveRestore,
   Copy,
   Download,
+  Eye,
   Link2,
   Mail,
   Pencil,
@@ -61,7 +62,7 @@ type TemporaryLink = {
   nombre_archivo: string;
 };
 type TaskView = "LISTA" | "KANBAN" | "CALENDARIO";
-type DocumentRequest = { id: number; titulo: string; proceso: string; cliente: string; estado: string; documento: string | null; documento_id: number | null; solicitado_en: string; fecha_limite: string | null; atendida_en: string | null };
+type DocumentRequest = { id: number; titulo: string; proceso: string; proceso_id: number; cliente: string; cliente_id: number; estado: string; documento: string | null; documento_id: number | null; solicitado_en: string; fecha_limite: string | null; atendida_en: string | null };
 const emptyForm: FormState = {
   owner_id: "",
   nombre: "",
@@ -155,6 +156,7 @@ function display(value: unknown) {
   if (value === null || value === undefined || value === "") return "—";
   if (Array.isArray(value)) return value.length ? value.join(" · ") : "Ninguna";
   if (typeof value === "boolean") return value ? "Sí" : "No";
+  if (typeof value === "object") return JSON.stringify(value);
   if (
     typeof value === "string" &&
     value.includes("T") &&
@@ -169,7 +171,8 @@ function display(value: unknown) {
 
 export default function AdminResourcePage({ sector }: { sector: Sector }) {
   const pathname = usePathname();
-  const resource = pathname.split("/").filter(Boolean).pop() as Resource;
+  const requestsOnly = pathname.endsWith("/documentos/solicitudes");
+  const resource = (requestsOnly ? "documentos" : pathname.split("/").filter(Boolean).pop()) as Resource;
   const validResource =
     typeof resource === "string" && Object.hasOwn(resourceNames, resource);
   const { token } = useSession();
@@ -187,6 +190,13 @@ export default function AdminResourcePage({ sector }: { sector: Sector }) {
   const [archived, setArchived] = useState(false);
   const [query, setQuery] = useState("");
   const [state, setState] = useState("TODOS");
+  const [ownerFilter, setOwnerFilter] = useState("TODOS");
+  const [processFilter, setProcessFilter] = useState("TODOS");
+  const [clientFilter, setClientFilter] = useState("TODOS");
+  const [dateFrom, setDateFrom] = useState("");
+  const [dateTo, setDateTo] = useState("");
+  const [selectedIds, setSelectedIds] = useState<number[]>([]);
+  const [detailsRow, setDetailsRow] = useState<Row | null>(null);
   const [taskView, setTaskView] = useState<TaskView>("LISTA");
   const [calendarMonth, setCalendarMonth] = useState(() => new Date().toISOString().slice(0, 7));
   const [loading, setLoading] = useState(true);
@@ -208,6 +218,8 @@ export default function AdminResourcePage({ sector }: { sector: Sector }) {
   } | null>(null);
   const [teamSelection, setTeamSelection] = useState("");
   const [documentRequests, setDocumentRequests] = useState<DocumentRequest[]>([]);
+  const [selectedRequestIds, setSelectedRequestIds] = useState<number[]>([]);
+  const [detailRequest, setDetailRequest] = useState<DocumentRequest | null>(null);
 
   async function reload() {
     if (!token || !validResource) return;
@@ -259,6 +271,15 @@ export default function AdminResourcePage({ sector }: { sector: Sector }) {
   }, [token, resource, sector, archived, validResource]);
 
   useEffect(() => {
+    const requestedId = new URLSearchParams(window.location.search).get("detalle");
+    if (!requestedId) return;
+    const matchingRow = rows.find((row) => String(row.id) === requestedId);
+    if (!matchingRow) return;
+    const timer = window.setTimeout(() => setDetailsRow(matchingRow), 0);
+    return () => window.clearTimeout(timer);
+  }, [rows]);
+
+  useEffect(() => {
     if (!token || resource !== "documentos") return;
     let active = true;
     adminFetch(`${API_URL}/api/admin/documentos/solicitudes?sector=${sector}`, { headers: { Authorization: `Bearer ${token}` } })
@@ -284,16 +305,24 @@ export default function AdminResourcePage({ sector }: { sector: Sector }) {
               .toLowerCase()
               .includes(query.toLowerCase()),
           );
-        return matchesState && matchesQuery;
+        const matchesOwner = ownerFilter === "TODOS" || String(row.owner_id ?? row.responsable_id ?? "") === ownerFilter;
+        const matchesProcess = processFilter === "TODOS" || String(row.proceso_id ?? "") === processFilter;
+        const matchesClient = clientFilter === "TODOS" || String(row.cliente_id ?? "") === clientFilter;
+        const rowDate = String(row.fecha_limite ?? row.created_at ?? row.consultado_en ?? "").slice(0, 10);
+        const matchesFrom = !dateFrom || (rowDate && rowDate >= dateFrom);
+        const matchesTo = !dateTo || (rowDate && rowDate <= dateTo);
+        return matchesState && matchesQuery && matchesOwner && matchesProcess && matchesClient && matchesFrom && matchesTo;
       }),
-    [rows, state, query],
+    [rows, state, query, ownerFilter, processFilter, clientFilter, dateFrom, dateTo],
   );
+  const selectedVisibleRows = filtered.filter((row) => selectedIds.includes(row.id));
   const states = [
-    ...new Set(
+    ...new Set([
       rows
         .map((row) => String(row.estado ?? row.estado_consulta ?? row.salud ?? ""))
         .filter(Boolean),
-    ),
+      ...(resource === "documentos" ? documentRequests.map((request) => request.estado) : []),
+    ].flat()),
   ];
   const tasksByState = ["PENDIENTE", "EN_CURSO", "COMPLETADA", "CANCELADA"].map((status) => ({
     status,
@@ -307,6 +336,14 @@ export default function AdminResourcePage({ sector }: { sector: Sector }) {
     const due = typeof row.fecha_limite === "string" ? row.fecha_limite.slice(0, 10) : "";
     if (due.startsWith(calendarMonth)) tasksByDueDate.set(due, [...(tasksByDueDate.get(due) ?? []), row]);
   }
+  const visibleDocumentRequests = documentRequests.filter((request) =>
+    (!query || `${request.titulo} ${request.proceso} ${request.cliente} ${request.documento ?? ""}`.toLowerCase().includes(query.trim().toLowerCase())) &&
+    (state === "TODOS" || request.estado === state) &&
+    (processFilter === "TODOS" || String(request.proceso_id) === processFilter) &&
+    (clientFilter === "TODOS" || String(request.cliente_id) === clientFilter) &&
+    (!dateFrom || request.solicitado_en.slice(0, 10) >= dateFrom) &&
+    (!dateTo || request.solicitado_en.slice(0, 10) <= dateTo)
+  );
 
   function openCreate() {
     setEditing(null);
@@ -712,6 +749,56 @@ export default function AdminResourcePage({ sector }: { sector: Sector }) {
     }
   }
 
+  async function runBulkAction(action: "DELETE" | "RESTORE" | "CONSULT") {
+    if (!token) return;
+    const selectedRows = selectedVisibleRows;
+    if (!selectedRows.length) return;
+    if (action === "DELETE" && !window.confirm(`¿Aplicar la acción a ${selectedRows.length} registros seleccionados? Esta operación puede ser irreversible.`)) return;
+    setWorking(true);
+    setError("");
+    setNotice("");
+    try {
+      if (action === "CONSULT") {
+        await iniciarWorkflowConsultaRadicado(token, { tipo: "MANUAL", radicado_ids: selectedRows.map((row) => row.id) });
+        setNotice(`${selectedRows.length} consultas enviadas al Workflow.`);
+      } else {
+        const outcomes = await Promise.allSettled(selectedRows.map(async (row) => {
+          const endpoint = action === "RESTORE"
+            ? `${API_URL}/api/admin/inventario/procesos/${row.id}/restaurar?sector=${sector}`
+            : `${API_URL}/api/admin/inventario/${resource}/${row.id}?sector=${sector}`;
+          const response = await adminFetch(endpoint, { method: action === "RESTORE" ? "PATCH" : "DELETE", headers: { Authorization: `Bearer ${token}` } });
+          const result = await response.json().catch(() => ({}));
+          if (!response.ok) throw new Error(result.detail || `No se pudo procesar el registro ${row.id}.`);
+          return row.id;
+        }));
+        const failed = outcomes.filter((item) => item.status === "rejected").length;
+        const succeeded = outcomes.length - failed;
+        setNotice(`${succeeded} registro(s) procesados${failed ? `; ${failed} con error` : ""}.`);
+        if (failed) setError(outcomes.filter((item): item is PromiseRejectedResult => item.status === "rejected").map((item) => item.reason instanceof Error ? item.reason.message : "Error al procesar registro.").join(" "));
+      }
+      setSelectedIds([]);
+      await reload();
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "No fue posible completar la acción masiva.");
+    } finally {
+      setWorking(false);
+    }
+  }
+
+  function exportSelectedRequests() {
+    const selected = visibleDocumentRequests.filter((request) => selectedRequestIds.includes(request.id));
+    if (!selected.length) return;
+    const escapeCsv = (value: string | number | null) => `"${String(value ?? "").replaceAll('"', '""')}"`;
+    const csv = [["Solicitud", "Proceso", "Cliente", "Estado", "Documento", "Solicitado", "Fecha límite"], ...selected.map((request) => [request.titulo, request.proceso, request.cliente, request.estado, request.documento, request.solicitado_en, request.fecha_limite])].map((line) => line.map(escapeCsv).join(",")).join("\r\n");
+    const url = URL.createObjectURL(new Blob([`\uFEFF${csv}`], { type: "text/csv;charset=utf-8" }));
+    const anchor = window.document.createElement("a");
+    anchor.href = url;
+    anchor.download = "solicitudes-documentales.csv";
+    anchor.click();
+    URL.revokeObjectURL(url);
+    setSelectedRequestIds([]);
+  }
+
   if (!validResource)
     return (
       <p role="alert" className="p-6 text-sm text-red-700">
@@ -768,7 +855,7 @@ export default function AdminResourcePage({ sector }: { sector: Sector }) {
             Panel Administrativo · {sectorLabel}
           </p>
           <h1 className="mt-1 text-2xl font-semibold text-foreground">
-            {resourceNames[resource]}
+            {requestsOnly ? "Solicitudes documentales" : resourceNames[resource]}
           </h1>
           <p className="mt-1 text-sm text-foreground-muted">
             Registros restringidos a este ámbito administrativo.
@@ -794,7 +881,7 @@ export default function AdminResourcePage({ sector }: { sector: Sector }) {
           >
             <RefreshCw className={`size-4 ${loading ? "animate-spin" : ""}`} />
           </button>
-          {canCreate && (
+          {canCreate && !requestsOnly && (
             <button
               type="button"
               onClick={openCreate}
@@ -868,6 +955,13 @@ export default function AdminResourcePage({ sector }: { sector: Sector }) {
             <option key={value}>{value}</option>
           ))}
         </select>
+        {resource !== "documentos" && <select aria-label="Filtrar responsable" value={ownerFilter} onChange={(event) => setOwnerFilter(event.target.value)} className="rounded-md border border-border bg-background px-3 py-2 text-sm">
+          <option value="TODOS">Todos los responsables</option>{owners.map((owner) => <option key={owner.id} value={owner.id}>{owner.nombre_completo}</option>)}
+        </select>}
+        {(resource === "tareas" || resource === "documentos") && <select aria-label="Filtrar proceso" value={processFilter} onChange={(event) => setProcessFilter(event.target.value)} className="rounded-md border border-border bg-background px-3 py-2 text-sm"><option value="TODOS">Todos los procesos</option>{processes.map((process) => <option key={process.id} value={process.id}>{process.nombre}</option>)}</select>}
+        {(resource === "tareas" || resource === "documentos") && <select aria-label="Filtrar cliente" value={clientFilter} onChange={(event) => setClientFilter(event.target.value)} className="rounded-md border border-border bg-background px-3 py-2 text-sm"><option value="TODOS">Todos los clientes</option>{clients.map((client) => <option key={client.id} value={client.id}>{client.nombre_completo}</option>)}</select>}
+        <label className="flex items-center gap-2 text-xs text-foreground-muted">Desde<input type="date" aria-label="Desde la fecha" value={dateFrom} onChange={(event) => setDateFrom(event.target.value)} className="h-9 rounded-md border border-border bg-background px-2 text-sm text-foreground" /></label>
+        <label className="flex items-center gap-2 text-xs text-foreground-muted">Hasta<input type="date" aria-label="Hasta la fecha" value={dateTo} onChange={(event) => setDateTo(event.target.value)} className="h-9 rounded-md border border-border bg-background px-2 text-sm text-foreground" /></label>
       </div>
       {resource === "tareas" && <div role="group" aria-label="Vista de tareas" className="inline-flex gap-1 rounded-md border border-border p-1">
         {(["LISTA", "KANBAN", "CALENDARIO"] as const).map((mode) => <button key={mode} type="button" aria-pressed={taskView === mode} onClick={() => setTaskView(mode)} className={`rounded px-3 py-1.5 text-sm ${taskView === mode ? "bg-primary text-white" : "hover:bg-surface-hover"}`}>{mode === "LISTA" ? "Lista" : mode === "KANBAN" ? "Kanban" : "Calendario"}</button>)}
@@ -879,15 +973,19 @@ export default function AdminResourcePage({ sector }: { sector: Sector }) {
         <div className="flex items-center justify-between"><h2 className="font-semibold">Vencimientos</h2><label className="text-xs text-foreground-muted">Mes<input type="month" aria-label="Mes del calendario de tareas" value={calendarMonth} onChange={(event) => setCalendarMonth(event.target.value)} className="ml-2 h-9 rounded-md border border-border bg-background px-2 text-sm text-foreground" /></label></div>
         <div className="grid grid-cols-7 border-l border-t border-border">{["Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom"].map((day) => <div key={day} className="border-b border-r border-border bg-surface-secondary p-2 text-xs font-semibold text-foreground-muted">{day}</div>)}{Array.from({ length: Math.ceil((calendarOffset + calendarDays) / 7) * 7 }, (_, index) => { const day = index - calendarOffset + 1; if (day < 1 || day > calendarDays) return <div key={`empty-${index}`} className="min-h-24 border-b border-r border-border bg-background-secondary/40" />; const key = `${calendarMonth}-${String(day).padStart(2, "0")}`; return <div key={key} className="min-h-24 border-b border-r border-border p-2"><p className="mb-1 text-xs text-foreground-muted">{day}</p><div className="space-y-1">{(tasksByDueDate.get(key) ?? []).map((row) => <button key={row.id} type="button" onClick={() => openEdit(row)} className="block w-full truncate rounded bg-primary/10 px-1.5 py-1 text-left text-xs text-primary">{String(row.titulo ?? row.nombre ?? "Tarea")}</button>)}</div></div>;})}</div>
       </section>}
-      {resource === "documentos" && <section className="space-y-3 rounded-lg border border-border bg-surface p-4">
+      {resource === "documentos" && <nav aria-label="Subpáginas documentales" className="flex flex-wrap gap-2"><a href="/gestion-procesos/admin/documentos" aria-current={!requestsOnly ? "page" : undefined} className={`rounded-md border border-border px-3 py-2 text-sm ${!requestsOnly ? "bg-primary text-white" : "hover:bg-surface-hover"}`}>Archivos</a><a href="/gestion-procesos/admin/documentos/solicitudes" aria-current={requestsOnly ? "page" : undefined} className={`rounded-md border border-border px-3 py-2 text-sm ${requestsOnly ? "bg-primary text-white" : "hover:bg-surface-hover"}`}>Solicitudes documentales</a></nav>}
+      {resource === "documentos" && requestsOnly && <section className="space-y-3 rounded-lg border border-border bg-surface p-4">
         <div><h2 className="font-semibold">Solicitudes y revisión</h2><p className="text-sm text-foreground-muted">Seguimiento de documentos solicitados y recibidos por los clientes.</p></div>
-        <div className="overflow-x-auto"><table className="w-full min-w-190 text-left text-sm"><thead className="bg-surface-secondary text-xs text-foreground-muted"><tr><th className="px-3 py-2">Solicitud</th><th className="px-3 py-2">Proceso</th><th className="px-3 py-2">Cliente</th><th className="px-3 py-2">Estado</th><th className="px-3 py-2">Documento</th><th className="px-3 py-2">Solicitado</th><th className="px-3 py-2">Vence</th></tr></thead><tbody>{documentRequests.map((request) => <tr key={request.id} className="border-t border-border"><td className="px-3 py-2 font-medium">{request.titulo}</td><td className="px-3 py-2">{request.proceso}</td><td className="px-3 py-2">{request.cliente}</td><td className="px-3 py-2">{request.estado === "SOLICITADO" ? "Pendiente" : request.estado === "RECIBIDO" ? "Recibido" : request.estado === "EN_REVISION" ? "En revisión" : request.estado === "REQUIERE_CORRECCION" ? "Requiere corrección" : request.estado === "APROBADO" ? "Aprobado" : request.estado === "RECHAZADO" ? "Rechazado" : request.estado === "VENCIDO" ? "Vencido" : request.estado}</td><td className="px-3 py-2">{request.documento ?? "Pendiente de carga"}{request.documento_id && <button type="button" onClick={() => { const row = rows.find((item) => item.id === request.documento_id); if (row) openEdit(row); }} className="ml-2 text-primary underline">Revisar</button>}</td><td className="px-3 py-2 text-xs text-foreground-muted">{display(request.solicitado_en)}</td><td className="px-3 py-2 text-xs text-foreground-muted">{display(request.fecha_limite)}</td></tr>)}</tbody></table>{documentRequests.length === 0 && <p className="py-6 text-center text-sm text-foreground-muted">No hay solicitudes documentales.</p>}</div>
+        <div className="overflow-x-auto"><table className="w-full min-w-190 text-left text-sm"><thead className="bg-surface-secondary text-xs text-foreground-muted"><tr><th className="px-3 py-2">Solicitud</th><th className="px-3 py-2">Proceso</th><th className="px-3 py-2">Cliente</th><th className="px-3 py-2">Estado</th><th className="px-3 py-2">Documento</th><th className="px-3 py-2">Solicitado</th><th className="px-3 py-2">Vence</th><th className="px-3 py-2">Detalle</th></tr></thead><tbody>{visibleDocumentRequests.map((request) => <tr key={request.id} className="border-t border-border"><td className="px-3 py-2 font-medium"><button type="button" onClick={() => setDetailRequest(request)} className="text-left text-primary hover:underline">{request.titulo}</button></td><td className="px-3 py-2">{request.proceso}</td><td className="px-3 py-2">{request.cliente}</td><td className="px-3 py-2">{request.estado === "SOLICITADO" ? "Pendiente" : request.estado === "RECIBIDO" ? "Recibido" : request.estado === "EN_REVISION" ? "En revisión" : request.estado === "REQUIERE_CORRECCION" ? "Requiere corrección" : request.estado === "APROBADO" ? "Aprobado" : request.estado === "RECHAZADO" ? "Rechazado" : request.estado === "VENCIDO" ? "Vencido" : request.estado}</td><td className="px-3 py-2">{request.documento ?? "Pendiente de carga"}{request.documento_id && <button type="button" onClick={() => { const row = rows.find((item) => item.id === request.documento_id); if (row) openEdit(row); }} className="ml-2 text-primary underline">Revisar</button>}</td><td className="px-3 py-2 text-xs text-foreground-muted">{display(request.solicitado_en)}</td><td className="px-3 py-2 text-xs text-foreground-muted">{display(request.fecha_limite)}</td><td className="px-3 py-2"><button type="button" onClick={() => setDetailRequest(request)} className="rounded border border-border px-2 py-1 text-xs hover:bg-surface-hover">Ver detalle</button></td></tr>)}</tbody></table>{visibleDocumentRequests.length === 0 && <p className="py-6 text-center text-sm text-foreground-muted">No hay solicitudes documentales para estos filtros.</p>}</div>
       </section>}
-      <div className="overflow-x-auto rounded-lg border border-border bg-surface">
+      {resource === "documentos" && requestsOnly && <div className="flex flex-wrap items-center gap-3 rounded-lg border border-border bg-surface p-3"><label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={visibleDocumentRequests.length > 0 && visibleDocumentRequests.every((request) => selectedRequestIds.includes(request.id))} onChange={(event) => setSelectedRequestIds((current) => event.target.checked ? [...new Set([...current, ...visibleDocumentRequests.map((request) => request.id)])] : current.filter((id) => !visibleDocumentRequests.some((request) => request.id === id)))} />Seleccionar solicitudes visibles</label><span className="text-sm text-foreground-muted">{visibleDocumentRequests.filter((request) => selectedRequestIds.includes(request.id)).length} seleccionadas</span><button type="button" disabled={!visibleDocumentRequests.some((request) => selectedRequestIds.includes(request.id))} onClick={exportSelectedRequests} className="ml-auto rounded-md border border-border px-3 py-2 text-sm disabled:opacity-50">Exportar selección CSV</button></div>}
+      {!requestsOnly && <div className="flex flex-wrap items-center gap-3 rounded-lg border border-border bg-surface p-3"><label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={filtered.length > 0 && filtered.every((row) => selectedIds.includes(row.id))} onChange={(event) => setSelectedIds((current) => event.target.checked ? [...new Set([...current, ...filtered.map((row) => row.id)])] : current.filter((id) => !filtered.some((row) => row.id === id)))} />Seleccionar registros visibles</label><span className="text-sm text-foreground-muted">{selectedVisibleRows.length} seleccionados</span><div className="ml-auto flex flex-wrap gap-2">{resource === "radicados" && <button type="button" disabled={!selectedVisibleRows.length || working} onClick={() => void runBulkAction("CONSULT")} className="rounded-md border border-border px-3 py-2 text-sm disabled:opacity-50">Consultar selección</button>}{resource === "procesos" && archived && <button type="button" disabled={!selectedVisibleRows.length || working} onClick={() => void runBulkAction("RESTORE")} className="rounded-md border border-border px-3 py-2 text-sm disabled:opacity-50">Restaurar seleccionados</button>}{selectedVisibleRows.length > 0 && (resource !== "procesos" || !archived) && <button type="button" disabled={working} onClick={() => void runBulkAction("DELETE")} className="rounded-md border border-danger/30 px-3 py-2 text-sm text-danger disabled:opacity-50">{resource === "procesos" ? "Archivar seleccionados" : "Eliminar seleccionados"}</button>}</div></div>}
+      {!requestsOnly && <div className="overflow-x-auto rounded-lg border border-border bg-surface">
         <table className="w-full min-w-195 text-left text-sm">
           <thead className="border-b border-border bg-surface-secondary text-xs uppercase text-foreground-muted">
             <tr>
-              <th className="px-4 py-3">ID</th>
+              <th className="px-4 py-3"><input type="checkbox" aria-label="Seleccionar registros visibles" checked={filtered.length > 0 && filtered.every((row) => selectedIds.includes(row.id))} onChange={(event) => setSelectedIds((current) => event.target.checked ? [...new Set([...current, ...filtered.map((row) => row.id)])] : current.filter((id) => !filtered.some((row) => row.id === id)))} /></th>
+              <th className="px-4 py-3">ID / detalle</th>
               {columns.map((column) => (
                 <th key={column.key} className="px-4 py-3">
                   {column.label}
@@ -900,7 +998,7 @@ export default function AdminResourcePage({ sector }: { sector: Sector }) {
             {loading ? (
               <tr>
                 <td
-                  colSpan={columns.length + 2}
+                  colSpan={columns.length + 3}
                   className="px-4 py-10 text-center text-foreground-muted"
                 >
                   Cargando registros...
@@ -912,8 +1010,9 @@ export default function AdminResourcePage({ sector }: { sector: Sector }) {
                   key={row.id}
                   className="border-b border-border last:border-0"
                 >
+                  <td className="px-4 py-3"><input type="checkbox" aria-label={`Seleccionar registro ${row.id}`} checked={selectedIds.includes(row.id)} onChange={() => setSelectedIds((current) => current.includes(row.id) ? current.filter((id) => id !== row.id) : [...current, row.id])} /></td>
                   <td className="px-4 py-3 font-mono text-xs text-foreground-muted">
-                    {row.id}
+                    <button type="button" onClick={() => setDetailsRow(row)} className="inline-flex items-center gap-1 rounded px-1 py-1 text-primary hover:bg-primary/5 hover:underline"><Eye className="size-3.5" />{row.id}</button>
                   </td>
                   {columns.map((column) => (
                     <td
@@ -1057,7 +1156,7 @@ export default function AdminResourcePage({ sector }: { sector: Sector }) {
             ) : (
               <tr>
                 <td
-                  colSpan={columns.length + 2}
+                  colSpan={columns.length + 3}
                   className="px-4 py-12 text-center text-sm text-foreground-muted"
                 >
                   No hay registros para este filtro.
@@ -1066,8 +1165,10 @@ export default function AdminResourcePage({ sector }: { sector: Sector }) {
             )}
           </tbody>
         </table>
-      </div>
+      </div>}
 
+      {detailsRow && <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) setDetailsRow(null); }}><section role="dialog" aria-modal="true" aria-labelledby="inventory-detail-title" className="max-h-[88vh] w-full max-w-3xl overflow-y-auto rounded-xl border border-border bg-surface shadow-2xl"><header className="sticky top-0 flex items-start justify-between gap-4 border-b border-border bg-surface p-5"><div><p className="text-xs font-semibold uppercase text-primary">{resourceNames[resource]} · {sectorLabel}</p><h2 id="inventory-detail-title" className="mt-1 text-xl font-semibold">{String(detailsRow.nombre ?? detailsRow.numero ?? detailsRow.titulo ?? detailsRow.nombre_archivo ?? `Registro ${detailsRow.id}`)}</h2><p className="text-xs text-foreground-muted">ID {detailsRow.id}</p></div><button type="button" onClick={() => setDetailsRow(null)} aria-label="Cerrar detalle" className="rounded-md border border-border p-2 hover:bg-surface-hover"><X className="size-4" /></button></header><dl className="grid gap-3 p-5 sm:grid-cols-2">{Object.entries(detailsRow).filter(([key]) => !["ruta_archivo", "url_temporal"].includes(key)).map(([key, value]) => <div key={key} className="min-w-0 rounded-lg border border-border p-3"><dt className="text-xs font-semibold uppercase tracking-wide text-foreground-muted">{key.replaceAll("_", " ")}</dt><dd className="mt-1 break-words text-sm text-foreground">{display(value)}</dd></div>)}</dl><footer className="flex justify-end gap-2 border-t border-border p-4"><button type="button" onClick={() => { setDetailsRow(null); openEdit(detailsRow); }} className="rounded-md bg-primary px-3 py-2 text-sm font-semibold text-white">Editar registro</button><button type="button" onClick={() => setDetailsRow(null)} className="rounded-md border border-border px-3 py-2 text-sm">Cerrar</button></footer></section></div>}
+      {detailRequest && <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) setDetailRequest(null); }}><section role="dialog" aria-modal="true" aria-labelledby="document-request-detail-title" className="w-full max-w-xl space-y-4 rounded-xl border border-border bg-surface p-5 shadow-2xl"><header className="flex items-start justify-between"><div><p className="text-xs uppercase text-primary">Solicitud documental · #{detailRequest.id}</p><h2 id="document-request-detail-title" className="mt-1 text-lg font-semibold">{detailRequest.titulo}</h2></div><button type="button" onClick={() => setDetailRequest(null)} aria-label="Cerrar detalle" className="rounded-md p-2 hover:bg-surface-hover"><X className="size-4" /></button></header><dl className="grid gap-3 sm:grid-cols-2">{([["Proceso", detailRequest.proceso], ["Cliente", detailRequest.cliente], ["Estado", detailRequest.estado], ["Documento", detailRequest.documento ?? "Pendiente de carga"], ["Solicitado", detailRequest.solicitado_en], ["Fecha límite", detailRequest.fecha_limite]] as const).map(([label, value]) => <div key={label} className="rounded-lg border border-border p-3"><dt className="text-xs text-foreground-muted">{label}</dt><dd className="mt-1 break-words text-sm font-medium">{display(value)}</dd></div>)}</dl>{detailRequest.documento_id && <button type="button" onClick={() => { const row = rows.find((item) => item.id === detailRequest.documento_id); setDetailRequest(null); if (row) openEdit(row); }} className="rounded-md bg-primary px-3 py-2 text-sm font-semibold text-white">Revisar documento</button>}</section></div>}
       {formOpen && (
         <div
           role="dialog"

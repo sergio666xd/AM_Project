@@ -28,6 +28,7 @@ import {
 import { useSession } from "@/context/SessionContext";
 import Breadcrumbs from "@/components/layout/Breadcrumbs";
 import { AdminAlertBell } from "@/components/admin/console/AdminAlertBell";
+import GlobalSearch from "@/components/layout/GlobalSearch";
 
 type Item = { label: string; href: string; icon: typeof LayoutDashboard };
 type Section = { title: string; scope: string; links: Item[] };
@@ -37,6 +38,14 @@ const operationsLinks: Item[] = [
   { label: "Consultas judiciales", href: "/gestion-procesos/admin/operacion/consultas", icon: CalendarDays },
   { label: "Integraciones", href: "/gestion-procesos/admin/operacion/integraciones", icon: ServerCog },
   { label: "Notificaciones", href: "/gestion-procesos/admin/operacion/notificaciones", icon: Bell },
+];
+const documentLinks: Item[] = [
+  { label: "Archivos recibidos", href: "/gestion-procesos/admin/documentos", icon: BookOpenText },
+  { label: "Solicitudes documentales", href: "/gestion-procesos/admin/documentos/solicitudes", icon: FileText },
+];
+const auditLinks: Item[] = [
+  { label: "Actividad", href: "/gestion-procesos/admin/actividad", icon: Activity },
+  { label: "Auditoría técnica", href: "/gestion-procesos/admin/auditoria", icon: ScrollText },
 ];
 
 const sections: Section[] = [
@@ -49,6 +58,7 @@ const sections: Section[] = [
         href: "/gestion-procesos/admin",
         icon: LayoutDashboard,
       },
+      { label: "Métricas y carga", href: "/gestion-procesos/admin/metricas", icon: Activity },
       {
         label: "Alertas",
         href: "/gestion-procesos/admin/alertas",
@@ -185,7 +195,7 @@ function activeScope(pathname: string) {
     return "Global · todas las modalidades";
   if (/\/admin\/(planes|solicitudes)(\/|$)/.test(pathname))
     return "SaaS · abogados externos";
-  if (/\/admin\/(notificaciones|alertas|auditoria|operacion)(\/|$)/.test(pathname))
+  if (/\/admin\/(notificaciones|alertas|actividad|auditoria|operacion)(\/|$)/.test(pathname))
     return "Global · todas las modalidades";
   if (/\/admin\/(procesos|radicados|tareas|documentos|agenda|firma)(\/|$)/.test(pathname))
     return "Firma · Alejandra Muñoz Abogada y Asociados";
@@ -254,6 +264,8 @@ export default function AdminConsoleShell({
                   })}
                 </div>
               )}
+              {href === "/gestion-procesos/admin/documentos" && isActive && <div className="ml-5 space-y-1 border-l border-border py-1 pl-3">{documentLinks.map(({ label: childLabel, href: childHref, icon: ChildIcon }) => <Link key={childHref} href={childHref} onClick={() => setMobileOpen(false)} aria-current={pathname === childHref ? "page" : undefined} className={`flex items-center gap-2 rounded-md px-2 py-2 text-xs font-medium ${pathname === childHref ? "bg-primary/10 text-primary" : "text-(--foreground-secondary) hover:bg-surface-hover"}`}><ChildIcon className="size-3.5" />{childLabel}</Link>)}</div>}
+              {href === "/gestion-procesos/admin/auditoria" && (pathname.startsWith("/gestion-procesos/admin/auditoria") || pathname.startsWith("/gestion-procesos/admin/actividad")) && <div className="ml-5 space-y-1 border-l border-border py-1 pl-3">{auditLinks.map(({ label: childLabel, href: childHref, icon: ChildIcon }) => <Link key={childHref} href={childHref} onClick={() => setMobileOpen(false)} aria-current={pathname === childHref ? "page" : undefined} className={`flex items-center gap-2 rounded-md px-2 py-2 text-xs font-medium ${pathname === childHref ? "bg-primary/10 text-primary" : "text-(--foreground-secondary) hover:bg-surface-hover"}`}><ChildIcon className="size-3.5" />{childLabel}</Link>)}</div>}
             </div>
           );
         })}
@@ -368,7 +380,7 @@ export default function AdminConsoleShell({
               <Breadcrumbs />
               <p className="mt-0.5 text-sm font-semibold text-foreground">{scope}</p>
             </div>
-            <AdminAlertBell token={token} />
+            <div className="flex items-center gap-2"><GlobalSearch /><AdminAlertBell token={token} /></div>
           </div>
         </header>
         <div className="p-5 md:p-8">{children}</div>

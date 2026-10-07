@@ -9,11 +9,13 @@ from zoneinfo import ZoneInfo
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
 from fastapi.responses import StreamingResponse
 from sqlalchemy import or_
+from sqlalchemy import func
 from botocore.exceptions import BotoCoreError, ClientError
 from sqlalchemy.orm import Session
 from urllib.parse import quote
 
 from app import models, schemas, security, storage
+from app.visibility import CLIENT_VISIBLE, INTERNAL
 from app.audit import registrar_evento_auditoria
 from app.database import get_db
 from app.document_validation import (
@@ -104,7 +106,7 @@ def _cliente_asignado(proceso: models.Proceso, cliente_id: int, db: Session) -> 
 def _timeline_proceso(proceso: models.Proceso, db: Session, cliente_id: int | None = None) -> list[dict]:
     items: list[dict] = [{"id": f"proceso:{proceso.id}", "tipo": "PROCESO", "titulo": "Proceso creado",
                           "descripcion": proceso.nombre, "actor": proceso.abogado.nombre_completo if proceso.abogado else None,
-                          "recurso": "Proceso", "recurso_id": proceso.id, "visibilidad": "INTERNA", "fecha": proceso.created_at}]
+                          "recurso": "Proceso", "recurso_id": proceso.id, "visibilidad": INTERNAL, "fecha": proceso.created_at}]
     if cliente_id is None:
         for audit in db.query(models.EventoAuditoria).filter_by(tipo_recurso="proceso", recurso_id=str(proceso.id)).all():
             if audit.accion == "proceso.crear":
@@ -112,7 +114,7 @@ def _timeline_proceso(proceso: models.Proceso, db: Session, cliente_id: int | No
             actor = db.query(models.Usuario).filter_by(id=audit.actor_id).first() if audit.actor_id else None
             items.append({"id": f"auditoria:{audit.id}", "tipo": "PROCESO", "titulo": "Proceso actualizado",
                           "descripcion": audit.accion.replace(".", " "), "actor": actor.nombre_completo if actor else None,
-                          "recurso": "Proceso", "recurso_id": proceso.id, "visibilidad": "INTERNA", "fecha": audit.created_at})
+                          "recurso": "Proceso", "recurso_id": proceso.id, "visibilidad": INTERNAL, "fecha": audit.created_at})
     radicado_ids = [enlace.radicado_id for enlace in proceso.radicados]
     for tarea in db.query(models.Tarea).filter(models.Tarea.proceso_id == proceso.id).all():
         if cliente_id is not None and tarea.cliente_id != cliente_id:
@@ -121,7 +123,7 @@ def _timeline_proceso(proceso: models.Proceso, db: Session, cliente_id: int | No
                       "descripcion": "Tarea asignada al cliente" if tarea.cliente_id else "Tarea interna del proceso",
                       "actor": tarea.usuario.nombre_completo if tarea.usuario else None,
                       "recurso": "Tarea", "recurso_id": tarea.id,
-                      "visibilidad": "CLIENTE" if tarea.cliente_id else "INTERNA", "fecha": tarea.created_at})
+                      "visibilidad": CLIENT_VISIBLE if tarea.cliente_id else INTERNAL, "fecha": tarea.created_at})
     events_query = db.query(models.EventoAgenda).filter(models.EventoAgenda.proceso_id == proceso.id)
     if cliente_id is not None:
         events_query = events_query.filter(models.EventoAgenda.cliente_id == cliente_id)
@@ -129,14 +131,14 @@ def _timeline_proceso(proceso: models.Proceso, db: Session, cliente_id: int | No
         items.append({"id": f"evento:{event.id}", "tipo": event.tipo, "titulo": event.titulo,
                       "descripcion": event.descripcion or "Evento de agenda programado", "actor": event.responsable.nombre_completo if event.responsable else None,
                       "recurso": "Agenda", "recurso_id": event.id,
-                      "visibilidad": "CLIENTE" if event.cliente_id else "INTERNA", "fecha": event.fecha_inicio})
+                      "visibilidad": CLIENT_VISIBLE if event.cliente_id else INTERNAL, "fecha": event.fecha_inicio})
     for solicitud in db.query(models.SolicitudDocumento).filter(models.SolicitudDocumento.proceso_id == proceso.id).all():
         if cliente_id is not None and solicitud.cliente_id != cliente_id:
             continue
         items.append({"id": f"solicitud:{solicitud.id}", "tipo": "DOCUMENTO", "titulo": solicitud.titulo,
                       "descripcion": "Solicitud documental atendida" if solicitud.atendida_en else "Documento solicitado al cliente",
                       "actor": None, "recurso": "Solicitud de documento", "recurso_id": solicitud.id,
-                      "visibilidad": "CLIENTE", "fecha": solicitud.atendida_en or solicitud.created_at})
+                      "visibilidad": CLIENT_VISIBLE, "fecha": solicitud.atendida_en or solicitud.created_at})
     docs_query = db.query(models.DocumentoProceso).filter(models.DocumentoProceso.proceso_id == proceso.id)
     if cliente_id is not None:
         docs_query = docs_query.filter(models.DocumentoProceso.cliente_id == cliente_id)
@@ -145,7 +147,7 @@ def _timeline_proceso(proceso: models.Proceso, db: Session, cliente_id: int | No
                       "descripcion": "Documento recibido" if documento.cliente_id else "Documento incorporado al proceso",
                       "actor": documento.cliente.nombre_completo if documento.cliente else None,
                       "recurso": "Documento", "recurso_id": documento.id,
-                      "visibilidad": "CLIENTE" if documento.cliente_id else "INTERNA", "fecha": documento.created_at})
+                      "visibilidad": CLIENT_VISIBLE if documento.cliente_id else INTERNAL, "fecha": documento.created_at})
     if radicado_ids:
         actuaciones = db.query(models.Actuacion).filter(models.Actuacion.radicado_id.in_(radicado_ids)).all()
         for actuacion in actuaciones:
@@ -2034,3 +2036,98 @@ def cargar_documento_cliente(solicitud_id: int, archivo: UploadFile = File(...),
         "DOCUMENTOS", f"DOCUMENTO_RECIBIDO:{documento.id}", emisor=usuario,
     )
     return {"id": documento.id, "nombre_archivo": documento.nombre_archivo}
+
+
+def _staff_scope(usuario: models.Usuario, db: Session):
+    require_roles(usuario, [models.RolUsuario.ADMIN, models.RolUsuario.ABOGADO_ADMIN], action="consultar la información de gestión")
+    return None if usuario.rol == models.RolUsuario.ADMIN else lawyer_process_ids(db, usuario)
+
+
+@router.get("/busqueda-global")
+def busqueda_global(q: str, usuario: models.Usuario = Depends(security.obtener_usuario_actual), db: Session = Depends(get_db)):
+    """Search firm records while enforcing the caller's process scope."""
+    process_ids = _staff_scope(usuario, db)
+    term = q.strip()[:100]
+    if len(term) < 2:
+        return []
+    pattern = f"%{term}%"
+    limit = 7
+    results: list[dict] = []
+
+    processes = db.query(models.Proceso).filter(models.Proceso.archivado_en.is_(None), or_(models.Proceso.nombre.ilike(pattern), models.Proceso.descripcion.ilike(pattern)))
+    if process_ids is not None:
+        processes = processes.filter(models.Proceso.id.in_(process_ids))
+    for item in processes.order_by(models.Proceso.nombre).limit(limit):
+        results.append({"id": f"proceso:{item.id}", "tipo": "Proceso", "titulo": item.nombre,
+                        "subtitulo": item.abogado.nombre_completo if item.abogado else "Proceso", "href": "/gestion-procesos/admin/procesos" if usuario.rol == models.RolUsuario.ADMIN else f"/gestion-procesos/abogado/procesos/{item.id}"})
+
+    clients = db.query(models.Usuario).filter(models.Usuario.rol == models.RolUsuario.CLIENTE, or_(models.Usuario.nombre_completo.ilike(pattern), models.Usuario.email.ilike(pattern)))
+    if process_ids is not None:
+        clients = clients.outerjoin(models.ProcesoCliente, models.ProcesoCliente.cliente_id == models.Usuario.id).filter(or_(models.Usuario.creado_por_abogado_id == usuario.id, models.ProcesoCliente.proceso_id.in_(process_ids)))
+    seen_clients: set[int] = set()
+    for item in clients.order_by(models.Usuario.nombre_completo).limit(limit * 3):
+        if item.id in seen_clients:
+            continue
+        seen_clients.add(item.id)
+        results.append({"id": f"cliente:{item.id}", "tipo": "Cliente", "titulo": item.nombre_completo,
+                        "subtitulo": item.email, "href": f"/gestion-procesos/admin/usuarios/{item.id}" if usuario.rol == models.RolUsuario.ADMIN else f"/gestion-procesos/abogado/clientes/{item.id}"})
+        if len(seen_clients) >= limit:
+            break
+
+    radicados = db.query(models.Radicado).filter(or_(models.Radicado.numero.ilike(pattern), models.Radicado.demandante.ilike(pattern), models.Radicado.demandado.ilike(pattern)))
+    if process_ids is not None:
+        radicados = radicados.outerjoin(models.ProcesoRadicado).filter(or_(
+            models.ProcesoRadicado.proceso_id.in_(process_ids),
+            models.Radicado.usuarios_vinculados.any(models.Usuario.id == usuario.id),
+        ))
+    for item in radicados.order_by(models.Radicado.id.desc()).limit(limit):
+        results.append({"id": f"radicado:{item.id}", "tipo": "Radicado", "titulo": item.numero,
+                        "subtitulo": f"{item.demandante or ''} · {item.demandado or ''}".strip(" ·"), "href": "/gestion-procesos/admin/radicados" if usuario.rol == models.RolUsuario.ADMIN else f"/gestion-procesos/abogado/radicados/{item.id}"})
+
+    tasks = db.query(models.Tarea).filter(models.Tarea.estado != models.EstadoTarea.CANCELADA, or_(models.Tarea.titulo.ilike(pattern), models.Tarea.descripcion.ilike(pattern)))
+    if process_ids is not None:
+        accessible_radicados = db.query(models.ProcesoRadicado.radicado_id).filter(models.ProcesoRadicado.proceso_id.in_(process_ids))
+        tasks = tasks.filter(or_(models.Tarea.proceso_id.in_(process_ids), models.Tarea.radicado_id.in_(accessible_radicados), models.Tarea.usuario_id == usuario.id))
+    for item in tasks.order_by(models.Tarea.updated_at.desc()).limit(limit):
+        results.append({"id": f"tarea:{item.id}", "tipo": "Tarea", "titulo": item.titulo,
+                        "subtitulo": item.estado.value if hasattr(item.estado, "value") else str(item.estado), "href": "/gestion-procesos/admin/tareas" if usuario.rol == models.RolUsuario.ADMIN else f"/gestion-procesos/abogado/tareas/{item.id}"})
+
+    documents = db.query(models.DocumentoProceso).filter(models.DocumentoProceso.nombre_archivo.ilike(pattern))
+    if process_ids is not None:
+        documents = documents.filter(models.DocumentoProceso.proceso_id.in_(process_ids))
+    for item in documents.order_by(models.DocumentoProceso.created_at.desc()).limit(limit):
+        results.append({"id": f"documento:{item.id}", "tipo": "Documento", "titulo": item.nombre_archivo,
+                        "subtitulo": item.proceso.nombre if item.proceso else "Documento del proceso", "href": f"/gestion-procesos/admin/documentos?proceso={item.proceso_id}" if usuario.rol == models.RolUsuario.ADMIN else f"/gestion-procesos/abogado/documentos?proceso={item.proceso_id}"})
+    return results[:35]
+
+
+@router.get("/metricas-carga")
+def metricas_carga(usuario: models.Usuario = Depends(security.obtener_usuario_actual), db: Session = Depends(get_db)):
+    """Workload view for platform admins and firm administrators."""
+    process_ids = _staff_scope(usuario, db)
+    now = datetime.utcnow()
+    process_query = db.query(models.Proceso).filter(models.Proceso.archivado_en.is_(None))
+    task_query = db.query(models.Tarea).filter(models.Tarea.estado.in_([models.EstadoTarea.PENDIENTE, models.EstadoTarea.EN_CURSO]))
+    if process_ids is not None:
+        process_query = process_query.filter(models.Proceso.id.in_(process_ids))
+        task_query = task_query.filter(or_(models.Tarea.proceso_id.in_(process_ids), models.Tarea.usuario_id == usuario.id))
+    process_rows = process_query.with_entities(models.Proceso.abogado_id, func.count(models.Proceso.id)).group_by(models.Proceso.abogado_id).all()
+    task_rows = task_query.with_entities(models.Tarea.usuario_id, func.count(models.Tarea.id)).group_by(models.Tarea.usuario_id).all()
+
+    def responsible_rows(rows):
+        ids = [row[0] for row in rows if row[0] is not None]
+        names = {item.id: item.nombre_completo for item in db.query(models.Usuario).filter(models.Usuario.id.in_(ids)).all()} if ids else {}
+        return [{"responsable_id": identifier, "responsable": names.get(identifier, "Sin responsable"), "cantidad": count} for identifier, count in rows]
+
+    due_query = task_query.filter(models.Tarea.fecha_limite.is_not(None))
+    overdue = due_query.filter(models.Tarea.fecha_limite < now).count()
+    upcoming = due_query.filter(models.Tarea.fecha_limite >= now, models.Tarea.fecha_limite <= now + timedelta(days=7)).count()
+    activity_query = db.query(models.ComunicacionProceso).join(models.Proceso).filter(models.Proceso.archivado_en.is_(None))
+    if process_ids is not None:
+        activity_query = activity_query.filter(models.ComunicacionProceso.proceso_id.in_(process_ids))
+    activity = [{"tipo": "Comunicación" if item.visibilidad == CLIENT_VISIBLE else "Nota interna", "titulo": item.asunto,
+                 "fecha": item.created_at, "proceso_id": item.proceso_id}
+                for item in activity_query.order_by(models.ComunicacionProceso.created_at.desc()).limit(10).all()]
+    return {"procesos_activos": process_query.count(), "tareas_abiertas": task_query.count(), "vencidas": overdue,
+            "por_vencer_7_dias": upcoming, "procesos_por_responsable": responsible_rows(process_rows),
+            "tareas_por_responsable": responsible_rows(task_rows), "actividad_reciente": activity}

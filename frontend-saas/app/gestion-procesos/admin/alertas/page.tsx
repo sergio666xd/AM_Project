@@ -35,6 +35,9 @@ export default function AdminAlertsPage() {
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [query, setQuery] = useState("");
+  const [dateFrom, setDateFrom] = useState("");
+  const [dateTo, setDateTo] = useState("");
   const [error, setError] = useState("");
   const token = typeof window === "undefined" ? "" : localStorage.getItem("token") || "";
 
@@ -103,6 +106,10 @@ export default function AdminAlertsPage() {
   }
 
   const visible = useMemo(() => items.filter((item) => {
+    if (query.trim() && !`${item.descripcion} ${item.recurso} ${item.tipo} ${item.accion_recomendada}`.toLowerCase().includes(query.trim().toLowerCase())) return false;
+    const day = item.fecha?.slice(0, 10) ?? "";
+    if (dateFrom && (!day || day < dateFrom)) return false;
+    if (dateTo && (!day || day > dateTo)) return false;
     if (filter === "Activas") return item.estado === "ACTIVA";
     if (filter === "Atendidas") return item.estado === "ATENDIDA" || item.estado === "DESCARTADA";
     if (filter === "Eliminadas") return item.estado === "ELIMINADA";
@@ -112,7 +119,7 @@ export default function AdminAlertsPage() {
     if (filter === "Riesgos") return item.tipo === "Riesgo";
     if (filter === "Eventos") return item.tipo === "Evento";
     return true;
-  }), [filter, items]);
+  }), [filter, items, query, dateFrom, dateTo]);
   const visibleIds = visible.map((item) => item.id);
   const allVisibleSelected = visibleIds.length > 0 && visibleIds.every((id) => selectedIds.includes(id));
   const selectedItems = items.filter((item) => selectedIds.includes(item.id));
@@ -146,6 +153,11 @@ export default function AdminAlertsPage() {
       </div>
 
       <FilterBar>
+        <div className="grid w-full gap-2 sm:grid-cols-[1fr_auto_auto]">
+          <label><span className="sr-only">Buscar alertas</span><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Buscar alerta o recurso" className="h-10 w-full rounded-md border border-border bg-background px-3 text-sm" /></label>
+          <label className="flex items-center gap-2 text-xs text-foreground-muted">Desde<input type="date" value={dateFrom} onChange={(event) => setDateFrom(event.target.value)} className="h-10 rounded-md border border-border bg-background px-2 text-sm text-foreground" /></label>
+          <label className="flex items-center gap-2 text-xs text-foreground-muted">Hasta<input type="date" value={dateTo} onChange={(event) => setDateTo(event.target.value)} className="h-10 rounded-md border border-border bg-background px-2 text-sm text-foreground" /></label>
+        </div>
         <div className="flex flex-wrap gap-2" role="group" aria-label="Filtrar alertas">
           {filters.map((option) => <Button key={option} size="sm" variant={filter === option ? "primary" : "secondary"} onClick={() => setFilter(option)}>{option}</Button>)}
         </div>

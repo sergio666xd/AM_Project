@@ -73,6 +73,7 @@ export default function AdminUsersPage() {
   const [formOpen, setFormOpen] = useState(false);
   const [editing, setEditing] = useState<User | null>(null);
   const [form, setForm] = useState<FormState>(initialForm);
+  const [selectedIds, setSelectedIds] = useState<number[]>([]);
   const token =
     typeof window === "undefined" ? "" : localStorage.getItem("token") || "";
 
@@ -287,6 +288,24 @@ export default function AdminUsersPage() {
     }
   }
 
+  async function bulkUserAction(action: "ACTIVATE" | "SUSPEND" | "DELETE") {
+    const selected = visible.filter((user) => selectedIds.includes(user.id) && user.rol !== "ADMIN");
+    const eligible = selected.filter((user) => action === "ACTIVATE" ? user.estado === "SUSPENDIDO" || user.estado === "RECHAZADO" : action === "SUSPEND" ? user.estado === "ACTIVO" : true);
+    if (!eligible.length) return;
+    if (!window.confirm(action === "DELETE" ? `¿Eliminar ${eligible.length} cuentas seleccionadas? Las cuentas con recursos vinculados pueden conservarse o ser rechazadas por el servidor.` : `¿${action === "ACTIVATE" ? "Activar" : "Suspender"} ${eligible.length} cuentas?`)) return;
+    setWorking(true); setError(""); setNotice("");
+    const outcomes = await Promise.allSettled(eligible.map((user) => fetchApi(
+      action === "DELETE" ? `/api/admin/usuarios/${user.id}` : `/api/admin/usuarios/${user.id}/estado?estado=${action === "ACTIVATE" ? "ACTIVO" : "SUSPENDIDO"}`,
+      { method: action === "DELETE" ? "DELETE" : "PATCH", token },
+    )));
+    const failed = outcomes.filter((result) => result.status === "rejected").length;
+    setNotice(`${outcomes.length - failed} cuenta(s) procesadas${selected.length > eligible.length ? `; ${selected.length - eligible.length} omitidas por su estado` : ""}${failed ? `; ${failed} con error` : ""}.`);
+    if (failed) setError(outcomes.filter((result): result is PromiseRejectedResult => result.status === "rejected").map((result) => result.reason instanceof Error ? result.reason.message : "Error al procesar una cuenta.").join(" "));
+    setSelectedIds([]);
+    setWorking(false);
+    await reload();
+  }
+
   return (
     <section className="mx-auto max-w-6xl space-y-5">
       <header className="flex flex-wrap items-end justify-between gap-4">
@@ -399,9 +418,11 @@ export default function AdminUsersPage() {
         </select>
       </div>
       <div className="overflow-x-auto rounded-lg border border-border bg-surface">
+        <div className="flex flex-wrap items-center gap-2 border-b border-border p-3"><label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={visible.length > 0 && visible.every((user) => selectedIds.includes(user.id))} onChange={(event) => setSelectedIds((current) => event.target.checked ? [...new Set([...current, ...visible.map((user) => user.id)])] : current.filter((id) => !visible.some((user) => user.id === id)))} />Seleccionar resultados visibles</label><span className="text-sm text-foreground-muted">{selectedIds.length} seleccionadas</span><div className="ml-auto flex flex-wrap gap-2"><button type="button" disabled={working || !visible.some((user) => selectedIds.includes(user.id) && user.estado === "ACTIVO" && user.rol !== "ADMIN")} onClick={() => void bulkUserAction("SUSPEND")} className="rounded-md border border-border px-3 py-2 text-xs disabled:opacity-50">Suspender</button><button type="button" disabled={working || !visible.some((user) => selectedIds.includes(user.id) && ["SUSPENDIDO", "RECHAZADO"].includes(user.estado) && user.rol !== "ADMIN")} onClick={() => void bulkUserAction("ACTIVATE")} className="rounded-md border border-border px-3 py-2 text-xs disabled:opacity-50">Activar</button><button type="button" disabled={working || !selectedIds.some((id) => visible.some((user) => user.id === id && user.rol !== "ADMIN"))} onClick={() => void bulkUserAction("DELETE")} className="rounded-md border border-danger/30 px-3 py-2 text-xs text-danger disabled:opacity-50">Eliminar seleccionadas</button></div></div>
         <table className="w-full min-w-230 text-left text-sm">
           <thead className="border-b border-border bg-surface-secondary text-xs uppercase text-foreground-muted">
             <tr>
+              <th className="px-4 py-3"><span className="sr-only">Selección</span></th>
               <th className="px-4 py-3">Usuario</th>
               <th className="px-4 py-3">Sector</th>
               <th className="px-4 py-3">Plan</th>
@@ -414,7 +435,7 @@ export default function AdminUsersPage() {
             {loading ? (
               <tr>
                 <td
-                  colSpan={6}
+                  colSpan={7}
                   className="px-4 py-10 text-center text-foreground-muted"
                 >
                   Cargando cuentas...
@@ -426,6 +447,7 @@ export default function AdminUsersPage() {
                   key={user.id}
                   className="border-b border-border last:border-0"
                 >
+                  <td className="px-4 py-3"><input type="checkbox" checked={selectedIds.includes(user.id)} onChange={() => setSelectedIds((current) => current.includes(user.id) ? current.filter((id) => id !== user.id) : [...current, user.id])} aria-label={`Seleccionar ${user.nombre_completo}`} /></td>
                   <td className="px-4 py-3">
                     <p className="font-medium text-foreground">
                       <Link className="hover:text-primary hover:underline" href={`/gestion-procesos/admin/usuarios/${user.id}`}>{user.nombre_completo}</Link>
@@ -494,7 +516,7 @@ export default function AdminUsersPage() {
             ) : (
               <tr>
                 <td
-                  colSpan={6}
+                  colSpan={7}
                   className="px-4 py-12 text-center text-sm text-foreground-muted"
                 >
                   No hay cuentas para este filtro.

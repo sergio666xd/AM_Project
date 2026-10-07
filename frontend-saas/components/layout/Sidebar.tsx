@@ -111,7 +111,7 @@ const platformAdminSections: { label: string; items: MenuItem[] }[] = [
   },
 ];
 
-const lawyerMenuItems = (isSaas: boolean) => [
+const lawyerMenuItems = (isSaas: boolean, isFirmAdmin: boolean) => [
   { label: "Resumen", href: "/gestion-procesos/abogado", icon: LayoutDashboard },
   { label: "Procesos", href: "/gestion-procesos/abogado/procesos", icon: FolderOpen },
   { label: "Solicitudes de clientes", href: "/gestion-procesos/abogado/solicitudes-perfil", icon: UserCheck },
@@ -121,6 +121,7 @@ const lawyerMenuItems = (isSaas: boolean) => [
   { label: "Agenda", href: "/gestion-procesos/abogado/agenda", icon: CalendarDays },
   { label: "Documentos", href: "/gestion-procesos/abogado/documentos", icon: FileText },
   { label: "Notificaciones", href: "/gestion-procesos/abogado/notificaciones", icon: Bell },
+  ...(isFirmAdmin ? [{ label: "Métricas y carga", href: "/gestion-procesos/abogado/metricas", icon: LayoutDashboard }] : []),
 ];
 
   const clientMenuItems: MenuItem[] = [
@@ -155,7 +156,7 @@ export default function Sidebar({ variant }: SidebarProps) {
 
   const menuRef = useRef<HTMLDivElement>(null);
 
-  const menuItems: MenuItem[] = variant === "client" ? clientMenuItems : lawyerMenuItems(user?.rol === "ABOGADO");
+  const menuItems: MenuItem[] = variant === "client" ? clientMenuItems : lawyerMenuItems(user?.rol === "ABOGADO", user?.rol === "ABOGADO_ADMIN");
   const homeHref = variant === "platform-admin" ? "/gestion-procesos/admin" : variant === "lawyer" || variant === "saas" ? "/gestion-procesos/abogado" : "/gestion-procesos/cliente";
   const accountBaseHref = variant === "platform-admin" ? "/gestion-procesos/admin" : variant === "lawyer" || variant === "saas" ? "/gestion-procesos/abogado" : "/gestion-procesos/cliente";
   const roleLabel = user?.rol === "ADMIN" ? "Administrador de plataforma" : user?.rol === "ABOGADO_ADMIN" ? "Abogado de la firma" : user?.rol === "ABOGADO" ? "Abogado SaaS" : "Cliente";

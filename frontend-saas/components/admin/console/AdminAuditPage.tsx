@@ -43,14 +43,15 @@ function DetailValue({ label, value }: { label: string; value: string | null }) 
   return <div><dt className="text-xs text-foreground-muted">{label}</dt><dd className="mt-1 break-words text-sm">{value || "No registrado"}</dd></div>;
 }
 
-export default function AdminAuditPage() {
+export default function AdminAuditPage({ initialView = "actividad" }: { initialView?: "actividad" | "auditoria" }) {
   const [events, setEvents] = useState<AuditEvent[]>([]);
   const [filters, setFilters] = useState<AuditFilters>(emptyFilters);
   const [draft, setDraft] = useState<AuditFilters>(emptyFilters);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
-  const [view, setView] = useState<"actividad" | "auditoria">("actividad");
+  const [view, setView] = useState<"actividad" | "auditoria">(initialView);
   const [selected, setSelected] = useState<AuditEvent | null>(null);
+  const [selectedIds, setSelectedIds] = useState<number[]>([]);
   const token = typeof window === "undefined" ? "" : localStorage.getItem("token") || "";
 
   async function loadEvents(activeFilters: AuditFilters) {
@@ -88,6 +89,16 @@ export default function AdminAuditPage() {
     setDraft(emptyFilters);
     setFilters(emptyFilters);
     void loadEvents(emptyFilters);
+  }
+
+  function exportSelected() {
+    const selectedEvents = events.filter((event) => selectedIds.includes(event.id));
+    if (!selectedEvents.length) return;
+    const quote = (value: unknown) => `"${String(value ?? "").replaceAll('"', '""')}"`;
+    const csv = [["Fecha", "Usuario", "Acción", "Módulo", "Recurso", "ID", "Resultado", "Endpoint", "Método"], ...selectedEvents.map((event) => [event.created_at, event.actor, event.accion, event.modulo, event.tipo_recurso, event.recurso_id, event.resultado, event.detalle_tecnico.endpoint, event.detalle_tecnico.metodo])].map((row) => row.map(quote).join(",")).join("\r\n");
+    const url = URL.createObjectURL(new Blob([`\uFEFF${csv}`], { type: "text/csv;charset=utf-8" }));
+    const anchor = window.document.createElement("a"); anchor.href = url; anchor.download = "auditoria-seleccion.csv"; anchor.click(); URL.revokeObjectURL(url);
+    setSelectedIds([]);
   }
 
   const actions = [...new Set(events.map((event) => event.accion))].sort();
@@ -138,12 +149,15 @@ export default function AdminAuditPage() {
         </form>
       </Card>
 
+      <div className="flex flex-wrap items-center gap-3 rounded-xl border border-border bg-surface p-3"><label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={events.length > 0 && events.every((event) => selectedIds.includes(event.id))} onChange={(event) => setSelectedIds((current) => event.target.checked ? [...new Set([...current, ...events.map((item) => item.id)])] : current.filter((id) => !events.some((item) => item.id === id)))} />Seleccionar eventos visibles</label><span className="text-sm text-foreground-muted">{selectedIds.length} seleccionados</span><button type="button" disabled={!selectedIds.length} onClick={exportSelected} className="ml-auto rounded-lg border border-border px-3 py-2 text-sm disabled:opacity-50">Exportar selección CSV</button></div>
+
       {error && <p role="alert" className="rounded-lg border border-danger/30 bg-danger-light p-3 text-sm text-danger">{error}</p>}
       {loading ? <LoadingState label="Cargando actividad" rows={5} /> : events.length === 0 ? (
         <EmptyState title="No hay eventos para estos filtros" description="Prueba otro rango de fechas o limpia los filtros." icon={FileSearch} />
       ) : view === "actividad" ? (
         <div className="space-y-3">
           {events.map((event) => <Card key={event.id} className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between">
+            <input type="checkbox" checked={selectedIds.includes(event.id)} onChange={() => setSelectedIds((current) => current.includes(event.id) ? current.filter((id) => id !== event.id) : [...current, event.id])} aria-label={`Seleccionar evento ${event.id}`} />
             <div className="min-w-0">
               <p className="font-medium">{event.descripcion}</p>
               <p className="mt-1 text-sm text-foreground-muted">{event.recurso}{event.recurso_id ? ` · ${event.recurso_id}` : ""} · {formatDate(event.created_at)}</p>
@@ -157,9 +171,9 @@ export default function AdminAuditPage() {
       ) : (
         <div className="overflow-x-auto rounded-xl border border-border bg-surface">
           <table className="w-full min-w-[850px] text-left text-sm">
-            <thead className="border-b border-border bg-surface-secondary text-xs uppercase text-foreground-muted"><tr><th className="px-4 py-3">Cuándo</th><th className="px-4 py-3">Quién</th><th className="px-4 py-3">Qué hizo</th><th className="px-4 py-3">Sobre qué</th><th className="px-4 py-3">Resultado</th><th className="px-4 py-3">Detalle</th></tr></thead>
+            <thead className="border-b border-border bg-surface-secondary text-xs uppercase text-foreground-muted"><tr><th className="px-4 py-3"><span className="sr-only">Selección</span></th><th className="px-4 py-3">Cuándo</th><th className="px-4 py-3">Quién</th><th className="px-4 py-3">Qué hizo</th><th className="px-4 py-3">Sobre qué</th><th className="px-4 py-3">Resultado</th><th className="px-4 py-3">Detalle</th></tr></thead>
             <tbody>{events.map((event) => <tr key={event.id} className="border-b border-border last:border-0">
-              <td className="px-4 py-3">{formatDate(event.created_at)}</td><td className="px-4 py-3">{event.actor}<span className="block text-xs text-foreground-muted">ID {event.actor_id ?? "Sistema"}</span></td><td className="px-4 py-3">{event.descripcion}<span className="block font-mono text-xs text-foreground-muted">{event.accion}</span></td><td className="px-4 py-3">{event.recurso}<span className="block text-xs text-foreground-muted">{event.tipo_recurso} · {event.recurso_id ?? "sin ID"}</span></td><td className="px-4 py-3"><Badge tone={event.resultado === "ERROR" ? "risk" : "completed"}>{event.resultado === "ERROR" ? "Error" : "Registrado"}</Badge></td><td className="px-4 py-3"><Button size="sm" variant="secondary" onClick={() => setSelected(event)}>Ver detalle</Button></td>
+              <td className="px-4 py-3"><input type="checkbox" checked={selectedIds.includes(event.id)} onChange={() => setSelectedIds((current) => current.includes(event.id) ? current.filter((id) => id !== event.id) : [...current, event.id])} aria-label={`Seleccionar evento ${event.id}`} /></td><td className="px-4 py-3">{formatDate(event.created_at)}</td><td className="px-4 py-3">{event.actor}<span className="block text-xs text-foreground-muted">ID {event.actor_id ?? "Sistema"}</span></td><td className="px-4 py-3">{event.descripcion}<span className="block font-mono text-xs text-foreground-muted">{event.accion}</span></td><td className="px-4 py-3">{event.recurso}<span className="block text-xs text-foreground-muted">{event.tipo_recurso} · {event.recurso_id ?? "sin ID"}</span></td><td className="px-4 py-3"><Badge tone={event.resultado === "ERROR" ? "risk" : "completed"}>{event.resultado === "ERROR" ? "Error" : "Registrado"}</Badge></td><td className="px-4 py-3"><Button size="sm" variant="secondary" onClick={() => setSelected(event)}>Ver detalle</Button></td>
             </tr>)}</tbody>
           </table>
         </div>

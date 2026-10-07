@@ -155,6 +155,7 @@ export default function ProcesoDetallePage() {
   const [editingAgendaId, setEditingAgendaId] = useState<number | null>(null);
   const [selectedColleagueId, setSelectedColleagueId] = useState("");
   const [selectedColleagueVisible, setSelectedColleagueVisible] = useState(false);
+  const [activeTab, setActiveTab] = useState("resumen");
 
   const [clientQuery, setClientQuery] = useState("");
   const [creatingClient, setCreatingClient] = useState(false);
@@ -509,6 +510,17 @@ export default function ProcesoDetallePage() {
     [process]
   );
 
+  const processTabs: { id: string; label: string }[] = [
+    { id: "resumen", label: "Resumen" },
+    { id: "relaciones", label: "Clientes y radicados" },
+    { id: "agenda", label: "Agenda" },
+    { id: "tareas", label: "Tareas" },
+    { id: "documentos", label: "Documentos" },
+    { id: "actividad", label: "Actividad" },
+    { id: "comunicaciones", label: "Comunicaciones" },
+    ...(process?.admite_colaboradores ? [{ id: "equipo", label: "Equipo" }] : []),
+  ];
+
   if (loading) {
     return (
       <div className="flex min-h-[400px] items-center justify-center">
@@ -625,12 +637,12 @@ export default function ProcesoDetallePage() {
         </div>
       </header>
 
-      <nav aria-label="Secciones del expediente" className="sticky top-0 z-20 flex gap-2 overflow-x-auto rounded-xl border border-[var(--border)] bg-[var(--surface)]/95 p-2 backdrop-blur">
-        {[ ["resumen", "Resumen"], ["clientes", "Clientes"], ["radicados", "Radicados"], ["agenda", "Agenda"], ["tareas", "Tareas"], ["documentos", "Documentos"], ["actividad", "Actividad"], ["comunicaciones", "Comunicaciones"] ].map(([href, label]) => <a key={href} href={`#${href}`} className="shrink-0 rounded-lg px-3 py-2 text-xs font-medium text-[var(--foreground-secondary)] hover:bg-[var(--surface-secondary)] hover:text-[var(--foreground)]">{label}</a>)}
+      <nav role="tablist" aria-label="Secciones del expediente" className="sticky top-0 z-20 flex gap-2 overflow-x-auto rounded-xl border border-[var(--border)] bg-[var(--surface)]/95 p-2 backdrop-blur">
+        {processTabs.map((tab) => <button key={tab.id} type="button" role="tab" id={`tab-${tab.id}`} aria-selected={activeTab === tab.id} aria-controls={`panel-${tab.id}`} onClick={() => setActiveTab(tab.id)} className={`shrink-0 rounded-lg px-3 py-2 text-xs font-medium transition ${activeTab === tab.id ? "bg-[var(--primary)] text-white" : "text-[var(--foreground-secondary)] hover:bg-[var(--surface-secondary)] hover:text-[var(--foreground)]"}`}>{tab.label}</button>)}
       </nav>
 
       {process.admite_colaboradores && (
-        <section className="space-y-4 rounded-xl border border-[var(--border)] bg-[var(--surface)] p-5">
+        <section id="panel-equipo" role="tabpanel" aria-labelledby="tab-equipo" style={{ display: activeTab === "equipo" ? undefined : "none" }} className="space-y-4 rounded-xl border border-[var(--border)] bg-[var(--surface)] p-5">
           <header className="flex items-start gap-3">
             <Users className="mt-0.5 size-5 text-[var(--primary)]" />
             <div>
@@ -695,7 +707,7 @@ export default function ProcesoDetallePage() {
       )}
 
       {/* INFORMACIÓN GENERAL */}
-      <section id="resumen" className="scroll-mt-20 rounded-2xl border border-[var(--border)] bg-[var(--surface)]">
+      <section id="panel-resumen" role="tabpanel" aria-labelledby="tab-resumen" style={{ display: activeTab === "resumen" ? undefined : "none" }} className="scroll-mt-20 rounded-2xl border border-[var(--border)] bg-[var(--surface)]">
         <div className="border-b border-[var(--border)] px-5 py-4">
           <h2 className="text-sm font-semibold text-[var(--foreground)]">
             Información general
@@ -771,7 +783,7 @@ export default function ProcesoDetallePage() {
       </section>
 
       {/* CLIENTES + RADICADOS */}
-      <div className="grid gap-5 xl:grid-cols-2">
+      <div id="panel-relaciones" role="tabpanel" aria-labelledby="tab-relaciones" style={{ display: activeTab === "relaciones" ? undefined : "none" }} className="grid gap-5 xl:grid-cols-2">
         {/* CLIENTES */}
         <section id="clientes" className="scroll-mt-20 rounded-2xl border border-[var(--border)] bg-[var(--surface)]">
           <div className="flex items-center justify-between border-b border-[var(--border)] px-5 py-4">
@@ -954,20 +966,20 @@ export default function ProcesoDetallePage() {
         </section>
       </div>
 
-      <section id="agenda" className="scroll-mt-20 rounded-2xl border border-[var(--border)] bg-[var(--surface)]">
+      <section id="panel-agenda" role="tabpanel" aria-labelledby="tab-agenda" style={{ display: activeTab === "agenda" ? undefined : "none" }} className="scroll-mt-20 rounded-2xl border border-[var(--border)] bg-[var(--surface)]">
         <header className="flex flex-wrap items-center justify-between gap-3 border-b border-[var(--border)] px-5 py-4"><div><h2 className="text-sm font-semibold text-[var(--foreground)]">Agenda del proceso</h2><p className="mt-1 text-xs text-[var(--foreground-muted)]">Audiencias, reuniones y eventos asociados a este expediente.</p></div><button type="button" onClick={() => openAgendaEvent()} className="inline-flex items-center gap-2 rounded-lg bg-[var(--primary)] px-3 py-2 text-xs font-semibold text-white"><Plus className="size-4" />Agendar actividad</button></header>
         {process.eventos.length ? <div className="divide-y divide-[var(--border)]">{process.eventos.map((event) => <article key={event.id} className="flex flex-wrap items-center justify-between gap-3 px-5 py-3"><div><p className="text-sm font-medium">{event.tipo === "AUDIENCIA" ? "Audiencia" : event.tipo === "REUNION" ? "Reunión" : "Evento"}: {event.titulo}</p><p className="mt-1 text-xs text-[var(--foreground-muted)]">{new Date(event.fecha_inicio).toLocaleString("es-CO")} · {event.estado.replaceAll("_", " ")}{event.cliente ? ` · ${event.cliente}` : ""}</p></div><div className="flex gap-3 text-xs"><button type="button" onClick={() => openAgendaEvent(event)} className="text-[var(--primary)] hover:underline">Editar</button><button type="button" onClick={() => { if (window.confirm(`¿Eliminar ${event.titulo} de la agenda?`)) void action(`/api/expedientes/agenda/eventos/${event.id}`, "DELETE"); }} className="text-red-600 hover:underline">Eliminar</button></div></article>)}</div> : <p className="px-5 py-8 text-center text-sm text-[var(--foreground-muted)]">No hay actividades programadas para este proceso.</p>}
       </section>
 
-      <section id="actividad" className="scroll-mt-20 rounded-2xl border border-[var(--border)] bg-[var(--surface)]">
+      <section id="panel-actividad" role="tabpanel" aria-labelledby="tab-actividad" style={{ display: activeTab === "actividad" ? undefined : "none" }} className="scroll-mt-20 rounded-2xl border border-[var(--border)] bg-[var(--surface)]">
         <header className="border-b border-[var(--border)] px-5 py-4"><h2 className="text-sm font-semibold text-[var(--foreground)]">Actividad del expediente</h2><p className="mt-1 text-xs text-[var(--foreground-muted)]">Timeline de actuaciones judiciales, tareas, documentos y comunicaciones, con la visibilidad asignada en el servidor.</p></header>
         {process.timeline.length ? <ol className="divide-y divide-[var(--border)]">{process.timeline.slice(0, 100).map((item) => <li key={item.id} className="flex gap-3 px-5 py-4"><span className={`mt-1 size-2 shrink-0 rounded-full ${item.visibilidad === "CLIENTE" ? "bg-emerald-500" : "bg-slate-400"}`} title={item.visibilidad === "CLIENTE" ? "Visible al cliente" : "Solo equipo interno"} /><div className="min-w-0 flex-1"><div className="flex flex-wrap items-center gap-2"><p className="text-sm font-medium text-[var(--foreground)]">{item.titulo}</p><span className="rounded-full bg-[var(--surface-secondary)] px-2 py-0.5 text-[10px] uppercase text-[var(--foreground-muted)]">{item.tipo}</span><span className={`rounded-full px-2 py-0.5 text-[10px] ${item.visibilidad === "CLIENTE" ? "bg-emerald-500/10 text-emerald-700" : "bg-slate-500/10 text-slate-600"}`}>{item.visibilidad === "CLIENTE" ? "Cliente visible" : "Interno"}</span><Link href={timelineResourceHref(item)} className="text-xs font-medium text-[var(--primary)] hover:underline">Abrir {item.recurso.toLowerCase()}</Link></div><p className="mt-1 whitespace-pre-wrap text-xs leading-5 text-[var(--foreground-secondary)]">{item.descripcion}</p><p className="mt-1 text-[11px] text-[var(--foreground-muted)]">{item.actor || item.recurso}{item.fecha ? ` · ${new Date(item.fecha).toLocaleString("es-CO")}` : ""}</p></div></li>)}</ol> : <p className="p-8 text-center text-sm text-[var(--foreground-muted)]">Aún no hay actividad registrada.</p>}
       </section>
 
       {/* MÓDULOS SECUNDARIOS */}
-      <div className="grid gap-5 lg:grid-cols-3">
+      <div className="grid gap-5">
         {/* TAREAS */}
-        <section id="tareas" className="scroll-mt-20 rounded-2xl border border-[var(--border)] bg-[var(--surface)]">
+        <section id="panel-tareas" role="tabpanel" aria-labelledby="tab-tareas" style={{ display: activeTab === "tareas" ? undefined : "none" }} className="scroll-mt-20 rounded-2xl border border-[var(--border)] bg-[var(--surface)]">
           <div className="flex items-center justify-between border-b border-[var(--border)] px-5 py-4">
             <div>
               <h2 className="text-sm font-semibold text-[var(--foreground)]">
@@ -1027,7 +1039,7 @@ export default function ProcesoDetallePage() {
         </section>
 
         {/* DOCUMENTOS */}
-        <section id="documentos" className="scroll-mt-20 rounded-2xl border border-[var(--border)] bg-[var(--surface)]">
+        <section id="panel-documentos" role="tabpanel" aria-labelledby="tab-documentos" style={{ display: activeTab === "documentos" ? undefined : "none" }} className="scroll-mt-20 rounded-2xl border border-[var(--border)] bg-[var(--surface)]">
           <div className="flex items-center justify-between gap-3 border-b border-[var(--border)] px-5 py-4">
             <div className="flex items-center gap-3">
               <div className="flex size-9 items-center justify-center rounded-lg bg-[var(--primary)]/10 text-[var(--primary)]"><FileText className="size-4" /></div>
@@ -1051,7 +1063,7 @@ export default function ProcesoDetallePage() {
         </section>
 
         {/* NOTIFICACIONES */}
-        <section id="comunicaciones" className="scroll-mt-20 rounded-2xl border border-[var(--border)] bg-[var(--surface)]">
+        <section id="panel-comunicaciones" role="tabpanel" aria-labelledby="tab-comunicaciones" style={{ display: activeTab === "comunicaciones" ? undefined : "none" }} className="scroll-mt-20 rounded-2xl border border-[var(--border)] bg-[var(--surface)]">
           <div className="border-b border-[var(--border)] px-5 py-4">
             <div className="flex items-center gap-3">
               <div className="flex size-9 items-center justify-center rounded-lg bg-[var(--primary)]/10 text-[var(--primary)]">

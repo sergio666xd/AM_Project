@@ -110,6 +110,9 @@ export default function AdminFirmAgendaPage() {
   const [clientId, setClientId] = useState("TODOS");
   const [activityType, setActivityType] = useState<ActivityFilter>("TODAS");
   const [expandedTaskId, setExpandedTaskId] = useState<number | null>(null);
+  const [selectedEventIds, setSelectedEventIds] = useState<number[]>([]);
+  const [selectedTaskIds, setSelectedTaskIds] = useState<number[]>([]);
+  const [selectedReminderIds, setSelectedReminderIds] = useState<number[]>([]);
   const [data, setData] = useState<AgendaResponse>({ tareas: [], responsables: [], eventos: [], recordatorios: [] });
   const [eventFormOpen, setEventFormOpen] = useState(false);
   const [editingEventId, setEditingEventId] = useState<number | null>(null);
@@ -235,6 +238,34 @@ export default function AdminFirmAgendaPage() {
     } catch (cause) { setError(cause instanceof Error ? cause.message : "No fue posible eliminar el evento."); }
   }
 
+  async function deleteSelectedEvents() {
+    const selected = visibleEvents.filter((event) => selectedEventIds.includes(event.id));
+    if (!token || !selected.length || !window.confirm(`¿Eliminar ${selected.length} eventos seleccionados de la agenda?`)) return;
+    setSavingEvent(true); setError("");
+    const outcomes = await Promise.allSettled(selected.map((event) => fetchApi(`/api/admin/agenda/eventos/${event.id}`, { method: "DELETE", token })));
+    const failed = outcomes.filter((outcome) => outcome.status === "rejected").length;
+    if (failed) setError(`${failed} evento(s) no se pudieron eliminar.`);
+    setSelectedEventIds([]); setSavingEvent(false); setRefreshKey((key) => key + 1);
+  }
+
+  function exportSelectedAgendaRows() {
+    const selectedTasks = (activityType === "TODAS" || activityType === "TAREA" ? data.tareas : []).filter((task) => selectedTaskIds.includes(task.id));
+    const selectedReminders = (activityType === "TODAS" || activityType === "TAREA" ? data.recordatorios : []).filter((reminder) => selectedReminderIds.includes(reminder.id));
+    const selectedEvents = visibleEvents.filter((event) => selectedEventIds.includes(event.id));
+    if (!selectedTasks.length && !selectedReminders.length && !selectedEvents.length) return;
+    const rows = [
+      ["Tipo", "Título", "Responsable", "Fecha", "Estado", "Contexto"],
+      ...selectedTasks.map((task) => ["Tarea", task.titulo, task.responsable, task.fecha_limite, task.estado, [task.proceso, task.cliente, task.radicado].filter(Boolean).join(" · ")]),
+      ...selectedReminders.map((reminder) => ["Recordatorio", reminder.tarea, reminder.responsable, reminder.fecha_hora, reminder.enviado ? "Enviado" : "Programado", [reminder.proceso, reminder.cliente].filter(Boolean).join(" · ")]),
+      ...selectedEvents.map((event) => [event.tipo, event.titulo, event.responsable ?? "", event.fecha_inicio, event.estado, [event.proceso, event.cliente].filter(Boolean).join(" · ")]),
+    ];
+    const quote = (value: unknown) => `"${String(value ?? "").replaceAll('"', '""')}"`;
+    const csv = rows.map((row) => row.map(quote).join(",")).join("\r\n");
+    const url = URL.createObjectURL(new Blob([`\uFEFF${csv}`], { type: "text/csv;charset=utf-8" }));
+    const anchor = window.document.createElement("a"); anchor.href = url; anchor.download = "agenda-seleccion.csv"; anchor.click(); URL.revokeObjectURL(url);
+    setSelectedTaskIds([]); setSelectedReminderIds([]); setSelectedEventIds([]);
+  }
+
   return (
     <section className="mx-auto max-w-7xl space-y-5">
       <header className="flex flex-wrap items-end justify-between gap-4">
@@ -328,9 +359,11 @@ export default function AdminFirmAgendaPage() {
             </div>
           ) : (
             <div className="overflow-x-auto border-y border-border">
+              <div className="flex flex-wrap items-center gap-3 border-b border-border py-3"><span className="text-sm text-foreground-muted">{(activityType === "TODAS" || activityType === "TAREA" ? selectedTaskIds.length + selectedReminderIds.length : 0) + selectedEventIds.filter((id) => visibleEvents.some((item) => item.id === id)).length} seleccionados</span><button type="button" disabled={!(activityType === "TODAS" || activityType === "TAREA" ? selectedTaskIds.length + selectedReminderIds.length : 0) && !selectedEventIds.some((id) => visibleEvents.some((item) => item.id === id))} onClick={exportSelectedAgendaRows} className="rounded-md border border-border px-3 py-2 text-xs disabled:opacity-50">Exportar selección CSV</button><button type="button" onClick={() => { setSelectedTaskIds(activityType === "TODAS" || activityType === "TAREA" ? data.tareas.map((item) => item.id) : []); setSelectedReminderIds(activityType === "TODAS" || activityType === "TAREA" ? data.recordatorios.map((item) => item.id) : []); setSelectedEventIds(visibleEvents.map((item) => item.id)); }} className="rounded-md border border-border px-3 py-2 text-xs">Seleccionar actividades visibles</button><button type="button" disabled={savingEvent || !selectedEventIds.some((id) => visibleEvents.some((item) => item.id === id))} onClick={() => void deleteSelectedEvents()} className="ml-auto rounded-md border border-danger/30 px-3 py-2 text-xs text-danger disabled:opacity-50">Eliminar eventos seleccionados</button></div>
               <table className="w-full min-w-220 text-left text-sm">
-                <thead className="bg-surface-secondary text-xs text-foreground-muted"><tr><th className="px-3 py-2">Fecha</th><th className="px-3 py-2">Actividad</th><th className="px-3 py-2">Responsable</th><th className="px-3 py-2">Contexto</th><th className="px-3 py-2">Estado</th><th className="px-3 py-2">Prioridad / Tipo</th><th className="px-3 py-2">Acciones</th></tr></thead>
+                <thead className="bg-surface-secondary text-xs text-foreground-muted"><tr><th className="px-3 py-2"><span className="sr-only">Selección</span></th><th className="px-3 py-2">Fecha</th><th className="px-3 py-2">Actividad</th><th className="px-3 py-2">Responsable</th><th className="px-3 py-2">Contexto</th><th className="px-3 py-2">Estado</th><th className="px-3 py-2">Prioridad / Tipo</th><th className="px-3 py-2">Acciones</th></tr></thead>
                 <tbody>{(activityType === "TODAS" || activityType === "TAREA") && data.tareas.map((task) => <tr key={`task-${task.id}`} className="border-t border-border align-top">
+                  <td className="px-3 py-2"><input type="checkbox" checked={selectedTaskIds.includes(task.id)} onChange={() => setSelectedTaskIds((current) => current.includes(task.id) ? current.filter((id) => id !== task.id) : [...current, task.id])} aria-label={`Seleccionar tarea ${task.titulo}`} /></td>
                   <td className="whitespace-nowrap px-3 py-2">{formatDue(task.fecha_limite)}</td>
                   <td className="px-3 py-2"><button type="button" onClick={() => setExpandedTaskId(expandedTaskId === task.id ? null : task.id)} className="text-left font-medium text-primary hover:underline">{task.titulo}</button>{expandedTaskId === task.id && taskDetail(task)}</td>
                   <td className="px-3 py-2">{task.responsable}</td>
@@ -338,8 +371,8 @@ export default function AdminFirmAgendaPage() {
                   <td className="px-3 py-2">{statusLabel(task.estado)}</td>
                   <td className="px-3 py-2">{task.prioridad}</td><td />
                 </tr>)}</tbody>
-                <tbody>{(activityType === "TODAS" || activityType === "TAREA") && data.recordatorios.map((reminder) => <tr key={`reminder-${reminder.id}`} className="border-t border-border align-top"><td className="whitespace-nowrap px-3 py-2">{formatDue(reminder.fecha_hora)}</td><td className="px-3 py-2 font-medium">Recordatorio: {reminder.tarea}</td><td className="px-3 py-2">{reminder.responsable}</td><td className="px-3 py-2 text-foreground-muted">{[reminder.cliente, reminder.proceso].filter(Boolean).join(" · ") || "Tarea general"}</td><td className="px-3 py-2">{reminder.enviado ? "Enviado" : "Programado"}</td><td className="px-3 py-2">{reminder.canales.join(" / ") || "Sin canal"}</td><td /></tr>)}</tbody>
-                <tbody>{visibleEvents.map((event) => <tr key={`event-${event.id}`} className="border-t border-border align-top"><td className="whitespace-nowrap px-3 py-2">{formatDue(event.fecha_inicio)}</td><td className="px-3 py-2 font-medium">{event.tipo === "AUDIENCIA" ? "Audiencia" : event.tipo === "REUNION" ? "Reunión" : "Evento"}: {event.titulo}</td><td className="px-3 py-2">{event.responsable || "Sin responsable"}</td><td className="px-3 py-2">{[event.cliente, event.proceso].filter(Boolean).join(" · ") || "Evento general"}</td><td className="px-3 py-2">{event.estado === "PROGRAMADO" ? "Programado" : event.estado === "COMPLETADO" ? "Completado" : "Cancelado"}</td><td className="px-3 py-2">{event.tipo}</td><td className="px-3 py-2"><div className="flex gap-2"><button type="button" onClick={() => openEditEvent(event)} className="text-primary underline">Editar</button><button type="button" onClick={() => void deleteEvent(event)} className="text-danger underline">Eliminar</button></div></td></tr>)}</tbody>
+                <tbody>{(activityType === "TODAS" || activityType === "TAREA") && data.recordatorios.map((reminder) => <tr key={`reminder-${reminder.id}`} className="border-t border-border align-top"><td className="px-3 py-2"><input type="checkbox" checked={selectedReminderIds.includes(reminder.id)} onChange={() => setSelectedReminderIds((current) => current.includes(reminder.id) ? current.filter((id) => id !== reminder.id) : [...current, reminder.id])} aria-label={`Seleccionar recordatorio ${reminder.tarea}`} /></td><td className="whitespace-nowrap px-3 py-2">{formatDue(reminder.fecha_hora)}</td><td className="px-3 py-2 font-medium"><button type="button" onClick={() => setExpandedTaskId(reminder.tarea_id)} className="text-left text-primary hover:underline">Recordatorio: {reminder.tarea}</button>{expandedTaskId === reminder.tarea_id && data.tareas.find((task) => task.id === reminder.tarea_id) && taskDetail(data.tareas.find((task) => task.id === reminder.tarea_id)!)}</td><td className="px-3 py-2">{reminder.responsable}</td><td className="px-3 py-2 text-foreground-muted">{[reminder.cliente, reminder.proceso].filter(Boolean).join(" · ") || "Tarea general"}</td><td className="px-3 py-2">{reminder.enviado ? "Enviado" : "Programado"}</td><td className="px-3 py-2">{reminder.canales.join(" / ") || "Sin canal"}</td><td /></tr>)}</tbody>
+                <tbody>{visibleEvents.map((event) => <tr key={`event-${event.id}`} className="border-t border-border align-top"><td className="px-3 py-2"><input type="checkbox" checked={selectedEventIds.includes(event.id)} onChange={() => setSelectedEventIds((current) => current.includes(event.id) ? current.filter((id) => id !== event.id) : [...current, event.id])} aria-label={`Seleccionar ${event.titulo}`} /></td><td className="whitespace-nowrap px-3 py-2">{formatDue(event.fecha_inicio)}</td><td className="px-3 py-2 font-medium"><button type="button" onClick={() => openEditEvent(event)} className="text-left text-primary hover:underline">{event.tipo === "AUDIENCIA" ? "Audiencia" : event.tipo === "REUNION" ? "Reunión" : "Evento"}: {event.titulo}</button></td><td className="px-3 py-2">{event.responsable || "Sin responsable"}</td><td className="px-3 py-2">{[event.cliente, event.proceso].filter(Boolean).join(" · ") || "Evento general"}</td><td className="px-3 py-2">{event.estado === "PROGRAMADO" ? "Programado" : event.estado === "COMPLETADO" ? "Completado" : "Cancelado"}</td><td className="px-3 py-2">{event.tipo}</td><td className="px-3 py-2"><div className="flex gap-2"><button type="button" onClick={() => openEditEvent(event)} className="text-primary underline">Editar</button><button type="button" onClick={() => void deleteEvent(event)} className="text-danger underline">Eliminar</button></div></td></tr>)}</tbody>
               </table>
               {(activityType === "TODAS" || activityType === "TAREA" ? data.tareas.length + data.recordatorios.length : 0) + visibleEvents.length === 0 && <p className="px-3 py-8 text-center text-sm text-foreground-muted">No hay actividades para este periodo y filtros.</p>}
             </div>

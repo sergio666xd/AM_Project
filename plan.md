@@ -2374,13 +2374,13 @@ Y debajo:
 
 ```text
 Última fase completada:
-Fase 10 — ADMIN: Configuración de firma (6 de octubre de 2026)
+Fase 38 — Métricas y carga de trabajo (7 de octubre de 2026)
 
 Siguiente fase:
-Fase 11 — CMS público visual
+Fase 39 — Pruebas
 
 Bloqueadores:
-La validación de Python no pudo ejecutarse: este entorno bloquea el launcher de Python. TypeScript y ESLint sí se ejecutaron; ESLint encontró un error preexistente en la página de documentos.
+La validación de Python de las fases 35–38 no pudo ejecutarse: Windows bloqueó el acceso a `python.exe` y `py.exe`. TypeScript, ESLint focalizado y `git diff --check` se ejecutaron correctamente.
 ```
 
 ### Registro de implementación — Fases 7–10 (6 de octubre de 2026)
@@ -2650,3 +2650,18 @@ La meta final es pasar de una aplicación funcional a un **producto jurídico in
 - **API cliente:** se añaden consultas protegidas para ficha, agenda, actividad compartida, notificaciones/lectura y mensajes; todas validan rol y vínculo cliente-proceso. La migración de `leido_en` para mensajes es compatible con instalaciones existentes.
 - **Última actuación:** el cliente ve únicamente la actuación más reciente por radicado, tanto en la ficha como en los timelines/actividad compartida; las vistas de abogado conservan el historial completo.
 - **Validación:** `tsc --noEmit`, ESLint focalizado de las rutas y componentes del cliente, `py_compile` de modelos/esquemas/routers y `git diff --check` aprobados. No se ejecutaron pruebas automatizadas.
+
+### Progreso actualizado — Fases 35–38 (7 de octubre de 2026)
+
+FASE 35 — [x] Seguridad y privacidad transversal
+FASE 36 — [x] Sistema de visibilidad
+FASE 37 — [x] Búsqueda global
+FASE 38 — [x] Métricas y carga de trabajo
+
+- **Fase 35:** los endpoints autenticados ahora rechazan cuentas suspendidas/no activas incluso cuando presentan un token emitido antes del cambio de estado. Se mantienen las verificaciones de vínculo cliente-proceso/documento/tarea existentes. Búsqueda y métricas limitan el alcance de `ABOGADO_ADMIN` a procesos propios/compartidos; `CLIENTE` no puede consumirlas.
+- **Fase 36:** se formalizaron `INTERNA` y `CLIENTE` en `app/visibility.py` y se reutilizan en el timeline del proceso. El timeline del cliente sigue filtrando comunicaciones por visibilidad y vínculo exacto con el cliente; las notas internas se mantienen solo en la vista de personal. Tareas, eventos y documentos conservan su visibilidad derivada de su asignación/vínculo.
+- **Fase 37:** endpoint de búsqueda global limitado por rol y ámbito, con resultados acotados de clientes, procesos, radicados, tareas y documentos. La paleta `Ctrl+K` aparece solo para ADMIN/ABOGADO_ADMIN y tiene también un botón visible.
+- **Fase 38:** endpoint y páginas de métricas con procesos/tareas por responsable, tareas abiertas y vencimientos (vencidas / próximos 7 días), más actividad reciente. La navegación expone métricas solo a ADMIN/ABOGADO_ADMIN.
+- **Modelos/migraciones:** no se añadieron campos ni tablas; se reutilizaron los vínculos actuales y valores de visibilidad persistidos.
+- **Validación:** `tsc --noEmit`, ESLint focalizado y `git diff --check` aprobados. `py_compile` no se pudo ejecutar: Windows bloqueó el acceso a `python.exe` y `py.exe`. No se ejecutaron pruebas automatizadas y no se comenzó la Fase 39.
+- **Siguiente fase:** Fase 39 — Pruebas.

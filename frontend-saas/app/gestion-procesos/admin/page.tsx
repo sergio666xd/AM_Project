@@ -107,14 +107,15 @@ function formatDate(value: string | null, includeTime = false) {
   });
 }
 
-function MetricCard({ label, value, hint, icon: Icon }: {
+function MetricCard({ label, value, hint, href, icon: Icon }: {
   label: string;
   value: number;
   hint: string;
+  href: string;
   icon: typeof Activity;
 }) {
   return (
-    <Card>
+    <Link href={href} className="block rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"><Card className="h-full transition-colors hover:border-primary/40 hover:bg-surface-hover">
       <div className="flex items-start justify-between gap-3">
         <div>
           <p className="text-sm text-foreground-muted">{label}</p>
@@ -125,7 +126,7 @@ function MetricCard({ label, value, hint, icon: Icon }: {
           <Icon aria-hidden="true" className="size-5" />
         </span>
       </div>
-    </Card>
+    </Card></Link>
   );
 }
 
@@ -200,7 +201,7 @@ export default function AdminDashboard() {
       key: "proceso",
       header: "Proceso",
       render: (process) => (
-        <Link href="/gestion-procesos/admin/procesos" className="font-semibold text-primary hover:underline">
+        <Link href={`/gestion-procesos/admin/procesos?detalle=${process.id}`} className="font-semibold text-primary hover:underline">
           {process.nombre}
           <span className="mt-1 block max-w-52 truncate text-xs font-normal text-foreground-muted">
             {process.cliente ?? (process.clientes ? `${process.clientes} clientes` : "Sin cliente asignado")}
@@ -246,13 +247,13 @@ export default function AdminDashboard() {
   }
 
   const metrics = [
-    { label: "Usuarios activos", value: data.resumen.usuarios_activos, hint: "En todas las áreas", icon: Users },
-    { label: "Solicitudes pendientes", value: data.resumen.solicitudes_pendientes, hint: "Registro y perfil", icon: UserCheck },
-    { label: "Procesos activos", value: data.resumen.procesos_activos, hint: "Firma y SaaS", icon: BriefcaseBusiness },
-    { label: "Tareas pendientes", value: data.resumen.tareas_pendientes, hint: "Por completar o en curso", icon: CalendarClock },
-    { label: "Documentos por revisar", value: data.resumen.documentos_pendientes, hint: "Solicitudes sin atender", icon: FileText },
-    { label: "Alertas activas", value: data.resumen.alertas, hint: "Elementos que requieren atención", icon: AlertTriangle },
-    { label: "Errores operativos", value: data.resumen.errores_operativos, hint: "Consultas y notificaciones críticas", icon: Activity },
+    { label: "Usuarios activos", value: data.resumen.usuarios_activos, hint: "En todas las áreas", href: "/gestion-procesos/admin/usuarios", icon: Users },
+    { label: "Solicitudes pendientes", value: data.resumen.solicitudes_pendientes, hint: "Registro y perfil", href: "/gestion-procesos/admin/solicitudes", icon: UserCheck },
+    { label: "Procesos activos", value: data.resumen.procesos_activos, hint: "Firma y SaaS", href: "/gestion-procesos/admin/procesos", icon: BriefcaseBusiness },
+    { label: "Tareas pendientes", value: data.resumen.tareas_pendientes, hint: "Por completar o en curso", href: "/gestion-procesos/admin/tareas", icon: CalendarClock },
+    { label: "Documentos por revisar", value: data.resumen.documentos_pendientes, hint: "Solicitudes sin atender", href: "/gestion-procesos/admin/documentos/solicitudes", icon: FileText },
+    { label: "Alertas activas", value: data.resumen.alertas, hint: "Elementos que requieren atención", href: "/gestion-procesos/admin/alertas", icon: AlertTriangle },
+    { label: "Errores operativos", value: data.resumen.errores_operativos, hint: "Consultas y notificaciones críticas", href: "/gestion-procesos/admin/operacion", icon: Activity },
   ];
   const quickActions = [
     { label: "Crear usuario", href: "/gestion-procesos/admin/usuarios/nuevo" },
@@ -377,18 +378,18 @@ export default function AdminDashboard() {
       <section aria-label="Indicadores por ámbito" className="grid gap-5 lg:grid-cols-2">
         <Card title="Firma" description="Alejandra Muñoz | Abogada y Asociados">
           <dl className="grid grid-cols-2 gap-4 text-sm">
-            <div><dt className="text-foreground-muted">Procesos activos</dt><dd className="mt-1 text-xl font-semibold">{data.firma.procesos}</dd></div>
-            <div><dt className="text-foreground-muted">Radicados</dt><dd className="mt-1 text-xl font-semibold">{data.firma.radicados}</dd></div>
-            <div><dt className="text-foreground-muted">Tareas</dt><dd className="mt-1 text-xl font-semibold">{data.firma.tareas}</dd></div>
-            <div><dt className="text-foreground-muted">Documentos</dt><dd className="mt-1 text-xl font-semibold">{data.firma.documentos}</dd></div>
+            <div><dt className="text-foreground-muted">Procesos activos</dt><dd className="mt-1 text-xl font-semibold"><Link href="/gestion-procesos/admin/procesos" className="hover:text-primary hover:underline">{data.firma.procesos}</Link></dd></div>
+            <div><dt className="text-foreground-muted">Radicados</dt><dd className="mt-1 text-xl font-semibold"><Link href="/gestion-procesos/admin/radicados" className="hover:text-primary hover:underline">{data.firma.radicados}</Link></dd></div>
+            <div><dt className="text-foreground-muted">Tareas</dt><dd className="mt-1 text-xl font-semibold"><Link href="/gestion-procesos/admin/tareas" className="hover:text-primary hover:underline">{data.firma.tareas}</Link></dd></div>
+            <div><dt className="text-foreground-muted">Documentos</dt><dd className="mt-1 text-xl font-semibold"><Link href="/gestion-procesos/admin/documentos" className="hover:text-primary hover:underline">{data.firma.documentos}</Link></dd></div>
           </dl>
         </Card>
         <Card title="SaaS individual" description={`${data.saas.abogados} cuentas de abogados externos`}>
           <dl className="grid grid-cols-2 gap-4 text-sm">
-            <div><dt className="text-foreground-muted">Procesos activos</dt><dd className="mt-1 text-xl font-semibold">{data.saas.procesos}</dd></div>
-            <div><dt className="text-foreground-muted">Radicados</dt><dd className="mt-1 text-xl font-semibold">{data.saas.radicados}</dd></div>
-            <div><dt className="text-foreground-muted">Tareas</dt><dd className="mt-1 text-xl font-semibold">{data.saas.tareas}</dd></div>
-            <div><dt className="text-foreground-muted">Abogados</dt><dd className="mt-1 text-xl font-semibold">{data.saas.abogados}</dd></div>
+            <div><dt className="text-foreground-muted">Procesos activos</dt><dd className="mt-1 text-xl font-semibold"><Link href="/gestion-procesos/admin/saas/procesos" className="hover:text-primary hover:underline">{data.saas.procesos}</Link></dd></div>
+            <div><dt className="text-foreground-muted">Radicados</dt><dd className="mt-1 text-xl font-semibold"><Link href="/gestion-procesos/admin/saas/radicados" className="hover:text-primary hover:underline">{data.saas.radicados}</Link></dd></div>
+            <div><dt className="text-foreground-muted">Tareas</dt><dd className="mt-1 text-xl font-semibold"><Link href="/gestion-procesos/admin/saas/tareas" className="hover:text-primary hover:underline">{data.saas.tareas}</Link></dd></div>
+            <div><dt className="text-foreground-muted">Abogados</dt><dd className="mt-1 text-xl font-semibold"><Link href="/gestion-procesos/admin/usuarios" className="hover:text-primary hover:underline">{data.saas.abogados}</Link></dd></div>
           </dl>
         </Card>
       </section>

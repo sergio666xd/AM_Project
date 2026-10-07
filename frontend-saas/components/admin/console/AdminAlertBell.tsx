@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { Bell, Download, ExternalLink } from "lucide-react";
+import { Bell, ExternalLink, X } from "lucide-react";
 import { fetchApi } from "@/lib/api";
 
 type AlertItem = {
@@ -16,18 +16,15 @@ type AlertItem = {
   estado: "ACTIVA" | "ATENDIDA" | "DESCARTADA" | "ELIMINADA";
   categoria: string;
   leida: boolean;
+  descartable: boolean;
 };
-
-function csvCell(value: string) {
-  const safe = /^[=+\-@]/.test(value) ? `'${value}` : value;
-  return `"${safe.replaceAll('"', '""')}"`;
-}
 
 export function AdminAlertBell({ token }: { token: string | null }) {
   const [items, setItems] = useState<AlertItem[]>([]);
   const [open, setOpen] = useState(false);
-  const [downloading, setDownloading] = useState(false);
-  const [downloadError, setDownloadError] = useState("");
+  const [discarding, setDiscarding] = useState(false);
+  const [actionMessage, setActionMessage] = useState("");
+  const [actionError, setActionError] = useState("");
   const rootRef = useRef<HTMLDivElement>(null);
 
   const refresh = useCallback(async () => {
@@ -61,34 +58,30 @@ export function AdminAlertBell({ token }: { token: string | null }) {
     };
   }, [refresh, token]);
 
-  async function downloadAll() {
+  async function discardAll() {
     if (!token) return;
-    setDownloading(true);
-    setDownloadError("");
+    setDiscarding(true);
+    setActionMessage("");
+    setActionError("");
     try {
       const alerts: AlertItem[] = await fetchApi("/api/admin/alertas", { method: "GET", token });
-      const columns = ["Fecha", "Descripción", "Tipo", "Prioridad", "Estado", "Recurso", "URL", "ID"];
-      const rows = alerts.filter((item) => item.estado !== "ELIMINADA").map((item) => [
-        item.fecha ? new Date(item.fecha).toLocaleString("es-CO") : "",
-        item.descripcion,
-        item.tipo,
-        item.prioridad,
-        item.estado,
-        item.recurso,
-        new URL(item.href, window.location.origin).toString(),
-        item.id,
-      ]);
-      const csv = [columns, ...rows].map((row) => row.map((value) => csvCell(String(value))).join(",")).join("\r\n");
-      const url = URL.createObjectURL(new Blob([`\uFEFF${csv}`], { type: "text/csv;charset=utf-8" }));
-      const anchor = document.createElement("a");
-      anchor.href = url;
-      anchor.download = `alertas-${new Date().toISOString().slice(0, 10)}.csv`;
-      anchor.click();
-      window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+      const discardable = alerts.filter((item) => item.estado === "ACTIVA" && item.descartable);
+      if (!discardable.length) {
+        setActionMessage("No hay alertas activas que se puedan descartar.");
+        return;
+      }
+      if (!window.confirm("Descartar las " + discardable.length + " alertas que permiten esta accion?")) return;
+      await fetchApi("/api/admin/alertas/acciones", {
+        method: "POST", token,
+        body: JSON.stringify({ alerta_ids: discardable.map((item) => item.id), estado: "DESCARTADA" }),
+      });
+      const pendientesNoDescartables = alerts.filter((item) => item.estado === "ACTIVA" && !item.descartable).length;
+      setActionMessage(discardable.length + " alertas descartadas." + (pendientesNoDescartables ? " " + pendientesNoDescartables + " deben resolverse desde su recurso." : ""));
+      await refresh();
     } catch {
-      setDownloadError("No fue posible descargar las alertas.");
+      setActionError("No fue posible descartar las alertas.");
     } finally {
-      setDownloading(false);
+      setDiscarding(false);
     }
   }
 
@@ -109,8 +102,9 @@ export function AdminAlertBell({ token }: { token: string | null }) {
         {unreadCount > 0 && <span className="absolute -right-1 -top-1 grid min-h-5 min-w-5 place-items-center rounded-full bg-danger px-1 text-[10px] font-bold text-white">{unreadCount}</span>}
       </button>
       {open && <section role="dialog" aria-label="Alertas recientes" className="absolute right-0 top-12 z-50 w-[min(24rem,calc(100vw-2rem))] overflow-hidden rounded-xl border border-border bg-surface shadow-xl">
-        <header className="flex items-center justify-between border-b border-border px-4 py-3"><div><h2 className="text-sm font-semibold">Alertas recientes</h2><p className="text-xs text-foreground-muted">Las cinco últimas</p></div><button type="button" disabled={downloading} onClick={() => void downloadAll()} className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs font-medium hover:bg-surface-hover disabled:opacity-50"><Download className="size-3.5" />Descargar todas</button></header>
-        {downloadError && <p role="alert" className="px-4 pt-2 text-xs text-danger">{downloadError}</p>}
+        <header className="flex items-center justify-between border-b border-border px-4 py-3"><div><h2 className="text-sm font-semibold">Alertas recientes</h2><p className="text-xs text-foreground-muted">Las cinco mas recientes</p></div><button type="button" disabled={discarding} onClick={() => void discardAll()} className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs font-medium hover:bg-surface-hover disabled:opacity-50"><X className="size-3.5" />{discarding ? "Procesando" : "Descartar todas"}</button></header>
+        {actionError && <p role="alert" className="px-4 pt-2 text-xs text-danger">{actionError}</p>}
+        {actionMessage && <p role="status" className="px-4 pt-2 text-xs text-foreground-muted">{actionMessage}</p>}
         {items.length ? <ul className="max-h-96 divide-y divide-border overflow-y-auto">
           {items.map((item) => <li key={item.id}><Link href={item.href} onClick={() => { void markRead(item); setOpen(false); }} className={`block px-4 py-3 hover:bg-surface-hover ${item.leida ? "opacity-70" : "bg-primary/5"}`}><span className="flex items-center justify-between gap-2"><span className="line-clamp-2 text-sm font-medium">{item.descripcion}</span><ExternalLink className="size-3.5 shrink-0 text-foreground-muted" /></span><span className="mt-1 flex justify-between gap-2 text-xs text-foreground-muted"><span>{item.categoria} · {item.estado === "ACTIVA" ? item.tipo : item.estado === "ATENDIDA" ? "Atendida" : "Descartada"} · {item.prioridad}</span><span>{item.fecha ? new Date(item.fecha).toLocaleDateString("es-CO") : ""}</span></span></Link></li>)}
         </ul> : <p className="px-4 py-8 text-center text-sm text-foreground-muted">No hay alertas recientes.</p>}
