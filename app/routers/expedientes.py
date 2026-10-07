@@ -244,6 +244,7 @@ def _equipo_proceso(proceso: models.Proceso) -> dict:
             {
                 "id": enlace.abogado.id,
                 "nombre_completo": enlace.abogado.nombre_completo,
+                "visible_cliente": enlace.visible_cliente,
             }
             for enlace in sorted(
                 proceso.colaboradores,
@@ -1420,6 +1421,14 @@ def detalle_proceso_cliente(proceso_id: int, db: Session = Depends(get_db), usua
             "email": proceso.abogado.email,
             "whatsapp_numero": proceso.abogado.whatsapp_numero or None,
         },
+        "abogados_participantes": [
+            {"nombre_completo": enlace.abogado.nombre_completo}
+            for enlace in proceso.colaboradores
+            if enlace.visible_cliente
+            and enlace.abogado
+            and enlace.abogado.rol == models.RolUsuario.ABOGADO_ADMIN
+            and enlace.abogado.estado == models.EstadoUsuario.ACTIVO
+        ],
         "radicados": [{
             "id": link.radicado.id,
             "numero": link.radicado.numero,
@@ -1680,10 +1689,47 @@ def asignar_colaborador_proceso(
         proceso_id=proceso.id,
         abogado_id=abogado.id,
         asignado_por_id=usuario.id,
+        visible_cliente=datos.visible_cliente,
     ))
     registrar_evento_auditoria(db, usuario, "proceso.colaborador.asignar", "proceso", proceso.id)
     db.commit()
-    return {"mensaje": f"{abogado.nombre_completo} fue asignado al proceso."}
+    permiso = "abogado participante, visible para el cliente" if datos.visible_cliente else "colaborador interno"
+    cuerpo = (
+        f"Hola {abogado.nombre_completo},\n\n"
+        f"{usuario.nombre_completo} te agregó como {permiso} en el proceso {proceso.nombre}.\n\n"
+        f"Proceso: {proceso.nombre}\n"
+        f"Responsable: {proceso.abogado.nombre_completo}\n"
+        f"Permiso: {permiso}\n\n"
+        f"Abrir enlace: Ver proceso | {public_site_url()}/gestion-procesos/abogado/procesos/{proceso.id}"
+    )
+    _notificar(
+        db, abogado, f"Te agregaron al proceso {proceso.nombre}", cuerpo,
+        "RESUMENES", f"COLABORACION_PROCESO:{proceso.id}:{abogado.id}:{uuid4().hex}",
+        emisor=usuario, incluir_email=True,
+    )
+    return {"mensaje": f"{abogado.nombre_completo} fue agregado como {permiso}."}
+
+
+@router.patch("/procesos/{proceso_id}/colaboradores/{abogado_id}")
+def actualizar_permiso_colaborador_proceso(
+    proceso_id: int,
+    abogado_id: int,
+    datos: schemas.ProcesoColaboradorUpdate,
+    db: Session = Depends(get_db),
+    usuario: models.Usuario = Depends(security.obtener_usuario_actual),
+):
+    _abogado(usuario)
+    proceso = _proceso_abogado(proceso_id, usuario, db)
+    require_process_manager(usuario, proceso.abogado_id, action="gestionar el equipo del proceso")
+    colaboracion = db.query(models.ProcesoColaborador).filter_by(
+        proceso_id=proceso.id, abogado_id=abogado_id
+    ).first()
+    if not colaboracion:
+        raise HTTPException(status_code=404, detail="El abogado no está asignado al proceso.")
+    colaboracion.visible_cliente = datos.visible_cliente
+    registrar_evento_auditoria(db, usuario, "proceso.colaborador.actualizar_permiso", "proceso", proceso.id)
+    db.commit()
+    return {"mensaje": "Permiso del abogado actualizado."}
 
 
 @router.delete("/procesos/{proceso_id}/colaboradores/{abogado_id}")

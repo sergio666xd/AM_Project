@@ -99,6 +99,7 @@ def actualizar_esquema_planes() -> None:
         conexion.execute(text("ALTER TABLE subtareas ADD COLUMN IF NOT EXISTS notificar_email BOOLEAN NOT NULL DEFAULT TRUE"))
         conexion.execute(text("ALTER TABLE subtareas ADD COLUMN IF NOT EXISTS notificar_whatsapp BOOLEAN NOT NULL DEFAULT TRUE"))
         conexion.execute(text("ALTER TABLE procesos ADD COLUMN IF NOT EXISTS archivado_en TIMESTAMP WITH TIME ZONE"))
+        conexion.execute(text("ALTER TABLE procesos_colaboradores ADD COLUMN IF NOT EXISTS visible_cliente BOOLEAN NOT NULL DEFAULT FALSE"))
         conexion.execute(text("ALTER TABLE documentos_proceso ADD COLUMN IF NOT EXISTS estado_revision VARCHAR(24) NOT NULL DEFAULT 'RECIBIDO'"))
         conexion.execute(text("ALTER TABLE documentos_proceso ADD COLUMN IF NOT EXISTS comentario_revision TEXT"))
         conexion.execute(text("ALTER TABLE documentos_proceso ADD COLUMN IF NOT EXISTS revisado_por_id INTEGER REFERENCES usuarios(id) ON DELETE SET NULL"))

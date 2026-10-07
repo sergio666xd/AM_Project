@@ -374,6 +374,11 @@ class ProcesoUpdate(BaseModel):
 
 class ProcesoColaboradorCreate(BaseModel):
     abogado_id: int
+    visible_cliente: bool = False
+
+
+class ProcesoColaboradorUpdate(BaseModel):
+    visible_cliente: bool
 
 
 class SolicitudDocumentoCreate(BaseModel):

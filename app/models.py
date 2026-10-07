@@ -403,6 +403,7 @@ class ProcesoColaborador(Base):
     proceso_id = Column(Integer, ForeignKey("procesos.id", ondelete="CASCADE"), primary_key=True)
     abogado_id = Column(Integer, ForeignKey("usuarios.id", ondelete="CASCADE"), primary_key=True)
     asignado_por_id = Column(Integer, ForeignKey("usuarios.id", ondelete="SET NULL"), nullable=True)
+    visible_cliente = Column(Boolean, nullable=False, default=False)
     created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
 
     proceso = relationship("Proceso", back_populates="colaboradores")

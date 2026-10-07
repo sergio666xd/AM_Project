@@ -50,7 +50,7 @@ type Process = {
   soy_responsable: boolean;
   puede_gestionar_equipo: boolean;
   responsable: { id: number; nombre_completo: string };
-  colaboradores: { id: number; nombre_completo: string }[];
+  colaboradores: { id: number; nombre_completo: string; visible_cliente: boolean }[];
   abogados_disponibles: { id: number; nombre_completo: string }[];
   clientes: Client[];
   radicados: Radicado[];
@@ -154,6 +154,7 @@ export default function ProcesoDetallePage() {
   const [agendaClientId, setAgendaClientId] = useState("");
   const [editingAgendaId, setEditingAgendaId] = useState<number | null>(null);
   const [selectedColleagueId, setSelectedColleagueId] = useState("");
+  const [selectedColleagueVisible, setSelectedColleagueVisible] = useState(false);
 
   const [clientQuery, setClientQuery] = useState("");
   const [creatingClient, setCreatingClient] = useState(false);
@@ -304,9 +305,13 @@ export default function ProcesoDetallePage() {
     const saved = await action(
       `/api/expedientes/procesos/${id}/colaboradores`,
       "POST",
-      { abogado_id: Number(selectedColleagueId) },
+      { abogado_id: Number(selectedColleagueId), visible_cliente: selectedColleagueVisible },
     );
-    if (saved) setSelectedColleagueId("");
+    if (saved) { setSelectedColleagueId(""); setSelectedColleagueVisible(false); }
+  }
+
+  async function updateColleaguePermission(colleagueId: number, visibleCliente: boolean) {
+    await action(`/api/expedientes/procesos/${id}/colaboradores/${colleagueId}`, "PATCH", { visible_cliente: visibleCliente });
   }
 
   async function createAndAssignClient(event: FormEvent<HTMLFormElement>) {
@@ -631,7 +636,7 @@ export default function ProcesoDetallePage() {
             <div>
               <h2 className="font-semibold text-[var(--foreground)]">Equipo del proceso</h2>
               <p className="mt-1 text-sm text-[var(--foreground-muted)]">
-                Responsable: {process.responsable.nombre_completo}. Los colaboradores internos acceden solo a este expediente.
+                Responsable: {process.responsable.nombre_completo}. Los colaboradores acceden a este expediente; los abogados participantes también aparecen al cliente.
               </p>
             </div>
           </header>
@@ -639,9 +644,14 @@ export default function ProcesoDetallePage() {
             <ul className="divide-y divide-[var(--border)] border-y border-[var(--border)]">
               {process.colaboradores.map((colleague) => (
                 <li key={colleague.id} className="flex items-center justify-between gap-3 py-3 text-sm">
-                  <span className="text-[var(--foreground)]">{colleague.nombre_completo}</span>
+                  <span className="text-[var(--foreground)]">{colleague.nombre_completo}<span className="ml-2 rounded-full bg-[var(--surface-secondary)] px-2 py-1 text-xs text-[var(--foreground-muted)]">{colleague.visible_cliente ? "Abogado participante · visible al cliente" : "Solo colaborador"}</span></span>
                   {process.puede_gestionar_equipo && (
-                    <button type="button" disabled={working} onClick={() => void removeColleague(colleague.id)} className="text-xs font-medium text-red-700 hover:underline disabled:opacity-50">Retirar acceso</button>
+                    <div className="flex items-center gap-3">
+                      <select aria-label={`Permiso de ${colleague.nombre_completo}`} value={colleague.visible_cliente ? "participante" : "interno"} disabled={working} onChange={(event) => void updateColleaguePermission(colleague.id, event.target.value === "participante")} className="rounded-md border border-[var(--border)] bg-[var(--background)] px-2 py-1 text-xs">
+                        <option value="interno">Solo colaborador</option><option value="participante">Abogado participante</option>
+                      </select>
+                      <button type="button" disabled={working} onClick={() => void removeColleague(colleague.id)} className="text-xs font-medium text-red-700 hover:underline disabled:opacity-50">Retirar acceso</button>
+                    </div>
                   )}
                 </li>
               ))}
@@ -649,15 +659,20 @@ export default function ProcesoDetallePage() {
           ) : (
             <p className="text-sm text-[var(--foreground-muted)]">No hay colaboradores asignados.</p>
           )}
-          {process.puede_gestionar_equipo && process.abogados_disponibles.length > 0 && (
-            <form onSubmit={addColleague} className="flex flex-wrap gap-2">
-              <select required value={selectedColleagueId} onChange={(event) => setSelectedColleagueId(event.target.value)} aria-label="Abogado colaborador" className="min-w-56 flex-1 rounded-md border border-[var(--border)] bg-[var(--background)] px-3 py-2 text-sm">
-                <option value="">Seleccionar abogado interno</option>
+          {process.puede_gestionar_equipo && (process.abogados_disponibles.length > 0 ? (
+            <form onSubmit={addColleague} className="grid gap-3 sm:grid-cols-[1fr_1fr_auto]">
+              <select required value={selectedColleagueId} onChange={(event) => setSelectedColleagueId(event.target.value)} aria-label="Abogado para agregar" className="min-w-56 rounded-md border border-[var(--border)] bg-[var(--background)] px-3 py-2 text-sm">
+                <option value="">Seleccionar abogado de la firma</option>
                 {process.abogados_disponibles.map((colleague) => <option key={colleague.id} value={colleague.id}>{colleague.nombre_completo}</option>)}
               </select>
-              <button type="submit" disabled={working || !selectedColleagueId} className="inline-flex items-center gap-2 rounded-md bg-[var(--primary)] px-3 py-2 text-sm font-semibold text-white disabled:opacity-50"><UserPlus className="size-4" />Asignar colaborador</button>
+              <select value={selectedColleagueVisible ? "participante" : "interno"} onChange={(event) => setSelectedColleagueVisible(event.target.value === "participante")} aria-label="Permiso del abogado" className="rounded-md border border-[var(--border)] bg-[var(--background)] px-3 py-2 text-sm">
+                <option value="interno">Solo colaborador</option><option value="participante">Abogado participante (visible al cliente)</option>
+              </select>
+              <button type="submit" disabled={working || !selectedColleagueId} className="inline-flex items-center justify-center gap-2 rounded-md bg-[var(--primary)] px-3 py-2 text-sm font-semibold text-white disabled:opacity-50"><UserPlus className="size-4" />Agregar abogado</button>
             </form>
-          )}
+          ) : (
+            <p className="rounded-md bg-[var(--surface-secondary)] p-3 text-sm text-[var(--foreground-muted)]">No hay otros abogados administradores activos disponibles para agregar.</p>
+          ))}
         </section>
       )}
 
