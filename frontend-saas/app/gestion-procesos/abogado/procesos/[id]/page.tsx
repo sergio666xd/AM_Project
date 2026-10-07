@@ -78,6 +78,7 @@ type Process = {
   }[];
   documentos: {
     id: number;
+    solicitud_id: number;
     nombre_archivo: string;
     cliente: string;
     mime_type: string;
@@ -155,6 +156,12 @@ export default function ProcesoDetallePage() {
   const [selectedColleagueId, setSelectedColleagueId] = useState("");
 
   const [clientQuery, setClientQuery] = useState("");
+  const [creatingClient, setCreatingClient] = useState(false);
+  const [newClientName, setNewClientName] = useState("");
+  const [newClientEmail, setNewClientEmail] = useState("");
+  const [newClientWhatsapp, setNewClientWhatsapp] = useState("");
+  const [newClientPassword, setNewClientPassword] = useState("");
+  const [newClientChannel, setNewClientChannel] = useState<"EMAIL" | "WHATSAPP">("EMAIL");
   const [radicadoQuery, setRadicadoQuery] = useState("");
 
   const [error, setError] = useState("");
@@ -302,6 +309,32 @@ export default function ProcesoDetallePage() {
     if (saved) setSelectedColleagueId("");
   }
 
+  async function createAndAssignClient(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!newClientName.trim() || !newClientEmail.trim() || newClientPassword.length < 8) return;
+    setWorking(true); setError(""); setNotice("");
+    try {
+      const createResponse = await apiRequest("/api/expedientes/clientes", {
+        method: "POST", headers: { ...headers(), "Content-Type": "application/json" },
+        body: JSON.stringify({ nombre_completo: newClientName.trim(), email: newClientEmail.trim(), whatsapp_numero: newClientWhatsapp.trim(), password_temporal: newClientPassword, canal_envio: newClientChannel }),
+      });
+      const created = await createResponse.json().catch(() => ({}));
+      if (!createResponse.ok) throw new Error(created.detail || "No fue posible crear el cliente.");
+      const assignResponse = await apiRequest(`/api/expedientes/procesos/${id}/clientes/${created.id}`, { method: "POST", headers: headers() });
+      const assigned = await assignResponse.json().catch(() => ({}));
+      if (!assignResponse.ok) {
+        setAllClients((current) => [...current, { id: created.id, nombre_completo: newClientName.trim(), email: newClientEmail.trim() }]);
+        setCreatingClient(false);
+        throw new Error(`La cuenta fue creada y sus credenciales se enviaron, pero no se pudo asociar al proceso: ${assigned.detail || "intenta agregar el cliente desde la lista"}`);
+      }
+      setNotice(`${created.mensaje || "Cliente creado"} y asociado a este proceso.`);
+      setNewClientName(""); setNewClientEmail(""); setNewClientWhatsapp(""); setNewClientPassword(""); setCreatingClient(false); setShowClientModal(false);
+      await load();
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "No fue posible crear y asociar el cliente.");
+    } finally { setWorking(false); }
+  }
+
   async function removeColleague(colleagueId: number) {
     await action(
       `/api/expedientes/procesos/${id}/colaboradores/${colleagueId}`,
@@ -420,6 +453,19 @@ export default function ProcesoDetallePage() {
           .includes(normalized);
       });
   }, [allClients, process, clientQuery]);
+
+  function timelineResourceHref(item: Process["timeline"][number]) {
+    if (item.recurso === "Tarea") return `/gestion-procesos/abogado/tareas/${item.recurso_id}`;
+    if (item.recurso === "Documento") return `/gestion-procesos/abogado/documentos?proceso=${id}#documento-${item.recurso_id}`;
+    if (item.recurso === "Solicitud de documento") return `/gestion-procesos/abogado/documentos?proceso=${id}#solicitud-${item.recurso_id}`;
+    if (item.recurso === "Actuación") {
+      const radicado = process?.radicados.find((entry) => entry.actuaciones.some((actuacion) => actuacion.id === item.recurso_id));
+      if (radicado) return `/gestion-procesos/abogado/radicados/${radicado.id}`;
+    }
+    if (item.recurso === "Agenda") return "#agenda";
+    if (item.recurso === "Comunicación" || item.recurso === "Nota interna") return "#comunicaciones";
+    return "#resumen";
+  }
 
   const availableRadicados = useMemo(() => {
     if (!process) return [];
@@ -761,6 +807,7 @@ export default function ProcesoDetallePage() {
                       <p className="mt-0.5 truncate text-xs text-[var(--foreground-muted)]">
                         {client.email}
                       </p>
+                      <Link href={`/gestion-procesos/abogado/clientes/${client.id}`} className="mt-1 inline-block text-xs font-medium text-[var(--primary)] hover:underline">Abrir ficha del cliente</Link>
                     </div>
 
                     <button
@@ -843,6 +890,7 @@ export default function ProcesoDetallePage() {
                         <p className="truncate font-mono text-sm font-semibold text-[var(--foreground)]">
                           {radicado.numero}
                         </p>
+                        <Link href={`/gestion-procesos/abogado/radicados/${radicado.id}`} className="mt-1 inline-block text-xs font-medium text-[var(--primary)] hover:underline">Abrir detalle del radicado</Link>
 
                         <p className="mt-1 text-xs text-[var(--foreground-muted)]">
                           {radicado.actuaciones.length} actuación
@@ -898,7 +946,7 @@ export default function ProcesoDetallePage() {
 
       <section id="actividad" className="scroll-mt-20 rounded-2xl border border-[var(--border)] bg-[var(--surface)]">
         <header className="border-b border-[var(--border)] px-5 py-4"><h2 className="text-sm font-semibold text-[var(--foreground)]">Actividad del expediente</h2><p className="mt-1 text-xs text-[var(--foreground-muted)]">Timeline de actuaciones judiciales, tareas, documentos y comunicaciones, con la visibilidad asignada en el servidor.</p></header>
-        {process.timeline.length ? <ol className="divide-y divide-[var(--border)]">{process.timeline.slice(0, 100).map((item) => <li key={item.id} className="flex gap-3 px-5 py-4"><span className={`mt-1 size-2 shrink-0 rounded-full ${item.visibilidad === "CLIENTE" ? "bg-emerald-500" : "bg-slate-400"}`} title={item.visibilidad === "CLIENTE" ? "Visible al cliente" : "Solo equipo interno"} /><div className="min-w-0 flex-1"><div className="flex flex-wrap items-center gap-2"><p className="text-sm font-medium text-[var(--foreground)]">{item.titulo}</p><span className="rounded-full bg-[var(--surface-secondary)] px-2 py-0.5 text-[10px] uppercase text-[var(--foreground-muted)]">{item.tipo}</span><span className={`rounded-full px-2 py-0.5 text-[10px] ${item.visibilidad === "CLIENTE" ? "bg-emerald-500/10 text-emerald-700" : "bg-slate-500/10 text-slate-600"}`}>{item.visibilidad === "CLIENTE" ? "Cliente visible" : "Interno"}</span></div><p className="mt-1 whitespace-pre-wrap text-xs leading-5 text-[var(--foreground-secondary)]">{item.descripcion}</p><p className="mt-1 text-[11px] text-[var(--foreground-muted)]">{item.actor || item.recurso}{item.fecha ? ` · ${new Date(item.fecha).toLocaleString("es-CO")}` : ""}</p></div></li>)}</ol> : <p className="p-8 text-center text-sm text-[var(--foreground-muted)]">Aún no hay actividad registrada.</p>}
+        {process.timeline.length ? <ol className="divide-y divide-[var(--border)]">{process.timeline.slice(0, 100).map((item) => <li key={item.id} className="flex gap-3 px-5 py-4"><span className={`mt-1 size-2 shrink-0 rounded-full ${item.visibilidad === "CLIENTE" ? "bg-emerald-500" : "bg-slate-400"}`} title={item.visibilidad === "CLIENTE" ? "Visible al cliente" : "Solo equipo interno"} /><div className="min-w-0 flex-1"><div className="flex flex-wrap items-center gap-2"><p className="text-sm font-medium text-[var(--foreground)]">{item.titulo}</p><span className="rounded-full bg-[var(--surface-secondary)] px-2 py-0.5 text-[10px] uppercase text-[var(--foreground-muted)]">{item.tipo}</span><span className={`rounded-full px-2 py-0.5 text-[10px] ${item.visibilidad === "CLIENTE" ? "bg-emerald-500/10 text-emerald-700" : "bg-slate-500/10 text-slate-600"}`}>{item.visibilidad === "CLIENTE" ? "Cliente visible" : "Interno"}</span><Link href={timelineResourceHref(item)} className="text-xs font-medium text-[var(--primary)] hover:underline">Abrir {item.recurso.toLowerCase()}</Link></div><p className="mt-1 whitespace-pre-wrap text-xs leading-5 text-[var(--foreground-secondary)]">{item.descripcion}</p><p className="mt-1 text-[11px] text-[var(--foreground-muted)]">{item.actor || item.recurso}{item.fecha ? ` · ${new Date(item.fecha).toLocaleString("es-CO")}` : ""}</p></div></li>)}</ol> : <p className="p-8 text-center text-sm text-[var(--foreground-muted)]">Aún no hay actividad registrada.</p>}
       </section>
 
       {/* MÓDULOS SECUNDARIOS */}
@@ -977,12 +1025,12 @@ export default function ProcesoDetallePage() {
             <div>
               <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-[var(--foreground-muted)]">Solicitudes</h3>
               {process.solicitudes_documento.length ? <div className="space-y-2">{process.solicitudes_documento.map((request) => <div key={request.id} className="rounded-lg border border-[var(--border)] bg-[var(--surface-secondary)] p-3">
-                <div className="flex items-start justify-between gap-3"><div className="min-w-0"><p className="text-sm font-medium text-[var(--foreground)]">{request.titulo}</p><p className="mt-1 text-xs text-[var(--foreground-muted)]">{request.cliente}</p>{request.instrucciones && <p className="mt-2 text-xs text-[var(--foreground-muted)]">{request.instrucciones}</p>}</div><span className={`shrink-0 rounded-md px-2 py-1 text-[10px] font-medium ${request.atendida_en ? "bg-emerald-500/10 text-emerald-700" : "bg-amber-500/10 text-amber-700"}`}>{request.atendida_en ? "Entregada" : "Pendiente"}</span></div>
+                <div className="flex items-start justify-between gap-3"><div className="min-w-0"><p className="text-sm font-medium text-[var(--foreground)]">{request.titulo}</p><p className="mt-1 text-xs text-[var(--foreground-muted)]">{request.cliente}</p>{request.instrucciones && <p className="mt-2 text-xs text-[var(--foreground-muted)]">{request.instrucciones}</p>}<Link href={`/gestion-procesos/abogado/documentos?proceso=${id}#solicitud-${request.id}`} className="mt-2 inline-block text-xs font-medium text-[var(--primary)] hover:underline">Abrir solicitud documental</Link></div><span className={`shrink-0 rounded-md px-2 py-1 text-[10px] font-medium ${request.atendida_en ? "bg-emerald-500/10 text-emerald-700" : "bg-amber-500/10 text-amber-700"}`}>{request.atendida_en ? "Entregada" : "Pendiente"}</span></div>
               </div>)}</div> : <p className="rounded-lg border border-dashed border-[var(--border)] px-3 py-5 text-center text-xs text-[var(--foreground-muted)]">No hay solicitudes para este proceso.</p>}
             </div>
             <div>
               <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-[var(--foreground-muted)]">Archivos entregados</h3>
-              {process.documentos.length ? <div className="space-y-2">{process.documentos.map((document) => <div key={document.id} className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-[var(--border)] bg-[var(--surface-secondary)] px-3 py-2.5"><div className="flex min-w-0 items-center gap-2"><FileText className="size-4 shrink-0 text-[var(--primary)]" /><div className="min-w-0"><p className="truncate text-sm font-medium text-[var(--foreground)]">{document.nombre_archivo}</p><p className="truncate text-xs text-[var(--foreground-muted)]">{document.cliente} · {new Date(document.created_at).toLocaleDateString("es-CO")} · {document.estado_revision.replaceAll("_", " ")}</p></div></div><div className="flex shrink-0 items-center gap-2"><button type="button" disabled={downloadingDocumentId !== null} onClick={() => void openDocumentPreview(document)} className="rounded-md border border-[var(--border)] bg-[var(--surface)] px-2.5 py-2 text-xs hover:bg-[var(--surface-hover)] disabled:opacity-50">{downloadingDocumentId === document.id ? "Abriendo…" : "Ver y revisar"}</button><button type="button" disabled={downloadingDocumentId !== null} onClick={() => void downloadDocument(document.id, document.nombre_archivo)} aria-label={`Descargar ${document.nombre_archivo}`} className="inline-flex items-center gap-1.5 rounded-md border border-[var(--border)] bg-[var(--surface)] px-2.5 py-2 text-xs text-[var(--foreground)] hover:bg-[var(--surface-hover)] disabled:opacity-50"><Download className="size-3.5" />Descargar</button></div></div>)}</div> : <p className="rounded-lg border border-dashed border-[var(--border)] px-3 py-5 text-center text-xs text-[var(--foreground-muted)]">Aún no se han entregado archivos.</p>}
+              {process.documentos.length ? <div className="space-y-2">{process.documentos.map((document) => <div key={document.id} className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-[var(--border)] bg-[var(--surface-secondary)] px-3 py-2.5"><div className="flex min-w-0 items-center gap-2"><FileText className="size-4 shrink-0 text-[var(--primary)]" /><div className="min-w-0"><p className="truncate text-sm font-medium text-[var(--foreground)]">{document.nombre_archivo}</p><p className="truncate text-xs text-[var(--foreground-muted)]">{document.cliente} · {new Date(document.created_at).toLocaleDateString("es-CO")} · {document.estado_revision.replaceAll("_", " ")}</p><Link href={`/gestion-procesos/abogado/documentos?proceso=${id}#documento-${document.id}`} className="mt-1 inline-block text-xs font-medium text-[var(--primary)] hover:underline">Abrir en carpeta documental</Link></div></div><div className="flex shrink-0 items-center gap-2"><button type="button" disabled={downloadingDocumentId !== null} onClick={() => void openDocumentPreview(document)} className="rounded-md border border-[var(--border)] bg-[var(--surface)] px-2.5 py-2 text-xs hover:bg-[var(--surface-hover)] disabled:opacity-50">{downloadingDocumentId === document.id ? "Abriendo…" : "Previsualizar y revisar"}</button><button type="button" disabled={downloadingDocumentId !== null} onClick={() => void downloadDocument(document.id, document.nombre_archivo)} aria-label={`Descargar ${document.nombre_archivo}`} className="inline-flex items-center gap-1.5 rounded-md border border-[var(--border)] bg-[var(--surface)] px-2.5 py-2 text-xs text-[var(--foreground)] hover:bg-[var(--surface-hover)] disabled:opacity-50"><Download className="size-3.5" />Descargar</button></div></div>)}</div> : <p className="rounded-lg border border-dashed border-[var(--border)] px-3 py-5 text-center text-xs text-[var(--foreground-muted)]">Aún no se han entregado archivos.</p>}
             </div>
           </div>
         </section>
@@ -1115,6 +1163,18 @@ export default function ProcesoDetallePage() {
             </div>
 
             <div className="space-y-4 p-5">
+              {error && <p role="alert" className="rounded-md border border-red-500/30 bg-red-500/5 p-3 text-xs text-red-700">{error}</p>}
+              <button type="button" onClick={() => setCreatingClient((current) => !current)} className="w-full rounded-lg border border-[var(--border)] px-3 py-2.5 text-sm font-medium text-[var(--primary)] hover:bg-[var(--primary)]/5">
+                {creatingClient ? "← Elegir un cliente existente" : "+ Crear cliente y asociarlo al proceso"}
+              </button>
+              {creatingClient ? <form onSubmit={(event) => void createAndAssignClient(event)} className="space-y-3 rounded-xl border border-[var(--border)] bg-[var(--surface-secondary)] p-4">
+                <label className="block text-xs font-medium">Nombre completo<input required maxLength={150} value={newClientName} onChange={(event) => setNewClientName(event.target.value)} className="mt-1 w-full rounded-lg border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-sm" /></label>
+                <label className="block text-xs font-medium">Correo<input required type="email" value={newClientEmail} onChange={(event) => setNewClientEmail(event.target.value)} className="mt-1 w-full rounded-lg border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-sm" /></label>
+                <label className="block text-xs font-medium">WhatsApp<input type="tel" value={newClientWhatsapp} onChange={(event) => setNewClientWhatsapp(event.target.value)} placeholder="57..." className="mt-1 w-full rounded-lg border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-sm" /></label>
+                <label className="block text-xs font-medium">Contraseña temporal<input required minLength={8} type="password" autoComplete="new-password" value={newClientPassword} onChange={(event) => setNewClientPassword(event.target.value)} className="mt-1 w-full rounded-lg border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-sm" /><span className="mt-1 block font-normal text-[var(--foreground-muted)]">El cliente tendrá que cambiarla al ingresar.</span></label>
+                <label className="block text-xs font-medium">Enviar credenciales por<select value={newClientChannel} onChange={(event) => setNewClientChannel(event.target.value as "EMAIL" | "WHATSAPP")} className="mt-1 w-full rounded-lg border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-sm"><option value="EMAIL">Correo</option><option value="WHATSAPP" disabled={!newClientWhatsapp.trim()}>WhatsApp</option></select></label>
+                <button type="submit" disabled={working || !newClientName.trim() || !newClientEmail.trim() || newClientPassword.length < 8 || (newClientChannel === "WHATSAPP" && !newClientWhatsapp.trim())} className="w-full rounded-lg bg-[var(--primary)] px-3 py-2.5 text-sm font-semibold text-white disabled:opacity-50">{working ? "Creando y asociando…" : "Crear, enviar acceso y asociar"}</button>
+              </form> : <>
               <div className="relative">
                 <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-[var(--foreground-muted)]" />
 
@@ -1166,6 +1226,7 @@ export default function ProcesoDetallePage() {
                   </div>
                 )}
               </div>
+              </>}
             </div>
           </div>
         </div>

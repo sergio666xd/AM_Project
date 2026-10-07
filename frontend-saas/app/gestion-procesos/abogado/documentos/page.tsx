@@ -18,6 +18,7 @@ import {
 
 type Request = {
   id: number;
+  proceso_id: number;
   proceso: string;
   cliente: string;
   titulo: string;
@@ -27,6 +28,8 @@ type Request = {
 
 type Document = {
   id: number;
+  proceso_id: number;
+  solicitud_id: number;
   proceso: string;
   cliente: string;
   nombre_archivo: string;
@@ -60,6 +63,8 @@ export default function DocumentosPage() {
 
   const [query, setQuery] = useState("");
   const [filtroEstado, setFiltroEstado] = useState("TODAS");
+  const [filtroEstadoArchivo, setFiltroEstadoArchivo] = useState("TODOS");
+  const [selectedProcessId, setSelectedProcessId] = useState<number | null>(null);
 
   const [loading, setLoading] = useState(true);
   const [actualizando, setActualizando] = useState(false);
@@ -167,6 +172,21 @@ export default function DocumentosPage() {
     return () => window.clearTimeout(timer);
   }, [load]);
 
+  useEffect(() => {
+    if (loading || !processes.length) return;
+    const timer = window.setTimeout(() => {
+      const requestedProcess = Number(new URLSearchParams(window.location.search).get("proceso"));
+      if (Number.isInteger(requestedProcess) && processes.some((process) => process.id === requestedProcess)) setSelectedProcessId(requestedProcess);
+    }, 0);
+    return () => window.clearTimeout(timer);
+  }, [loading, processes]);
+
+  useEffect(() => {
+    if (selectedProcessId === null || loading || !window.location.hash) return;
+    const timer = window.setTimeout(() => document.getElementById(decodeURIComponent(window.location.hash.slice(1)))?.scrollIntoView({ behavior: "smooth", block: "center" }), 80);
+    return () => window.clearTimeout(timer);
+  }, [selectedProcessId, loading, data]);
+
   useEffect(() => () => {
     if (archivoPreview) URL.revokeObjectURL(archivoPreview);
   }, [archivoPreview]);
@@ -209,6 +229,7 @@ export default function DocumentosPage() {
     const text = query.toLowerCase().trim();
 
     return data.solicitudes.filter((item) => {
+      if (selectedProcessId !== null && item.proceso_id !== selectedProcessId) return false;
       const matchesSearch =
         !text ||
         `${item.titulo} ${item.proceso} ${item.cliente} ${
@@ -224,12 +245,14 @@ export default function DocumentosPage() {
 
       return matchesSearch && matchesStatus;
     });
-  }, [data.solicitudes, query, filtroEstado]);
+  }, [data.solicitudes, query, filtroEstado, selectedProcessId]);
 
   const documentosFiltrados = useMemo(() => {
     const text = query.toLowerCase().trim();
 
     return data.documentos.filter((item) => {
+      if (selectedProcessId !== null && item.proceso_id !== selectedProcessId) return false;
+      if (filtroEstadoArchivo !== "TODOS" && (item.estado_revision || "RECIBIDO") !== filtroEstadoArchivo) return false;
       return (
         !text ||
         `${item.nombre_archivo} ${item.proceso} ${item.cliente} ${item.mime_type}`
@@ -237,7 +260,15 @@ export default function DocumentosPage() {
           .includes(text)
       );
     });
-  }, [data.documentos, query]);
+  }, [data.documentos, query, filtroEstadoArchivo, selectedProcessId]);
+
+  const carpetasFiltradas = useMemo(() => {
+    const text = query.toLowerCase().trim();
+    if (!text) return processes;
+    return processes.filter((process) => process.nombre.toLowerCase().includes(text)
+      || data.solicitudes.some((item) => item.proceso_id === process.id && `${item.titulo} ${item.cliente} ${item.instrucciones || ""}`.toLowerCase().includes(text))
+      || data.documentos.some((item) => item.proceso_id === process.id && `${item.nombre_archivo} ${item.cliente} ${item.mime_type}`.toLowerCase().includes(text)));
+  }, [processes, data.solicitudes, data.documentos, query]);
 
   const pendientes = data.solicitudes.filter(
     (item) => !item.atendida_en,
@@ -349,6 +380,15 @@ export default function DocumentosPage() {
             <option value="ENTREGADAS">Entregadas</option>
           </select>
 
+          <select value={filtroEstadoArchivo} onChange={(event) => setFiltroEstadoArchivo(event.target.value)} aria-label="Filtrar archivos por estado" className="rounded-lg border px-3 py-2.5 text-sm outline-none" style={{ background: "var(--surface-muted)", borderColor: "var(--border)", color: "var(--foreground)" }}>
+            <option value="TODOS">Todos los estados de archivo</option>
+            <option value="RECIBIDO">Recibidos</option>
+            <option value="EN_REVISION">En revisión</option>
+            <option value="APROBADO">Aprobados</option>
+            <option value="REQUIERE_CORRECCION">Requieren corrección</option>
+            <option value="RECHAZADO">Rechazados</option>
+          </select>
+
           <button
             onClick={() => void load()}
             disabled={actualizando}
@@ -438,6 +478,17 @@ export default function DocumentosPage() {
         </div>
       )}
 
+      {selectedProcessId === null ? (
+        <section className="space-y-3">
+          <div><h2 className="text-lg font-semibold">Carpetas por proceso</h2><p className="text-sm" style={{ color: "var(--foreground-muted)" }}>Abre una carpeta para ver solicitudes y archivos; los filtros se aplican dentro de cada proceso.</p></div>
+          {carpetasFiltradas.length ? <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">{carpetasFiltradas.map((process) => {
+            const requests = data.solicitudes.filter((item) => item.proceso_id === process.id);
+            const documents = data.documentos.filter((item) => item.proceso_id === process.id);
+            return <button type="button" key={process.id} onClick={() => setSelectedProcessId(process.id)} className="rounded-xl border p-4 text-left transition hover:border-primary hover:bg-surface-hover" style={{ borderColor: "var(--border)", background: "var(--surface)" }}><div className="flex items-center gap-3"><div className="grid size-11 place-items-center rounded-lg" style={{ background: "var(--primary-light)", color: "var(--primary)" }}><FileText size={21}/></div><span className="min-w-0"><span className="block truncate font-semibold">{process.nombre}</span><span className="text-xs" style={{ color: "var(--foreground-muted)" }}>Abrir carpeta</span></span></div><div className="mt-4 flex gap-4 border-t pt-3 text-xs" style={{ borderColor: "var(--border)", color: "var(--foreground-muted)" }}><span>{requests.filter((item) => !item.atendida_en).length} solicitudes pendientes</span><span>{documents.length} archivos</span></div></button>;
+          })}</div> : <EmptyState icon={<FileText size={30}/>} title="No hay carpetas de procesos" description="Los documentos aparecerán organizados aquí cuando existan procesos asignados."/>}
+        </section>
+      ) : <>
+      <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border p-4" style={{ borderColor: "var(--border)", background: "var(--surface)" }}><div><button type="button" onClick={() => setSelectedProcessId(null)} className="text-xs font-medium text-primary hover:underline">← Todas las carpetas</button><h2 className="mt-1 text-lg font-semibold">{processes.find((process) => process.id === selectedProcessId)?.nombre || "Proceso"}</h2></div><span className="text-xs" style={{ color: "var(--foreground-muted)" }}>{solicitudesFiltradas.length} solicitudes · {documentosFiltrados.length} archivos visibles</span></div>
       {/* SOLICITUDES */}
       <section
         className="overflow-hidden rounded-xl border"
@@ -510,7 +561,7 @@ export default function DocumentosPage() {
                 </tr>
               ) : (
                 solicitudesFiltradas.map((item) => (
-                  <tr
+                  <tr id={`solicitud-${item.id}`}
                     key={item.id}
                     className="border-b transition hover:bg-surface-hover"
                     style={{
@@ -673,7 +724,7 @@ export default function DocumentosPage() {
                 </tr>
               ) : (
                 documentosFiltrados.map((item) => (
-                  <tr
+                  <tr id={`documento-${item.id}`}
                     key={item.id}
                     className="border-b transition hover:bg-surface-hover"
                     style={{
@@ -731,7 +782,7 @@ export default function DocumentosPage() {
                       <div className="flex flex-col items-start gap-2">
                         <span className="text-xs text-foreground-muted">{(item.estado_revision || "RECIBIDO").replaceAll("_", " ")}</span>
                         <button type="button" onClick={() => void abrirDocumento(item)} className="rounded-lg border px-3 py-2 text-xs font-medium" style={{ borderColor: "var(--border)", color: "var(--primary)" }}>
-                          Ver y revisar
+                          Vista previa y revisar
                         </button>
                       </div>
                     </td>
@@ -742,6 +793,7 @@ export default function DocumentosPage() {
           </table>
         </div>
       </section>
+      </>}
 
       {documentoActivo && archivoPreview && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-3 sm:p-6" role="dialog" aria-modal="true" aria-labelledby="documento-preview-titulo" onMouseDown={(event) => { if (event.target === event.currentTarget) { setDocumentoActivo(null); setArchivoPreview(""); } }}>
