@@ -105,7 +105,14 @@ def _query_inventario_admin(db: Session, recurso: str, sector: str):
     if recurso == "tareas":
         return db.query(models.Tarea).join(models.Usuario, models.Usuario.id == models.Tarea.usuario_id).filter(models.Usuario.rol.in_(roles))
     if recurso == "documentos":
-        return db.query(models.DocumentoProceso).join(models.Proceso, models.Proceso.id == models.DocumentoProceso.proceso_id).join(models.Usuario, models.Usuario.id == models.Proceso.abogado_id).filter(models.Usuario.rol.in_(roles))
+        return db.query(models.DocumentoProceso).outerjoin(
+            models.Proceso, models.Proceso.id == models.DocumentoProceso.proceso_id
+        ).outerjoin(
+            models.Usuario, models.Usuario.id == models.Proceso.abogado_id
+        ).filter(or_(
+            models.DocumentoProceso.proceso_id.is_(None),
+            models.Usuario.rol.in_(roles),
+        ))
     raise HTTPException(status_code=404, detail="Inventario no disponible.")
 
 
@@ -1174,9 +1181,11 @@ def listar_inventario_global(
         query = query.filter(or_(models.Tarea.proceso_id.is_(None), models.Tarea.proceso.has(models.Proceso.archivado_en.is_(None))))
         return [{"id": t.id, "owner_id": t.usuario_id, "titulo": t.titulo, "descripcion": t.descripcion, "estado": t.estado.value, "prioridad": t.prioridad.value, "abogado": t.usuario.nombre_completo, "cliente": t.cliente_asignado.nombre_completo if t.cliente_asignado else None, "cliente_id": t.cliente_id, "proceso": t.proceso.nombre if t.proceso else None, "proceso_id": t.proceso_id, "radicado_id": t.radicado_id, "fecha_limite": t.fecha_limite} for t in query.order_by(models.Tarea.created_at.desc()).limit(limite).all()]
     if recurso == "documentos":
-        query = db.query(models.DocumentoProceso).join(models.Proceso, models.Proceso.id == models.DocumentoProceso.proceso_id).join(models.Usuario, models.Usuario.id == models.Proceso.abogado_id).filter(models.Usuario.rol.in_(roles))
-        query = query.filter(models.Proceso.archivado_en.is_(None))
-        return [{"id": d.id, "owner_id": d.proceso.abogado_id, "nombre_archivo": d.nombre_archivo, "mime_type": d.mime_type, "proceso": d.proceso.nombre, "proceso_id": d.proceso_id, "cliente": d.cliente.nombre_completo, "cliente_id": d.cliente_id, "solicitud_id": d.solicitud_id, "estado_revision": d.estado_revision, "comentario_revision": d.comentario_revision, "revisado_en": d.revisado_en, "created_at": d.created_at} for d in query.order_by(models.DocumentoProceso.created_at.desc()).limit(limite).all()]
+        query = _query_inventario_admin(db, recurso, sector).filter(or_(
+            models.DocumentoProceso.proceso_id.is_(None),
+            models.Proceso.archivado_en.is_(None),
+        ))
+        return [{"id": d.id, "owner_id": d.proceso.abogado_id if d.proceso else None, "nombre_archivo": d.nombre_archivo, "mime_type": d.mime_type, "proceso": d.proceso.nombre if d.proceso else "Sin proceso asociado", "proceso_id": d.proceso_id, "cliente": d.cliente.nombre_completo if d.cliente else "Usuario eliminado", "cliente_id": d.cliente_id, "solicitud_id": d.solicitud_id, "estado_revision": d.estado_revision, "comentario_revision": d.comentario_revision, "revisado_en": d.revisado_en, "created_at": d.created_at} for d in query.order_by(models.DocumentoProceso.created_at.desc()).limit(limite).all()]
     raise HTTPException(status_code=404, detail="Inventario no disponible.")
 
 
@@ -1420,9 +1429,9 @@ def actualizar_recurso_admin(
             item.estado_revision = values["estado_revision"]
             item.revisado_por_id = admin.id
             item.revisado_en = datetime.utcnow()
-            if values["estado_revision"] in {"APROBADO", "RECHAZADO"}:
+            if item.solicitud and values["estado_revision"] in {"APROBADO", "RECHAZADO"}:
                 item.solicitud.atendida_en = item.revisado_en
-            elif values["estado_revision"] == "REQUIERE_CORRECCION":
+            elif item.solicitud and values["estado_revision"] == "REQUIERE_CORRECCION":
                 item.solicitud.atendida_en = None
         if "comentario_revision" in values:
             item.comentario_revision = values["comentario_revision"]
@@ -3073,52 +3082,77 @@ def eliminar_usuario_admin(
     if usuario.rol == models.RolUsuario.ADMIN:
         raise HTTPException(status_code=403, detail="Las cuentas administradoras de plataforma no se eliminan desde este módulo.")
 
-    referencias = {
-        "cuentas que tienen esta cuenta como responsable": db.query(models.Usuario.id).filter(
-            models.Usuario.creado_por_abogado_id == usuario_id
-        ).first(),
-        "radicados creados o vinculados": db.query(models.Radicado.id).filter(
-            or_(models.Radicado.creado_por_id == usuario_id, models.Radicado.usuarios_vinculados.any(models.Usuario.id == usuario_id))
-        ).first(),
-        "solicitudes de registro": db.query(models.SolicitudRegistro.id).filter(
-            models.SolicitudRegistro.usuario_id == usuario_id
-        ).first(),
-        "solicitudes de perfil": db.query(models.SolicitudEdicionPerfilCliente.id).filter(
-            models.SolicitudEdicionPerfilCliente.cliente_id == usuario_id
-        ).first(),
-        "procesos como abogado": db.query(models.Proceso.id).filter(
-            models.Proceso.abogado_id == usuario_id
-        ).first(),
-        "colaboraciones o procesos como cliente": db.query(models.ProcesoColaborador.proceso_id).filter(
-            models.ProcesoColaborador.abogado_id == usuario_id
-        ).first() or db.query(models.ProcesoCliente.proceso_id).filter(
-            models.ProcesoCliente.cliente_id == usuario_id
-        ).first(),
-        "tareas o subtareas": db.query(models.Tarea.id).filter(
-            or_(models.Tarea.usuario_id == usuario_id, models.Tarea.cliente_id == usuario_id)
-        ).first() or db.query(models.Subtarea.id).filter(models.Subtarea.cliente_id == usuario_id).first(),
-        "solicitudes o documentos": db.query(models.SolicitudDocumento.id).filter(
-            models.SolicitudDocumento.cliente_id == usuario_id
-        ).first() or db.query(models.DocumentoProceso.id).filter(
-            models.DocumentoProceso.cliente_id == usuario_id
-        ).first(),
-        "notificaciones o entregas": db.query(models.NotificacionProceso.id).filter(
-            or_(models.NotificacionProceso.abogado_id == usuario_id, models.NotificacionProceso.cliente_id == usuario_id)
-        ).first() or db.query(models.EntregaNotificacion.id).filter(
-            models.EntregaNotificacion.usuario_id == usuario_id
-        ).first() or db.query(models.EntregaNotificacionActuacion.id).filter(
-            models.EntregaNotificacionActuacion.usuario_id == usuario_id
-        ).first(),
-    }
-    vinculadas = [label for label, record in referencias.items() if record]
-    if vinculadas:
-        detalle = ", ".join(vinculadas)
-        raise HTTPException(
-            status_code=409,
-            detail=f"No se puede eliminar esta cuenta porque conserva historial: {detalle}. Suspéndela para mantener esos datos.",
-        )
+    procesos_ids = [row[0] for row in db.query(models.Proceso.id).filter(
+        models.Proceso.abogado_id == usuario_id
+    ).all()]
+    ids_procesos_usuario = procesos_ids or [-1]
+    documentos_conservados = db.query(models.DocumentoProceso.id).filter(or_(
+        models.DocumentoProceso.cliente_id == usuario_id,
+        models.DocumentoProceso.proceso_id.in_(ids_procesos_usuario),
+    )).count()
 
-    registrar_evento_auditoria(db, usuario_actual, "admin.usuario.eliminar", "usuario", usuario.id)
+    # Preserve file metadata and R2 objects while removing account/process links.
+    db.query(models.DocumentoProceso).filter(or_(
+        models.DocumentoProceso.cliente_id == usuario_id,
+        models.DocumentoProceso.proceso_id.in_(ids_procesos_usuario),
+    )).update({models.DocumentoProceso.solicitud_id: None}, synchronize_session=False)
+    db.query(models.DocumentoProceso).filter(
+        models.DocumentoProceso.proceso_id.in_(ids_procesos_usuario)
+    ).update({models.DocumentoProceso.proceso_id: None}, synchronize_session=False)
+    db.query(models.DocumentoProceso).filter(
+        models.DocumentoProceso.cliente_id == usuario_id
+    ).update({models.DocumentoProceso.cliente_id: None}, synchronize_session=False)
+
+    # Clear assignments on records that may belong to other accounts.
+    db.query(models.Usuario).filter(
+        models.Usuario.creado_por_abogado_id == usuario_id
+    ).update({models.Usuario.creado_por_abogado_id: None}, synchronize_session=False)
+    db.query(models.Tarea).filter(
+        models.Tarea.cliente_id == usuario_id
+    ).update({models.Tarea.cliente_id: None}, synchronize_session=False)
+    db.query(models.Subtarea).filter(
+        models.Subtarea.cliente_id == usuario_id
+    ).update({models.Subtarea.cliente_id: None}, synchronize_session=False)
+    db.query(models.ProcesoCliente).filter(
+        models.ProcesoCliente.cliente_id == usuario_id
+    ).delete(synchronize_session=False)
+    db.query(models.ProcesoColaborador).filter(or_(
+        models.ProcesoColaborador.abogado_id == usuario_id,
+        models.ProcesoColaborador.proceso_id.in_(ids_procesos_usuario),
+    )).delete(synchronize_session=False)
+    db.query(models.SolicitudDocumento).filter(or_(
+        models.SolicitudDocumento.cliente_id == usuario_id,
+        models.SolicitudDocumento.proceso_id.in_(ids_procesos_usuario),
+    )).delete(synchronize_session=False)
+    db.query(models.SolicitudRegistro).filter(
+        models.SolicitudRegistro.usuario_id == usuario_id
+    ).delete(synchronize_session=False)
+    db.query(models.SolicitudEdicionPerfilCliente).filter(or_(
+        models.SolicitudEdicionPerfilCliente.cliente_id == usuario_id,
+        models.SolicitudEdicionPerfilCliente.revisada_por_id == usuario_id,
+    )).delete(synchronize_session=False)
+    db.query(models.NotificacionProceso).filter(or_(
+        models.NotificacionProceso.abogado_id == usuario_id,
+        models.NotificacionProceso.cliente_id == usuario_id,
+        models.NotificacionProceso.proceso_id.in_(ids_procesos_usuario),
+    )).delete(synchronize_session=False)
+    db.execute(models.radicados_usuarios.delete().where(
+        models.radicados_usuarios.c.usuario_id == usuario_id
+    ))
+
+    # Radicados may be shared by another process; preserve them under ADMIN.
+    db.query(models.Radicado).filter(
+        models.Radicado.creado_por_id == usuario_id
+    ).update({models.Radicado.creado_por_id: usuario_actual.id}, synchronize_session=False)
+
+    registrar_evento_auditoria(
+        db,
+        usuario_actual,
+        "admin.usuario.eliminar",
+        "usuario",
+        usuario.id,
+        metadata={"documentos_conservados": documentos_conservados},
+    )
     db.delete(usuario)
     try:
         db.commit()
@@ -3126,6 +3160,11 @@ def eliminar_usuario_admin(
         db.rollback()
         raise HTTPException(
             status_code=409,
-            detail="La cuenta conserva registros relacionados y no se eliminó. Suspéndela para proteger el historial.",
+            detail="No fue posible completar la eliminación por una dependencia de datos. No se aplicaron cambios.",
         ) from error
-    return {"mensaje": "Cuenta eliminada. Los registros de auditoría se conservaron."}
+    return {
+        "mensaje": (
+            f"Cuenta eliminada. Se conservaron {documentos_conservados} documento(s) "
+            "en el inventario ADMIN; los demás registros vinculados se eliminaron o desligaron."
+        )
+    }

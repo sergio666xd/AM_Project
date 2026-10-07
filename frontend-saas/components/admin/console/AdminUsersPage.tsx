@@ -251,7 +251,7 @@ export default function AdminUsersPage() {
   }
 
   async function deleteUser(user: User) {
-    if (!window.confirm(`¿Eliminar la cuenta de ${user.nombre_completo}? Si tiene procesos, tareas, solicitudes o documentos vinculados, el sistema conservará el historial y rechazará la eliminación.`)) return;
+    if (!window.confirm(`¿Eliminar de forma permanente la cuenta de ${user.nombre_completo}? Se eliminarán sus registros asociados; los documentos se conservarán en el inventario ADMIN sin los vínculos a esta cuenta.`)) return;
     setWorking(true);
     setError("");
     setNotice("");
@@ -292,7 +292,7 @@ export default function AdminUsersPage() {
     const selected = visible.filter((user) => selectedIds.includes(user.id) && user.rol !== "ADMIN");
     const eligible = selected.filter((user) => action === "ACTIVATE" ? user.estado === "SUSPENDIDO" || user.estado === "RECHAZADO" : action === "SUSPEND" ? user.estado === "ACTIVO" : true);
     if (!eligible.length) return;
-    if (!window.confirm(action === "DELETE" ? `¿Eliminar ${eligible.length} cuentas seleccionadas? Las cuentas con recursos vinculados pueden conservarse o ser rechazadas por el servidor.` : `¿${action === "ACTIVATE" ? "Activar" : "Suspender"} ${eligible.length} cuentas?`)) return;
+    if (!window.confirm(action === "DELETE" ? `¿Eliminar permanentemente ${eligible.length} cuentas? Los documentos asociados se conservarán en el inventario ADMIN y se desligarán de las cuentas eliminadas.` : `¿${action === "ACTIVATE" ? "Activar" : "Suspender"} ${eligible.length} cuentas?`)) return;
     setWorking(true); setError(""); setNotice("");
     const outcomes = await Promise.allSettled(eligible.map((user) => fetchApi(
       action === "DELETE" ? `/api/admin/usuarios/${user.id}` : `/api/admin/usuarios/${user.id}/estado?estado=${action === "ACTIVATE" ? "ACTIVO" : "SUSPENDIDO"}`,

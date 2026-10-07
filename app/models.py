@@ -394,7 +394,7 @@ class Proceso(Base):
     clientes = relationship("ProcesoCliente", back_populates="proceso", cascade="all, delete-orphan")
     tareas = relationship("Tarea", back_populates="proceso")
     solicitudes_documento = relationship("SolicitudDocumento", back_populates="proceso", cascade="all, delete-orphan")
-    documentos = relationship("DocumentoProceso", back_populates="proceso", cascade="all, delete-orphan")
+    documentos = relationship("DocumentoProceso", back_populates="proceso")
 
 
 class ProcesoColaborador(Base):
@@ -445,9 +445,9 @@ class SolicitudDocumento(Base):
 class DocumentoProceso(Base):
     __tablename__ = "documentos_proceso"
     id = Column(Integer, primary_key=True, index=True)
-    proceso_id = Column(Integer, ForeignKey("procesos.id"), nullable=False, index=True)
-    cliente_id = Column(Integer, ForeignKey("usuarios.id"), nullable=False, index=True)
-    solicitud_id = Column(Integer, ForeignKey("solicitudes_documento.id"), nullable=False, index=True)
+    proceso_id = Column(Integer, ForeignKey("procesos.id"), nullable=True, index=True)
+    cliente_id = Column(Integer, ForeignKey("usuarios.id"), nullable=True, index=True)
+    solicitud_id = Column(Integer, ForeignKey("solicitudes_documento.id"), nullable=True, index=True)
     nombre_archivo = Column(String(255), nullable=False)
     ruta_archivo = Column(String(500), nullable=False)
     mime_type = Column(String(100), nullable=False)
