@@ -1,9 +1,65 @@
 import logging
+import re
 import requests
 from app.integration_settings import get_integration_settings
 
 # Configuración mediante variables de entorno (o valores directos para pruebas locales)
 logger = logging.getLogger(__name__)
+
+
+_ETIQUETAS = {
+    "proceso": "📁",
+    "radicado": "⚖️",
+    "actuación": "📝",
+    "actuacion": "📝",
+    "tarea": "✅",
+    "documento": "📄",
+    "detalle": "📋",
+    "fecha": "📅",
+    "fecha límite": "⏰",
+    "vencimiento": "⏰",
+    "responsable": "👤",
+    "estado": "📌",
+    "prioridad": "🚦",
+    "asunto": "💬",
+    "solicitud": "📥",
+    "evento": "🗓️",
+    "permiso": "🔐",
+    "anotación": "🗒️",
+    "anotacion": "🗒️",
+    "comentarios del abogado": "💬",
+}
+
+
+def formatear_mensaje_whatsapp(mensaje: str) -> str:
+    """Adapta el texto de correo/notificación a un formato legible en WhatsApp."""
+    texto = mensaje.replace("\r\n", "\n").replace("\r", "\n").strip()
+    texto = re.sub(r"\n[ \t]+", "\n", texto)
+    texto = re.sub(r"\n{3,}", "\n\n", texto)
+
+    # Las notificaciones comparten cuerpo con correo; convierte su llamada a la
+    # acción en un enlace fácil de reconocer y tocar desde WhatsApp.
+    texto = re.sub(
+        r"(?im)^Abrir (?:enlace|tarea):\s*(?:(.*?)\s*\|\s*)?(https?://\S+)\s*$",
+        lambda match: f"🔗 *{match.group(1).strip() if match.group(1) else 'Ver detalles'}*\n{match.group(2)}",
+        texto,
+    )
+    texto = re.sub(r"(?i)^Hola(?=\s)", "👋 Hola", texto, count=1)
+    if texto and texto[0].isalnum() and not texto.startswith("👋 Hola"):
+        texto = f"👋 Hola,\n\n{texto}"
+
+    etiquetas = "|".join(sorted((re.escape(label) for label in _ETIQUETAS), key=len, reverse=True))
+    texto = re.sub(
+        rf"(?im)^({etiquetas}):",
+        lambda match: f"{_ETIQUETAS[match.group(1).casefold()]} *{match.group(1)}:*",
+        texto,
+    )
+
+    pie = "🤖 _Mensaje automático de Gestión de Procesos._"
+    if pie not in texto:
+        texto = f"{texto}\n\n{pie}"
+    return texto
+
 
 def enviar_mensaje_whatsapp(numero_destino: str, mensaje: str) -> bool:
     """
@@ -25,7 +81,7 @@ def enviar_mensaje_whatsapp(numero_destino: str, mensaje: str) -> bool:
     payload = {
         "token": token,
         "to": f"+{numero_limpio}",
-        "body": mensaje
+        "body": formatear_mensaje_whatsapp(mensaje)
     }
 
     try:

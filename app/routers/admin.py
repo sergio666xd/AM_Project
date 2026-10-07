@@ -2249,7 +2249,11 @@ def enviar_mensaje_prueba_integracion(
         enviado = (
             enviar_correo(destinatario, "Prueba de integración", "Mensaje de prueba solicitado por un administrador.")
             if datos.canal == "EMAIL"
-            else enviar_mensaje_whatsapp(destinatario, "Mensaje de prueba solicitado por un administrador.")
+            else enviar_mensaje_whatsapp(
+                destinatario,
+                "👋 ¡Hola! Esta es una prueba de integración de WhatsApp solicitada por el administrador.\n\n"
+                "Si recibiste este mensaje, la conexión está funcionando correctamente.",
+            )
         )
     except Exception as exc:
         raise HTTPException(status_code=502, detail="El proveedor no pudo completar el envío de prueba.") from exc
