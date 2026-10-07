@@ -382,7 +382,7 @@ export default function ProcesoDetallePage() {
         throw new Error(result.detail || "No fue posible abrir el documento.");
       }
       const url = URL.createObjectURL(await response.blob());
-      setDocumentPreview({ id: document.id, name: document.nombre_archivo, mimeType: document.mime_type, url, estado: document.estado_revision || "RECIBIDO", comentario: document.comentario_revision || "" });
+      setDocumentPreview({ id: document.id, name: document.nombre_archivo, mimeType: document.mime_type, url, estado: document.estado_revision === "RECIBIDO" ? "EN_REVISION" : document.estado_revision || "EN_REVISION", comentario: document.comentario_revision || "" });
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "No fue posible abrir el documento.");
     } finally {

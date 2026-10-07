@@ -823,11 +823,18 @@ def revisar_documento(documento_id: int, datos: schemas.DocumentoRevisionUpdate,
     db.commit()
     cliente = documento.cliente
     if cliente and cliente.estado == models.EstadoUsuario.ACTIVO:
-        _notificar(
-            db, cliente, f"Documento revisado: {documento.nombre_archivo}",
-            f"Hola {cliente.nombre_completo},\n\n{usuario.nombre_completo} revis? el documento {documento.nombre_archivo} del proceso {documento.proceso.nombre}.\n\nEstado: {documento.estado_revision}\nComentario: {documento.comentario_revision or 'Sin comentarios adicionales'}\nFecha de revisi?n: {documento.revisado_en.strftime('%d/%m/%Y %H:%M UTC')}\n\nAbrir enlace: Ver proceso | {public_site_url()}/gestion-procesos/cliente#proceso-{documento.proceso_id}",
-            "DOCUMENTOS", f"REVISION_DOCUMENTO:{documento.id}:{documento.estado_revision}", emisor=usuario,
-        )
+        try:
+            _notificar(
+                db, cliente, f"Documento revisado: {documento.nombre_archivo}",
+                f"Hola {cliente.nombre_completo},\n\n{usuario.nombre_completo} revisó el documento {documento.nombre_archivo} del proceso {documento.proceso.nombre}.\n\nEstado: {documento.estado_revision.replace('_', ' ')}\nComentario: {documento.comentario_revision or 'Sin comentarios adicionales'}\nFecha de revisión: {documento.revisado_en.strftime('%d/%m/%Y %H:%M UTC')}\n\nAbrir enlace: Ver proceso | {public_site_url()}/gestion-procesos/cliente#proceso-{documento.proceso_id}",
+                "DOCUMENTOS", f"REVISION_DOCUMENTO:{documento.id}:{documento.estado_revision}", emisor=usuario,
+            )
+        except Exception:
+            db.rollback()
+            logger.exception(
+                "No se pudo programar la notificación de revisión para el documento %s.",
+                documento.id,
+            )
     return {"id": documento.id, "estado_revision": documento.estado_revision, "comentario_revision": documento.comentario_revision, "mensaje": "Revisión guardada."}
 
 

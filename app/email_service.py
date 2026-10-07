@@ -5,11 +5,13 @@ import re
 from datetime import date
 from email.message import EmailMessage
 from email.policy import SMTP
+from email.utils import formataddr, parseaddr
 from html import escape
 from app.integration_settings import get_firm_settings, get_integration_settings
 
 
 _LOGO_URL = "https://www.alejandramunozabogada.com/AM_logo_Recurso%202_Landscape_web.png"
+_SENDER_NAME = "Alejandra Muñoz | Abogada y Asociados"
 _NAVY = "#002060"
 _GOLD = "#ccb56b"
 
@@ -79,7 +81,8 @@ def enviar_correo(destinatario: str, asunto: str, cuerpo: str) -> bool:
         return False
     mensaje = EmailMessage(policy=SMTP)
     mensaje["Subject"] = asunto
-    mensaje["From"] = remitente
+    _, sender_address = parseaddr(str(remitente))
+    mensaje["From"] = formataddr((_SENDER_NAME, sender_address or str(remitente)))
     mensaje["To"] = destinatario
     mensaje.set_content(
         cuerpo,

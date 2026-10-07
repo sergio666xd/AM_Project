@@ -1,3 +1,4 @@
+import ipaddress
 import os
 import time
 import hashlib
@@ -14,7 +15,7 @@ from sqlalchemy import or_, text
 from sqlalchemy.orm import Session
 from fastapi.middleware.cors import CORSMiddleware
 from datetime import datetime, timedelta
-from urllib.parse import quote
+from urllib.parse import quote, urlsplit
 from botocore.exceptions import BotoCoreError, ClientError
 from app.database import engine, Base, get_db
 from app import models, schemas, security, storage
@@ -36,6 +37,7 @@ from app.audit import (
     registrar_evento_auditoria,
 )
 from app.firm_access import has_firm_wide_access, lawyer_process_ids, lawyer_scope_id
+from app.workflow_service import public_site_url
 
 # Crear las tablas en la BD
 models.Base.metadata.create_all(bind=engine)
@@ -207,6 +209,32 @@ def _send_password_reset_email(email: str, reset_url: str) -> None:
             logging.getLogger(__name__).warning("Password reset email skipped because SMTP is not configured.")
     except Exception:
         logging.getLogger(__name__).exception("Password reset email delivery failed.")
+
+
+def _password_reset_frontend_url() -> str:
+    """Use a configured public frontend origin; ignore localhost in production."""
+    configured = os.getenv("FRONTEND_URL", "").strip()
+    candidate = configured if "://" in configured else f"https://{configured}" if configured else ""
+    parsed = urlsplit(candidate) if candidate else None
+    hostname = (parsed.hostname or "").lower() if parsed else ""
+    is_local = hostname in {"localhost", "localhost.localdomain"} or hostname.endswith(".localhost")
+    if hostname:
+        try:
+            address = ipaddress.ip_address(hostname)
+            is_local = is_local or address.is_loopback or address.is_unspecified
+        except ValueError:
+            pass
+    if parsed and parsed.scheme in {"http", "https"} and parsed.netloc and hostname and not is_local:
+        return candidate.rstrip("/")
+
+    canonical = public_site_url()
+    canonical_host = (urlsplit(canonical).hostname or "").lower()
+    if os.getenv("NODE_ENV") != "development" and (
+        canonical_host in {"localhost", "localhost.localdomain"}
+        or canonical_host.endswith(".localhost")
+    ):
+        return "https://www.alejandramunozabogada.com"
+    return canonical
 
 @app.on_event("startup")
 def crear_datos_iniciales():
@@ -451,7 +479,7 @@ def solicitar_recuperacion_password(
     usuario = db.query(models.Usuario).filter(models.Usuario.email == email).first()
     if usuario and usuario.estado == models.EstadoUsuario.ACTIVO:
         token = security.create_password_reset_token(usuario.id, usuario.password_hash)
-        frontend_url = (os.getenv("FRONTEND_URL") or get_cors_origins()[0]).rstrip("/")
+        frontend_url = _password_reset_frontend_url()
         reset_url = f"{frontend_url}/gestion-procesos/auth/restablecer-password?token={quote(token, safe='')}"
         background_tasks.add_task(_send_password_reset_email, email, reset_url)
     return {"mensaje": PASSWORD_RESET_MESSAGE}
