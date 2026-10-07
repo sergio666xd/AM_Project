@@ -47,3 +47,23 @@ def get_integration_settings() -> dict[str, str | int | bool | None]:
         }
     finally:
         db.close()
+
+
+def get_firm_settings() -> dict[str, str | bool]:
+    """Return the public brand/contact values configured by ADMIN."""
+    db = SessionLocal()
+    try:
+        config = db.query(models.ConfiguracionFirma).filter_by(id=1).first()
+        return {
+            "nombre": config.nombre if config else "Alejandra Muñoz Abogada y Asociados",
+            "correo_contacto": config.correo_contacto if config else "contacto@alejandramunozabogada.com",
+            "correo_pqr": config.correo_pqr if config else "pqr@alejandramunozabogada.com",
+            "telefono": config.telefono if config else "3508809878",
+            "whatsapp": config.whatsapp if config else "3508809878",
+            "direccion": config.direccion if config else "Sabaneta, Antioquia, Colombia",
+            "logo_url": config.logo_url if config else "https://www.alejandramunozabogada.com/AM_logo_Recurso%202_Landscape_web.png",
+            "sitio_web": config.sitio_web if config else "https://www.alejandramunozabogada.com",
+            "mostrar_contacto_publico": config.mostrar_contacto_publico if config else True,
+        }
+    finally:
+        db.close()

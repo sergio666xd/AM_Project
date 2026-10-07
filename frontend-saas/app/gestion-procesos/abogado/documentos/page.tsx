@@ -832,6 +832,7 @@ function SolicitudDocumentoModal({
     const instrucciones = String(
       form.get("instrucciones") || "",
     ).trim();
+    const fechaLimiteLocal = String(form.get("fecha_limite") || "");
 
     if (!selectedProcessId) {
       onError("Debes seleccionar un proceso.");
@@ -863,6 +864,7 @@ function SolicitudDocumentoModal({
             cliente_id: Number(clienteId),
             titulo,
             instrucciones: instrucciones || null,
+            fecha_limite: fechaLimiteLocal ? new Date(fechaLimiteLocal).toISOString() : null,
           }),
         },
       );
@@ -997,6 +999,11 @@ function SolicitudDocumentoModal({
                 <strong>{selectedProcess.nombre}</strong>.
               </p>
             )}
+          </div>
+
+          <div>
+            <label className="mb-1.5 block text-sm font-medium">Fecha límite <span className="font-normal text-foreground-muted">(opcional)</span></label>
+            <input name="fecha_limite" type="datetime-local" className="w-full rounded-lg border px-3 py-2.5 text-sm outline-none" style={{ background: "var(--surface-muted)", borderColor: "var(--border)", color: "var(--foreground)" }} />
           </div>
 
           <div>

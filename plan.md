@@ -2362,7 +2362,11 @@ FASE 3 — [x]
 FASE 4 — [x]
 FASE 5 — [x]
 FASE 6 — [x]
-FASE 11 — [ ] (Fases 7–10 siguen pendientes)
+FASE 7 — [x]
+FASE 8 — [x]
+FASE 9 — [x]
+FASE 10 — [x]
+FASE 11 — [ ]
 ...
 ```
 
@@ -2370,14 +2374,25 @@ Y debajo:
 
 ```text
 Última fase completada:
-Fase 6 — ADMIN: Procesos y salud operativa (6 de octubre de 2026)
+Fase 10 — ADMIN: Configuración de firma (6 de octubre de 2026)
 
 Siguiente fase:
-Fase 7 — ADMIN: Agenda, tareas y documentos
+Fase 11 — CMS público visual
 
 Bloqueadores:
-Ninguno
+La validación de Python no pudo ejecutarse: este entorno bloquea el launcher de Python. TypeScript y ESLint sí se ejecutaron; ESLint encontró un error preexistente en la página de documentos.
 ```
+
+### Registro de implementación — Fases 7–10 (6 de octubre de 2026)
+
+- **Fase 7 — Agenda, tareas y documentos:** se ampliaron las vistas de agenda de firma a día, semana, mes y listado; se añadieron filtros por responsable/proceso/cliente/estado/tipo, CRUD de eventos, audiencias y reuniones, y visibilidad de tareas y recordatorios existentes. Las tareas administrativas cuentan con lista/Kanban/calendario; el centro documental relaciona solicitudes con archivos y permite actualizar estado de revisión y comentario con trazabilidad. Se añadió fecha límite opcional a solicitudes documentales.
+- **Fase 8 — Comunicaciones y notificaciones:** se creó un centro administrativo de notificaciones por categoría, estado leído/no leído y recurso relacionado, con marcar individual y todo como leído. El estado de lectura es por usuario ADMIN. Se reutiliza el historial existente de comunicaciones/notificaciones de proceso; no se creó chat ni persistencia paralela.
+- **Fase 9 — Operación y automatizaciones:** se reutilizaron las páginas operativas ya separadas para resumen, consultas, integraciones y notificaciones, con estado de ejecuciones, errores/reintentos y salud de servicios. Se mantiene el acceso restringido a ADMIN y la ejecución durable desacoplada de los routers mediante los workflows existentes; no se duplicó esta infraestructura.
+- **Fase 10 — Configuración de firma:** se añadió una configuración central editable para identidad, contacto, logo, información pública, canales, preferencias y parámetros generales, separada de la configuración SaaS. Los correos del sistema consumen los datos públicos configurados y mantienen valores predeterminados compatibles.
+- **Backend/endpoints:** `/api/admin/agenda/tareas` amplía filtros y respuesta con recordatorios; se añadieron `/api/admin/agenda/eventos` (GET/POST/PATCH/DELETE), `/api/admin/documentos/solicitudes` (GET), `/api/admin/notificaciones/leer` (POST), `/api/admin/notificaciones/leer-todas` (POST), y `/api/admin/configuracion/firma` (GET/PUT). Los recursos documentales ADMIN incorporan estado y comentario de revisión.
+- **Modelos y migración:** se añadieron `EventoAgenda`, `ConfiguracionFirma` y `LecturaNotificacionAdmin`; `DocumentoProceso` incorpora campos de revisión. El inicio aplica columnas nuevas a tablas existentes y `create_all` crea las tablas nuevas. No se añadió archivo de migración Alembic.
+- **Validación:** `tsc --noEmit` aprobado; `git diff --check` aprobado. ESLint de archivos relacionados reporta un error en `AdminNotificationCenterPage` que se corrigió, y otro preexistente en `app/gestion-procesos/abogado/documentos/page.tsx` (`react-hooks/set-state-in-effect` en la carga inicial); las advertencias detectadas son imports sin uso preexistentes e `<img>` en vista previa. No fue posible ejecutar `py_compile` porque el launcher Python del entorno no es accesible. No se ejecutaron pruebas automatizadas.
+- **Archivos principales:** backend `app/models.py`, `app/schemas.py`, `app/main.py`, `app/routers/admin.py`, `app/routers/expedientes.py`, `app/integration_settings.py`, `app/email_service.py`; frontend `AdminFirmAgendaPage`, `AdminResourcePage`, `AdminAlertBell`, `AdminNotificationCenterPage`, `AdminFirmSettingsPage`, `AdminConsoleShell`, y las rutas ADMIN correspondientes; formulario de solicitudes de documento en el área de abogado.
 
 ### Registro de preparación — Fase 0 (6 de octubre de 2026)
 

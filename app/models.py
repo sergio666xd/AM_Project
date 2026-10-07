@@ -69,6 +69,28 @@ class ConfiguracionSaas(Base):
     mostrar_planes = Column(Boolean, nullable=False, default=False)
 
 
+class ConfiguracionFirma(Base):
+    __tablename__ = "configuracion_firma"
+
+    id = Column(Integer, primary_key=True, default=1)
+    nombre = Column(String(180), nullable=False, default="Alejandra Muñoz Abogada y Asociados")
+    correo_contacto = Column(String(320), nullable=True, default="contacto@alejandramunozabogada.com")
+    correo_pqr = Column(String(320), nullable=True, default="pqr@alejandramunozabogada.com")
+    telefono = Column(String(40), nullable=True)
+    whatsapp = Column(String(40), nullable=True, default="3508809878")
+    direccion = Column(String(300), nullable=True)
+    ciudad = Column(String(120), nullable=True, default="Sabaneta, Antioquia")
+    pais = Column(String(120), nullable=True, default="Colombia")
+    logo_url = Column(String(1000), nullable=True, default="https://www.alejandramunozabogada.com/AM_logo_Recurso%202_Landscape_web.png")
+    sitio_web = Column(String(1000), nullable=True, default="https://www.alejandramunozabogada.com")
+    zona_horaria = Column(String(80), nullable=False, default="America/Bogota")
+    mostrar_contacto_publico = Column(Boolean, nullable=False, default=True)
+    preferencias_notificacion = Column(JSON, nullable=False, default=lambda: {"email": True, "whatsapp": True})
+    parametros_generales = Column(JSON, nullable=False, default=dict)
+    actualizado_por_id = Column(Integer, ForeignKey("usuarios.id", ondelete="SET NULL"), nullable=True)
+    updated_at = Column(DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+
 class ConfiguracionIntegraciones(Base):
     """Credenciales globales SMTP y WhatsApp cifradas en la base de datos."""
     __tablename__ = "configuracion_integraciones"
@@ -96,6 +118,26 @@ class ConfiguracionConsultas(Base):
     updated_at = Column(DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow)
     ejecucion_activa_id = Column(String(36), nullable=True)
     lease_hasta = Column(DateTime, nullable=True)
+
+
+class EventoAgenda(Base):
+    __tablename__ = "eventos_agenda"
+
+    id = Column(Integer, primary_key=True, index=True)
+    titulo = Column(String(255), nullable=False)
+    descripcion = Column(Text, nullable=True)
+    tipo = Column(String(20), nullable=False, default="EVENTO")
+    estado = Column(String(20), nullable=False, default="PROGRAMADO")
+    fecha_inicio = Column(DateTime, nullable=False, index=True)
+    fecha_fin = Column(DateTime, nullable=True)
+    responsable_id = Column(Integer, ForeignKey("usuarios.id", ondelete="SET NULL"), nullable=True, index=True)
+    proceso_id = Column(Integer, ForeignKey("procesos.id", ondelete="SET NULL"), nullable=True, index=True)
+    cliente_id = Column(Integer, ForeignKey("usuarios.id", ondelete="SET NULL"), nullable=True, index=True)
+    creado_por_id = Column(Integer, ForeignKey("usuarios.id", ondelete="SET NULL"), nullable=True)
+    created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
+    responsable = relationship("Usuario", foreign_keys=[responsable_id])
+    proceso = relationship("Proceso", foreign_keys=[proceso_id])
+    cliente = relationship("Usuario", foreign_keys=[cliente_id])
 
 
 class EjecucionBarrido(Base):
@@ -391,6 +433,7 @@ class SolicitudDocumento(Base):
     cliente_id = Column(Integer, ForeignKey("usuarios.id"), nullable=False, index=True)
     titulo = Column(String(255), nullable=False)
     instrucciones = Column(Text, nullable=True)
+    fecha_limite = Column(DateTime, nullable=True)
     atendida_en = Column(DateTime, nullable=True)
     created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
     proceso = relationship("Proceso", back_populates="solicitudes_documento")
@@ -407,6 +450,10 @@ class DocumentoProceso(Base):
     nombre_archivo = Column(String(255), nullable=False)
     ruta_archivo = Column(String(500), nullable=False)
     mime_type = Column(String(100), nullable=False)
+    estado_revision = Column(String(24), nullable=False, default="RECIBIDO")
+    comentario_revision = Column(Text, nullable=True)
+    revisado_por_id = Column(Integer, ForeignKey("usuarios.id", ondelete="SET NULL"), nullable=True)
+    revisado_en = Column(DateTime, nullable=True)
     created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
     proceso = relationship("Proceso", back_populates="documentos")
     cliente = relationship("Usuario", foreign_keys=[cliente_id])
@@ -506,6 +553,16 @@ class EventoAuditoria(Base):
     metadata_json = Column(Text, nullable=True)
     error_tecnico = Column(Text, nullable=True)
     created_at = Column(DateTime, nullable=False, default=datetime.utcnow, index=True)
+
+
+class LecturaNotificacionAdmin(Base):
+    __tablename__ = "lecturas_notificacion_admin"
+    __table_args__ = (UniqueConstraint("usuario_id", "notificacion_id", name="uq_lectura_notificacion_admin"),)
+
+    id = Column(Integer, primary_key=True, index=True)
+    usuario_id = Column(Integer, ForeignKey("usuarios.id", ondelete="CASCADE"), nullable=False, index=True)
+    notificacion_id = Column(String(120), nullable=False, index=True)
+    leida_en = Column(DateTime, nullable=False, default=datetime.utcnow)
 
 class Actuacion(Base):
     __tablename__ = "actuaciones"

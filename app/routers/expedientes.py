@@ -991,7 +991,7 @@ def notificar_actuacion(proceso_id: int, actuacion_id: int, datos: schemas.Notif
 @router.post("/procesos/{proceso_id}/solicitudes-documento", status_code=status.HTTP_201_CREATED)
 def solicitar_documento(proceso_id: int, datos: schemas.SolicitudDocumentoCreate, db: Session = Depends(get_db), usuario: models.Usuario = Depends(security.obtener_usuario_actual)):
     _abogado(usuario); proceso = _proceso_abogado(proceso_id, usuario, db); cliente = _cliente_asignado(proceso, datos.cliente_id, db)
-    solicitud = models.SolicitudDocumento(proceso_id=proceso.id, cliente_id=datos.cliente_id, titulo=datos.titulo.strip(), instrucciones=datos.instrucciones)
+    solicitud = models.SolicitudDocumento(proceso_id=proceso.id, cliente_id=datos.cliente_id, titulo=datos.titulo.strip(), instrucciones=datos.instrucciones, fecha_limite=datos.fecha_limite)
     db.add(solicitud); db.flush()
     registrar_evento_auditoria(db, usuario, "documento.solicitar", "solicitud_documento", solicitud.id)
     db.commit(); db.refresh(solicitud)

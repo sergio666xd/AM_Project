@@ -18,6 +18,7 @@ import {
   LogOut,
   Menu,
   ScrollText,
+  Settings,
   ServerCog,
   Users,
   UserCheck,
@@ -51,6 +52,11 @@ const sections: Section[] = [
       {
         label: "Alertas",
         href: "/gestion-procesos/admin/alertas",
+        icon: Bell,
+      },
+      {
+        label: "Notificaciones",
+        href: "/gestion-procesos/admin/notificaciones",
         icon: Bell,
       },
       {
@@ -114,6 +120,11 @@ const sections: Section[] = [
         href: "/gestion-procesos/admin/documentos",
         icon: BookOpenText,
       },
+      {
+        label: "Configuración de firma",
+        href: "/gestion-procesos/admin/firma",
+        icon: Settings,
+      },
     ],
   },
   {
@@ -174,7 +185,9 @@ function activeScope(pathname: string) {
     return "Global · todas las modalidades";
   if (/\/admin\/(planes|solicitudes)(\/|$)/.test(pathname))
     return "SaaS · abogados externos";
-  if (/\/admin\/(procesos|radicados|tareas|documentos|agenda)(\/|$)/.test(pathname))
+  if (/\/admin\/(notificaciones|alertas|auditoria|operacion)(\/|$)/.test(pathname))
+    return "Global · todas las modalidades";
+  if (/\/admin\/(procesos|radicados|tareas|documentos|agenda|firma)(\/|$)/.test(pathname))
     return "Firma · Alejandra Muñoz Abogada y Asociados";
   return "Global · todas las modalidades";
 }

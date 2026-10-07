@@ -837,6 +837,16 @@ def _alertas_admin(db: Session) -> list[dict]:
             )
     for alerta in alertas:
         alerta["estado"] = dispositions.get(alerta["id"], "ACTIVA")
+        tipo_recurso = alerta["id"].split(":", 1)[0]
+        alerta["categoria"] = (
+            "solicitudes" if tipo_recurso in {"registro", "perfil"}
+            else "tareas" if tipo_recurso.startswith("tarea")
+            else "documentos" if tipo_recurso == "documento"
+            else "operacion" if tipo_recurso in {"consulta", "notificacion"}
+            else "procesos" if tipo_recurso == "evento" and "proceso" in alerta["recurso"].lower()
+            else "usuarios" if tipo_recurso == "evento" and "usuario" in alerta["recurso"].lower()
+            else "sistema"
+        )
     prioridad_orden = {"Alta": 0, "Media": 1, "Baja": 2}
     alertas.sort(key=lambda item: (
         prioridad_orden[item["prioridad"]],
@@ -852,11 +862,42 @@ def listar_alertas_admin(
     admin: models.Usuario = Depends(verificar_admin),
 ):
     alertas = _alertas_admin(db)
+    leidas = {registro.notificacion_id for registro in db.query(models.LecturaNotificacionAdmin).filter_by(usuario_id=admin.id).all()}
+    for alerta in alertas:
+        alerta["leida"] = alerta["id"] in leidas
     if limite is not None:
         alertas = [alerta for alerta in alertas if alerta["estado"] != "ELIMINADA"]
         alertas.sort(key=lambda item: datetime.fromisoformat(item["fecha"]).timestamp() if item["fecha"] else 0, reverse=True)
         return alertas[:limite]
     return alertas
+
+
+@router.post("/notificaciones/leer")
+def marcar_notificaciones_leidas(
+    datos: schemas.NotificacionesLeidasUpdate,
+    db: Session = Depends(get_db),
+    admin: models.Usuario = Depends(verificar_admin),
+):
+    existentes = {item.notificacion_id for item in db.query(models.LecturaNotificacionAdmin).filter_by(usuario_id=admin.id).all()}
+    ids = list(dict.fromkeys(datos.ids))
+    for notificacion_id in ids:
+        if notificacion_id not in existentes:
+            db.add(models.LecturaNotificacionAdmin(usuario_id=admin.id, notificacion_id=notificacion_id))
+    db.commit()
+    return {"leidas": len(ids)}
+
+
+@router.post("/notificaciones/leer-todas")
+def marcar_todas_notificaciones_leidas(
+    db: Session = Depends(get_db),
+    admin: models.Usuario = Depends(verificar_admin),
+):
+    actuales = [item["id"] for item in _alertas_admin(db) if item["estado"] != "ELIMINADA"]
+    existentes = {item.notificacion_id for item in db.query(models.LecturaNotificacionAdmin).filter_by(usuario_id=admin.id).all()}
+    nuevas = [item for item in actuales if item not in existentes]
+    db.add_all(models.LecturaNotificacionAdmin(usuario_id=admin.id, notificacion_id=item) for item in nuevas)
+    db.commit()
+    return {"leidas": len(nuevas)}
 
 
 @router.delete("/alertas")
@@ -1085,7 +1126,7 @@ def listar_inventario_global(
     if recurso == "documentos":
         query = db.query(models.DocumentoProceso).join(models.Proceso, models.Proceso.id == models.DocumentoProceso.proceso_id).join(models.Usuario, models.Usuario.id == models.Proceso.abogado_id).filter(models.Usuario.rol.in_(roles))
         query = query.filter(models.Proceso.archivado_en.is_(None))
-        return [{"id": d.id, "owner_id": d.proceso.abogado_id, "nombre_archivo": d.nombre_archivo, "mime_type": d.mime_type, "proceso": d.proceso.nombre, "proceso_id": d.proceso_id, "cliente": d.cliente.nombre_completo, "cliente_id": d.cliente_id, "solicitud_id": d.solicitud_id, "created_at": d.created_at} for d in query.order_by(models.DocumentoProceso.created_at.desc()).limit(limite).all()]
+        return [{"id": d.id, "owner_id": d.proceso.abogado_id, "nombre_archivo": d.nombre_archivo, "mime_type": d.mime_type, "proceso": d.proceso.nombre, "proceso_id": d.proceso_id, "cliente": d.cliente.nombre_completo, "cliente_id": d.cliente_id, "solicitud_id": d.solicitud_id, "estado_revision": d.estado_revision, "comentario_revision": d.comentario_revision, "revisado_en": d.revisado_en, "created_at": d.created_at} for d in query.order_by(models.DocumentoProceso.created_at.desc()).limit(limite).all()]
     raise HTTPException(status_code=404, detail="Inventario no disponible.")
 
 
@@ -1325,6 +1366,16 @@ def actualizar_recurso_admin(
             if not values["nombre_archivo"] or not values["nombre_archivo"].strip():
                 raise HTTPException(status_code=400, detail="El nombre del archivo es obligatorio.")
             item.nombre_archivo = values["nombre_archivo"].strip()
+        if "estado_revision" in values:
+            item.estado_revision = values["estado_revision"]
+            item.revisado_por_id = admin.id
+            item.revisado_en = datetime.utcnow()
+            if values["estado_revision"] in {"APROBADO", "RECHAZADO"}:
+                item.solicitud.atendida_en = item.revisado_en
+            elif values["estado_revision"] == "REQUIERE_CORRECCION":
+                item.solicitud.atendida_en = None
+        if "comentario_revision" in values:
+            item.comentario_revision = values["comentario_revision"]
     else:
         raise HTTPException(status_code=404, detail="Recurso no disponible.")
 
@@ -1587,6 +1638,8 @@ def obtener_agenda_tareas_firma(
     fecha_desde: str | None = None,
     fecha_hasta: str | None = None,
     abogado_id: int | None = None,
+    proceso_id: int | None = None,
+    cliente_id: int | None = None,
     estado: str | None = None,
     limite: int = 500,
     db: Session = Depends(get_db),
@@ -1645,6 +1698,10 @@ def obtener_agenda_tareas_firma(
     )
     if abogado_id is not None:
         query = query.filter(models.Tarea.usuario_id == abogado_id)
+    if proceso_id is not None:
+        query = query.filter(models.Tarea.proceso_id == proceso_id)
+    if cliente_id is not None:
+        query = query.filter(models.Tarea.cliente_id == cliente_id)
     if estado:
         try:
             estado_tarea = models.EstadoTarea(estado.upper())
@@ -1653,6 +1710,34 @@ def obtener_agenda_tareas_firma(
         query = query.filter(models.Tarea.estado == estado_tarea)
 
     tareas = query.order_by(models.Tarea.fecha_limite.asc(), models.Tarea.id.asc()).limit(min(max(limite, 1), 1000)).all()
+    recordatorios_query = (
+        db.query(models.RecordatorioTarea, models.Tarea)
+        .join(models.Tarea, models.Tarea.id == models.RecordatorioTarea.tarea_id)
+        .join(models.Usuario, models.Usuario.id == models.Tarea.usuario_id)
+        .filter(
+            models.RecordatorioTarea.activo.is_(True),
+            models.RecordatorioTarea.fecha_hora >= inicio_utc,
+            models.RecordatorioTarea.fecha_hora < fin_utc,
+            models.Usuario.rol == models.RolUsuario.ABOGADO_ADMIN,
+            or_(
+                models.Tarea.proceso_id.is_(None),
+                models.Tarea.proceso.has(and_(
+                    models.Proceso.archivado_en.is_(None),
+                    models.Proceso.abogado.has(models.Usuario.rol.in_((models.RolUsuario.ABOGADO_ADMIN, models.RolUsuario.ADMIN))),
+                )),
+            ),
+            or_(models.Tarea.radicado_id.is_(None), models.Tarea.radicado.has(models.Radicado.ambito_key == "FIRMA")),
+        )
+    )
+    if abogado_id is not None:
+        recordatorios_query = recordatorios_query.filter(models.Tarea.usuario_id == abogado_id)
+    if proceso_id is not None:
+        recordatorios_query = recordatorios_query.filter(models.Tarea.proceso_id == proceso_id)
+    if cliente_id is not None:
+        recordatorios_query = recordatorios_query.filter(models.Tarea.cliente_id == cliente_id)
+    if estado:
+        recordatorios_query = recordatorios_query.filter(models.Tarea.estado == estado_tarea)
+    recordatorios = recordatorios_query.order_by(models.RecordatorioTarea.fecha_hora.asc()).limit(1000).all()
     responsables = (
         db.query(models.Usuario.id, models.Usuario.nombre_completo)
         .filter(
@@ -1690,7 +1775,170 @@ def obtener_agenda_tareas_firma(
             for tarea in tareas
         ],
         "responsables": [{"id": responsable.id, "nombre": responsable.nombre_completo} for responsable in responsables],
+        "recordatorios": [
+            {
+                "id": recordatorio.id,
+                "fecha_hora": recordatorio.fecha_hora,
+                "tarea_id": tarea.id,
+                "tarea": tarea.titulo,
+                "responsable": tarea.usuario.nombre_completo,
+                "proceso": tarea.proceso.nombre if tarea.proceso else None,
+                "cliente": tarea.cliente_asignado.nombre_completo if tarea.cliente_asignado else None,
+                "canales": [canal for canal, activo in (("email", recordatorio.notificar_email), ("whatsapp", recordatorio.notificar_whatsapp)) if activo],
+                "enviado": recordatorio.enviado_en is not None,
+            }
+            for recordatorio, tarea in recordatorios
+        ],
     }
+
+
+def _fecha_agenda_utc(value: datetime) -> datetime:
+    if value.tzinfo is None:
+        return value
+    return value.astimezone(timezone.utc).replace(tzinfo=None)
+
+
+def _validar_vinculos_evento_agenda(db: Session, responsable_id: int | None, proceso_id: int | None, cliente_id: int | None):
+    if responsable_id is not None:
+        responsable = db.query(models.Usuario).filter_by(id=responsable_id, estado=models.EstadoUsuario.ACTIVO).first()
+        if not responsable or responsable.rol not in (models.RolUsuario.ABOGADO_ADMIN, models.RolUsuario.ADMIN):
+            raise HTTPException(status_code=400, detail="El responsable debe pertenecer al equipo activo de la firma.")
+    proceso = None
+    if proceso_id is not None:
+        proceso = db.query(models.Proceso).filter_by(id=proceso_id, archivado_en=None).first()
+        if not proceso or proceso.abogado.rol not in (models.RolUsuario.ABOGADO_ADMIN, models.RolUsuario.ADMIN):
+            raise HTTPException(status_code=400, detail="El proceso no pertenece a la firma.")
+    if cliente_id is not None:
+        cliente = db.query(models.Usuario).filter_by(id=cliente_id, rol=models.RolUsuario.CLIENTE, estado=models.EstadoUsuario.ACTIVO).first()
+        if not cliente or (proceso and not db.query(models.ProcesoCliente).filter_by(proceso_id=proceso.id, cliente_id=cliente.id).first()):
+            raise HTTPException(status_code=400, detail="El cliente no está asignado al proceso seleccionado.")
+
+
+@router.get("/agenda/eventos")
+def listar_eventos_agenda_admin(
+    fecha_desde: str,
+    fecha_hasta: str,
+    responsable_id: int | None = None,
+    proceso_id: int | None = None,
+    cliente_id: int | None = None,
+    tipo: str | None = None,
+    estado: str | None = None,
+    db: Session = Depends(get_db),
+    admin: models.Usuario = Depends(verificar_admin),
+):
+    try:
+        zona = ZoneInfo("America/Bogota")
+        desde_fecha = datetime.fromisoformat(fecha_desde).date()
+        hasta_fecha = datetime.fromisoformat(fecha_hasta).date() + timedelta(days=1)
+        desde = datetime.combine(desde_fecha, datetime.min.time(), tzinfo=zona)
+        hasta = datetime.combine(hasta_fecha, datetime.min.time(), tzinfo=zona)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail="Usa fechas ISO YYYY-MM-DD.") from exc
+    query = db.query(models.EventoAgenda).filter(
+        models.EventoAgenda.fecha_inicio >= _fecha_agenda_utc(desde),
+        models.EventoAgenda.fecha_inicio < _fecha_agenda_utc(hasta),
+    )
+    for field, value in (("responsable_id", responsable_id), ("proceso_id", proceso_id), ("cliente_id", cliente_id), ("tipo", tipo), ("estado", estado)):
+        if value is not None:
+            query = query.filter(getattr(models.EventoAgenda, field) == value)
+    eventos = query.order_by(models.EventoAgenda.fecha_inicio.asc()).limit(1000).all()
+    return [{
+        "id": event.id, "titulo": event.titulo, "descripcion": event.descripcion,
+        "tipo": event.tipo, "estado": event.estado, "fecha_inicio": event.fecha_inicio,
+        "fecha_fin": event.fecha_fin, "responsable_id": event.responsable_id,
+        "responsable": event.responsable.nombre_completo if event.responsable else None,
+        "proceso_id": event.proceso_id, "proceso": event.proceso.nombre if event.proceso else None,
+        "cliente_id": event.cliente_id, "cliente": event.cliente.nombre_completo if event.cliente else None,
+    } for event in eventos]
+
+
+@router.post("/agenda/eventos", status_code=status.HTTP_201_CREATED)
+def crear_evento_agenda_admin(datos: schemas.EventoAgendaCreate, db: Session = Depends(get_db), admin: models.Usuario = Depends(verificar_admin)):
+    _validar_vinculos_evento_agenda(db, datos.responsable_id, datos.proceso_id, datos.cliente_id)
+    inicio = _fecha_agenda_utc(datos.fecha_inicio)
+    fin = _fecha_agenda_utc(datos.fecha_fin) if datos.fecha_fin else None
+    if fin and fin < inicio:
+        raise HTTPException(status_code=400, detail="La fecha de finalización debe ser posterior al inicio.")
+    evento = models.EventoAgenda(
+        titulo=datos.titulo.strip(), descripcion=datos.descripcion, tipo=datos.tipo,
+        estado=datos.estado, fecha_inicio=inicio, fecha_fin=fin,
+        responsable_id=datos.responsable_id, proceso_id=datos.proceso_id,
+        cliente_id=datos.cliente_id, creado_por_id=admin.id,
+    )
+    db.add(evento)
+    db.flush()
+    registrar_evento_auditoria(db, admin, "admin.agenda.evento.crear", "evento_agenda", evento.id)
+    db.commit()
+    return {"id": evento.id, "mensaje": "Evento agregado a la agenda."}
+
+
+@router.patch("/agenda/eventos/{evento_id}")
+def actualizar_evento_agenda_admin(evento_id: int, datos: schemas.EventoAgendaUpdate, db: Session = Depends(get_db), admin: models.Usuario = Depends(verificar_admin)):
+    evento = db.query(models.EventoAgenda).filter_by(id=evento_id).first()
+    if not evento:
+        raise HTTPException(status_code=404, detail="El evento no existe.")
+    _validar_vinculos_evento_agenda(db, datos.responsable_id, datos.proceso_id, datos.cliente_id)
+    inicio = _fecha_agenda_utc(datos.fecha_inicio)
+    fin = _fecha_agenda_utc(datos.fecha_fin) if datos.fecha_fin else None
+    if fin and fin < inicio:
+        raise HTTPException(status_code=400, detail="La fecha de finalización debe ser posterior al inicio.")
+    for key in ("titulo", "descripcion", "tipo", "estado", "responsable_id", "proceso_id", "cliente_id"):
+        setattr(evento, key, getattr(datos, key))
+    evento.fecha_inicio = inicio
+    evento.fecha_fin = fin
+    registrar_evento_auditoria(db, admin, "admin.agenda.evento.actualizar", "evento_agenda", evento.id)
+    db.commit()
+    return {"id": evento.id, "mensaje": "Evento actualizado."}
+
+
+@router.delete("/agenda/eventos/{evento_id}")
+def eliminar_evento_agenda_admin(evento_id: int, db: Session = Depends(get_db), admin: models.Usuario = Depends(verificar_admin)):
+    evento = db.query(models.EventoAgenda).filter_by(id=evento_id).first()
+    if not evento:
+        raise HTTPException(status_code=404, detail="El evento no existe.")
+    registrar_evento_auditoria(db, admin, "admin.agenda.evento.eliminar", "evento_agenda", evento.id)
+    db.delete(evento)
+    db.commit()
+    return {"mensaje": "Evento eliminado de la agenda."}
+
+
+@router.get("/documentos/solicitudes")
+def listar_solicitudes_documento_admin(
+    sector: str = "FIRMA",
+    limite: int = Query(default=500, ge=1, le=1000),
+    db: Session = Depends(get_db),
+    admin: models.Usuario = Depends(verificar_admin),
+):
+    roles = _roles_para_sector(sector)
+    solicitudes = (
+        db.query(models.SolicitudDocumento)
+        .join(models.Proceso, models.Proceso.id == models.SolicitudDocumento.proceso_id)
+        .join(models.Usuario, models.Usuario.id == models.Proceso.abogado_id)
+        .filter(models.Usuario.rol.in_(roles), models.Proceso.archivado_en.is_(None))
+        .order_by(models.SolicitudDocumento.created_at.desc())
+        .limit(limite)
+        .all()
+    )
+    resultado = []
+    for solicitud in solicitudes:
+        documento = solicitud.documentos[-1] if solicitud.documentos else None
+        vencida = bool(solicitud.fecha_limite and solicitud.fecha_limite < datetime.utcnow() and not solicitud.atendida_en and not documento)
+        estado = documento.estado_revision if documento else ("VENCIDO" if vencida else "RECIBIDO" if solicitud.atendida_en else "SOLICITADO")
+        resultado.append({
+            "id": solicitud.id,
+            "titulo": solicitud.titulo,
+            "proceso": solicitud.proceso.nombre,
+            "proceso_id": solicitud.proceso_id,
+            "cliente": solicitud.cliente.nombre_completo,
+            "cliente_id": solicitud.cliente_id,
+            "estado": estado,
+            "documento": documento.nombre_archivo if documento else None,
+            "documento_id": documento.id if documento else None,
+            "solicitado_en": solicitud.created_at,
+            "fecha_limite": solicitud.fecha_limite,
+            "atendida_en": solicitud.atendida_en,
+        })
+    return resultado
 
 
 @router.get("/consultas/ejecuciones/{ejecucion_id}")
@@ -2213,6 +2461,67 @@ def obtener_configuracion(
         db.commit()
         db.refresh(configuracion)
     return configuracion
+
+
+def _serializar_configuracion_firma(config: models.ConfiguracionFirma) -> dict:
+    return {
+        "nombre": config.nombre,
+        "correo_contacto": config.correo_contacto,
+        "correo_pqr": config.correo_pqr,
+        "telefono": config.telefono,
+        "whatsapp": config.whatsapp,
+        "direccion": config.direccion,
+        "ciudad": config.ciudad,
+        "pais": config.pais,
+        "logo_url": config.logo_url,
+        "sitio_web": config.sitio_web,
+        "zona_horaria": config.zona_horaria,
+        "mostrar_contacto_publico": config.mostrar_contacto_publico,
+        "preferencias_notificacion": config.preferencias_notificacion or {"email": True, "whatsapp": True},
+        "parametros_generales": config.parametros_generales or {},
+        "updated_at": config.updated_at,
+    }
+
+
+@router.get("/configuracion/firma")
+def obtener_configuracion_firma(db: Session = Depends(get_db), admin: models.Usuario = Depends(verificar_admin)):
+    config = db.query(models.ConfiguracionFirma).filter_by(id=1).first()
+    if config is None:
+        config = models.ConfiguracionFirma(id=1)
+        db.add(config)
+        db.commit()
+        db.refresh(config)
+    return _serializar_configuracion_firma(config)
+
+
+@router.put("/configuracion/firma")
+def actualizar_configuracion_firma(
+    datos: schemas.ConfiguracionFirmaUpdate,
+    db: Session = Depends(get_db),
+    admin: models.Usuario = Depends(verificar_admin),
+):
+    try:
+        ZoneInfo(datos.zona_horaria)
+    except Exception as exc:
+        raise HTTPException(status_code=400, detail="La zona horaria no es válida.") from exc
+    for field_name in ("logo_url", "sitio_web"):
+        value = getattr(datos, field_name).strip()
+        if value and urlsplit(value).scheme not in {"https", "http"}:
+            raise HTTPException(status_code=400, detail=f"{field_name} debe usar una URL HTTP o HTTPS.")
+    invalid_channels = set(datos.preferencias_notificacion) - {"email", "whatsapp"}
+    if invalid_channels:
+        raise HTTPException(status_code=400, detail="Las preferencias solo aceptan los canales email y whatsapp.")
+    config = db.query(models.ConfiguracionFirma).filter_by(id=1).with_for_update().first()
+    if config is None:
+        config = models.ConfiguracionFirma(id=1)
+        db.add(config)
+    for field_name, value in datos.model_dump().items():
+        setattr(config, field_name, value)
+    config.actualizado_por_id = admin.id
+    registrar_evento_auditoria(db, admin, "admin.configuracion_firma.actualizar", "configuracion_firma", 1)
+    db.commit()
+    db.refresh(config)
+    return _serializar_configuracion_firma(config)
 
 
 @router.put("/configuracion", response_model=schemas.ConfiguracionSaasOut)

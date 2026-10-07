@@ -30,6 +30,8 @@ type Row = Record<string, unknown> & {
   titulo?: string;
   nombre_archivo?: string;
   estado?: string;
+  estado_revision?: string;
+  comentario_revision?: string | null;
   fecha_limite?: string | null;
   archivado_en?: string | null;
   salud?: string;
@@ -49,6 +51,8 @@ type FormState = {
   radicado_id: string;
   cliente_id: string;
   nombre_archivo: string;
+  estado_revision: string;
+  comentario_revision: string;
 };
 type TemporaryLink = {
   url: string;
@@ -56,6 +60,8 @@ type TemporaryLink = {
   expires_in: number;
   nombre_archivo: string;
 };
+type TaskView = "LISTA" | "KANBAN" | "CALENDARIO";
+type DocumentRequest = { id: number; titulo: string; proceso: string; cliente: string; estado: string; documento: string | null; documento_id: number | null; solicitado_en: string; fecha_limite: string | null; atendida_en: string | null };
 const emptyForm: FormState = {
   owner_id: "",
   nombre: "",
@@ -69,6 +75,8 @@ const emptyForm: FormState = {
   radicado_id: "",
   cliente_id: "",
   nombre_archivo: "",
+  estado_revision: "RECIBIDO",
+  comentario_revision: "",
 };
 const resourceNames: Record<Resource, string> = {
   procesos: "Procesos",
@@ -179,6 +187,8 @@ export default function AdminResourcePage({ sector }: { sector: Sector }) {
   const [archived, setArchived] = useState(false);
   const [query, setQuery] = useState("");
   const [state, setState] = useState("TODOS");
+  const [taskView, setTaskView] = useState<TaskView>("LISTA");
+  const [calendarMonth, setCalendarMonth] = useState(() => new Date().toISOString().slice(0, 7));
   const [loading, setLoading] = useState(true);
   const [working, setWorking] = useState(false);
   const [error, setError] = useState("");
@@ -197,6 +207,7 @@ export default function AdminResourcePage({ sector }: { sector: Sector }) {
     abogados_disponibles: { id: number; nombre_completo: string }[];
   } | null>(null);
   const [teamSelection, setTeamSelection] = useState("");
+  const [documentRequests, setDocumentRequests] = useState<DocumentRequest[]>([]);
 
   async function reload() {
     if (!token || !validResource) return;
@@ -247,6 +258,19 @@ export default function AdminResourcePage({ sector }: { sector: Sector }) {
     };
   }, [token, resource, sector, archived, validResource]);
 
+  useEffect(() => {
+    if (!token || resource !== "documentos") return;
+    let active = true;
+    adminFetch(`${API_URL}/api/admin/documentos/solicitudes?sector=${sector}`, { headers: { Authorization: `Bearer ${token}` } })
+      .then(async (response) => {
+        const result = await response.json();
+        if (!response.ok) throw new Error(result.detail || "No fue posible cargar las solicitudes documentales.");
+        if (active) setDocumentRequests(result);
+      })
+      .catch((cause: unknown) => { if (active) setError(cause instanceof Error ? cause.message : "No fue posible cargar las solicitudes documentales."); });
+    return () => { active = false; };
+  }, [token, resource, sector]);
+
   const filtered = useMemo(
     () =>
       rows.filter((row) => {
@@ -271,6 +295,18 @@ export default function AdminResourcePage({ sector }: { sector: Sector }) {
         .filter(Boolean),
     ),
   ];
+  const tasksByState = ["PENDIENTE", "EN_CURSO", "COMPLETADA", "CANCELADA"].map((status) => ({
+    status,
+    rows: filtered.filter((row) => String(row.estado) === status),
+  }));
+  const [calendarYear, calendarMonthNumber] = calendarMonth.split("-").map(Number);
+  const calendarDays = new Date(Date.UTC(calendarYear, calendarMonthNumber, 0)).getUTCDate();
+  const calendarOffset = (new Date(Date.UTC(calendarYear, calendarMonthNumber - 1, 1)).getUTCDay() + 6) % 7;
+  const tasksByDueDate = new Map<string, Row[]>();
+  for (const row of filtered) {
+    const due = typeof row.fecha_limite === "string" ? row.fecha_limite.slice(0, 10) : "";
+    if (due.startsWith(calendarMonth)) tasksByDueDate.set(due, [...(tasksByDueDate.get(due) ?? []), row]);
+  }
 
   function openCreate() {
     setEditing(null);
@@ -298,6 +334,8 @@ export default function AdminResourcePage({ sector }: { sector: Sector }) {
       radicado_id: String(row.radicado_id ?? ""),
       cliente_id: String(row.cliente_id ?? ""),
       nombre_archivo: String(row.nombre_archivo ?? ""),
+      estado_revision: String(row.estado_revision ?? "RECIBIDO"),
+      comentario_revision: String(row.comentario_revision ?? ""),
     });
   }
 
@@ -331,7 +369,11 @@ export default function AdminResourcePage({ sector }: { sector: Sector }) {
         radicado_id: form.radicado_id ? Number(form.radicado_id) : null,
         cliente_id: form.cliente_id ? Number(form.cliente_id) : null,
       };
-    else if (editing) payload = { nombre_archivo: form.nombre_archivo.trim() };
+    else if (editing) payload = {
+      nombre_archivo: form.nombre_archivo.trim(),
+      estado_revision: form.estado_revision,
+      comentario_revision: form.comentario_revision || null,
+    };
     else {
       if (!documentFile) {
         setError("Selecciona el archivo que deseas cargar.");
@@ -711,6 +753,7 @@ export default function AdminResourcePage({ sector }: { sector: Sector }) {
             ]
           : [
               { key: "nombre_archivo", label: "Documento" },
+              { key: "estado_revision", label: "Estado de revisión" },
               { key: "proceso", label: "Proceso" },
               { key: "cliente", label: "Cliente" },
               { key: "mime_type", label: "Tipo" },
@@ -826,6 +869,20 @@ export default function AdminResourcePage({ sector }: { sector: Sector }) {
           ))}
         </select>
       </div>
+      {resource === "tareas" && <div role="group" aria-label="Vista de tareas" className="inline-flex gap-1 rounded-md border border-border p-1">
+        {(["LISTA", "KANBAN", "CALENDARIO"] as const).map((mode) => <button key={mode} type="button" aria-pressed={taskView === mode} onClick={() => setTaskView(mode)} className={`rounded px-3 py-1.5 text-sm ${taskView === mode ? "bg-primary text-white" : "hover:bg-surface-hover"}`}>{mode === "LISTA" ? "Lista" : mode === "KANBAN" ? "Kanban" : "Calendario"}</button>)}
+      </div>}
+      {resource === "tareas" && taskView === "KANBAN" && <div className="grid gap-3 xl:grid-cols-4">
+        {tasksByState.map(({ status, rows: stateRows }) => <section key={status} aria-label={status} className="min-h-56 rounded-lg border border-border bg-surface-secondary p-3"><h2 className="mb-3 flex items-center justify-between text-sm font-semibold">{status === "EN_CURSO" ? "En curso" : status === "COMPLETADA" ? "Completadas" : status === "CANCELADA" ? "Canceladas" : "Pendientes"}<span className="rounded-full bg-surface px-2 py-0.5 text-xs text-foreground-muted">{stateRows.length}</span></h2><div className="space-y-2">{stateRows.map((row) => <button key={row.id} type="button" onClick={() => openEdit(row)} className="w-full rounded-md border border-border bg-surface p-3 text-left hover:bg-surface-hover"><p className="font-medium">{String(row.titulo ?? row.nombre ?? "Tarea")}</p><p className="mt-1 text-xs text-foreground-muted">{display(row.owner_id ? owners.find((owner) => owner.id === row.owner_id)?.nombre_completo : "")}</p><p className="mt-1 text-xs text-foreground-muted">{display(row.proceso)}{row.fecha_limite ? ` · ${display(row.fecha_limite)}` : ""}</p></button>)}</div></section>)}
+      </div>}
+      {resource === "tareas" && taskView === "CALENDARIO" && <section className="space-y-3 rounded-lg border border-border bg-surface p-3">
+        <div className="flex items-center justify-between"><h2 className="font-semibold">Vencimientos</h2><label className="text-xs text-foreground-muted">Mes<input type="month" aria-label="Mes del calendario de tareas" value={calendarMonth} onChange={(event) => setCalendarMonth(event.target.value)} className="ml-2 h-9 rounded-md border border-border bg-background px-2 text-sm text-foreground" /></label></div>
+        <div className="grid grid-cols-7 border-l border-t border-border">{["Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom"].map((day) => <div key={day} className="border-b border-r border-border bg-surface-secondary p-2 text-xs font-semibold text-foreground-muted">{day}</div>)}{Array.from({ length: Math.ceil((calendarOffset + calendarDays) / 7) * 7 }, (_, index) => { const day = index - calendarOffset + 1; if (day < 1 || day > calendarDays) return <div key={`empty-${index}`} className="min-h-24 border-b border-r border-border bg-background-secondary/40" />; const key = `${calendarMonth}-${String(day).padStart(2, "0")}`; return <div key={key} className="min-h-24 border-b border-r border-border p-2"><p className="mb-1 text-xs text-foreground-muted">{day}</p><div className="space-y-1">{(tasksByDueDate.get(key) ?? []).map((row) => <button key={row.id} type="button" onClick={() => openEdit(row)} className="block w-full truncate rounded bg-primary/10 px-1.5 py-1 text-left text-xs text-primary">{String(row.titulo ?? row.nombre ?? "Tarea")}</button>)}</div></div>;})}</div>
+      </section>}
+      {resource === "documentos" && <section className="space-y-3 rounded-lg border border-border bg-surface p-4">
+        <div><h2 className="font-semibold">Solicitudes y revisión</h2><p className="text-sm text-foreground-muted">Seguimiento de documentos solicitados y recibidos por los clientes.</p></div>
+        <div className="overflow-x-auto"><table className="w-full min-w-190 text-left text-sm"><thead className="bg-surface-secondary text-xs text-foreground-muted"><tr><th className="px-3 py-2">Solicitud</th><th className="px-3 py-2">Proceso</th><th className="px-3 py-2">Cliente</th><th className="px-3 py-2">Estado</th><th className="px-3 py-2">Documento</th><th className="px-3 py-2">Solicitado</th><th className="px-3 py-2">Vence</th></tr></thead><tbody>{documentRequests.map((request) => <tr key={request.id} className="border-t border-border"><td className="px-3 py-2 font-medium">{request.titulo}</td><td className="px-3 py-2">{request.proceso}</td><td className="px-3 py-2">{request.cliente}</td><td className="px-3 py-2">{request.estado === "SOLICITADO" ? "Pendiente" : request.estado === "RECIBIDO" ? "Recibido" : request.estado === "EN_REVISION" ? "En revisión" : request.estado === "REQUIERE_CORRECCION" ? "Requiere corrección" : request.estado === "APROBADO" ? "Aprobado" : request.estado === "RECHAZADO" ? "Rechazado" : request.estado === "VENCIDO" ? "Vencido" : request.estado}</td><td className="px-3 py-2">{request.documento ?? "Pendiente de carga"}{request.documento_id && <button type="button" onClick={() => { const row = rows.find((item) => item.id === request.documento_id); if (row) openEdit(row); }} className="ml-2 text-primary underline">Revisar</button>}</td><td className="px-3 py-2 text-xs text-foreground-muted">{display(request.solicitado_en)}</td><td className="px-3 py-2 text-xs text-foreground-muted">{display(request.fecha_limite)}</td></tr>)}</tbody></table>{documentRequests.length === 0 && <p className="py-6 text-center text-sm text-foreground-muted">No hay solicitudes documentales.</p>}</div>
+      </section>}
       <div className="overflow-x-auto rounded-lg border border-border bg-surface">
         <table className="w-full min-w-195 text-left text-sm">
           <thead className="border-b border-border bg-surface-secondary text-xs uppercase text-foreground-muted">
@@ -1244,18 +1301,20 @@ export default function AdminResourcePage({ sector }: { sector: Sector }) {
             )}
             {resource === "documentos" &&
               (editing ? (
-                <label className="block text-sm font-medium">
-                  Nombre del archivo
-                  <input
-                    required
-                    maxLength={255}
-                    value={form.nombre_archivo}
-                    onChange={(event) =>
-                      setForm({ ...form, nombre_archivo: event.target.value })
-                    }
-                    className="mt-1 w-full rounded-md border border-border bg-background px-3 py-2.5"
-                  />
-                </label>
+                <>
+                  <label className="block text-sm font-medium">
+                    Nombre del archivo
+                    <input required maxLength={255} value={form.nombre_archivo} onChange={(event) => setForm({ ...form, nombre_archivo: event.target.value })} className="mt-1 w-full rounded-md border border-border bg-background px-3 py-2.5" />
+                  </label>
+                  <label className="block text-sm font-medium">Estado de revisión
+                    <select value={form.estado_revision} onChange={(event) => setForm({ ...form, estado_revision: event.target.value })} className="mt-1 w-full rounded-md border border-border bg-background px-3 py-2.5">
+                      <option value="RECIBIDO">Recibido</option><option value="EN_REVISION">En revisión</option><option value="APROBADO">Aprobado</option><option value="REQUIERE_CORRECCION">Requiere corrección</option><option value="RECHAZADO">Rechazado</option>
+                    </select>
+                  </label>
+                  <label className="block text-sm font-medium">Observación de revisión
+                    <textarea rows={3} maxLength={4000} value={form.comentario_revision} onChange={(event) => setForm({ ...form, comentario_revision: event.target.value })} className="mt-1 w-full rounded-md border border-border bg-background px-3 py-2.5" />
+                  </label>
+                </>
               ) : (
                 <>
                   <label className="block text-sm font-medium">

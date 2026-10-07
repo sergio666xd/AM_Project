@@ -57,6 +57,23 @@ class ConfiguracionSaasUpdate(BaseModel):
     mostrar_planes: bool
 
 
+class ConfiguracionFirmaUpdate(BaseModel):
+    nombre: str = Field(min_length=2, max_length=180)
+    correo_contacto: EmailStr | None = None
+    correo_pqr: EmailStr | None = None
+    telefono: str = Field(default="", max_length=40)
+    whatsapp: str = Field(default="", max_length=40)
+    direccion: str = Field(default="", max_length=300)
+    ciudad: str = Field(default="", max_length=120)
+    pais: str = Field(default="Colombia", max_length=120)
+    logo_url: str = Field(default="", max_length=1000)
+    sitio_web: str = Field(default="", max_length=1000)
+    zona_horaria: str = Field(default="America/Bogota", max_length=80)
+    mostrar_contacto_publico: bool = True
+    preferencias_notificacion: dict[str, bool] = Field(default_factory=lambda: {"email": True, "whatsapp": True})
+    parametros_generales: dict[str, Any] = Field(default_factory=dict)
+
+
 class ConfiguracionIntegracionesUpdate(BaseModel):
     smtp_host: str | None = Field(default=None, max_length=255)
     smtp_port: int | None = Field(default=None, ge=1, le=65535)
@@ -81,6 +98,22 @@ class ConfiguracionConsultasOut(BaseModel):
 class ConfiguracionConsultasUpdate(BaseModel):
     activa: bool
     dias_habilitados: list[int]
+
+
+class EventoAgendaCreate(BaseModel):
+    titulo: str = Field(min_length=1, max_length=255)
+    descripcion: str | None = Field(default=None, max_length=4000)
+    tipo: Literal["EVENTO", "AUDIENCIA", "REUNION"] = "EVENTO"
+    estado: Literal["PROGRAMADO", "COMPLETADO", "CANCELADO"] = "PROGRAMADO"
+    fecha_inicio: datetime
+    fecha_fin: datetime | None = None
+    responsable_id: int | None = None
+    proceso_id: int | None = None
+    cliente_id: int | None = None
+
+
+class EventoAgendaUpdate(EventoAgendaCreate):
+    pass
 
 
 class WorkflowClaimConsulta(BaseModel):
@@ -151,6 +184,8 @@ class AdminResourceUpdate(BaseModel):
     prioridad: Optional[PrioridadTarea] = None
     fecha_limite: Optional[datetime] = None
     nombre_archivo: Optional[str] = None
+    estado_revision: Literal["RECIBIDO", "EN_REVISION", "APROBADO", "REQUIERE_CORRECCION", "RECHAZADO"] | None = None
+    comentario_revision: Optional[str] = Field(default=None, max_length=4000)
 
 
 class DiagnosticoEnvioPrueba(BaseModel):
@@ -166,6 +201,10 @@ class DiagnosticoIntegracion(BaseModel):
 class AlertasAccionMasiva(BaseModel):
     alerta_ids: list[str] = Field(min_length=1, max_length=5000)
     estado: Literal["ATENDIDA", "DESCARTADA", "ELIMINADA"]
+
+
+class NotificacionesLeidasUpdate(BaseModel):
+    ids: list[str] = Field(default_factory=list, max_length=500)
 
 
 class AplicarMigracionRadicados(BaseModel):
@@ -340,6 +379,7 @@ class SolicitudDocumentoCreate(BaseModel):
     cliente_id: int
     titulo: str
     instrucciones: Optional[str] = None
+    fecha_limite: Optional[datetime] = None
 
 
 class NotificacionActuacionCreate(BaseModel):
