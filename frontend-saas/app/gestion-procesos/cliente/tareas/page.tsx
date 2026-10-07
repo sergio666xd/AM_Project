@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { Check, Clock3, ListChecks, RefreshCw } from "lucide-react";
+import { CalendarClock, Check, Clock3, ListChecks, RefreshCw } from "lucide-react";
 import { useSession } from "@/context/SessionContext";
 import { fetchApi } from "@/lib/api";
 import TaskMonthCalendar, {
@@ -22,6 +22,14 @@ type Task = CalendarTask & {
   }[];
 };
 
+function fechaLocalParaInput(value?: string | null) {
+  if (!value) return "";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
+  const pad = (part: number) => String(part).padStart(2, "0");
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
+}
+
 async function loadTasks(token: string): Promise<Task[]> {
   return fetchApi("/api/tareas", { method: "GET", token });
 }
@@ -35,6 +43,8 @@ export default function TareasClientePage() {
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const [focusedTaskId, setFocusedTaskId] = useState<number | null>(null);
+  const [deadlineDrafts, setDeadlineDrafts] = useState<Record<number, string>>({});
+  const [deadlineBusyId, setDeadlineBusyId] = useState<number | null>(null);
 
   useEffect(() => {
     if (sessionLoading || !token) return;
@@ -116,6 +126,29 @@ export default function TareasClientePage() {
     } finally {
       setWorkingId(null);
     }
+  }
+
+  async function updateDeadline(task: Task) {
+    if (!token) return;
+    const localValue = deadlineDrafts[task.id] ?? fechaLocalParaInput(task.fecha_limite);
+    const date = new Date(localValue);
+    if (!localValue || Number.isNaN(date.getTime())) {
+      setError("Elige una fecha y hora válida para reprogramar la tarea.");
+      return;
+    }
+    setDeadlineBusyId(task.id);
+    setError("");
+    setNotice("");
+    try {
+      await fetchApi(`/api/tareas/${task.id}`, {
+        method: "PUT", token, body: JSON.stringify({ fecha_limite: date.toISOString() }),
+      });
+      setTasks((current) => current.map((item) => item.id === task.id ? { ...item, fecha_limite: date.toISOString() } : item));
+      setDeadlineDrafts((current) => ({ ...current, [task.id]: "" }));
+      setNotice("Fecha actualizada. Los avisos programados se reprogramaron.");
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "No fue posible cambiar la fecha.");
+    } finally { setDeadlineBusyId(null); }
   }
 
   async function completeSubtask(taskId: number, subtaskId: number) {
@@ -303,6 +336,13 @@ export default function TareasClientePage() {
                           : "Sin fecha límite"}{" "}
                         · {task.prioridad}
                       </p>
+                      <div className="mt-3 flex flex-wrap items-center gap-2">
+                        <label className="flex items-center gap-2 text-xs text-(--foreground-muted)">
+                          Cambiar fecha y hora
+                          <input aria-label={`Nueva fecha límite de ${task.titulo}`} type="datetime-local" value={deadlineDrafts[task.id] ?? fechaLocalParaInput(task.fecha_limite)} onChange={(event) => setDeadlineDrafts((current) => ({ ...current, [task.id]: event.target.value }))} className="rounded-md border border-border bg-surface-secondary px-2 py-1.5 text-xs text-foreground" />
+                        </label>
+                        <button type="button" disabled={deadlineBusyId === task.id} onClick={() => void updateDeadline(task)} className="inline-flex items-center gap-1.5 rounded-md border border-border px-2.5 py-1.5 text-xs font-medium hover:bg-surface-hover disabled:opacity-50"><CalendarClock className="size-3.5" />{deadlineBusyId === task.id ? "Reprogramando…" : "Guardar fecha"}</button>
+                      </div>
                     </div>
                     <button
                       type="button"

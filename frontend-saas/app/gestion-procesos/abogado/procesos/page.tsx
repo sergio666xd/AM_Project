@@ -29,6 +29,15 @@ type Process = {
   archivado_en?: string | null;
   radicados_count?: number;
   clientes_count?: number;
+  clientes?: { id: number; nombre_completo: string }[];
+  tareas_pendientes?: number;
+  tareas_vencidas?: number;
+  documentos_pendientes?: number;
+  proxima_actividad?: string | null;
+  ultima_actividad?: string | null;
+  estado_atencion?: "ACTIVO" | "ATENCION";
+  riesgo?: boolean;
+  inactivo?: boolean;
   radicados: {
     id: number;
     numero: string;
@@ -50,6 +59,7 @@ export default function ProcesosPage() {
   const [items, setItems] = useState<Process[]>([]);
   const [query, setQuery] = useState("");
   const [showArchived, setShowArchived] = useState(false);
+  const [scopeFilter, setScopeFilter] = useState("TODAS");
 
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
@@ -109,14 +119,13 @@ export default function ProcesosPage() {
   const filtered = useMemo(() => {
     const normalizedQuery = query.trim().toLowerCase();
 
-    if (!normalizedQuery) return items;
-
-    return items.filter((item) =>
-      `${item.nombre} ${item.descripcion || ""}`
-        .toLowerCase()
-        .includes(normalizedQuery)
-    );
-  }, [items, query]);
+    return items.filter((item) => {
+      const searchText = `${item.nombre} ${item.descripcion || ""} ${item.responsable?.nombre_completo || ""} ${(item.clientes || []).map((client) => client.nombre_completo).join(" ")} ${item.radicados.map((radicado) => radicado.numero).join(" ")}`.toLowerCase();
+      const matchesSearch = !normalizedQuery || searchText.includes(normalizedQuery);
+      const matchesScope = scopeFilter === "TODAS" || scopeFilter === "PROPIOS" && item.soy_responsable || scopeFilter === "COLABORATIVOS" && !item.soy_responsable || scopeFilter === "ATENCION" && item.estado_atencion === "ATENCION" || scopeFilter === "RIESGO" && item.riesgo;
+      return matchesSearch && matchesScope;
+    });
+  }, [items, query, scopeFilter]);
 
   const totalRadicados = useMemo(
     () =>
@@ -335,6 +344,7 @@ export default function ProcesosPage() {
             </button>
           </div>
 
+          {!showArchived && <select aria-label="Filtrar procesos" value={scopeFilter} onChange={(event) => setScopeFilter(event.target.value)} className="h-10 rounded-lg border border-[var(--border)] bg-[var(--surface-secondary)] px-3 text-sm text-[var(--foreground)]"><option value="TODAS">Todos los procesos</option><option value="PROPIOS">Propios</option><option value="COLABORATIVOS">Colaborativos</option><option value="ATENCION">Requieren atención</option><option value="RIESGO">En riesgo</option></select>}
           <div className="relative w-full lg:max-w-sm">
             <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-[var(--foreground-muted)]" />
 
@@ -440,6 +450,8 @@ export default function ProcesosPage() {
                       </p>
                     </div>
                   </div>
+                  {!showArchived && <div className="mt-3 grid grid-cols-2 gap-2 text-xs"><div className="rounded-lg border border-[var(--border)] bg-[var(--surface)] p-2.5"><p className="text-[var(--foreground-muted)]">Tareas pendientes</p><p className="mt-1 font-semibold">{item.tareas_pendientes ?? 0}{(item.tareas_vencidas ?? 0) > 0 && <span className="ml-1 text-red-600">· {item.tareas_vencidas} vencidas</span>}</p></div><div className="rounded-lg border border-[var(--border)] bg-[var(--surface)] p-2.5"><p className="text-[var(--foreground-muted)]">Documentos pendientes</p><p className="mt-1 font-semibold">{item.documentos_pendientes ?? 0}</p></div></div>}
+                  {!showArchived && <div className="mt-3 flex flex-wrap items-center justify-between gap-2 text-[11px] text-[var(--foreground-muted)]"><span>Última actividad: {item.ultima_actividad ? new Date(item.ultima_actividad).toLocaleDateString("es-CO") : "Sin actividad"}</span>{item.proxima_actividad && <span>Próxima: {new Date(item.proxima_actividad).toLocaleDateString("es-CO")}</span>}<span className={`rounded-full px-2 py-1 ${item.estado_atencion === "ATENCION" ? "bg-amber-500/10 text-amber-700" : "bg-emerald-500/10 text-emerald-700"}`}>{item.estado_atencion === "ATENCION" ? "Requiere atención" : "Al día"}</span></div>}
 
                   {/* RADICADOS */}
                   {item.radicados.length > 0 && (

@@ -94,6 +94,7 @@ def emitir_notificacion_workflow(
     recordatorio_id: int | None = None,
     recordatorio_version: int | None = None,
     actuacion_ids: list[int] | None = None,
+    incluir_email: bool = False,
 ) -> list[int]:
     recordatorio = (
         db.query(models.RecordatorioTarea).filter_by(id=recordatorio_id).first()
@@ -105,6 +106,8 @@ def emitir_notificacion_workflow(
         if tipo == "RECORDATORIOS" and recordatorio_id is not None
         else canales_habilitados(usuario, tipo, emisor=emisor)
     )
+    if incluir_email and usuario.estado == models.EstadoUsuario.ACTIVO and usuario.email:
+        canales = tuple(dict.fromkeys((*canales, "EMAIL")))
     if not canales:
         if usuario.rol == models.RolUsuario.CLIENTE:
             canal = usuario.canal_notificacion_cliente or "SIN_CANAL"

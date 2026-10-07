@@ -872,6 +872,56 @@ def listar_alertas_admin(
     return alertas
 
 
+@router.get("/notificaciones/entregas")
+def listar_entregas_notificacion_admin(
+    canal: str | None = Query(default=None, pattern="^(EMAIL|WHATSAPP)$"),
+    estado: str | None = Query(default=None, pattern="^(PENDIENTE|ENVIANDO|ENVIADA|ERROR|OMITIDA|DESCARTADA)$"),
+    tipo: str | None = Query(default=None, min_length=1, max_length=32),
+    limite: int = Query(default=50, ge=1, le=200),
+    offset: int = Query(default=0, ge=0),
+    db: Session = Depends(get_db),
+    _: models.Usuario = Depends(verificar_admin),
+):
+    """Historial paginado de cada mensaje preparado para correo o WhatsApp."""
+    query = db.query(models.EntregaNotificacion, models.Usuario).join(
+        models.Usuario, models.Usuario.id == models.EntregaNotificacion.usuario_id
+    )
+    if canal:
+        query = query.filter(models.EntregaNotificacion.canal == canal)
+    if estado:
+        query = query.filter(models.EntregaNotificacion.estado == estado)
+    if tipo:
+        query = query.filter(models.EntregaNotificacion.tipo == tipo)
+    total = query.count()
+    filas = query.order_by(
+        models.EntregaNotificacion.created_at.desc(),
+        models.EntregaNotificacion.id.desc(),
+    ).offset(offset).limit(limite).all()
+    return {
+        "items": [
+            {
+                "id": entrega.id,
+                "tipo": entrega.tipo,
+                "canal": entrega.canal,
+                "estado": entrega.estado,
+                "asunto": entrega.asunto,
+                "cuerpo": entrega.cuerpo,
+                "destinatario": usuario.nombre_completo,
+                "email": usuario.email,
+                "whatsapp": usuario.whatsapp_numero,
+                "intentos": entrega.intentos,
+                "error": entrega.error,
+                "creada_en": entrega.created_at,
+                "enviada_en": entrega.enviado_en,
+            }
+            for entrega, usuario in filas
+        ],
+        "total": total,
+        "limite": limite,
+        "offset": offset,
+    }
+
+
 @router.post("/notificaciones/leer")
 def marcar_notificaciones_leidas(
     datos: schemas.NotificacionesLeidasUpdate,
@@ -1716,6 +1766,7 @@ def obtener_agenda_tareas_firma(
         .join(models.Usuario, models.Usuario.id == models.Tarea.usuario_id)
         .filter(
             models.RecordatorioTarea.activo.is_(True),
+            models.RecordatorioTarea.interno_sistema.is_(False),
             models.RecordatorioTarea.fecha_hora >= inicio_utc,
             models.RecordatorioTarea.fecha_hora < fin_utc,
             models.Usuario.rol == models.RolUsuario.ABOGADO_ADMIN,

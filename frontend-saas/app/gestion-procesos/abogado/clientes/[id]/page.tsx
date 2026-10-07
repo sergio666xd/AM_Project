@@ -30,6 +30,8 @@ type Client = {
   email: string;
   whatsapp_numero: string;
   canal_notificacion_cliente?: "EMAIL" | "WHATSAPP" | null;
+  estado_relacion: "ACTIVO" | "SIN_PROCESOS";
+  ultimo_contacto?: string | null;
   procesos: {
     id: number;
     nombre: string;
@@ -47,6 +49,8 @@ type Client = {
     atendida_en?: string | null;
     created_at?: string;
   }[];
+  actividad: { tipo: string; titulo: string; descripcion: string; fecha?: string | null; proceso_id?: number | null; proceso?: string | null; actor?: string | null; visibilidad: string }[];
+  comunicaciones: { id: number; asunto: string; contenido: string; visibilidad: string; canal: string; created_at: string; proceso_id: number; proceso: string; actor: string }[];
 };
 
 export default function ClienteDetalle() {
@@ -105,7 +109,8 @@ export default function ClienteDetalle() {
   }, [id, headers]);
 
   useEffect(() => {
-    void load();
+    const timer = window.setTimeout(() => void load(), 0);
+    return () => window.clearTimeout(timer);
   }, [load]);
 
   const initials = useMemo(() => {
@@ -317,9 +322,9 @@ export default function ClienteDetalle() {
           </div>
 
           <div className="flex items-center gap-2 self-start">
-            <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-500/20 bg-emerald-500/10 px-3 py-1.5 text-xs font-medium text-emerald-700 dark:text-emerald-400">
+            <span className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-medium ${client.estado_relacion === "ACTIVO" ? "border-emerald-500/20 bg-emerald-500/10 text-emerald-700 dark:text-emerald-400" : "border-amber-500/20 bg-amber-500/10 text-amber-700 dark:text-amber-400"}`}>
               <ShieldCheck className="size-3.5" />
-              Acceso activo
+              {client.estado_relacion === "ACTIVO" ? "Con procesos activos" : "Sin procesos asociados"}
             </span>
 
             <button
@@ -542,6 +547,49 @@ export default function ClienteDetalle() {
                     </div>
                   );
                 })}
+              </div>
+            )}
+          </section>
+
+          <section className="overflow-hidden rounded-xl border border-[var(--border)] bg-[var(--surface)]">
+            <SectionHeader icon={<Clock3 className="size-5" />} title="Actividad reciente" count={client.actividad.length} />
+            {client.actividad.length === 0 ? (
+              <EmptySection icon={<Clock3 className="size-5" />} title="Sin actividad registrada" description="Los cambios y comunicaciones asociados al cliente aparecerán aquí." />
+            ) : (
+              <div className="divide-y divide-[var(--border)]">
+                {client.actividad.map((item, index) => (
+                  <div key={`${item.tipo}-${item.proceso_id}-${item.fecha}-${index}`} className="flex gap-3 px-5 py-4">
+                    <span className="mt-1 size-2 shrink-0 rounded-full bg-[var(--primary)]" />
+                    <div className="min-w-0 flex-1">
+                      <div className="flex flex-wrap items-start justify-between gap-2">
+                        <p className="text-sm font-medium text-[var(--foreground)]">{item.titulo}</p>
+                        <span className="text-xs text-[var(--foreground-muted)]">{item.fecha ? formatDate(item.fecha) : "Fecha no disponible"}</span>
+                      </div>
+                      <p className="mt-1 text-sm text-[var(--foreground-secondary)]">{item.descripcion}</p>
+                      <p className="mt-1 text-xs text-[var(--foreground-muted)]">{item.proceso || "Cliente"}{item.actor ? ` · ${item.actor}` : ""} · {item.visibilidad === "CLIENTE" ? "Visible al cliente" : "Uso interno"}</p>
+                    </div>
+                    {item.proceso_id && <Link href={`/gestion-procesos/abogado/procesos/${item.proceso_id}#actividad`} className="shrink-0 text-xs font-medium text-[var(--primary)] hover:underline">Abrir proceso</Link>}
+                  </div>
+                ))}
+              </div>
+            )}
+          </section>
+
+          <section className="overflow-hidden rounded-xl border border-[var(--border)] bg-[var(--surface)]">
+            <SectionHeader icon={<MessageCircle className="size-5" />} title="Comunicaciones" count={client.comunicaciones.length} />
+            <div className="border-b px-5 py-3 text-xs text-[var(--foreground-muted)]" style={{ borderColor: "var(--border)" }}>
+              Último contacto registrado: {client.ultimo_contacto ? formatDate(client.ultimo_contacto) : "Sin contactos registrados"}
+            </div>
+            {client.comunicaciones.length === 0 ? (
+              <EmptySection icon={<MessageCircle className="size-5" />} title="Sin comunicaciones" description="Las notas y comunicaciones del expediente aparecerán aquí." />
+            ) : (
+              <div className="divide-y divide-[var(--border)]">
+                {client.comunicaciones.map((item) => (
+                  <div key={item.id} className="flex flex-wrap items-start justify-between gap-3 px-5 py-4">
+                    <div className="min-w-0"><p className="text-sm font-medium text-[var(--foreground)]">{item.asunto}</p><p className="mt-1 whitespace-pre-wrap text-sm text-[var(--foreground-secondary)]">{item.contenido}</p><p className="mt-1 text-xs text-[var(--foreground-muted)]">{item.proceso} · {item.actor} · {item.visibilidad === "CLIENTE" ? "Visible al cliente" : "Interna"} · {item.canal}</p></div>
+                    <span className="text-xs text-[var(--foreground-muted)]">{formatDate(item.created_at)}</span>
+                  </div>
+                ))}
               </div>
             )}
           </section>

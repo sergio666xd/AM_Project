@@ -578,7 +578,11 @@ def preparar_recordatorio_workflow(
         return {"estado": "CANCELADO", "entrega_ids": []}
 
     tarea = recordatorio.tarea
-    usuario = tarea.usuario if tarea else None
+    usuario = (
+        tarea.cliente_asignado
+        if tarea and recordatorio.interno_sistema and tarea.cliente_id
+        else tarea.usuario if tarea else None
+    )
     if (
         tarea is None
         or tarea.estado in {models.EstadoTarea.COMPLETADA, models.EstadoTarea.CANCELADA}
@@ -609,11 +613,23 @@ def preparar_recordatorio_workflow(
         tarea_path = f"/gestion-procesos/cliente/tareas?tarea={tarea.id}#tarea-{tarea.id}"
     else:
         tarea_path = f"/gestion-procesos/abogado/tareas/{tarea.id}"
-    mensaje = f"📌 *Recordatorio de tarea*\n\n*{tarea.titulo}*"
+    mensaje = f"Recordatorio de tarea: {tarea.titulo}"
+    mensaje += f"\n\nAcción requerida: completa o revisa esta tarea antes de su vencimiento."
+    mensaje += f"\nEstado: {tarea.estado.value}\nPrioridad: {tarea.prioridad.value}"
+    if tarea.proceso:
+        mensaje += f"\nProceso: {tarea.proceso.nombre}"
+    if tarea.radicado:
+        mensaje += f"\nRadicado: {tarea.radicado.numero}"
+    if tarea.actuacion_rel:
+        mensaje += f"\nActuación: {tarea.actuacion_rel.actuacion or 'Actuación judicial'}"
+    if tarea.descripcion:
+        mensaje += f"\nDetalle: {tarea.descripcion}"
     if tarea.fecha_limite:
         fecha_limite = normalizar_utc_naive(tarea.fecha_limite)
-        mensaje += f"\nFecha límite: {fecha_limite.strftime('%d/%m/%Y %H:%M')}"
-    mensaje += f"\nAbrir tarea: {public_site_url()}{tarea_path}"
+        anticipacion = recordatorio.anticipacion_minutos
+        programado_por = f"{anticipacion // 60} horas antes" if anticipacion else "en el momento programado"
+        mensaje += f"\nVencimiento: {fecha_limite.strftime('%d/%m/%Y %H:%M UTC')}\nAviso: {programado_por}"
+    mensaje += f"\n\nAbrir enlace: Ver tarea | {public_site_url()}{tarea_path}"
     entrega_ids = emitir_notificacion_workflow(
         db,
         usuario,
@@ -654,6 +670,8 @@ def enviar_entrega_notificacion_workflow(
     entrega = db.query(models.EntregaNotificacion).filter_by(id=entrega_id).with_for_update().first()
     if not entrega:
         raise HTTPException(status_code=404, detail="Entrega no encontrada.")
+    if entrega.estado in {"DESCARTADA", "OMITIDA"}:
+        return {"estado": entrega.estado, "repetida": True}
     if entrega.estado == "ENVIADA":
         return {"estado": "ENVIADA", "repetida": True}
     ahora = datetime.utcnow()

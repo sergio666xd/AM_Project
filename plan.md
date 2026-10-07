@@ -2626,3 +2626,15 @@ Sitio público
 ```
 
 La meta final es pasar de una aplicación funcional a un **producto jurídico integral, visualmente consistente, seguro, accionable y mantenible**.
+
+### Registro de implementación — Fases 12–20 (7 de octubre de 2026)
+
+- **Fase 12 — Dashboard profesional:** agrega indicadores reales, lista de asuntos que requieren atención, actividad reciente y accesos rápidos a los módulos de trabajo del abogado.
+- **Fase 13 — Procesos:** incorpora filtros por ámbito/atención/riesgo y búsqueda por proceso, cliente, radicado y responsable; muestra salud, actividad reciente/próxima, tareas y documentos pendientes.
+- **Fase 14 — Expediente digital:** la ficha conserva las secciones existentes y organiza resumen, clientes, radicados/actuaciones, agenda, tareas, documentos, solicitudes, comunicaciones y timeline. Las tareas pueden crearse dentro del proceso y opcionalmente ligarse a cliente, radicado y actuación; el backend valida que el radicado y la actuación correspondan al proceso. La revisión documental se realiza en vista emergente.
+- **Fases 15–16 — Tareas y agenda:** se añaden lista/Kanban/calendario y filtros de responsable, proceso, cliente, estado, contexto y vencimiento. La agenda de abogado distingue tareas de eventos, ofrece día/semana/mes/lista y permite registrar eventos desde la ficha del proceso.
+- **Fase 17 — Clientes:** la ficha incorpora relación derivada de procesos vigentes, último contacto y actividad/comunicaciones relacionadas, incluidas notificaciones de actuaciones existentes; las consultas quedan limitadas a procesos accesibles al abogado.
+- **Fase 18 — Documentos:** el centro permite previsualizar imágenes/PDF en modal, revisar, aprobar, rechazar o solicitar correcciones con comentario y trazabilidad.
+- **Fases 19–20 — Comunicaciones y notificaciones:** la ficha conserva historial interno/visible al cliente por proceso sin enviar automáticamente por canales externos. El centro de notificaciones agrega categorías, lectura individual/masiva, filtros y navegación al recurso; el contador refleja pendientes de lectura.
+- **Modelos/API:** se añadieron persistencia de comunicaciones del proceso y lecturas de notificaciones de abogado, CRUD de eventos de agenda, endpoints de timeline/comunicaciones/revisión y validaciones de ámbito para tareas. No se implementó funcionalidad de fases 21 en adelante.
+- **Validación:** `tsc --noEmit`, ESLint focalizado (sin errores; quedan avisos de `<img>` en previsualizaciones), `py_compile` de modelos/esquemas/routers y `git diff --check` aprobados. No se ejecutaron pruebas automatizadas.

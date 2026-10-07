@@ -104,7 +104,7 @@ export default function ClientePage() {
       ) : (
         <div className="space-y-3">
           {procesos.map((proceso) => (
-            <article key={proceso.id} className="rounded-lg border border-border bg-surface">
+            <article id={`proceso-${proceso.id}`} key={proceso.id} className="rounded-lg border border-border bg-surface">
               <div className="flex flex-wrap items-start justify-between gap-4 p-5">
                 <div className="min-w-0">
                   <h2 className="font-semibold text-foreground">{proceso.nombre}</h2>

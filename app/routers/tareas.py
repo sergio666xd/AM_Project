@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timedelta
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import or_
@@ -37,9 +37,11 @@ def _url_tarea_notificacion(usuario: models.Usuario, tarea_id: int) -> str:
     return f"{public_site_url()}{ruta}"
 
 
-def _versionar_recordatorios_pendientes(tarea: models.Tarea) -> list[int]:
+def _versionar_recordatorios_pendientes(tarea: models.Tarea, incluir_sistema: bool = True) -> list[int]:
     recordatorio_ids = []
     for recordatorio in tarea.recordatorios:
+        if recordatorio.interno_sistema and not incluir_sistema:
+            continue
         if not recordatorio.activo or recordatorio.enviado_en is not None:
             continue
         recordatorio.version += 1
@@ -48,6 +50,106 @@ def _versionar_recordatorios_pendientes(tarea: models.Tarea) -> list[int]:
             continue
         recordatorio_ids.append(recordatorio.id)
     return recordatorio_ids
+
+
+def _invalidar_recordatorios_sistema(tarea: models.Tarea) -> None:
+    for recordatorio in tarea.recordatorios:
+        if recordatorio.interno_sistema and recordatorio.activo and recordatorio.enviado_en is None:
+            recordatorio.activo = False
+            recordatorio.version += 1
+
+
+def _descartar_recordatorios_tarea(db: Session, tarea: models.Tarea) -> None:
+    """Remove scheduled reminders and prevent their queued deliveries from sending."""
+    for recordatorio in list(tarea.recordatorios):
+        entregas = db.query(models.EntregaNotificacion).filter(
+            models.EntregaNotificacion.recordatorio_id == recordatorio.id,
+            models.EntregaNotificacion.estado.in_(("PENDIENTE", "ERROR", "ENVIANDO")),
+        ).all()
+        for entrega in entregas:
+            entrega.estado = "DESCARTADA"
+            entrega.error = "La tarea fue completada, cancelada o eliminada."
+            entrega.lease_hasta = None
+        db.delete(recordatorio)
+    db.flush()
+
+
+def _crear_recordatorios_sistema(db: Session, tarea: models.Tarea) -> list[int]:
+    if tarea.fecha_limite is None or tarea.estado in {models.EstadoTarea.COMPLETADA, models.EstadoTarea.CANCELADA}:
+        return []
+    destinatario = tarea.cliente_asignado if tarea.cliente_id else tarea.usuario
+    if destinatario is None or destinatario.estado != models.EstadoUsuario.ACTIVO:
+        return []
+    if destinatario.rol == models.RolUsuario.CLIENTE:
+        email = destinatario.canal_notificacion_cliente == "EMAIL" and bool(destinatario.email)
+        whatsapp = destinatario.canal_notificacion_cliente == "WHATSAPP" and bool(destinatario.whatsapp_numero.strip())
+    else:
+        preferencias = (destinatario.preferencias_notificacion or {}).get("RECORDATORIOS", {})
+        email = bool(preferencias.get("email", destinatario.notificaciones_email)) and bool(destinatario.email)
+        whatsapp = bool(preferencias.get("whatsapp", destinatario.notificaciones_whatsapp)) and bool(destinatario.whatsapp_numero.strip())
+    ids = []
+    for anticipacion in (1440, 720):
+        fecha_aviso = tarea.fecha_limite - timedelta(minutes=anticipacion)
+        if fecha_aviso <= datetime.utcnow():
+            continue
+        reminder = models.RecordatorioTarea(
+            tarea_id=tarea.id,
+            canal=models.CanalRecordatorio.WHATSAPP,
+            notificar_email=email,
+            notificar_whatsapp=whatsapp,
+            activo=True,
+            version=1,
+            workflow_version_lanzada=0,
+            anticipacion_minutos=anticipacion,
+            interno_sistema=True,
+        )
+        db.add(reminder)
+        db.flush()
+        ids.append(reminder.id)
+    return ids
+
+
+def _notificar_cambio_tarea(
+    db: Session,
+    tarea: models.Tarea,
+    actor: models.Usuario,
+    accion: str,
+    detalle: str,
+) -> None:
+    destinatarios = []
+    cliente = tarea.cliente_asignado if tarea.cliente_id else None
+    if cliente and cliente.estado == models.EstadoUsuario.ACTIVO and actor.id != cliente.id:
+        destinatarios.append(cliente)
+    elif actor.rol == models.RolUsuario.CLIENTE and tarea.usuario and tarea.usuario.id != actor.id:
+        destinatarios.append(tarea.usuario)
+    elif tarea.usuario and tarea.usuario.id != actor.id:
+        destinatarios.append(tarea.usuario)
+    if not destinatarios:
+        return
+    due = tarea.fecha_limite.strftime("%d/%m/%Y %H:%M UTC") if tarea.fecha_limite else "Sin fecha límite"
+    process = tarea.proceso.nombre if tarea.proceso else "Tarea general"
+    radicado = tarea.radicado.numero if tarea.radicado else "No asociado"
+    actuacion = tarea.actuacion_rel.actuacion if tarea.actuacion_rel else "No asociada"
+    for destinatario in destinatarios:
+        url_tarea = _url_tarea_notificacion(destinatario, tarea.id)
+        if accion == "eliminó la tarea":
+            if destinatario.rol == models.RolUsuario.CLIENTE:
+                url_tarea = f"{public_site_url()}/gestion-procesos/cliente/tareas"
+            elif destinatario.rol == models.RolUsuario.ABOGADO:
+                url_tarea = f"{public_site_url()}/gestion-procesos/dashboard/tareas"
+            else:
+                url_tarea = f"{public_site_url()}/gestion-procesos/abogado/tareas"
+        cuerpo = (
+            f"Hola {destinatario.nombre_completo},\n\n{actor.nombre_completo} {accion}.\n\n"
+            f"Tarea: {tarea.titulo}\nDetalle: {detalle}\nEstado: {tarea.estado.value}\n"
+            f"Prioridad: {tarea.prioridad.value}\nFecha límite: {due}\nProceso: {process}\n"
+            f"Radicado: {radicado}\nActuación: {actuacion}\n\n"
+            f"Abrir enlace: Ver tareas | {url_tarea}"
+        )
+        emitir_notificacion_workflow(
+            db, destinatario, "TAREAS", f"TAREA_ACCION:{tarea.id}:{datetime.utcnow().timestamp()}",
+            f"{accion.capitalize()}: {tarea.titulo}", cuerpo, emisor=actor, incluir_email=True,
+        )
 
 
 def _lanzar_recordatorios_pendientes(
@@ -151,6 +253,8 @@ def validar_actualizacion_tarea(datos: schemas.TareaUpdate, tarea: models.Tarea,
         campos = getattr(datos, "model_fields_set", None)
         if campos is None:
             campos = getattr(datos, "__fields_set__", set())
+        if campos == {"fecha_limite"} and datos.fecha_limite is not None:
+            return
         if campos != {"estado"} or datos.estado != models.EstadoTarea.COMPLETADA:
             raise HTTPException(status_code=403, detail="El cliente solo puede marcar sus tareas como completadas.")
         return
@@ -204,6 +308,22 @@ def validar_relaciones_tarea(datos, usuario_actual: models.Usuario, db: Session)
         if radicado is None:
             radicado = db.query(models.Radicado).filter(models.Radicado.id == actuacion.radicado_id).first()
     return radicado, actuacion
+
+
+def validar_ambito_proceso_radicado_actuacion(
+    proceso_id: int | None,
+    radicado: models.Radicado | None,
+    actuacion: models.Actuacion | None,
+    db: Session,
+) -> None:
+    """Cuando una tarea está en un proceso, impide asociarla a recursos de otro expediente."""
+    if proceso_id is None:
+        return
+    radicado_id = actuacion.radicado_id if actuacion is not None else radicado.id if radicado is not None else None
+    if radicado_id is not None and not db.query(models.ProcesoRadicado).filter_by(
+        proceso_id=proceso_id, radicado_id=radicado_id
+    ).first():
+        raise HTTPException(status_code=400, detail="El radicado o la actuación no pertenece al proceso seleccionado.")
 
 
 def validar_asignacion_subtarea(
@@ -401,6 +521,7 @@ def crear_tarea(
             raise HTTPException(status_code=404, detail="Proceso no encontrado o no asignado.")
 
     radicado, actuacion = validar_relaciones_tarea(datos, usuario_actual, db)
+    validar_ambito_proceso_radicado_actuacion(datos.proceso_id, radicado, actuacion, db)
     if datos.cliente_id is not None:
         cliente = db.query(models.Usuario).filter(
             models.Usuario.id == datos.cliente_id,
@@ -445,27 +566,13 @@ def crear_tarea(
         tarea.completada_en = datetime.utcnow()
     db.add(tarea)
     db.flush()
+    reminder_ids = _crear_recordatorios_sistema(db, tarea)
     registrar_evento_auditoria(db, usuario_actual, "tarea.crear", "tarea", tarea.id)
     db.commit()
     db.refresh(tarea)
-
-    if tarea.cliente_id:
-        cliente = db.query(models.Usuario).filter_by(id=tarea.cliente_id).first()
-        if cliente:
-            mensaje = (
-                f"{usuario_actual.nombre_completo} le ha asignado una tarea: {tarea.titulo}.\n"
-                f"Abrir tarea: {_url_tarea_notificacion(cliente, tarea.id)}"
-            )
-            emitir_notificacion_workflow(
-                db,
-                cliente,
-                "TAREAS",
-                f"TAREA:{tarea.id}:{cliente.id}",
-                "Nueva tarea asignada",
-                mensaje,
-                emisor=usuario_actual,
-            )
-    return tarea
+    _lanzar_recordatorios_pendientes(db, tarea, reminder_ids)
+    _notificar_cambio_tarea(db, tarea, usuario_actual, "creó una tarea asignada", "Se creó una nueva actividad con la fecha, prioridad y contexto indicados.")
+    return serializar_tarea_para_usuario(tarea, usuario_actual)
 
 
 @router.put("/{tarea_id}", response_model=schemas.TareaOut)
@@ -477,18 +584,43 @@ def actualizar_tarea(
 ):
     tarea = obtener_tarea_usuario(tarea_id, usuario_actual, db)
     validar_actualizacion_tarea(datos, tarea, usuario_actual, db)
+    fields_set = datos.model_fields_set
     if usuario_actual.rol == models.RolUsuario.CLIENTE:
-        tarea.estado = models.EstadoTarea.COMPLETADA
-        if tarea.completada_en is None:
-            tarea.completada_en = datetime.utcnow()
-        recordatorio_ids = _versionar_recordatorios_pendientes(tarea)
-        registrar_evento_auditoria(db, usuario_actual, "tarea.completar", "tarea", tarea.id)
+        if tarea.estado in {models.EstadoTarea.COMPLETADA, models.EstadoTarea.CANCELADA} and fields_set != {"estado"}:
+            raise HTTPException(status_code=409, detail="No se pueden programar avisos ni cambiar el vencimiento de una tarea completada o cancelada.")
+        if fields_set == {"estado"}:
+            tarea.estado = models.EstadoTarea.COMPLETADA
+            if tarea.completada_en is None:
+                tarea.completada_en = datetime.utcnow()
+            _descartar_recordatorios_tarea(db, tarea)
+            recordatorio_ids = []
+            registrar_evento_auditoria(db, usuario_actual, "tarea.completar", "tarea", tarea.id)
+            db.commit()
+            _lanzar_recordatorios_pendientes(db, tarea, recordatorio_ids)
+            db.refresh(tarea)
+            _notificar_cambio_tarea(db, tarea, usuario_actual, "completó la tarea", "El cliente marcó la tarea como finalizada.")
+            return serializar_tarea_para_usuario(tarea, usuario_actual)
+        nueva_fecha = normalizar_utc_naive(datos.fecha_limite)
+        if nueva_fecha is None or nueva_fecha <= datetime.utcnow():
+            raise HTTPException(status_code=400, detail="El nuevo vencimiento debe ser una fecha y hora futura.")
+        if tarea.fecha_limite == nueva_fecha:
+            return serializar_tarea_para_usuario(tarea, usuario_actual)
+        anterior = tarea.fecha_limite
+        tarea.fecha_limite = nueva_fecha
+        recordatorio_ids = _versionar_recordatorios_pendientes(tarea, incluir_sistema=False)
+        _invalidar_recordatorios_sistema(tarea)
+        recordatorio_ids.extend(_crear_recordatorios_sistema(db, tarea))
+        registrar_evento_auditoria(db, usuario_actual, "tarea.fecha_limite.cambiar_cliente", "tarea", tarea.id)
         db.commit()
         _lanzar_recordatorios_pendientes(db, tarea, recordatorio_ids)
         db.refresh(tarea)
-        return tarea
+        _notificar_cambio_tarea(db, tarea, usuario_actual, "cambió la fecha límite", f"Fecha anterior: {anterior.strftime('%d/%m/%Y %H:%M UTC') if anterior else 'Sin fecha'}. Nueva fecha: {nueva_fecha.strftime('%d/%m/%Y %H:%M UTC')}.")
+        return serializar_tarea_para_usuario(tarea, usuario_actual)
 
+    estado_anterior = tarea.estado
     reprogramar_recordatorios = False
+    fecha_cambio = False
+    fecha_anterior = tarea.fecha_limite
     if datos.titulo is not None:
         titulo = datos.titulo.strip()
         if not titulo:
@@ -502,27 +634,43 @@ def actualizar_tarea(
         tarea.completada_en = datetime.utcnow() if datos.estado == models.EstadoTarea.COMPLETADA else None
     if datos.prioridad is not None:
         tarea.prioridad = datos.prioridad
-    if datos.fecha_limite is not None:
+    if "fecha_limite" in fields_set:
         fecha_limite = normalizar_utc_naive(datos.fecha_limite)
+        fecha_cambio = tarea.fecha_limite != fecha_limite
         reprogramar_recordatorios = reprogramar_recordatorios or tarea.fecha_limite != fecha_limite
         tarea.fecha_limite = fecha_limite
     if datos.radicado_id is not None or datos.actuacion_id is not None:
         radicado, actuacion = validar_relaciones_tarea(datos, usuario_actual, db)
+        validar_ambito_proceso_radicado_actuacion(tarea.proceso_id, radicado, actuacion, db)
         if datos.actuacion_id is not None:
             tarea.actuacion_id = datos.actuacion_id
             tarea.radicado_id = actuacion.radicado_id
         else:
             tarea.radicado_id = datos.radicado_id
             tarea.actuacion_id = None
-    recordatorio_ids = (
-        _versionar_recordatorios_pendientes(tarea)
-        if reprogramar_recordatorios
-        else []
-    )
+    if tarea.estado in (models.EstadoTarea.COMPLETADA, models.EstadoTarea.CANCELADA):
+        _descartar_recordatorios_tarea(db, tarea)
+        recordatorio_ids = []
+    elif fecha_cambio:
+        recordatorio_ids = _versionar_recordatorios_pendientes(tarea, incluir_sistema=False)
+        _invalidar_recordatorios_sistema(tarea)
+        recordatorio_ids.extend(_crear_recordatorios_sistema(db, tarea))
+    elif reprogramar_recordatorios:
+        recordatorio_ids = _versionar_recordatorios_pendientes(tarea)
+        if estado_anterior in (models.EstadoTarea.COMPLETADA, models.EstadoTarea.CANCELADA):
+            _invalidar_recordatorios_sistema(tarea)
+            recordatorio_ids.extend(_crear_recordatorios_sistema(db, tarea))
+    else:
+        recordatorio_ids = []
     registrar_evento_auditoria(db, usuario_actual, "tarea.actualizar", "tarea", tarea.id)
     db.commit()
     _lanzar_recordatorios_pendientes(db, tarea, recordatorio_ids)
     db.refresh(tarea)
+    cambios = []
+    if datos.estado is not None: cambios.append(f"estado {datos.estado.value}")
+    if datos.prioridad is not None: cambios.append(f"prioridad {datos.prioridad.value}")
+    if fecha_cambio: cambios.append(f"vencimiento actualizado desde {fecha_anterior.strftime('%d/%m/%Y %H:%M UTC') if fecha_anterior else 'sin fecha'}")
+    _notificar_cambio_tarea(db, tarea, usuario_actual, "actualizó la tarea", "; ".join(cambios) or "Se actualizaron sus datos.")
     return serializar_tarea_para_usuario(tarea, usuario_actual)
 
 
@@ -541,6 +689,7 @@ def completar_tarea(
     else:
         require_task_manager(usuario_actual, tarea, action="completar tareas", db=db)
 
+    estado_anterior = tarea.estado
     if tarea.estado == models.EstadoTarea.COMPLETADA:
         tarea.estado = models.EstadoTarea.PENDIENTE
         tarea.completada_en = None
@@ -548,11 +697,19 @@ def completar_tarea(
         tarea.estado = models.EstadoTarea.COMPLETADA
         tarea.completada_en = datetime.utcnow()
 
-    recordatorio_ids = _versionar_recordatorios_pendientes(tarea)
+    if tarea.estado in (models.EstadoTarea.COMPLETADA, models.EstadoTarea.CANCELADA):
+        _descartar_recordatorios_tarea(db, tarea)
+        recordatorio_ids = []
+    elif estado_anterior in (models.EstadoTarea.COMPLETADA, models.EstadoTarea.CANCELADA):
+        recordatorio_ids = _crear_recordatorios_sistema(db, tarea)
+        recordatorio_ids.extend(_versionar_recordatorios_pendientes(tarea))
+    else:
+        recordatorio_ids = _versionar_recordatorios_pendientes(tarea)
     registrar_evento_auditoria(db, usuario_actual, "tarea.completar", "tarea", tarea.id)
     db.commit()
     _lanzar_recordatorios_pendientes(db, tarea, recordatorio_ids)
     db.refresh(tarea)
+    _notificar_cambio_tarea(db, tarea, usuario_actual, "actualizó el estado de la tarea", f"Estado actualizado a {tarea.estado.value}.")
 
     return serializar_tarea_para_usuario(tarea, usuario_actual)
 
@@ -571,6 +728,11 @@ def eliminar_tarea(
     )
     require_task_manager(usuario_actual, tarea, action="eliminar tareas", db=db)
 
+    _descartar_recordatorios_tarea(db, tarea)
+    _notificar_cambio_tarea(
+        db, tarea, usuario_actual, "eliminó la tarea",
+        "La tarea y sus recordatorios asociados se eliminaron del sistema.",
+    )
     registrar_evento_auditoria(db, usuario_actual, "tarea.eliminar", "tarea", tarea.id)
     db.delete(tarea)
     db.commit()
@@ -789,6 +951,9 @@ def crear_recordatorio(
     )
     require_task_manager(usuario_actual, tarea, action="gestionar recordatorios", db=db)
 
+    if tarea.estado in {models.EstadoTarea.COMPLETADA, models.EstadoTarea.CANCELADA}:
+        raise HTTPException(status_code=409, detail="No se pueden programar avisos para una tarea completada o cancelada.")
+
     if (datos.fecha_hora is None) == (datos.anticipacion_minutos is None):
         raise HTTPException(
             status_code=400,
@@ -869,11 +1034,15 @@ def actualizar_recordatorio(
     )
     require_task_manager(usuario_actual, tarea, action="gestionar recordatorios", db=db)
 
+    if tarea.estado in {models.EstadoTarea.COMPLETADA, models.EstadoTarea.CANCELADA}:
+        raise HTTPException(status_code=409, detail="No se pueden modificar avisos de una tarea completada o cancelada.")
+
     recordatorio = (
         db.query(models.RecordatorioTarea)
         .filter(
             models.RecordatorioTarea.id == recordatorio_id,
             models.RecordatorioTarea.tarea_id == tarea.id,
+            models.RecordatorioTarea.interno_sistema.is_(False),
         )
         .first()
     )
@@ -944,6 +1113,7 @@ def eliminar_recordatorio(
         .filter(
             models.RecordatorioTarea.id == recordatorio_id,
             models.RecordatorioTarea.tarea_id == tarea.id,
+            models.RecordatorioTarea.interno_sistema.is_(False),
         )
         .first()
     )

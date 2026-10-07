@@ -1,14 +1,13 @@
 "use client";
 
 import { apiRequest } from "@/lib/api";
+import Image from "next/image";
 
 import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 import {
   AlertCircle,
   CheckCircle2,
-  ChevronDown,
   FileText,
-  Filter,
   Plus,
   RefreshCw,
   Search,
@@ -33,6 +32,8 @@ type Document = {
   nombre_archivo: string;
   mime_type: string;
   created_at: string;
+  estado_revision?: string;
+  comentario_revision?: string | null;
 };
 
 type Process = {
@@ -67,6 +68,11 @@ export default function DocumentosPage() {
   const [notice, setNotice] = useState("");
 
   const [mostrarModal, setMostrarModal] = useState(false);
+  const [documentoActivo, setDocumentoActivo] = useState<Document | null>(null);
+  const [archivoPreview, setArchivoPreview] = useState("");
+  const [estadoRevision, setEstadoRevision] = useState("EN_REVISION");
+  const [comentarioRevision, setComentarioRevision] = useState("");
+  const [guardandoRevision, setGuardandoRevision] = useState(false);
 
   const headers = useCallback(
     () => ({
@@ -157,8 +163,47 @@ export default function DocumentosPage() {
   }, [headers]);
 
   useEffect(() => {
-    void load();
+    const timer = window.setTimeout(() => void load(), 0);
+    return () => window.clearTimeout(timer);
   }, [load]);
+
+  useEffect(() => () => {
+    if (archivoPreview) URL.revokeObjectURL(archivoPreview);
+  }, [archivoPreview]);
+
+  const abrirDocumento = async (documento: Document) => {
+    setError("");
+    try {
+      const response = await apiRequest(`/api/expedientes/documentos/${documento.id}/archivo`, { headers: headers() });
+      if (!response.ok) throw new Error("No fue posible abrir el documento.");
+      const blob = await response.blob();
+      setArchivoPreview((previous) => { if (previous) URL.revokeObjectURL(previous); return URL.createObjectURL(blob); });
+      setDocumentoActivo(documento);
+      setEstadoRevision(documento.estado_revision === "RECIBIDO" ? "EN_REVISION" : documento.estado_revision || "EN_REVISION");
+      setComentarioRevision(documento.comentario_revision || "");
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "No fue posible abrir el documento.");
+    }
+  };
+
+  const guardarRevision = async () => {
+    if (!documentoActivo) return;
+    setGuardandoRevision(true);
+    try {
+      const response = await apiRequest(`/api/expedientes/documentos/${documentoActivo.id}/revision`, {
+        method: "PATCH", headers: { ...headers(), "Content-Type": "application/json" },
+        body: JSON.stringify({ estado_revision: estadoRevision, comentario_revision: comentarioRevision }),
+      });
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.detail || "No fue posible guardar la revisión.");
+      setNotice("Revisión documental guardada.");
+      setDocumentoActivo(null);
+      setArchivoPreview("");
+      await load();
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "No fue posible guardar la revisión.");
+    } finally { setGuardandoRevision(false); }
+  };
 
   const solicitudesFiltradas = useMemo(() => {
     const text = query.toLowerCase().trim();
@@ -607,13 +652,14 @@ export default function DocumentosPage() {
                 <th className="p-4">Cliente</th>
                 <th className="p-4">Tipo</th>
                 <th className="p-4">Fecha</th>
+                <th className="p-4">Revisión</th>
               </tr>
             </thead>
 
             <tbody>
               {documentosFiltrados.length === 0 ? (
                 <tr>
-                  <td colSpan={5}>
+                  <td colSpan={6}>
                     <EmptyState
                       icon={<FileText size={30} />}
                       title="No hay archivos entregados"
@@ -671,7 +717,6 @@ export default function DocumentosPage() {
                         {item.mime_type}
                       </span>
                     </td>
-
                     <td className="p-4">
                       <span
                         className="text-sm"
@@ -682,6 +727,14 @@ export default function DocumentosPage() {
                         {formatearFecha(item.created_at)}
                       </span>
                     </td>
+                    <td className="p-4">
+                      <div className="flex flex-col items-start gap-2">
+                        <span className="text-xs text-foreground-muted">{(item.estado_revision || "RECIBIDO").replaceAll("_", " ")}</span>
+                        <button type="button" onClick={() => void abrirDocumento(item)} className="rounded-lg border px-3 py-2 text-xs font-medium" style={{ borderColor: "var(--border)", color: "var(--primary)" }}>
+                          Ver y revisar
+                        </button>
+                      </div>
+                    </td>
                   </tr>
                 ))
               )}
@@ -689,6 +742,25 @@ export default function DocumentosPage() {
           </table>
         </div>
       </section>
+
+      {documentoActivo && archivoPreview && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-3 sm:p-6" role="dialog" aria-modal="true" aria-labelledby="documento-preview-titulo" onMouseDown={(event) => { if (event.target === event.currentTarget) { setDocumentoActivo(null); setArchivoPreview(""); } }}>
+          <div className="flex max-h-[94vh] w-full max-w-6xl flex-col overflow-hidden rounded-2xl border" style={{ background: "var(--surface)", borderColor: "var(--border)", color: "var(--foreground)" }}>
+            <header className="flex items-center justify-between gap-4 border-b p-4" style={{ borderColor: "var(--border)" }}>
+              <div className="min-w-0"><h2 id="documento-preview-titulo" className="truncate font-semibold">{documentoActivo.nombre_archivo}</h2><p className="text-xs text-foreground-muted">{documentoActivo.proceso} · {documentoActivo.cliente}</p></div>
+              <button type="button" onClick={() => { setDocumentoActivo(null); setArchivoPreview(""); }} aria-label="Cerrar vista" className="rounded-lg p-2"><X size={18} /></button>
+            </header>
+            <div className="grid min-h-0 flex-1 overflow-y-auto lg:grid-cols-[minmax(0,1fr)_320px]">
+              <div className="min-h-[45vh] bg-black/5 p-2">{documentoActivo.mime_type.startsWith("image/") ? <Image src={archivoPreview} alt={documentoActivo.nombre_archivo} width={1600} height={1200} unoptimized className="mx-auto max-h-[72vh] w-auto max-w-full object-contain" /> : documentoActivo.mime_type === "application/pdf" ? <iframe src={archivoPreview} title={documentoActivo.nombre_archivo} className="h-[68vh] w-full rounded-lg bg-white" /> : <div className="flex h-full min-h-64 items-center justify-center text-sm text-foreground-muted">Vista previa no disponible. Descarga el archivo para consultarlo.</div>}</div>
+              <aside className="space-y-4 border-t p-4 lg:border-l lg:border-t-0" style={{ borderColor: "var(--border)" }}>
+                <label className="block text-sm font-medium">Estado de revisión<select value={estadoRevision} onChange={(event) => setEstadoRevision(event.target.value)} className="mt-1.5 w-full rounded-lg border px-3 py-2" style={{ background: "var(--surface-muted)", borderColor: "var(--border)", color: "var(--foreground)" }}><option value="EN_REVISION">En revisión</option><option value="APROBADO">Aprobado</option><option value="REQUIERE_CORRECCION">Requiere corrección</option><option value="RECHAZADO">Rechazado</option></select></label>
+                <label className="block text-sm font-medium">Comentario<textarea value={comentarioRevision} onChange={(event) => setComentarioRevision(event.target.value)} rows={5} className="mt-1.5 w-full rounded-lg border px-3 py-2 text-sm" style={{ background: "var(--surface-muted)", borderColor: "var(--border)", color: "var(--foreground)" }} /></label>
+                <div className="flex flex-wrap gap-2"><button type="button" onClick={() => void guardarRevision()} disabled={guardandoRevision} className="rounded-lg px-3 py-2 text-sm font-medium disabled:opacity-50" style={{ background: "var(--primary)", color: "var(--primary-foreground)" }}>{guardandoRevision ? "Guardando…" : "Guardar revisión"}</button><a href={archivoPreview} download={documentoActivo.nombre_archivo} className="rounded-lg border px-3 py-2 text-sm" style={{ borderColor: "var(--border)" }}>Descargar</a></div>
+              </aside>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* MODAL */}
       {mostrarModal && (

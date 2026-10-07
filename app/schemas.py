@@ -1,4 +1,4 @@
-from pydantic import BaseModel, EmailStr, Field, field_serializer
+from pydantic import BaseModel, EmailStr, Field, field_serializer, field_validator
 from typing import Any, Literal, Optional
 from datetime import datetime, timezone
 from app.models import EstadoUsuario, RolUsuario
@@ -347,6 +347,7 @@ class ClienteCreate(BaseModel):
     nombre_completo: str
     whatsapp_numero: str = ""
     password_temporal: str
+    canal_envio: Literal["EMAIL", "WHATSAPP"] = "EMAIL"
 
 
 class ClienteUpdate(BaseModel):
@@ -545,6 +546,23 @@ class TareaCreate(BaseModel):
     cliente_id: Optional[int] = None
 
 
+class ComunicacionProcesoCreate(BaseModel):
+    asunto: str = Field(min_length=1, max_length=255)
+    contenido: str = Field(min_length=1, max_length=12000)
+    visibilidad: Literal["INTERNA", "CLIENTE"] = "INTERNA"
+    canal: Literal["INTERNO", "EMAIL", "WHATSAPP"] = "INTERNO"
+    cliente_id: int | None = None
+
+
+class DocumentoRevisionUpdate(BaseModel):
+    estado_revision: Literal["EN_REVISION", "APROBADO", "REQUIERE_CORRECCION", "RECHAZADO"]
+    comentario_revision: str = Field(default="", max_length=4000)
+
+
+class NotificacionesAbogadoLeidasUpdate(BaseModel):
+    ids: list[str] = Field(min_length=1, max_length=500)
+
+
 class TareaUpdate(BaseModel):
     titulo: Optional[str] = None
     descripcion: Optional[str] = None
@@ -583,6 +601,11 @@ class TareaOut(BaseModel):
 
     subtareas: list[SubtareaOut] = []
     recordatorios: list[RecordatorioTareaOut] = []
+
+    @field_validator("recordatorios", mode="before")
+    @classmethod
+    def ocultar_recordatorios_internos(cls, value):
+        return [item for item in (value or []) if not getattr(item, "interno_sistema", False)]
 
     class Config:
         from_attributes = True

@@ -475,6 +475,34 @@ class NotificacionProceso(Base):
     created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
 
 
+class ComunicacionProceso(Base):
+    """Entrada trazable de una comunicación o nota asociada al expediente."""
+    __tablename__ = "comunicaciones_proceso"
+
+    id = Column(Integer, primary_key=True, index=True)
+    proceso_id = Column(Integer, ForeignKey("procesos.id", ondelete="CASCADE"), nullable=False, index=True)
+    actor_id = Column(Integer, ForeignKey("usuarios.id", ondelete="SET NULL"), nullable=True, index=True)
+    cliente_id = Column(Integer, ForeignKey("usuarios.id", ondelete="SET NULL"), nullable=True, index=True)
+    visibilidad = Column(String(16), nullable=False, default="INTERNA", index=True)
+    canal = Column(String(16), nullable=False, default="INTERNO")
+    asunto = Column(String(255), nullable=False)
+    contenido = Column(Text, nullable=False)
+    created_at = Column(DateTime, nullable=False, default=datetime.utcnow, index=True)
+    proceso = relationship("Proceso")
+    actor = relationship("Usuario", foreign_keys=[actor_id])
+    cliente = relationship("Usuario", foreign_keys=[cliente_id])
+
+
+class LecturaNotificacionAbogado(Base):
+    __tablename__ = "lecturas_notificacion_abogado"
+    __table_args__ = (UniqueConstraint("usuario_id", "notificacion_id", name="uq_lectura_notificacion_abogado"),)
+
+    id = Column(Integer, primary_key=True, index=True)
+    usuario_id = Column(Integer, ForeignKey("usuarios.id", ondelete="CASCADE"), nullable=False, index=True)
+    notificacion_id = Column(String(120), nullable=False, index=True)
+    leida_en = Column(DateTime, nullable=False, default=datetime.utcnow)
+
+
 class EntregaNotificacion(Base):
     __tablename__ = "entregas_notificacion"
     __table_args__ = (
@@ -831,6 +859,7 @@ class RecordatorioTarea(Base):
 
     notificar_email = Column(Boolean, nullable=False, default=False)
     notificar_whatsapp = Column(Boolean, nullable=False, default=True)
+    interno_sistema = Column(Boolean, nullable=False, default=False, server_default="false", index=True)
 
     activo = Column(
         Boolean,

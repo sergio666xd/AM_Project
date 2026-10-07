@@ -41,6 +41,7 @@ type ClientForm = {
   email: string;
   whatsapp_numero: string;
   password_temporal: string;
+  canal_envio: "EMAIL" | "WHATSAPP";
 };
 
 const EMPTY_FORM: ClientForm = {
@@ -48,6 +49,7 @@ const EMPTY_FORM: ClientForm = {
   email: "",
   whatsapp_numero: "",
   password_temporal: "",
+  canal_envio: "EMAIL",
 };
 
 export default function ClientesPage() {
@@ -202,6 +204,7 @@ export default function ClientesPage() {
       email: client.email,
       whatsapp_numero: client.whatsapp_numero || "",
       password_temporal: "",
+      canal_envio: "EMAIL",
     });
 
     setOpenEdit(true);
@@ -236,6 +239,7 @@ export default function ClientesPage() {
             email: form.email.trim(),
             whatsapp_numero: form.whatsapp_numero.trim(),
             password_temporal: form.password_temporal,
+            canal_envio: form.canal_envio,
           }),
         }
       );
@@ -248,7 +252,7 @@ export default function ClientesPage() {
         );
       }
 
-      setNotice("Cliente creado correctamente con acceso temporal.");
+      setNotice(data.mensaje || "Cliente creado correctamente; credenciales programadas para envío.");
       setOpenCreate(false);
       setForm(EMPTY_FORM);
 
@@ -874,6 +878,7 @@ export default function ClientesPage() {
                   }))
                 }
                 placeholder="Opcional"
+                required={form.canal_envio === "WHATSAPP"}
               />
 
               <ClientField
@@ -890,6 +895,15 @@ export default function ClientesPage() {
                 required
                 hint="Debe tener al menos 8 caracteres."
               />
+
+              <label className="block text-sm font-medium text-[var(--foreground)]">
+                Enviar credenciales por
+                <select value={form.canal_envio} onChange={(event) => setForm((current) => ({ ...current, canal_envio: event.target.value as "EMAIL" | "WHATSAPP" }))} className="mt-1.5 h-10 w-full rounded-lg border border-[var(--border)] bg-[var(--background)] px-3 text-sm">
+                  <option value="EMAIL">Correo electrónico</option>
+                  <option value="WHATSAPP">WhatsApp</option>
+                </select>
+                <span className="mt-1 block text-xs font-normal text-[var(--foreground-muted)]">Se enviarán el usuario, la contraseña temporal y un botón para ingresar al portal. El cliente deberá cambiar la contraseña al iniciar sesión.</span>
+              </label>
             </div>
 
             <footer className="flex justify-end gap-2 border-t border-[var(--border)] px-5 py-4">

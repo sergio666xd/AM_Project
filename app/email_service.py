@@ -25,6 +25,11 @@ def _html_correo(cuerpo: str, firma: dict[str, str | bool] | None = None) -> str
             lineas.append(
                 f'<a href="{escape(url, quote=True)}" style="display:inline-block;margin:5px 0;padding:10px 16px;background:{_NAVY};color:#ffffff;text-decoration:none;border-radius:6px;font-weight:bold;">{label}</a>'
             )
+        elif (action := re.fullmatch(r"Abrir enlace:\s*(.{1,80}?)\s*\|\s*(https?://\S+)", line.strip())):
+            label, url = action.groups()
+            lineas.append(
+                f'<a href="{escape(url, quote=True)}" style="display:inline-block;margin:12px 0;padding:12px 20px;background:{_NAVY};color:#ffffff;text-decoration:none;border-radius:7px;font-weight:bold;">{escape(label)}</a>'
+            )
         else:
             lineas.append(escape(line))
     contenido = "<br>\n".join(lineas)

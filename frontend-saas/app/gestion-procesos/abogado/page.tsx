@@ -48,6 +48,13 @@ interface SaasDashboardData {
   }[];
 }
 
+interface FirmDashboardData {
+  resumen: { procesos_activos: number; tareas_pendientes: number; tareas_vencidas: number; documentos_pendientes: number; solicitudes_clientes: number; consultas_con_error: number; proximos_eventos: number; procesos_sin_actividad: number; procesos_sin_responsable: number };
+  atencion: { tipo: string; titulo: string; descripcion: string; fecha?: string | null; href: string }[];
+  actividad_reciente: { id: string; tipo: string; titulo: string; descripcion: string; actor?: string | null; proceso: string; fecha: string; href: string; visibilidad: string }[];
+  acciones: { label: string; href: string }[];
+}
+
 async function requestOverview(isSaasLawyer: boolean) {
   const headers = {
     Authorization: `Bearer ${localStorage.getItem("token") || ""}`,
@@ -100,7 +107,7 @@ async function requestOverview(isSaasLawyer: boolean) {
 }
 
 export default function AbogadoPage() {
-  const { user } = useSession();
+  const { user, token, loading: sessionLoading } = useSession();
   const isSaasLawyer = user?.rol === "ABOGADO";
   const [data, setData] = useState<SummaryData>({
     processes: 0,
@@ -112,6 +119,7 @@ export default function AbogadoPage() {
   const [error, setError] = useState("");
   const [saasData, setSaasData] = useState<SaasDashboardData | null>(null);
   const [calendarTasks, setCalendarTasks] = useState<CalendarTask[]>([]);
+  const [firmDashboard, setFirmDashboard] = useState<FirmDashboardData | null>(null);
 
   useEffect(() => {
     let active = true;
@@ -130,6 +138,19 @@ export default function AbogadoPage() {
     return () => { active = false; };
   }, [isSaasLawyer]);
 
+  useEffect(() => {
+    if (sessionLoading || !token || isSaasLawyer) return;
+    let active = true;
+    apiRequest("/api/expedientes/dashboard", { headers: { Authorization: `Bearer ${token}` } })
+      .then(async (response) => {
+        const result = await response.json();
+        if (!response.ok) throw new Error(result.detail || "No fue posible cargar el panel del despacho.");
+        if (active) setFirmDashboard(result as FirmDashboardData);
+      })
+      .catch((cause: unknown) => { if (active) setError(cause instanceof Error ? cause.message : "No fue posible cargar el panel del despacho."); });
+    return () => { active = false; };
+  }, [isSaasLawyer, sessionLoading, token]);
+
   async function load() {
     setLoading(true);
     setError("");
@@ -138,6 +159,12 @@ export default function AbogadoPage() {
       setData(overview.summary);
       setSaasData(overview.saasData);
       setCalendarTasks(overview.calendarTasks);
+      if (!isSaasLawyer && token) {
+        const response = await apiRequest("/api/expedientes/dashboard", { headers: { Authorization: `Bearer ${token}` } });
+        const dashboard = await response.json();
+        if (!response.ok) throw new Error(dashboard.detail || "No fue posible cargar el panel del despacho.");
+        setFirmDashboard(dashboard as FirmDashboardData);
+      }
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "Error al cargar el resumen.");
     } finally {
@@ -270,6 +297,24 @@ export default function AbogadoPage() {
           )
         )}
       </div>
+
+      {!isSaasLawyer && firmDashboard && <section className="space-y-5" aria-label="Centro de trabajo de la firma">
+        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">{[
+          ["Procesos activos", firmDashboard.resumen.procesos_activos, "/gestion-procesos/abogado/procesos"],
+          ["Tareas pendientes", firmDashboard.resumen.tareas_pendientes, "/gestion-procesos/abogado/tareas"],
+          ["Tareas vencidas", firmDashboard.resumen.tareas_vencidas, "/gestion-procesos/abogado/tareas"],
+          ["Documentos pendientes", firmDashboard.resumen.documentos_pendientes, "/gestion-procesos/abogado/documentos"],
+          ["Solicitudes de clientes", firmDashboard.resumen.solicitudes_clientes, "/gestion-procesos/abogado/solicitudes-perfil"],
+          ["Consultas judiciales con error", firmDashboard.resumen.consultas_con_error, "/gestion-procesos/abogado/radicados"],
+          ["Próximos vencimientos", firmDashboard.resumen.proximos_eventos, "/gestion-procesos/abogado/agenda"],
+          ["Procesos sin actividad", firmDashboard.resumen.procesos_sin_actividad, "/gestion-procesos/abogado/procesos?filtro=ATENCION"],
+        ].map(([label, value, href]) => <Link key={String(label)} href={String(href)} className="rounded-xl border border-[var(--border)] bg-[var(--surface)] p-4 transition hover:border-[var(--primary)]/40"><p className="text-sm text-[var(--foreground-muted)]">{label}</p><p className="mt-2 text-2xl font-semibold text-[var(--foreground)]">{value}</p></Link>)}</div>
+        <div className="grid gap-5 xl:grid-cols-[1fr_1.2fr]">
+          <section className="overflow-hidden rounded-xl border border-[var(--border)] bg-[var(--surface)]"><header className="flex items-center justify-between border-b border-[var(--border)] px-5 py-4"><div><h2 className="font-semibold">Requiere tu atención</h2><p className="mt-1 text-xs text-[var(--foreground-muted)]">Tareas, documentos, consultas y procesos sin actividad reciente</p></div><Link href="/gestion-procesos/abogado/notificaciones" className="text-xs font-medium text-[var(--primary)] hover:underline">Ver avisos</Link></header>{firmDashboard.atencion.length ? <div className="divide-y divide-[var(--border)]">{firmDashboard.atencion.slice(0, 8).map((item, index) => <Link key={`${item.tipo}-${item.titulo}-${index}`} href={item.href} className="flex items-center justify-between gap-3 px-5 py-3 hover:bg-[var(--surface-hover)]"><span className="min-w-0"><span className="block truncate text-sm font-medium">{item.titulo}</span><span className="mt-1 block text-xs text-[var(--foreground-muted)]">{item.descripcion}</span></span><ArrowRight className="size-4 shrink-0 text-[var(--primary)]" /></Link>)}</div> : <p className="px-5 py-8 text-center text-sm text-[var(--foreground-muted)]">No hay elementos que requieran atención ahora.</p>}</section>
+          <section className="overflow-hidden rounded-xl border border-[var(--border)] bg-[var(--surface)]"><header className="border-b border-[var(--border)] px-5 py-4"><h2 className="font-semibold">Actividad reciente</h2><p className="mt-1 text-xs text-[var(--foreground-muted)]">Movimientos recientes de procesos, documentos y tareas.</p></header>{firmDashboard.actividad_reciente.length ? <div className="max-h-[28rem] divide-y divide-[var(--border)] overflow-y-auto">{firmDashboard.actividad_reciente.slice(0, 12).map((item) => <Link key={item.id} href={item.href} className="block px-5 py-3 hover:bg-[var(--surface-hover)]"><div className="flex items-center justify-between gap-3"><p className="truncate text-sm font-medium">{item.titulo}</p><span className="shrink-0 text-[10px] text-[var(--foreground-muted)]">{new Date(item.fecha).toLocaleString("es-CO")}</span></div><p className="mt-1 truncate text-xs text-[var(--foreground-muted)]">{item.proceso} · {item.tipo} · {item.descripcion}</p></Link>)}</div> : <p className="px-5 py-8 text-center text-sm text-[var(--foreground-muted)]">No hay actividad reciente.</p>}</section>
+        </div>
+        <section className="rounded-xl border border-[var(--border)] bg-[var(--surface)] p-4"><h2 className="mb-3 font-semibold">Acciones rápidas</h2><div className="flex flex-wrap gap-2">{firmDashboard.acciones.map((action) => <Link key={action.label} href={action.href} className="rounded-lg border border-[var(--border)] px-3 py-2 text-sm font-medium hover:bg-[var(--surface-hover)]">{action.label}</Link>)}</div></section>
+      </section>}
 
       <TaskMonthCalendar tasks={calendarTasks} />
 
