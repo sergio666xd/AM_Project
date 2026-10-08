@@ -10,14 +10,24 @@ type FirmSettings = {
   telefono: string; whatsapp: string; direccion: string; ciudad: string; pais: string;
   logo_url: string; sitio_web: string; zona_horaria: string; mostrar_contacto_publico: boolean;
   preferencias_notificacion: { email?: boolean; whatsapp?: boolean };
-  parametros_generales: Record<string, unknown>;
+  parametros_generales: Record<string, unknown> & { contrato_abogado?: ContractAttorneySettings };
+};
+
+type ContractAttorneySettings = {
+  nombre: string; genero: "MASCULINO" | "FEMENINO"; documento: string;
+  tarjeta_profesional: string; correo: string; telefono: string; domicilio: string;
+};
+
+const DEFAULT_CONTRACT_ATTORNEY: ContractAttorneySettings = {
+  nombre: "YEINNY ALEJANDRA MUÑOZ MARÍN", genero: "FEMENINO", documento: "40.328.563",
+  tarjeta_profesional: "375.092", correo: "alejandramunozabg@outlook.com", telefono: "3508809878", domicilio: "SABANETA",
 };
 
 const EMPTY: FirmSettings = {
   nombre: "", correo_contacto: "", correo_pqr: "", telefono: "", whatsapp: "",
   direccion: "", ciudad: "", pais: "Colombia", logo_url: "", sitio_web: "",
   zona_horaria: "America/Bogota", mostrar_contacto_publico: true,
-  preferencias_notificacion: { email: true, whatsapp: true }, parametros_generales: {},
+  preferencias_notificacion: { email: true, whatsapp: true }, parametros_generales: { contrato_abogado: DEFAULT_CONTRACT_ATTORNEY },
 };
 
 export default function AdminFirmSettingsPage() {
@@ -32,7 +42,7 @@ export default function AdminFirmSettingsPage() {
     if (!token) return;
     let active = true;
     fetchApi("/api/admin/configuracion/firma", { method: "GET", token })
-      .then((data: FirmSettings) => { if (active) setSettings(data); })
+      .then((data: FirmSettings) => { if (active) setSettings({ ...data, parametros_generales: { ...data.parametros_generales, contrato_abogado: { ...DEFAULT_CONTRACT_ATTORNEY, ...data.parametros_generales?.contrato_abogado } } }); })
       .catch((cause: unknown) => { if (active) setError(cause instanceof Error ? cause.message : "No se pudo cargar la configuración de la firma."); })
       .finally(() => { if (active) setLoading(false); });
     return () => { active = false; };
@@ -53,6 +63,14 @@ export default function AdminFirmSettingsPage() {
 
   const input = "mt-1 h-10 w-full rounded-md border border-border bg-background px-3 text-sm text-foreground";
   const set = (key: keyof FirmSettings, value: string | boolean) => setSettings((current) => ({ ...current, [key]: value }));
+  const attorney = settings.parametros_generales.contrato_abogado ?? DEFAULT_CONTRACT_ATTORNEY;
+  const setAttorney = (key: keyof ContractAttorneySettings, value: string) => setSettings((current) => ({
+    ...current,
+    parametros_generales: {
+      ...current.parametros_generales,
+      contrato_abogado: { ...(current.parametros_generales.contrato_abogado ?? DEFAULT_CONTRACT_ATTORNEY), [key]: key === "correo" ? value : value.toUpperCase() },
+    },
+  }));
 
   return <section className="mx-auto max-w-5xl space-y-6">
     <header><p className="text-xs font-semibold uppercase tracking-wide text-primary">Panel Administrativo · Firma</p><h1 className="mt-1 text-2xl font-semibold">Configuración de la firma</h1><p className="mt-1 text-sm text-foreground-muted">Identidad, contacto público y parámetros operativos de la firma. Las credenciales técnicas se administran aparte en Integraciones.</p></header>
@@ -76,6 +94,17 @@ export default function AdminFirmSettingsPage() {
         <label className="text-sm font-medium">Ciudad / departamento<input className={input} value={settings.ciudad} onChange={(e) => set("ciudad", e.target.value)} /></label>
         <label className="text-sm font-medium">País<input className={input} value={settings.pais} onChange={(e) => set("pais", e.target.value)} /></label>
         <label className="flex items-center gap-2 text-sm sm:col-span-2"><input type="checkbox" checked={settings.mostrar_contacto_publico} onChange={(e) => set("mostrar_contacto_publico", e.target.checked)} />Mostrar los canales en comunicaciones públicas de correo</label>
+      </fieldset>
+      <fieldset className="grid gap-4 rounded-lg border border-border bg-surface p-4 sm:grid-cols-2">
+        <legend className="px-2 font-semibold">Datos del abogado que aparecen en los contratos CPS</legend>
+        <label className="text-sm font-medium">Nombre<input required maxLength={150} className={input} value={attorney.nombre} onChange={(e) => setAttorney("nombre", e.target.value)} /></label>
+        <label className="text-sm font-medium">Género<select className={input} value={attorney.genero} onChange={(e) => setAttorney("genero", e.target.value)}><option value="FEMENINO">Femenino</option><option value="MASCULINO">Masculino</option></select></label>
+        <label className="text-sm font-medium">Documento<input required maxLength={40} className={input} value={attorney.documento} onChange={(e) => setAttorney("documento", e.target.value)} /></label>
+        <label className="text-sm font-medium">Tarjeta profesional<input required maxLength={40} className={input} value={attorney.tarjeta_profesional} onChange={(e) => setAttorney("tarjeta_profesional", e.target.value)} /></label>
+        <label className="text-sm font-medium">Correo del abogado<input required type="email" maxLength={320} className={input} value={attorney.correo} onChange={(e) => setAttorney("correo", e.target.value)} /></label>
+        <label className="text-sm font-medium">Teléfono del abogado<input required maxLength={40} className={input} value={attorney.telefono} onChange={(e) => setAttorney("telefono", e.target.value)} /></label>
+        <label className="text-sm font-medium sm:col-span-2">Domicilio del abogado<input required maxLength={120} className={input} value={attorney.domicilio} onChange={(e) => setAttorney("domicilio", e.target.value)} /></label>
+        <p className="text-xs text-foreground-muted sm:col-span-2">Estos datos precargan el formulario de cada contrato. Cada contrato guarda su propia versión; el encabezado y el pie de página del modelo permanecen intactos.</p>
       </fieldset>
       <fieldset className="grid gap-4 rounded-lg border border-border bg-surface p-4 sm:grid-cols-2">
         <legend className="px-2 font-semibold">Preferencias y parámetros generales</legend>

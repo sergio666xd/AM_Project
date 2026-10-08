@@ -59,6 +59,15 @@ def actualizar_esquema_planes() -> None:
         conexion.execute(text("ALTER TABLE usuarios ADD COLUMN IF NOT EXISTS ultimo_acceso TIMESTAMP"))
         conexion.execute(text("ALTER TABLE usuarios ADD COLUMN IF NOT EXISTS preferencias_notificacion JSON NOT NULL DEFAULT '{}'::json"))
         conexion.execute(text("ALTER TABLE usuarios ADD COLUMN IF NOT EXISTS canal_notificacion_cliente VARCHAR(16)"))
+        conexion.execute(text("ALTER TABLE usuarios ADD COLUMN IF NOT EXISTS genero VARCHAR(16)"))
+        conexion.execute(text("ALTER TABLE usuarios ADD COLUMN IF NOT EXISTS numero_documento VARCHAR(40)"))
+        conexion.execute(text("ALTER TABLE usuarios ADD COLUMN IF NOT EXISTS domicilio VARCHAR(120)"))
+        conexion.execute(text("ALTER TABLE usuarios ADD COLUMN IF NOT EXISTS direccion VARCHAR(300)"))
+        conexion.execute(text("ALTER TABLE usuarios ADD COLUMN IF NOT EXISTS tarjeta_profesional VARCHAR(40)"))
+        conexion.execute(text("ALTER TABLE solicitudes_edicion_perfil_cliente ADD COLUMN IF NOT EXISTS genero_solicitado VARCHAR(16)"))
+        conexion.execute(text("ALTER TABLE solicitudes_edicion_perfil_cliente ADD COLUMN IF NOT EXISTS numero_documento_solicitado VARCHAR(40)"))
+        conexion.execute(text("ALTER TABLE solicitudes_edicion_perfil_cliente ADD COLUMN IF NOT EXISTS domicilio_solicitado VARCHAR(120)"))
+        conexion.execute(text("ALTER TABLE solicitudes_edicion_perfil_cliente ADD COLUMN IF NOT EXISTS direccion_solicitada VARCHAR(300)"))
         conexion.execute(text("""
             UPDATE usuarios
             SET preferencias_notificacion = json_build_object(
@@ -113,6 +122,8 @@ def actualizar_esquema_planes() -> None:
         conexion.execute(text("ALTER TABLE comunicaciones_proceso ADD COLUMN IF NOT EXISTS leido_en TIMESTAMP"))
         conexion.execute(text("ALTER TABLE eventos_agenda ADD COLUMN IF NOT EXISTS contrato_id INTEGER REFERENCES contratos_servicios(id) ON DELETE SET NULL"))
         conexion.execute(text("ALTER TABLE documentos_proceso ADD COLUMN IF NOT EXISTS contrato_id INTEGER REFERENCES contratos_servicios(id) ON DELETE SET NULL"))
+        conexion.execute(text("ALTER TABLE contratos_servicios ADD COLUMN IF NOT EXISTS campos_actual JSON NOT NULL DEFAULT '{}'::json"))
+        conexion.execute(text("ALTER TABLE contratos_servicios_versiones ADD COLUMN IF NOT EXISTS campos JSON NOT NULL DEFAULT '{}'::json"))
 
 ALLOWED_CARD_TYPES = {"application/pdf", "image/jpeg", "image/png"}
 ALLOWED_CARD_EXTENSIONS = {".pdf", ".jpg", ".jpeg", ".png"}
@@ -752,7 +763,10 @@ def actualizar_mi_perfil(datos: schemas.PerfilUpdate, usuario_actual: models.Usu
         raise HTTPException(status_code=403, detail="Correo y WhatsApp solo se pueden cambiar con verificación OTP desde Configuración > Seguridad.")
     if usuario_actual.rol == models.RolUsuario.CLIENTE and any(
         value is not None
-        for value in (datos.email, datos.nombre_completo, datos.whatsapp_numero)
+        for value in (
+            datos.email, datos.nombre_completo, datos.whatsapp_numero, datos.genero,
+            datos.numero_documento, datos.domicilio, datos.direccion, datos.tarjeta_profesional,
+        )
     ):
         raise HTTPException(
             status_code=403,
@@ -774,10 +788,24 @@ def actualizar_mi_perfil(datos: schemas.PerfilUpdate, usuario_actual: models.Usu
         usuario_actual.nombre_completo = nombre
     if datos.whatsapp_numero is not None:
         usuario_actual.whatsapp_numero = datos.whatsapp_numero.strip()
+    if datos.genero is not None:
+        genero = datos.genero.strip().upper()
+        if genero and genero not in {"MASCULINO", "FEMENINO"}:
+            raise HTTPException(status_code=400, detail="Selecciona masculino o femenino.")
+        usuario_actual.genero = genero or None
+    for field in ("numero_documento", "domicilio", "direccion", "tarjeta_profesional"):
+        value = getattr(datos, field)
+        if value is not None:
+            setattr(usuario_actual, field, value.strip().upper() or None)
     registrar_evento_auditoria(db, usuario_actual, "auth.perfil.actualizar", "usuario", usuario_actual.id)
     db.commit()
     db.refresh(usuario_actual)
-    return {"email": usuario_actual.email, "nombre_completo": usuario_actual.nombre_completo, "whatsapp_numero": usuario_actual.whatsapp_numero}
+    return {
+        "email": usuario_actual.email, "nombre_completo": usuario_actual.nombre_completo,
+        "whatsapp_numero": usuario_actual.whatsapp_numero, "genero": usuario_actual.genero,
+        "numero_documento": usuario_actual.numero_documento, "domicilio": usuario_actual.domicilio,
+        "direccion": usuario_actual.direccion, "tarjeta_profesional": usuario_actual.tarjeta_profesional,
+    }
 
 @app.get("/api/auth/me")
 def obtener_mi_usuario(
@@ -801,6 +829,11 @@ def obtener_mi_usuario(
         "email": usuario.email,
         "nombre_completo": usuario.nombre_completo,
         "whatsapp_numero": usuario.whatsapp_numero,
+        "genero": usuario.genero,
+        "numero_documento": usuario.numero_documento,
+        "domicilio": usuario.domicilio,
+        "direccion": usuario.direccion,
+        "tarjeta_profesional": usuario.tarjeta_profesional,
         "rol": usuario.rol.value
         if hasattr(usuario.rol, "value")
         else usuario.rol,

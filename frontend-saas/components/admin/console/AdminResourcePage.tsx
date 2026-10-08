@@ -8,6 +8,7 @@ import {
   Download,
   Eye,
   Link2,
+  Loader2,
   Mail,
   Pencil,
   Plus,
@@ -32,6 +33,7 @@ type Row = Record<string, unknown> & {
   nombre_archivo?: string;
   estado?: string;
   estado_revision?: string;
+  contrato_id?: number | null;
   comentario_revision?: string | null;
   fecha_limite?: string | null;
   archivado_en?: string | null;
@@ -172,7 +174,8 @@ function display(value: unknown) {
 export default function AdminResourcePage({ sector }: { sector: Sector }) {
   const pathname = usePathname();
   const requestsOnly = pathname.endsWith("/documentos/solicitudes");
-  const resource = (requestsOnly ? "documentos" : pathname.split("/").filter(Boolean).pop()) as Resource;
+  const contractsOnly = pathname.endsWith("/documentos/contratos");
+  const resource = (requestsOnly || contractsOnly ? "documentos" : pathname.split("/").filter(Boolean).pop()) as Resource;
   const validResource =
     typeof resource === "string" && Object.hasOwn(resourceNames, resource);
   const { token } = useSession();
@@ -201,6 +204,7 @@ export default function AdminResourcePage({ sector }: { sector: Sector }) {
   const [calendarMonth, setCalendarMonth] = useState(() => new Date().toISOString().slice(0, 7));
   const [loading, setLoading] = useState(true);
   const [working, setWorking] = useState(false);
+  const [downloadingDocumentId, setDownloadingDocumentId] = useState<number | null>(null);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const [editing, setEditing] = useState<Row | null>(null);
@@ -315,7 +319,10 @@ export default function AdminResourcePage({ sector }: { sector: Sector }) {
       }),
     [rows, state, query, ownerFilter, processFilter, clientFilter, dateFrom, dateTo],
   );
-  const selectedVisibleRows = filtered.filter((row) => selectedIds.includes(row.id));
+  const routeFiltered = resource === "documentos"
+    ? filtered.filter((row) => contractsOnly === Boolean(row.contrato_id))
+    : filtered;
+  const selectedVisibleRows = routeFiltered.filter((row) => selectedIds.includes(row.id));
   const states = [
     ...new Set([
       rows
@@ -326,13 +333,13 @@ export default function AdminResourcePage({ sector }: { sector: Sector }) {
   ];
   const tasksByState = ["PENDIENTE", "EN_CURSO", "COMPLETADA", "CANCELADA"].map((status) => ({
     status,
-    rows: filtered.filter((row) => String(row.estado) === status),
+    rows: routeFiltered.filter((row) => String(row.estado) === status),
   }));
   const [calendarYear, calendarMonthNumber] = calendarMonth.split("-").map(Number);
   const calendarDays = new Date(Date.UTC(calendarYear, calendarMonthNumber, 0)).getUTCDate();
   const calendarOffset = (new Date(Date.UTC(calendarYear, calendarMonthNumber - 1, 1)).getUTCDay() + 6) % 7;
   const tasksByDueDate = new Map<string, Row[]>();
-  for (const row of filtered) {
+  for (const row of routeFiltered) {
     const due = typeof row.fecha_limite === "string" ? row.fecha_limite.slice(0, 10) : "";
     if (due.startsWith(calendarMonth)) tasksByDueDate.set(due, [...(tasksByDueDate.get(due) ?? []), row]);
   }
@@ -571,7 +578,8 @@ export default function AdminResourcePage({ sector }: { sector: Sector }) {
   }
 
   async function download(row: Row) {
-    if (!token) return;
+    if (!token || downloadingDocumentId !== null) return;
+    setDownloadingDocumentId(row.id);
     setError("");
     try {
       const response = await adminFetch(
@@ -596,6 +604,8 @@ export default function AdminResourcePage({ sector }: { sector: Sector }) {
           ? cause.message
           : "No fue posible descargar el archivo.",
       );
+    } finally {
+      setDownloadingDocumentId(null);
     }
   }
 
@@ -840,6 +850,7 @@ export default function AdminResourcePage({ sector }: { sector: Sector }) {
             ]
           : [
               { key: "nombre_archivo", label: "Documento" },
+              ...(contractsOnly ? [{ key: "contrato_id", label: "Contrato" }] : []),
               { key: "estado_revision", label: "Estado de revisión" },
               { key: "proceso", label: "Proceso" },
               { key: "cliente", label: "Cliente" },
@@ -855,7 +866,7 @@ export default function AdminResourcePage({ sector }: { sector: Sector }) {
             Panel Administrativo · {sectorLabel}
           </p>
           <h1 className="mt-1 text-2xl font-semibold text-foreground">
-            {requestsOnly ? "Solicitudes documentales" : resourceNames[resource]}
+            {requestsOnly ? "Solicitudes documentales" : contractsOnly ? "Contratos cargados" : resourceNames[resource]}
           </h1>
           <p className="mt-1 text-sm text-foreground-muted">
             Registros restringidos a este ámbito administrativo.
@@ -973,18 +984,18 @@ export default function AdminResourcePage({ sector }: { sector: Sector }) {
         <div className="flex items-center justify-between"><h2 className="font-semibold">Vencimientos</h2><label className="text-xs text-foreground-muted">Mes<input type="month" aria-label="Mes del calendario de tareas" value={calendarMonth} onChange={(event) => setCalendarMonth(event.target.value)} className="ml-2 h-9 rounded-md border border-border bg-background px-2 text-sm text-foreground" /></label></div>
         <div className="grid grid-cols-7 border-l border-t border-border">{["Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom"].map((day) => <div key={day} className="border-b border-r border-border bg-surface-secondary p-2 text-xs font-semibold text-foreground-muted">{day}</div>)}{Array.from({ length: Math.ceil((calendarOffset + calendarDays) / 7) * 7 }, (_, index) => { const day = index - calendarOffset + 1; if (day < 1 || day > calendarDays) return <div key={`empty-${index}`} className="min-h-24 border-b border-r border-border bg-background-secondary/40" />; const key = `${calendarMonth}-${String(day).padStart(2, "0")}`; return <div key={key} className="min-h-24 border-b border-r border-border p-2"><p className="mb-1 text-xs text-foreground-muted">{day}</p><div className="space-y-1">{(tasksByDueDate.get(key) ?? []).map((row) => <button key={row.id} type="button" onClick={() => openEdit(row)} className="block w-full truncate rounded bg-primary/10 px-1.5 py-1 text-left text-xs text-primary">{String(row.titulo ?? row.nombre ?? "Tarea")}</button>)}</div></div>;})}</div>
       </section>}
-      {resource === "documentos" && <nav aria-label="Subpáginas documentales" className="flex flex-wrap gap-2"><a href="/gestion-procesos/admin/documentos" aria-current={!requestsOnly ? "page" : undefined} className={`rounded-md border border-border px-3 py-2 text-sm ${!requestsOnly ? "bg-primary text-white" : "hover:bg-surface-hover"}`}>Archivos</a><a href="/gestion-procesos/admin/documentos/solicitudes" aria-current={requestsOnly ? "page" : undefined} className={`rounded-md border border-border px-3 py-2 text-sm ${requestsOnly ? "bg-primary text-white" : "hover:bg-surface-hover"}`}>Solicitudes documentales</a></nav>}
+      {resource === "documentos" && <nav aria-label="Subpáginas documentales" className="flex flex-wrap gap-2"><a href="/gestion-procesos/admin/documentos" aria-current={!requestsOnly && !contractsOnly ? "page" : undefined} className={`rounded-md border border-border px-3 py-2 text-sm ${!requestsOnly && !contractsOnly ? "bg-primary text-white" : "hover:bg-surface-hover"}`}>Archivos</a><a href="/gestion-procesos/admin/documentos/contratos" aria-current={contractsOnly ? "page" : undefined} className={`rounded-md border border-border px-3 py-2 text-sm ${contractsOnly ? "bg-primary text-white" : "hover:bg-surface-hover"}`}>Contratos cargados</a><a href="/gestion-procesos/admin/documentos/solicitudes" aria-current={requestsOnly ? "page" : undefined} className={`rounded-md border border-border px-3 py-2 text-sm ${requestsOnly ? "bg-primary text-white" : "hover:bg-surface-hover"}`}>Solicitudes documentales</a></nav>}
       {resource === "documentos" && requestsOnly && <section className="space-y-3 rounded-lg border border-border bg-surface p-4">
         <div><h2 className="font-semibold">Solicitudes y revisión</h2><p className="text-sm text-foreground-muted">Seguimiento de documentos solicitados y recibidos por los clientes.</p></div>
         <div className="overflow-x-auto"><table className="w-full min-w-190 text-left text-sm"><thead className="bg-surface-secondary text-xs text-foreground-muted"><tr><th className="px-3 py-2">Solicitud</th><th className="px-3 py-2">Proceso</th><th className="px-3 py-2">Cliente</th><th className="px-3 py-2">Estado</th><th className="px-3 py-2">Documento</th><th className="px-3 py-2">Solicitado</th><th className="px-3 py-2">Vence</th><th className="px-3 py-2">Detalle</th></tr></thead><tbody>{visibleDocumentRequests.map((request) => <tr key={request.id} className="border-t border-border"><td className="px-3 py-2 font-medium"><button type="button" onClick={() => setDetailRequest(request)} className="text-left text-primary hover:underline">{request.titulo}</button></td><td className="px-3 py-2">{request.proceso}</td><td className="px-3 py-2">{request.cliente}</td><td className="px-3 py-2">{request.estado === "SOLICITADO" ? "Pendiente" : request.estado === "RECIBIDO" ? "Recibido" : request.estado === "EN_REVISION" ? "En revisión" : request.estado === "REQUIERE_CORRECCION" ? "Requiere corrección" : request.estado === "APROBADO" ? "Aprobado" : request.estado === "RECHAZADO" ? "Rechazado" : request.estado === "VENCIDO" ? "Vencido" : request.estado}</td><td className="px-3 py-2">{request.documento ?? "Pendiente de carga"}{request.documento_id && <button type="button" onClick={() => { const row = rows.find((item) => item.id === request.documento_id); if (row) openEdit(row); }} className="ml-2 text-primary underline">Revisar</button>}</td><td className="px-3 py-2 text-xs text-foreground-muted">{display(request.solicitado_en)}</td><td className="px-3 py-2 text-xs text-foreground-muted">{display(request.fecha_limite)}</td><td className="px-3 py-2"><button type="button" onClick={() => setDetailRequest(request)} className="rounded border border-border px-2 py-1 text-xs hover:bg-surface-hover">Ver detalle</button></td></tr>)}</tbody></table>{visibleDocumentRequests.length === 0 && <p className="py-6 text-center text-sm text-foreground-muted">No hay solicitudes documentales para estos filtros.</p>}</div>
       </section>}
       {resource === "documentos" && requestsOnly && <div className="flex flex-wrap items-center gap-3 rounded-lg border border-border bg-surface p-3"><label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={visibleDocumentRequests.length > 0 && visibleDocumentRequests.every((request) => selectedRequestIds.includes(request.id))} onChange={(event) => setSelectedRequestIds((current) => event.target.checked ? [...new Set([...current, ...visibleDocumentRequests.map((request) => request.id)])] : current.filter((id) => !visibleDocumentRequests.some((request) => request.id === id)))} />Seleccionar solicitudes visibles</label><span className="text-sm text-foreground-muted">{visibleDocumentRequests.filter((request) => selectedRequestIds.includes(request.id)).length} seleccionadas</span><button type="button" disabled={!visibleDocumentRequests.some((request) => selectedRequestIds.includes(request.id))} onClick={exportSelectedRequests} className="ml-auto rounded-md border border-border px-3 py-2 text-sm disabled:opacity-50">Exportar selección CSV</button></div>}
-      {!requestsOnly && <div className="flex flex-wrap items-center gap-3 rounded-lg border border-border bg-surface p-3"><label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={filtered.length > 0 && filtered.every((row) => selectedIds.includes(row.id))} onChange={(event) => setSelectedIds((current) => event.target.checked ? [...new Set([...current, ...filtered.map((row) => row.id)])] : current.filter((id) => !filtered.some((row) => row.id === id)))} />Seleccionar registros visibles</label><span className="text-sm text-foreground-muted">{selectedVisibleRows.length} seleccionados</span><div className="ml-auto flex flex-wrap gap-2">{resource === "radicados" && <button type="button" disabled={!selectedVisibleRows.length || working} onClick={() => void runBulkAction("CONSULT")} className="rounded-md border border-border px-3 py-2 text-sm disabled:opacity-50">Consultar selección</button>}{resource === "procesos" && archived && <button type="button" disabled={!selectedVisibleRows.length || working} onClick={() => void runBulkAction("RESTORE")} className="rounded-md border border-border px-3 py-2 text-sm disabled:opacity-50">Restaurar seleccionados</button>}{selectedVisibleRows.length > 0 && (resource !== "procesos" || !archived) && <button type="button" disabled={working} onClick={() => void runBulkAction("DELETE")} className="rounded-md border border-danger/30 px-3 py-2 text-sm text-danger disabled:opacity-50">{resource === "procesos" ? "Archivar seleccionados" : "Eliminar seleccionados"}</button>}</div></div>}
+      {!requestsOnly && <div className="flex flex-wrap items-center gap-3 rounded-lg border border-border bg-surface p-3"><label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={routeFiltered.length > 0 && routeFiltered.every((row) => selectedIds.includes(row.id))} onChange={(event) => setSelectedIds((current) => event.target.checked ? [...new Set([...current, ...routeFiltered.map((row) => row.id)])] : current.filter((id) => !routeFiltered.some((row) => row.id === id)))} />Seleccionar registros visibles</label><span className="text-sm text-foreground-muted">{selectedVisibleRows.length} seleccionados</span><div className="ml-auto flex flex-wrap gap-2">{resource === "radicados" && <button type="button" disabled={!selectedVisibleRows.length || working} onClick={() => void runBulkAction("CONSULT")} className="rounded-md border border-border px-3 py-2 text-sm disabled:opacity-50">Consultar selección</button>}{resource === "procesos" && archived && <button type="button" disabled={!selectedVisibleRows.length || working} onClick={() => void runBulkAction("RESTORE")} className="rounded-md border border-border px-3 py-2 text-sm disabled:opacity-50">Restaurar seleccionados</button>}{selectedVisibleRows.length > 0 && (resource !== "procesos" || !archived) && <button type="button" disabled={working} onClick={() => void runBulkAction("DELETE")} className="rounded-md border border-danger/30 px-3 py-2 text-sm text-danger disabled:opacity-50">{resource === "procesos" ? "Archivar seleccionados" : "Eliminar seleccionados"}</button>}</div></div>}
       {!requestsOnly && <div className="overflow-x-auto rounded-lg border border-border bg-surface">
         <table className="w-full min-w-195 text-left text-sm">
           <thead className="border-b border-border bg-surface-secondary text-xs uppercase text-foreground-muted">
             <tr>
-              <th className="px-4 py-3"><input type="checkbox" aria-label="Seleccionar registros visibles" checked={filtered.length > 0 && filtered.every((row) => selectedIds.includes(row.id))} onChange={(event) => setSelectedIds((current) => event.target.checked ? [...new Set([...current, ...filtered.map((row) => row.id)])] : current.filter((id) => !filtered.some((row) => row.id === id)))} /></th>
+              <th className="px-4 py-3"><input type="checkbox" aria-label="Seleccionar registros visibles" checked={routeFiltered.length > 0 && routeFiltered.every((row) => selectedIds.includes(row.id))} onChange={(event) => setSelectedIds((current) => event.target.checked ? [...new Set([...current, ...routeFiltered.map((row) => row.id)])] : current.filter((id) => !routeFiltered.some((row) => row.id === id)))} /></th>
               <th className="px-4 py-3">ID / detalle</th>
               {columns.map((column) => (
                 <th key={column.key} className="px-4 py-3">
@@ -1004,8 +1015,8 @@ export default function AdminResourcePage({ sector }: { sector: Sector }) {
                   Cargando registros...
                 </td>
               </tr>
-            ) : filtered.length ? (
-              filtered.map((row) => (
+            ) : routeFiltered.length ? (
+              routeFiltered.map((row) => (
                 <tr
                   key={row.id}
                   className="border-b border-border last:border-0"
@@ -1062,11 +1073,12 @@ export default function AdminResourcePage({ sector }: { sector: Sector }) {
                           </button>
                           <button
                             type="button"
+                            disabled={downloadingDocumentId !== null}
                             onClick={() => void download(row)}
                             aria-label={`Descargar ${String(row.nombre_archivo)}`}
-                            className="grid size-9 place-items-center rounded-md border border-border hover:bg-surface-hover"
+                            className="grid size-9 place-items-center rounded-md border border-border hover:bg-surface-hover disabled:opacity-50"
                           >
-                            <Download className="size-4" />
+                            {downloadingDocumentId === row.id ? <Loader2 className="size-4 animate-spin" /> : <Download className="size-4" />}
                           </button>
                           <button
                             type="button"

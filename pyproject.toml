@@ -21,4 +21,7 @@ dependencies = [
     "requests",
     "boto3",
     "qstash",
+    "pypdf>=6.0,<7",
+    "pypdfium2>=4.30,<5",
+    "reportlab>=4.3,<5",
 ]

@@ -11,6 +11,7 @@ export type CalendarTask = {
   prioridad?: string;
   fecha_limite: string | null;
   href?: string;
+  soloFecha?: boolean;
 };
 
 const weekdays = ["Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom"];
@@ -61,11 +62,11 @@ export default function TaskMonthCalendar({ tasks }: { tasks: CalendarTask[] }) 
   }
 
   return (
-    <section aria-label="Calendario de tareas" className="overflow-hidden rounded-xl border border-[var(--border)] bg-[var(--surface)]">
+    <section aria-label="Calendario de agenda" className="overflow-hidden rounded-xl border border-[var(--border)] bg-[var(--surface)]">
       <header className="flex flex-wrap items-center justify-between gap-3 border-b border-[var(--border)] px-4 py-3 sm:px-5">
         <div>
-          <h2 className="font-semibold text-[var(--foreground)]">Calendario de tareas</h2>
-          <p className="mt-0.5 text-xs text-[var(--foreground-muted)]">Vencimientos registrados</p>
+          <h2 className="font-semibold text-[var(--foreground)]">Calendario de agenda</h2>
+          <p className="mt-0.5 text-xs text-[var(--foreground-muted)]">Tareas, eventos y actuaciones registradas</p>
         </div>
         <div className="flex items-center gap-2">
           <button type="button" onClick={() => moveMonth(-1)} aria-label="Mes anterior" className="grid size-9 place-items-center rounded-md border border-[var(--border)] hover:bg-[var(--surface-hover)]"><ChevronLeft className="size-4" /></button>
@@ -94,9 +95,9 @@ export default function TaskMonthCalendar({ tasks }: { tasks: CalendarTask[] }) 
       <section aria-label={`Tareas del ${dayFormatter.format(selectedDate)}`} className="space-y-2 p-4 sm:p-5">
         <h3 className="text-sm font-semibold capitalize text-[var(--foreground)]">{dayFormatter.format(selectedDate)}</h3>
         {selectedTasks.length ? selectedTasks.map((task) => {
-          const content = <><span className="min-w-0"><span className="block truncate text-sm font-medium text-[var(--foreground)]">{task.titulo}</span><span className="mt-0.5 block text-xs text-[var(--foreground-muted)]">{task.estado.replaceAll("_", " ")}{task.prioridad ? ` · ${task.prioridad.toLowerCase()}` : ""}</span></span><span className="inline-flex shrink-0 items-center gap-1.5 text-xs text-[var(--foreground-muted)]"><Clock3 className="size-3.5" />{timeFormatter.format(new Date(task.fecha_limite!))}</span></>;
+          const content = <><span className="min-w-0"><span className="block truncate text-sm font-medium text-[var(--foreground)]">{task.titulo}</span><span className="mt-0.5 block text-xs text-[var(--foreground-muted)]">{task.estado.replaceAll("_", " ")}{task.prioridad ? ` · ${task.prioridad.toLowerCase()}` : ""}</span></span>{!task.soloFecha && <span className="inline-flex shrink-0 items-center gap-1.5 text-xs text-[var(--foreground-muted)]"><Clock3 className="size-3.5" />{timeFormatter.format(new Date(task.fecha_limite!))}</span>}</>;
           return task.href ? <Link key={task.id} href={task.href} className="flex items-center justify-between gap-3 rounded-md border border-[var(--border)] px-3 py-2.5 transition hover:bg-[var(--surface-hover)]">{content}</Link> : <div key={task.id} className="flex items-center justify-between gap-3 rounded-md border border-[var(--border)] px-3 py-2.5">{content}</div>;
-        }) : <p className="text-sm text-[var(--foreground-muted)]">No hay tareas con vencimiento este día.</p>}
+        }) : <p className="text-sm text-[var(--foreground-muted)]">No hay actividades este día.</p>}
       </section>
     </section>
   );

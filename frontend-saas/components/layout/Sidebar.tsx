@@ -120,6 +120,7 @@ const lawyerMenuItems = (isSaas: boolean, isFirmAdmin: boolean) => [
   { label: "Tareas", href: isSaas ? "/gestion-procesos/dashboard/tareas" : "/gestion-procesos/abogado/tareas", icon: ListChecks },
   { label: "Agenda", href: "/gestion-procesos/abogado/agenda", icon: CalendarDays },
   { label: "Documentos", href: "/gestion-procesos/abogado/documentos", icon: FileText },
+  ...(isFirmAdmin ? [{ label: "Contratos", href: "/gestion-procesos/abogado/contratos", icon: FileText }] : []),
   { label: "Notificaciones", href: "/gestion-procesos/abogado/notificaciones", icon: Bell },
   ...(isFirmAdmin ? [{ label: "Métricas y carga", href: "/gestion-procesos/abogado/metricas", icon: LayoutDashboard }] : []),
 ];

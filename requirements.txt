@@ -13,3 +13,6 @@ python-jose[cryptography]
 cryptography
 requests
 boto3
+pypdf>=6.0,<7
+pypdfium2>=4.30,<5
+reportlab>=4.3,<5

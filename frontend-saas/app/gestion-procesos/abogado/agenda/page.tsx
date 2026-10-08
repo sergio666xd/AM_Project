@@ -23,20 +23,22 @@ type Task = {
 type Process = { id: number; nombre: string };
 type Client = { id: number; nombre_completo: string };
 type Radicado = { id: number; numero: string };
-type AgendaEvent = { id: number; titulo: string; descripcion?: string | null; tipo: "EVENTO" | "AUDIENCIA" | "REUNION"; estado: "PROGRAMADO" | "COMPLETADO" | "CANCELADO"; fecha_inicio: string; proceso_id: number; proceso: string; cliente_id?: number | null; cliente?: string | null; responsable_id?: number | null };
-type AgendaData = { tasks: Task[]; processes: Process[]; clients: Client[]; radicados: Radicado[]; events: AgendaEvent[] };
+type AgendaEvent = { id: number; titulo: string; descripcion?: string | null; tipo: "EVENTO" | "AUDIENCIA" | "REUNION" | "FIRMA_CONTRATO"; estado: "PROGRAMADO" | "COMPLETADO" | "CANCELADO"; fecha_inicio: string; proceso_id: number; proceso: string; cliente_id?: number | null; cliente?: string | null; responsable_id?: number | null };
+type AgendaActuacion = { id: number; titulo: string; descripcion: string; fecha: string; proceso_id: number; proceso: string; abogado_id: number; cliente_ids: number[]; radicado_id: number; radicado: string };
+type AgendaData = { tasks: Task[]; processes: Process[]; clients: Client[]; radicados: Radicado[]; events: AgendaEvent[]; actuaciones: AgendaActuacion[] };
 type AgendaFilter = "TODAS" | "VENCIDAS" | "HOY" | "PROXIMAS";
 type AgendaView = "DIA" | "SEMANA" | "MES" | "LISTA";
 
 async function cargarAgenda(token: string): Promise<AgendaData> {
-  const [tasks, processes, clients, radicados, events] = await Promise.all([
+  const [tasks, processes, clients, radicados, events, actuaciones] = await Promise.all([
     fetchApi("/api/tareas", { method: "GET", token }),
     fetchApi("/api/expedientes/procesos", { method: "GET", token }),
     fetchApi("/api/expedientes/clientes", { method: "GET", token }),
     fetchApi("/api/radicados", { method: "GET", token }),
     fetchApi("/api/expedientes/agenda/eventos", { method: "GET", token }),
+    fetchApi("/api/expedientes/agenda/actuaciones", { method: "GET", token }),
   ]);
-  return { tasks, processes, clients, radicados, events };
+  return { tasks, processes, clients, radicados, events, actuaciones };
 }
 
 function inicioDelDia(value: string) {
@@ -69,13 +71,17 @@ function formatoFecha(value: string) {
   });
 }
 
+function etiquetaTipoEvento(tipo: AgendaEvent["tipo"]) {
+  return { AUDIENCIA: "Audiencia", REUNION: "Reunión", FIRMA_CONTRATO: "Firma de contrato", EVENTO: "Evento" }[tipo];
+}
+
 function etiquetaPrioridad(priority: Task["prioridad"]) {
   return { BAJA: "Baja", MEDIA: "Media", ALTA: "Alta", URGENTE: "Urgente" }[priority];
 }
 
 export default function AgendaPage() {
   const { token, user, loading: sessionLoading } = useSession();
-  const [data, setData] = useState<AgendaData>({ tasks: [], processes: [], clients: [], radicados: [], events: [] });
+  const [data, setData] = useState<AgendaData>({ tasks: [], processes: [], clients: [], radicados: [], events: [], actuaciones: [] });
   const [filter, setFilter] = useState<AgendaFilter>("TODAS");
   const [view, setView] = useState<AgendaView>("SEMANA");
   const [selectedDate, setSelectedDate] = useState(() => claveFecha(new Date()));
@@ -145,9 +151,17 @@ export default function AgendaPage() {
   const eventsForView = filteredEvents.filter((event) => view === "DIA" ? claveFechaIso(event.fecha_inicio) === selectedDate
     : view === "SEMANA" ? claveFechaIso(event.fecha_inicio) >= weekStart && claveFechaIso(event.fecha_inicio) <= sumarDias(weekStart, 6)
     : view === "MES" ? claveFechaIso(event.fecha_inicio).slice(0, 7) === selectedDate.slice(0, 7) : true);
+  const filteredActuations = data.actuaciones.filter((item) => (processFilter === "TODOS" || String(item.proceso_id) === processFilter)
+    && (clientFilter === "TODOS" || item.cliente_ids.includes(Number(clientFilter)))
+    && (responsibleFilter === "TODOS" || (responsibleFilter === "YO" ? item.abogado_id === user?.id : item.abogado_id !== user?.id))
+    && (typeFilter === "TODOS" || typeFilter === "ACTUACION"));
+  const actuacionesForView = filteredActuations.filter((item) => view === "DIA" ? claveFechaIso(item.fecha) === selectedDate
+    : view === "SEMANA" ? claveFechaIso(item.fecha) >= weekStart && claveFechaIso(item.fecha) <= sumarDias(weekStart, 6)
+    : view === "MES" ? claveFechaIso(item.fecha).slice(0, 7) === selectedDate.slice(0, 7) : true);
   const calendarItems: CalendarTask[] = [
     ...tareasConVencimiento.map((task) => ({ id: task.id, titulo: task.titulo, estado: task.estado, prioridad: task.prioridad, fecha_limite: task.fecha_limite ?? null, href: `${taskBase}/${task.id}` })),
-    ...filteredEvents.map((event) => ({ id: -event.id, titulo: `${event.tipo === "AUDIENCIA" ? "Audiencia" : event.tipo === "REUNION" ? "Reunión" : "Evento"}: ${event.titulo}`, estado: event.estado, fecha_limite: event.fecha_inicio, href: `/gestion-procesos/abogado/procesos/${event.proceso_id}#agenda` })),
+    ...filteredEvents.map((event) => ({ id: -event.id, titulo: `${etiquetaTipoEvento(event.tipo)}: ${event.titulo}`, estado: event.estado, fecha_limite: event.fecha_inicio, href: `/gestion-procesos/abogado/procesos/${event.proceso_id}#agenda` })),
+    ...filteredActuations.map((item) => ({ id: -1000000 - item.id, titulo: `Actuación judicial: ${item.titulo}`, estado: "REGISTRADA", fecha_limite: item.fecha, href: `/gestion-procesos/abogado/procesos/${item.proceso_id}#actividad`, soloFecha: true })),
   ];
   const filters: { id: AgendaFilter; label: string }[] = [
     { id: "TODAS", label: "Todas" },
@@ -162,7 +176,7 @@ export default function AgendaPage() {
         <div>
           <p className="text-sm text-(--foreground-muted)">Trabajo jurídico</p>
           <h1 className="mt-1 text-2xl font-semibold text-foreground">Agenda</h1>
-          <p className="mt-1 text-sm text-(--foreground-muted)">Vencimientos y recordatorios de tus tareas.</p>
+          <p className="mt-1 text-sm text-(--foreground-muted)">Tareas, eventos y actuaciones judiciales de tus procesos.</p>
         </div>
         <button type="button" onClick={() => void actualizar()} disabled={loading || sessionLoading} className="inline-flex items-center gap-2 rounded-lg border border-border bg-surface px-3 py-2 text-sm font-medium text-foreground hover:bg-surface-hover disabled:opacity-50"><RefreshCw className={`size-4 ${loading ? "animate-spin" : ""}`} />Actualizar</button>
       </header>
@@ -175,15 +189,16 @@ export default function AgendaPage() {
         <select aria-label="Filtrar por responsable" value={responsibleFilter} onChange={(event) => setResponsibleFilter(event.target.value)} className="h-10 rounded-md border border-border bg-surface-secondary px-3 text-sm"><option value="TODOS">Todos los responsables</option><option value="YO">Asignados a mí</option><option value="OTROS">Otros responsables</option></select>
         <select aria-label="Filtrar por proceso" value={processFilter} onChange={(event) => setProcessFilter(event.target.value)} className="h-10 rounded-md border border-border bg-surface-secondary px-3 text-sm"><option value="TODOS">Todos los procesos</option>{data.processes.map((process) => <option key={process.id} value={process.id}>{process.nombre}</option>)}</select>
         <select aria-label="Filtrar por cliente" value={clientFilter} onChange={(event) => setClientFilter(event.target.value)} className="h-10 rounded-md border border-border bg-surface-secondary px-3 text-sm"><option value="TODOS">Todos los clientes</option>{data.clients.map((client) => <option key={client.id} value={client.id}>{client.nombre_completo}</option>)}</select>
-        <select aria-label="Filtrar por tipo de evento" value={typeFilter} onChange={(event) => setTypeFilter(event.target.value)} className="h-10 rounded-md border border-border bg-surface-secondary px-3 text-sm"><option value="TODOS">Todos los tipos</option><option value="AUDIENCIA">Audiencias</option><option value="REUNION">Reuniones</option><option value="EVENTO">Eventos</option></select>
+        <select aria-label="Filtrar por tipo de evento" value={typeFilter} onChange={(event) => setTypeFilter(event.target.value)} className="h-10 rounded-md border border-border bg-surface-secondary px-3 text-sm"><option value="TODOS">Todos los tipos</option><option value="AUDIENCIA">Audiencias</option><option value="REUNION">Reuniones</option><option value="FIRMA_CONTRATO">Firmas de contrato</option><option value="EVENTO">Eventos</option><option value="ACTUACION">Actuaciones judiciales</option></select>
       </div>
 
       <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-border bg-surface p-3"><div role="group" aria-label="Vista de agenda" className="flex gap-1">{(["DIA", "SEMANA", "MES", "LISTA"] as const).map((mode) => <button key={mode} type="button" aria-pressed={view === mode} onClick={() => setView(mode)} className={`rounded-md px-3 py-1.5 text-sm ${view === mode ? "bg-primary text-white" : "text-(--foreground-muted) hover:bg-surface-secondary"}`}>{mode === "DIA" ? "Día" : mode === "SEMANA" ? "Semana" : mode === "MES" ? "Mes" : "Lista"}</button>)}</div>{view === "MES" ? <input aria-label="Mes de agenda" type="month" value={selectedDate.slice(0, 7)} onChange={(event) => setSelectedDate(`${event.target.value}-01`)} className="h-9 rounded-md border border-border bg-surface-secondary px-3 text-sm" /> : view !== "LISTA" ? <input aria-label="Fecha de agenda" type="date" value={selectedDate} onChange={(event) => setSelectedDate(event.target.value)} className="h-9 rounded-md border border-border bg-surface-secondary px-3 text-sm" /> : null}</div>
 
       {error && <div role="alert" className="flex items-center gap-2 rounded-lg border border-red-500/20 bg-red-500/5 p-4 text-sm text-red-700"><AlertCircle className="size-4 shrink-0" />{error}</div>}
 
-      {loading || sessionLoading ? <div className="flex min-h-48 items-center justify-center gap-3 text-sm text-(--foreground-muted)"><RefreshCw className="size-5 animate-spin" />Cargando agenda...</div> : view === "MES" ? <TaskMonthCalendar tasks={calendarItems} /> : taskItemsForView.length || eventsForView.length ? <div className="space-y-2">
-        {eventsForView.map((event) => <Link key={`event-${event.id}`} href={`/gestion-procesos/abogado/procesos/${event.proceso_id}#agenda`} className="flex flex-wrap items-center justify-between gap-4 rounded-lg border border-amber-500/20 bg-amber-500/5 px-4 py-3 transition hover:bg-amber-500/10"><div className="flex min-w-0 items-start gap-3"><div className="mt-0.5 flex size-9 shrink-0 items-center justify-center rounded-lg bg-amber-500/10 text-amber-700"><CalendarDays className="size-4" /></div><div className="min-w-0"><p className="font-medium text-foreground">{event.tipo === "AUDIENCIA" ? "Audiencia" : event.tipo === "REUNION" ? "Reunión" : "Evento"}: {event.titulo}</p><p className="mt-1 text-xs text-(--foreground-muted)">{event.proceso}{event.cliente ? ` · ${event.cliente}` : ""}</p></div></div><span className="rounded-md bg-surface px-2 py-1 text-xs text-(--foreground-secondary)">{formatoFecha(event.fecha_inicio)}</span></Link>)}
+      {loading || sessionLoading ? <div className="flex min-h-48 items-center justify-center gap-3 text-sm text-(--foreground-muted)"><RefreshCw className="size-5 animate-spin" />Cargando agenda...</div> : view === "MES" ? <TaskMonthCalendar tasks={calendarItems} /> : taskItemsForView.length || eventsForView.length || actuacionesForView.length ? <div className="space-y-2">
+        {eventsForView.map((event) => <Link key={`event-${event.id}`} href={`/gestion-procesos/abogado/procesos/${event.proceso_id}#agenda`} className="flex flex-wrap items-center justify-between gap-4 rounded-lg border border-amber-500/20 bg-amber-500/5 px-4 py-3 transition hover:bg-amber-500/10"><div className="flex min-w-0 items-start gap-3"><div className="mt-0.5 flex size-9 shrink-0 items-center justify-center rounded-lg bg-amber-500/10 text-amber-700"><CalendarDays className="size-4" /></div><div className="min-w-0"><p className="font-medium text-foreground">{etiquetaTipoEvento(event.tipo)}: {event.titulo}</p><p className="mt-1 text-xs text-(--foreground-muted)">{event.proceso}{event.cliente ? ` · ${event.cliente}` : ""}</p></div></div><span className="rounded-md bg-surface px-2 py-1 text-xs text-(--foreground-secondary)">{formatoFecha(event.fecha_inicio)}</span></Link>)}
+        {actuacionesForView.map((item) => <Link key={`actuacion-${item.proceso_id}-${item.id}`} href={`/gestion-procesos/abogado/procesos/${item.proceso_id}#actividad`} className="flex flex-wrap items-center justify-between gap-4 rounded-lg border border-indigo-500/20 bg-indigo-500/5 px-4 py-3 transition hover:bg-indigo-500/10"><div className="flex min-w-0 items-start gap-3"><div className="mt-0.5 flex size-9 shrink-0 items-center justify-center rounded-lg bg-indigo-500/10 text-indigo-700"><CalendarDays className="size-4" /></div><div className="min-w-0"><p className="font-medium text-foreground">Actuación judicial: {item.titulo}</p><p className="mt-1 text-xs text-(--foreground-muted)">{item.proceso} · Radicado {item.radicado}{item.descripcion ? ` · ${item.descripcion}` : ""}</p></div></div><span className="rounded-md bg-surface px-2 py-1 text-xs text-(--foreground-secondary)">{new Date(item.fecha).toLocaleDateString("es-CO", { weekday: "long", day: "2-digit", month: "short" })}</span></Link>)}
         {taskItemsForView.map((task) => {
           const due = inicioDelDia(task.fecha_limite!);
           const today = inicioDelDia(new Date().toISOString());

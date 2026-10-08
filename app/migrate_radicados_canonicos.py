@@ -18,6 +18,7 @@ from app.radicados import FUENTE_RAMA_JUDICIAL, normalizar_numero_radicado
 _RADICADO_REFERENCES = {
     "actuaciones",
     "consultas_radicados",
+    "ejecuciones_radicados",
     "procesos_radicados",
     "radicados_usuarios",
     "subtareas",
@@ -345,7 +346,7 @@ def _merge_group(connection, radicados: Table, associations: Table, group: list[
                 )
 
     _merge_actuations(connection, radicado_ids, survivor_id)
-    for table_name in ("consultas_radicados", "tareas", "subtareas"):
+    for table_name in ("consultas_radicados", "ejecuciones_radicados", "tareas", "subtareas"):
         table = _existing_table(connection, table_name)
         if table is not None and "radicado_id" in table.c:
             connection.execute(

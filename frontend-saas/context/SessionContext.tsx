@@ -15,6 +15,11 @@ export interface UsuarioActual {
   email: string;
   nombre_completo: string;
   whatsapp_numero?: string | null;
+  genero?: "MASCULINO" | "FEMENINO" | null;
+  numero_documento?: string | null;
+  domicilio?: string | null;
+  direccion?: string | null;
+  tarjeta_profesional?: string | null;
   rol: string;
   estado: string;
   debe_cambiar_password?: boolean;

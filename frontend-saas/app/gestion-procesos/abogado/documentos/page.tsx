@@ -2,12 +2,15 @@
 
 import { apiRequest } from "@/lib/api";
 import Image from "next/image";
+import Link from "next/link";
+import { useSession } from "@/context/SessionContext";
 
 import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 import {
   AlertCircle,
   CheckCircle2,
   FileText,
+  Loader2,
   Plus,
   RefreshCw,
   Search,
@@ -29,7 +32,8 @@ type Request = {
 type Document = {
   id: number;
   proceso_id: number;
-  solicitud_id: number;
+  solicitud_id: number | null;
+  contrato_id?: number | null;
   proceso: string;
   cliente: string;
   nombre_archivo: string;
@@ -50,6 +54,7 @@ type Client = {
 };
 
 export default function DocumentosPage() {
+  const { user } = useSession();
   const [data, setData] = useState<{
     solicitudes: Request[];
     documentos: Document[];
@@ -75,6 +80,7 @@ export default function DocumentosPage() {
   const [mostrarModal, setMostrarModal] = useState(false);
   const [documentoActivo, setDocumentoActivo] = useState<Document | null>(null);
   const [archivoPreview, setArchivoPreview] = useState("");
+  const [documentAction, setDocumentAction] = useState<{ id: number; type: "view" | "download" } | null>(null);
   const [estadoRevision, setEstadoRevision] = useState("EN_REVISION");
   const [comentarioRevision, setComentarioRevision] = useState("");
   const [guardandoRevision, setGuardandoRevision] = useState(false);
@@ -192,6 +198,8 @@ export default function DocumentosPage() {
   }, [archivoPreview]);
 
   const abrirDocumento = async (documento: Document) => {
+    if (documentAction) return;
+    setDocumentAction({ id: documento.id, type: "view" });
     setError("");
     try {
       const response = await apiRequest(`/api/expedientes/documentos/${documento.id}/archivo`, { headers: headers() });
@@ -203,11 +211,33 @@ export default function DocumentosPage() {
       setComentarioRevision(documento.comentario_revision || "");
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "No fue posible abrir el documento.");
+    } finally {
+      setDocumentAction(null);
+    }
+  };
+
+  const descargarDocumento = async (documento: Document) => {
+    if (documentAction) return;
+    setDocumentAction({ id: documento.id, type: "download" });
+    setError("");
+    try {
+      const response = await apiRequest(`/api/expedientes/documentos/${documento.id}/archivo`, { headers: headers() });
+      if (!response.ok) throw new Error("No fue posible descargar el documento.");
+      const url = URL.createObjectURL(await response.blob());
+      const anchor = window.document.createElement("a");
+      anchor.href = url;
+      anchor.download = documento.nombre_archivo;
+      anchor.click();
+      window.setTimeout(() => URL.revokeObjectURL(url), 60_000);
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "No fue posible descargar el documento.");
+    } finally {
+      setDocumentAction(null);
     }
   };
 
   const guardarRevision = async () => {
-    if (!documentoActivo) return;
+    if (!documentoActivo || documentoActivo.contrato_id) return;
     setGuardandoRevision(true);
     try {
       const response = await apiRequest(`/api/expedientes/documentos/${documentoActivo.id}/revision`, {
@@ -247,12 +277,11 @@ export default function DocumentosPage() {
     });
   }, [data.solicitudes, query, filtroEstado, selectedProcessId]);
 
-  const documentosFiltrados = useMemo(() => {
+  const documentosVisibles = useMemo(() => {
     const text = query.toLowerCase().trim();
 
     return data.documentos.filter((item) => {
       if (selectedProcessId !== null && item.proceso_id !== selectedProcessId) return false;
-      if (filtroEstadoArchivo !== "TODOS" && (item.estado_revision || "RECIBIDO") !== filtroEstadoArchivo) return false;
       return (
         !text ||
         `${item.nombre_archivo} ${item.proceso} ${item.cliente} ${item.mime_type}`
@@ -260,7 +289,10 @@ export default function DocumentosPage() {
           .includes(text)
       );
     });
-  }, [data.documentos, query, filtroEstadoArchivo, selectedProcessId]);
+  }, [data.documentos, query, selectedProcessId]);
+  const documentosFiltrados = documentosVisibles.filter((item) => !item.contrato_id
+    && (filtroEstadoArchivo === "TODOS" || (item.estado_revision || "RECIBIDO") === filtroEstadoArchivo));
+  const contratosCargados = documentosVisibles.filter((item) => Boolean(item.contrato_id));
 
   const carpetasFiltradas = useMemo(() => {
     const text = query.toLowerCase().trim();
@@ -781,8 +813,8 @@ export default function DocumentosPage() {
                     <td className="p-4">
                       <div className="flex flex-col items-start gap-2">
                         <span className="text-xs text-foreground-muted">{(item.estado_revision || "RECIBIDO").replaceAll("_", " ")}</span>
-                        <button type="button" onClick={() => void abrirDocumento(item)} className="rounded-lg border px-3 py-2 text-xs font-medium" style={{ borderColor: "var(--border)", color: "var(--primary)" }}>
-                          Vista previa y revisar
+                        <button type="button" disabled={documentAction !== null} onClick={() => void abrirDocumento(item)} className="inline-flex items-center gap-1.5 rounded-lg border px-3 py-2 text-xs font-medium disabled:opacity-50" style={{ borderColor: "var(--border)", color: "var(--primary)" }}>
+                          {documentAction?.id === item.id && documentAction.type === "view" ? <><Loader2 className="size-3.5 animate-spin" />Abriendo…</> : "Vista previa y revisar"}
                         </button>
                       </div>
                     </td>
@@ -795,6 +827,11 @@ export default function DocumentosPage() {
       </section>
       </>}
 
+      <section id="contratos-cargados" className="overflow-hidden rounded-xl border" style={{ background: "var(--surface)", borderColor: "var(--border)", boxShadow: "var(--shadow-sm)" }}>
+        <div className="flex items-center justify-between border-b px-5 py-4" style={{ borderColor: "var(--border)" }}><div><h2 className="font-semibold">Contratos cargados</h2><p className="mt-1 text-xs" style={{ color: "var(--foreground-muted)" }}>PDF firmados y versiones anteriores asociados a los expedientes.</p></div><div className="flex items-center gap-3"><span className="rounded-full px-2.5 py-1 text-xs font-semibold" style={{ background: "var(--surface-muted)", color: "var(--foreground-secondary)" }}>{contratosCargados.length}</span>{user?.rol === "ABOGADO_ADMIN" && <Link href="/gestion-procesos/abogado/contratos" className="text-xs font-semibold text-[var(--primary)] hover:underline">Gestionar todos</Link>}</div></div>
+        {contratosCargados.length ? <div className="divide-y" style={{ borderColor: "var(--border)" }}>{contratosCargados.map((item) => <article id={`documento-${item.id}`} key={item.id} className="flex flex-wrap items-center justify-between gap-3 px-5 py-3"><div className="flex min-w-0 items-center gap-3"><FileText size={18} className="shrink-0" style={{ color: "var(--primary)" }} /><div className="min-w-0"><p className="truncate text-sm font-medium">{item.nombre_archivo}</p><p className="mt-1 truncate text-xs" style={{ color: "var(--foreground-muted)" }}>{item.proceso} · {item.cliente} · Contrato #{item.contrato_id} · {formatearFecha(item.created_at)}</p></div></div><div className="flex gap-2"><button type="button" disabled={documentAction !== null} onClick={() => void abrirDocumento(item)} className="inline-flex items-center gap-1.5 rounded-lg border px-3 py-2 text-xs font-medium disabled:opacity-50" style={{ borderColor: "var(--border)", color: "var(--primary)" }}>{documentAction?.id === item.id && documentAction.type === "view" ? <><Loader2 className="size-3.5 animate-spin" />Abriendo…</> : "Ver PDF"}</button><button type="button" disabled={documentAction !== null} onClick={() => void descargarDocumento(item)} className="inline-flex items-center gap-1.5 rounded-lg border px-3 py-2 text-xs font-medium disabled:opacity-50" style={{ borderColor: "var(--border)" }}>{documentAction?.id === item.id && documentAction.type === "download" ? <><Loader2 className="size-3.5 animate-spin" />Descargando…</> : "Descargar"}</button></div></article>)}</div> : <div className="px-5 py-10 text-center text-sm" style={{ color: "var(--foreground-muted)" }}>Los documentos firmados de contratos aparecerán aquí.</div>}
+      </section>
+
       {documentoActivo && archivoPreview && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-3 sm:p-6" role="dialog" aria-modal="true" aria-labelledby="documento-preview-titulo" onMouseDown={(event) => { if (event.target === event.currentTarget) { setDocumentoActivo(null); setArchivoPreview(""); } }}>
           <div className="flex max-h-[94vh] w-full max-w-6xl flex-col overflow-hidden rounded-2xl border" style={{ background: "var(--surface)", borderColor: "var(--border)", color: "var(--foreground)" }}>
@@ -805,9 +842,8 @@ export default function DocumentosPage() {
             <div className="grid min-h-0 flex-1 overflow-y-auto lg:grid-cols-[minmax(0,1fr)_320px]">
               <div className="min-h-[45vh] bg-black/5 p-2">{documentoActivo.mime_type.startsWith("image/") ? <Image src={archivoPreview} alt={documentoActivo.nombre_archivo} width={1600} height={1200} unoptimized className="mx-auto max-h-[72vh] w-auto max-w-full object-contain" /> : documentoActivo.mime_type === "application/pdf" ? <iframe src={archivoPreview} title={documentoActivo.nombre_archivo} className="h-[68vh] w-full rounded-lg bg-white" /> : <div className="flex h-full min-h-64 items-center justify-center text-sm text-foreground-muted">Vista previa no disponible. Descarga el archivo para consultarlo.</div>}</div>
               <aside className="space-y-4 border-t p-4 lg:border-l lg:border-t-0" style={{ borderColor: "var(--border)" }}>
-                <label className="block text-sm font-medium">Estado de revisión<select value={estadoRevision} onChange={(event) => setEstadoRevision(event.target.value)} className="mt-1.5 w-full rounded-lg border px-3 py-2" style={{ background: "var(--surface-muted)", borderColor: "var(--border)", color: "var(--foreground)" }}><option value="EN_REVISION">En revisión</option><option value="APROBADO">Aprobado</option><option value="REQUIERE_CORRECCION">Requiere corrección</option><option value="RECHAZADO">Rechazado</option></select></label>
-                <label className="block text-sm font-medium">Comentario<textarea value={comentarioRevision} onChange={(event) => setComentarioRevision(event.target.value)} rows={5} className="mt-1.5 w-full rounded-lg border px-3 py-2 text-sm" style={{ background: "var(--surface-muted)", borderColor: "var(--border)", color: "var(--foreground)" }} /></label>
-                <div className="flex flex-wrap gap-2"><button type="button" onClick={() => void guardarRevision()} disabled={guardandoRevision} className="rounded-lg px-3 py-2 text-sm font-medium disabled:opacity-50" style={{ background: "var(--primary)", color: "var(--primary-foreground)" }}>{guardandoRevision ? "Guardando…" : "Guardar revisión"}</button><a href={archivoPreview} download={documentoActivo.nombre_archivo} className="rounded-lg border px-3 py-2 text-sm" style={{ borderColor: "var(--border)" }}>Descargar</a></div>
+                {documentoActivo.contrato_id ? <p className="rounded-lg border border-[var(--border)] bg-[var(--surface-secondary)] p-3 text-sm">PDF firmado del contrato #{documentoActivo.contrato_id}. Este archivo no requiere revisión documental.</p> : <><label className="block text-sm font-medium">Estado de revisión<select value={estadoRevision} onChange={(event) => setEstadoRevision(event.target.value)} className="mt-1.5 w-full rounded-lg border px-3 py-2" style={{ background: "var(--surface-muted)", borderColor: "var(--border)", color: "var(--foreground)" }}><option value="EN_REVISION">En revisión</option><option value="APROBADO">Aprobado</option><option value="REQUIERE_CORRECCION">Requiere corrección</option><option value="RECHAZADO">Rechazado</option></select></label><label className="block text-sm font-medium">Comentario<textarea value={comentarioRevision} onChange={(event) => setComentarioRevision(event.target.value)} rows={5} className="mt-1.5 w-full rounded-lg border px-3 py-2 text-sm" style={{ background: "var(--surface-muted)", borderColor: "var(--border)", color: "var(--foreground)" }} /></label><button type="button" onClick={() => void guardarRevision()} disabled={guardandoRevision} className="rounded-lg px-3 py-2 text-sm font-medium disabled:opacity-50" style={{ background: "var(--primary)", color: "var(--primary-foreground)" }}>{guardandoRevision ? "Guardando…" : "Guardar revisión"}</button></>}
+                <a href={archivoPreview} download={documentoActivo.nombre_archivo} className="inline-block rounded-lg border px-3 py-2 text-sm" style={{ borderColor: "var(--border)" }}>Descargar</a>
               </aside>
             </div>
           </div>

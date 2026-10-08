@@ -2,7 +2,7 @@
 
 import { FormEvent, useEffect, useState } from "react";
 import Link from "next/link";
-import { Activity, ExternalLink, FileSearch, RefreshCw, ScrollText, Search, X } from "lucide-react";
+import { Activity, ExternalLink, FileSearch, RefreshCw, ScrollText, Search, Trash2, X } from "lucide-react";
 import { fetchApi } from "@/lib/api";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
@@ -52,6 +52,7 @@ export default function AdminAuditPage({ initialView = "actividad" }: { initialV
   const [view, setView] = useState<"actividad" | "auditoria">(initialView);
   const [selected, setSelected] = useState<AuditEvent | null>(null);
   const [selectedIds, setSelectedIds] = useState<number[]>([]);
+  const [deleting, setDeleting] = useState(false);
   const token = typeof window === "undefined" ? "" : localStorage.getItem("token") || "";
 
   async function loadEvents(activeFilters: AuditFilters) {
@@ -81,11 +82,13 @@ export default function AdminAuditPage({ initialView = "actividad" }: { initialV
 
   function applyFilters(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    setSelectedIds([]);
     setFilters(draft);
     void loadEvents(draft);
   }
 
   function clearFilters() {
+    setSelectedIds([]);
     setDraft(emptyFilters);
     setFilters(emptyFilters);
     void loadEvents(emptyFilters);
@@ -99,6 +102,38 @@ export default function AdminAuditPage({ initialView = "actividad" }: { initialV
     const url = URL.createObjectURL(new Blob([`\uFEFF${csv}`], { type: "text/csv;charset=utf-8" }));
     const anchor = window.document.createElement("a"); anchor.href = url; anchor.download = "auditoria-seleccion.csv"; anchor.click(); URL.revokeObjectURL(url);
     setSelectedIds([]);
+  }
+
+  async function deleteSelected() {
+    if (!selectedIds.length || deleting || !window.confirm(`¿Eliminar ${selectedIds.length} registros de auditoría seleccionados? Esta acción no se puede deshacer.`)) return;
+    setDeleting(true);
+    setError("");
+    try {
+      await fetchApi("/api/admin/auditoria", { method: "DELETE", token, body: JSON.stringify({ ids: selectedIds }) });
+      setSelectedIds([]);
+      setSelected(null);
+      await loadEvents(filters);
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "No fue posible eliminar los registros seleccionados.");
+    } finally {
+      setDeleting(false);
+    }
+  }
+
+  async function deleteEvent(event: AuditEvent) {
+    if (deleting || !window.confirm(`¿Eliminar el registro de auditoría #${event.id}? Esta acción no se puede deshacer.`)) return;
+    setDeleting(true);
+    setError("");
+    try {
+      await fetchApi(`/api/admin/auditoria/${event.id}`, { method: "DELETE", token });
+      setSelectedIds((current) => current.filter((id) => id !== event.id));
+      if (selected?.id === event.id) setSelected(null);
+      await loadEvents(filters);
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "No fue posible eliminar el registro.");
+    } finally {
+      setDeleting(false);
+    }
   }
 
   const actions = [...new Set(events.map((event) => event.accion))].sort();
@@ -149,7 +184,7 @@ export default function AdminAuditPage({ initialView = "actividad" }: { initialV
         </form>
       </Card>
 
-      <div className="flex flex-wrap items-center gap-3 rounded-xl border border-border bg-surface p-3"><label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={events.length > 0 && events.every((event) => selectedIds.includes(event.id))} onChange={(event) => setSelectedIds((current) => event.target.checked ? [...new Set([...current, ...events.map((item) => item.id)])] : current.filter((id) => !events.some((item) => item.id === id)))} />Seleccionar eventos visibles</label><span className="text-sm text-foreground-muted">{selectedIds.length} seleccionados</span><button type="button" disabled={!selectedIds.length} onClick={exportSelected} className="ml-auto rounded-lg border border-border px-3 py-2 text-sm disabled:opacity-50">Exportar selección CSV</button></div>
+      <div className="flex flex-wrap items-center gap-3 rounded-xl border border-border bg-surface p-3"><label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={events.length > 0 && events.every((event) => selectedIds.includes(event.id))} onChange={(event) => setSelectedIds((current) => event.target.checked ? [...new Set([...current, ...events.map((item) => item.id)])] : current.filter((id) => !events.some((item) => item.id === id)))} />Seleccionar eventos visibles</label><span className="text-sm text-foreground-muted">{selectedIds.length} seleccionados</span><button type="button" disabled={!selectedIds.length || deleting} onClick={() => void deleteSelected()} className="ml-auto inline-flex items-center gap-2 rounded-lg border border-danger/30 px-3 py-2 text-sm text-danger disabled:opacity-50"><Trash2 className="size-4" />{deleting ? "Eliminando…" : "Eliminar seleccionados"}</button><button type="button" disabled={!selectedIds.length} onClick={exportSelected} className="rounded-lg border border-border px-3 py-2 text-sm disabled:opacity-50">Exportar selección CSV</button></div>
 
       {error && <p role="alert" className="rounded-lg border border-danger/30 bg-danger-light p-3 text-sm text-danger">{error}</p>}
       {loading ? <LoadingState label="Cargando actividad" rows={5} /> : events.length === 0 ? (
@@ -164,7 +199,7 @@ export default function AdminAuditPage({ initialView = "actividad" }: { initialV
             </div>
             <div className="flex shrink-0 items-center gap-2">
               <Badge tone={event.resultado === "ERROR" ? "risk" : "completed"}>{event.resultado === "ERROR" ? "Error" : "Evento registrado"}</Badge>
-              <Button size="sm" variant="secondary" onClick={() => setSelected(event)}>Ver detalle</Button>
+              <Button size="sm" variant="secondary" onClick={() => setSelected(event)}>Ver detalle</Button><button type="button" disabled={deleting} onClick={() => void deleteEvent(event)} aria-label={`Eliminar registro de auditoría ${event.id}`} className="inline-flex items-center gap-1 rounded-lg border border-danger/30 px-3 py-2 text-sm text-danger disabled:opacity-50"><Trash2 className="size-4" />Eliminar</button>
             </div>
           </Card>)}
         </div>
@@ -173,7 +208,7 @@ export default function AdminAuditPage({ initialView = "actividad" }: { initialV
           <table className="w-full min-w-[850px] text-left text-sm">
             <thead className="border-b border-border bg-surface-secondary text-xs uppercase text-foreground-muted"><tr><th className="px-4 py-3"><span className="sr-only">Selección</span></th><th className="px-4 py-3">Cuándo</th><th className="px-4 py-3">Quién</th><th className="px-4 py-3">Qué hizo</th><th className="px-4 py-3">Sobre qué</th><th className="px-4 py-3">Resultado</th><th className="px-4 py-3">Detalle</th></tr></thead>
             <tbody>{events.map((event) => <tr key={event.id} className="border-b border-border last:border-0">
-              <td className="px-4 py-3"><input type="checkbox" checked={selectedIds.includes(event.id)} onChange={() => setSelectedIds((current) => current.includes(event.id) ? current.filter((id) => id !== event.id) : [...current, event.id])} aria-label={`Seleccionar evento ${event.id}`} /></td><td className="px-4 py-3">{formatDate(event.created_at)}</td><td className="px-4 py-3">{event.actor}<span className="block text-xs text-foreground-muted">ID {event.actor_id ?? "Sistema"}</span></td><td className="px-4 py-3">{event.descripcion}<span className="block font-mono text-xs text-foreground-muted">{event.accion}</span></td><td className="px-4 py-3">{event.recurso}<span className="block text-xs text-foreground-muted">{event.tipo_recurso} · {event.recurso_id ?? "sin ID"}</span></td><td className="px-4 py-3"><Badge tone={event.resultado === "ERROR" ? "risk" : "completed"}>{event.resultado === "ERROR" ? "Error" : "Registrado"}</Badge></td><td className="px-4 py-3"><Button size="sm" variant="secondary" onClick={() => setSelected(event)}>Ver detalle</Button></td>
+              <td className="px-4 py-3"><input type="checkbox" checked={selectedIds.includes(event.id)} onChange={() => setSelectedIds((current) => current.includes(event.id) ? current.filter((id) => id !== event.id) : [...current, event.id])} aria-label={`Seleccionar evento ${event.id}`} /></td><td className="px-4 py-3">{formatDate(event.created_at)}</td><td className="px-4 py-3">{event.actor}<span className="block text-xs text-foreground-muted">ID {event.actor_id ?? "Sistema"}</span></td><td className="px-4 py-3">{event.descripcion}<span className="block font-mono text-xs text-foreground-muted">{event.accion}</span></td><td className="px-4 py-3">{event.recurso}<span className="block text-xs text-foreground-muted">{event.tipo_recurso} · {event.recurso_id ?? "sin ID"}</span></td><td className="px-4 py-3"><Badge tone={event.resultado === "ERROR" ? "risk" : "completed"}>{event.resultado === "ERROR" ? "Error" : "Registrado"}</Badge></td><td className="px-4 py-3"><Button size="sm" variant="secondary" onClick={() => setSelected(event)}>Ver detalle</Button><button type="button" disabled={deleting} onClick={() => void deleteEvent(event)} aria-label={`Eliminar registro de auditoría ${event.id}`} className="inline-flex items-center gap-1 rounded-lg border border-danger/30 px-3 py-2 text-sm text-danger disabled:opacity-50"><Trash2 className="size-4" />Eliminar</button></td>
             </tr>)}</tbody>
           </table>
         </div>

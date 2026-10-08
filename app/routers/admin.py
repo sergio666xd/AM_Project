@@ -376,6 +376,41 @@ def listar_eventos_auditoria(
     return results
 
 
+@router.delete("/auditoria")
+def eliminar_eventos_auditoria(
+    datos: dict = Body(...),
+    db: Session = Depends(get_db),
+    admin: models.Usuario = Depends(verificar_admin),
+):
+    ids = datos.get("ids")
+    if not isinstance(ids, list) or not ids or len(ids) > 200:
+        raise HTTPException(status_code=400, detail="Selecciona entre 1 y 200 registros de auditoría.")
+    if any(not isinstance(event_id, int) or isinstance(event_id, bool) or event_id < 1 for event_id in ids):
+        raise HTTPException(status_code=400, detail="La selección contiene identificadores inválidos.")
+    selected_ids = list(set(ids))
+    deleted = db.query(models.EventoAuditoria).filter(models.EventoAuditoria.id.in_(selected_ids)).delete(synchronize_session=False)
+    if not deleted:
+        raise HTTPException(status_code=404, detail="No se encontraron registros para eliminar.")
+    registrar_evento_auditoria(db, admin, "admin.auditoria.eliminar_en_bloque", "evento_auditoria", None, {"cantidad": deleted})
+    db.commit()
+    return {"eliminados": deleted}
+
+
+@router.delete("/auditoria/{evento_id}")
+def eliminar_evento_auditoria(
+    evento_id: int,
+    db: Session = Depends(get_db),
+    admin: models.Usuario = Depends(verificar_admin),
+):
+    evento = db.query(models.EventoAuditoria).filter(models.EventoAuditoria.id == evento_id).first()
+    if evento is None:
+        raise HTTPException(status_code=404, detail="El registro de auditoría no existe.")
+    db.delete(evento)
+    registrar_evento_auditoria(db, admin, "admin.auditoria.eliminar", "evento_auditoria", evento_id)
+    db.commit()
+    return {"eliminado": evento_id}
+
+
 # ============================================================
 # DASHBOARD
 # ============================================================
@@ -1186,7 +1221,7 @@ def listar_inventario_global(
             models.DocumentoProceso.proceso_id.is_(None),
             models.Proceso.archivado_en.is_(None),
         ))
-        return [{"id": d.id, "owner_id": d.proceso.abogado_id if d.proceso else None, "nombre_archivo": d.nombre_archivo, "mime_type": d.mime_type, "proceso": d.proceso.nombre if d.proceso else "Sin proceso asociado", "proceso_id": d.proceso_id, "cliente": d.cliente.nombre_completo if d.cliente else "Usuario eliminado", "cliente_id": d.cliente_id, "solicitud_id": d.solicitud_id, "estado_revision": d.estado_revision, "comentario_revision": d.comentario_revision, "revisado_en": d.revisado_en, "created_at": d.created_at} for d in query.order_by(models.DocumentoProceso.created_at.desc()).limit(limite).all()]
+        return [{"id": d.id, "owner_id": d.proceso.abogado_id if d.proceso else None, "nombre_archivo": d.nombre_archivo, "mime_type": d.mime_type, "proceso": d.proceso.nombre if d.proceso else "Sin proceso asociado", "proceso_id": d.proceso_id, "cliente": d.cliente.nombre_completo if d.cliente else "Usuario eliminado", "cliente_id": d.cliente_id, "solicitud_id": d.solicitud_id, "contrato_id": d.contrato_id, "estado_revision": d.estado_revision, "comentario_revision": d.comentario_revision, "revisado_en": d.revisado_en, "created_at": d.created_at} for d in query.order_by(models.DocumentoProceso.created_at.desc()).limit(limite).all()]
     raise HTTPException(status_code=404, detail="Inventario no disponible.")
 
 
@@ -1885,8 +1920,9 @@ def _validar_vinculos_evento_agenda(db: Session, responsable_id: int | None, pro
             contract.version_actual = version_number
             db.add(models.ContratoServicioVersion(
                 contrato_id=contract.id, version=version_number, estado="EN_FIRMA",
-                contenido=contract.contenido_actual, parte_cliente_snapshot=contract.parte_cliente_snapshot,
-                hash_sha256=hashlib.sha256(contract.contenido_actual.encode("utf-8")).hexdigest(),
+                contenido=json.dumps(contract.campos_actual or {}, ensure_ascii=False, sort_keys=True),
+                campos=contract.campos_actual or {}, parte_cliente_snapshot=contract.parte_cliente_snapshot,
+                hash_sha256=hashlib.sha256(json.dumps(contract.campos_actual or {}, ensure_ascii=False, sort_keys=True).encode("utf-8")).hexdigest(),
                 creado_por_id=actor.id if actor else None,
             ))
             if actor:

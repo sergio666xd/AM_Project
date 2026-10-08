@@ -19,6 +19,13 @@ import { useSession } from "@/context/SessionContext";
 
 export default function PerfilAbogadoPage() {
   const { user, token, refreshUser } = useSession();
+  const [contractProfileEdits, setContractProfileEdits] = useState<Partial<{ genero: string; numero_documento: string; domicilio: string; tarjeta_profesional: string }>>({});
+  const contractProfile = {
+    genero: contractProfileEdits.genero ?? user?.genero ?? "",
+    numero_documento: contractProfileEdits.numero_documento ?? user?.numero_documento ?? "",
+    domicilio: contractProfileEdits.domicilio ?? user?.domicilio ?? "",
+    tarjeta_profesional: contractProfileEdits.tarjeta_profesional ?? user?.tarjeta_profesional ?? "",
+  };
 
   const [nombreEditado, setNombreEditado] = useState<{ userId: number; value: string } | null>(null);
   const nombre = user && nombreEditado?.userId === user.id ? nombreEditado.value : user?.nombre_completo ?? "";
@@ -67,6 +74,7 @@ export default function PerfilAbogadoPage() {
           },
           body: JSON.stringify({
             nombre_completo: nombre.trim(),
+            ...contractProfile,
           }),
         }
       );
@@ -82,6 +90,7 @@ export default function PerfilAbogadoPage() {
 
       await refreshUser();
       setNombreEditado(null);
+      setContractProfileEdits({});
 
       setProfileMessage(
         "Tus datos personales fueron actualizados correctamente."
@@ -380,7 +389,7 @@ export default function PerfilAbogadoPage() {
                     color: "var(--foreground-muted)",
                   }}
                 >
-                  Actualiza tus datos de contacto.
+                  Actualiza tus datos personales y la información que se usa al preparar contratos.
                 </p>
               </div>
             </div>
@@ -507,6 +516,13 @@ export default function PerfilAbogadoPage() {
                 notificaciones habilitadas en tu cuenta.
               </p>
             </div>
+            <fieldset className="grid gap-4 rounded-lg border border-[var(--border)] p-4 sm:grid-cols-2">
+              <legend className="px-2 text-sm font-semibold">Datos para los contratos</legend>
+              <label className="text-sm font-medium">Género<select value={contractProfile.genero} onChange={(event) => setContractProfileEdits({ ...contractProfileEdits, genero: event.target.value })} className="mt-1 w-full rounded-lg border border-[var(--border)] bg-[var(--surface-muted)] px-3 py-2.5"><option value="">Sin especificar</option><option value="MASCULINO">Masculino</option><option value="FEMENINO">Femenino</option></select></label>
+              <label className="text-sm font-medium">Documento<input maxLength={40} value={contractProfile.numero_documento} onChange={(event) => setContractProfileEdits({ ...contractProfileEdits, numero_documento: event.target.value })} className="mt-1 w-full rounded-lg border border-[var(--border)] bg-[var(--surface-muted)] px-3 py-2.5" /></label>
+              <label className="text-sm font-medium">Tarjeta profesional<input maxLength={40} value={contractProfile.tarjeta_profesional} onChange={(event) => setContractProfileEdits({ ...contractProfileEdits, tarjeta_profesional: event.target.value })} className="mt-1 w-full rounded-lg border border-[var(--border)] bg-[var(--surface-muted)] px-3 py-2.5" /></label>
+              <label className="text-sm font-medium">Domicilio<input maxLength={120} value={contractProfile.domicilio} onChange={(event) => setContractProfileEdits({ ...contractProfileEdits, domicilio: event.target.value })} className="mt-1 w-full rounded-lg border border-[var(--border)] bg-[var(--surface-muted)] px-3 py-2.5" /></label>
+            </fieldset>
           </div>
 
           <div

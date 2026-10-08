@@ -58,6 +58,8 @@ ALTER TABLE eventos_agenda ADD COLUMN IF NOT EXISTS contrato_id INTEGER REFERENC
 ALTER TABLE documentos_proceso ADD COLUMN IF NOT EXISTS contrato_id INTEGER REFERENCES contratos_servicios(id) ON DELETE SET NULL;
 CREATE INDEX IF NOT EXISTS ix_eventos_agenda_contrato_id ON eventos_agenda(contrato_id);
 CREATE INDEX IF NOT EXISTS ix_documentos_proceso_contrato_id ON documentos_proceso(contrato_id);
+ALTER TABLE contratos_servicios ADD COLUMN IF NOT EXISTS campos_actual JSON NOT NULL DEFAULT '{}'::json;
+ALTER TABLE contratos_servicios_versiones ADD COLUMN IF NOT EXISTS campos JSON NOT NULL DEFAULT '{}'::json;
 
 CREATE TABLE IF NOT EXISTS cuentas_cobro (
     id SERIAL PRIMARY KEY,

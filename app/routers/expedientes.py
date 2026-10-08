@@ -3,6 +3,7 @@
 import logging
 import os
 import hashlib
+import json
 from datetime import datetime, timedelta, timezone
 from uuid import uuid4
 from zoneinfo import ZoneInfo
@@ -200,7 +201,7 @@ def _serializar_evento_firma(evento: models.EventoAgenda) -> dict:
             "contrato_id": evento.contrato_id}
 
 
-def _validar_contrato_evento(proceso: models.Proceso, tipo: str, contrato_id: int | None, cliente: models.Usuario | None, db: Session, actor: models.Usuario):
+def _validar_contrato_evento(proceso: models.Proceso, tipo: str, contrato_id: int | None, cliente: models.Usuario | None, db: Session, actor: models.Usuario, permitir_firmado: bool = False):
     if tipo != "FIRMA_CONTRATO":
         if contrato_id is not None:
             raise HTTPException(status_code=400, detail="Solo los eventos de firma pueden asociarse a un contrato.")
@@ -212,7 +213,8 @@ def _validar_contrato_evento(proceso: models.Proceso, tipo: str, contrato_id: in
     ).with_for_update().first()
     if not contrato or contrato.cliente_id is None or (cliente and cliente.id != contrato.cliente_id):
         raise HTTPException(status_code=400, detail="El contrato debe pertenecer a este expediente y al cliente seleccionado.")
-    if contrato.estado not in {"LISTO_PARA_FIRMA", "EN_FIRMA"}:
+    estados_permitidos = {"LISTO_PARA_FIRMA", "EN_FIRMA"} | ({"FIRMADO"} if permitir_firmado else set())
+    if contrato.estado not in estados_permitidos:
         raise HTTPException(status_code=409, detail="El contrato debe estar listo para firma antes de agendarla.")
     if cliente is None:
         raise HTTPException(status_code=400, detail="Selecciona el cliente que asistirá a la firma.")
@@ -222,8 +224,9 @@ def _validar_contrato_evento(proceso: models.Proceso, tipo: str, contrato_id: in
         contrato.version_actual = version_number
         db.add(models.ContratoServicioVersion(
             contrato_id=contrato.id, version=version_number, estado="EN_FIRMA",
-            contenido=contrato.contenido_actual, parte_cliente_snapshot=contrato.parte_cliente_snapshot,
-            hash_sha256=hashlib.sha256(contrato.contenido_actual.encode("utf-8")).hexdigest(),
+            contenido=json.dumps(contrato.campos_actual or {}, ensure_ascii=False, sort_keys=True),
+            campos=contrato.campos_actual or {}, parte_cliente_snapshot=contrato.parte_cliente_snapshot,
+            hash_sha256=hashlib.sha256(json.dumps(contrato.campos_actual or {}, ensure_ascii=False, sort_keys=True).encode("utf-8")).hexdigest(),
             creado_por_id=actor.id,
         ))
         registrar_evento_auditoria(db, actor, "contrato.estado", "contrato_servicio", contrato.id, {"estado": "EN_FIRMA", "origen": "evento_agenda"})
@@ -259,6 +262,10 @@ def _serializar_solicitud_perfil(solicitud: models.SolicitudEdicionPerfilCliente
         "nombre_completo": solicitud.nombre_completo_solicitado,
         "email": solicitud.email_solicitado,
         "whatsapp_numero": solicitud.whatsapp_numero_solicitado,
+        "genero": solicitud.genero_solicitado,
+        "numero_documento": solicitud.numero_documento_solicitado,
+        "domicilio": solicitud.domicilio_solicitado,
+        "direccion": solicitud.direccion_solicitada,
         "estado": solicitud.estado,
         "solicitada_en": solicitud.solicitada_en,
         "revisada_en": solicitud.revisada_en,
@@ -480,10 +487,20 @@ def solicitar_edicion_perfil_cliente(
     whatsapp = datos.whatsapp_numero.strip()
     if not nombre:
         raise HTTPException(status_code=400, detail="El nombre completo es obligatorio.")
-    if (nombre, email, whatsapp) == (
+    genero = (datos.genero or "").strip().upper() or None
+    if genero and genero not in {"MASCULINO", "FEMENINO"}:
+        raise HTTPException(status_code=400, detail="Selecciona masculino o femenino.")
+    numero_documento = (datos.numero_documento or "").strip().upper() or None
+    domicilio = (datos.domicilio or "").strip().upper() or None
+    direccion = (datos.direccion or "").strip().upper() or None
+    if (nombre, email, whatsapp, genero, numero_documento, domicilio, direccion) == (
         usuario.nombre_completo,
         usuario.email.lower(),
         usuario.whatsapp_numero,
+        usuario.genero,
+        usuario.numero_documento,
+        usuario.domicilio,
+        usuario.direccion,
     ):
         raise HTTPException(status_code=400, detail="No hay cambios para solicitar.")
     pending = db.query(models.SolicitudEdicionPerfilCliente).filter_by(
@@ -503,6 +520,10 @@ def solicitar_edicion_perfil_cliente(
         email_solicitado=email,
         nombre_completo_solicitado=nombre,
         whatsapp_numero_solicitado=whatsapp,
+        genero_solicitado=genero,
+        numero_documento_solicitado=numero_documento,
+        domicilio_solicitado=domicilio,
+        direccion_solicitada=direccion,
     )
     db.add(solicitud)
     db.flush()
@@ -574,6 +595,14 @@ def revisar_solicitud_edicion_perfil(
         solicitud.cliente.email = solicitud.email_solicitado
         solicitud.cliente.nombre_completo = solicitud.nombre_completo_solicitado
         solicitud.cliente.whatsapp_numero = solicitud.whatsapp_numero_solicitado
+        if solicitud.genero_solicitado is not None:
+            solicitud.cliente.genero = solicitud.genero_solicitado
+        if solicitud.numero_documento_solicitado is not None:
+            solicitud.cliente.numero_documento = solicitud.numero_documento_solicitado
+        if solicitud.domicilio_solicitado is not None:
+            solicitud.cliente.domicilio = solicitud.domicilio_solicitado
+        if solicitud.direccion_solicitada is not None:
+            solicitud.cliente.direccion = solicitud.direccion_solicitada
         solicitud.estado = "APROBADA"
         accion = "cliente.solicitud_perfil.aprobar"
     else:
@@ -685,6 +714,8 @@ def obtener_cliente(cliente_id: int, db: Session = Depends(get_db), usuario: mod
     return {
         "id": cliente.id, "nombre_completo": cliente.nombre_completo, "email": cliente.email,
         "whatsapp_numero": cliente.whatsapp_numero, "canal_notificacion_cliente": cliente.canal_notificacion_cliente,
+        "genero": cliente.genero, "numero_documento": cliente.numero_documento,
+        "domicilio": cliente.domicilio, "direccion": cliente.direccion,
         "estado_relacion": "ACTIVO" if procesos else "SIN_PROCESOS",
         "ultimo_contacto": ultimo_contacto,
         "procesos": [{"id": p.id, "nombre": p.nombre} for p in procesos],
@@ -774,8 +805,18 @@ def listar_documentos_despacho(db: Session = Depends(get_db), usuario: models.Us
                 models.Proceso.id.in_(assigned_processes)
             )
     solicitudes = solicitudes_query.order_by(models.SolicitudDocumento.created_at.desc()).all()
-    documentos = documentos_query.order_by(models.DocumentoProceso.created_at.desc()).all()
-    return {"solicitudes": [{"id": s.id, "proceso": s.proceso.nombre, "proceso_id": s.proceso_id, "cliente": s.cliente.nombre_completo, "cliente_id": s.cliente_id, "titulo": s.titulo, "instrucciones": s.instrucciones, "atendida_en": s.atendida_en, "fecha_limite": s.fecha_limite, "created_at": s.created_at} for s in solicitudes], "documentos": [{"id": d.id, "proceso": d.proceso.nombre, "proceso_id": d.proceso_id, "cliente": d.cliente.nombre_completo if d.cliente else "Usuario eliminado", "cliente_id": d.cliente_id, "solicitud_id": d.solicitud_id, "nombre_archivo": d.nombre_archivo, "mime_type": d.mime_type, "estado_revision": d.estado_revision, "comentario_revision": d.comentario_revision, "created_at": d.created_at} for d in documentos]}
+    documentos = documentos_query.order_by(models.DocumentoProceso.created_at.desc(), models.DocumentoProceso.id.desc()).all()
+    if usuario.rol == models.RolUsuario.CLIENTE:
+        contract_ids = {document.contrato_id for document in documentos if document.contrato_id is not None}
+        if contract_ids:
+            contracts = db.query(models.ContratoServicio).filter(models.ContratoServicio.id.in_(contract_ids)).all()
+            visible_contract_ids = {contract.id for contract in contracts if contract.estado in {"FIRMADO", "TERMINADO"}}
+            latest_document_by_contract = {}
+            for document in documentos:
+                if document.contrato_id in visible_contract_ids and document.contrato_id not in latest_document_by_contract:
+                    latest_document_by_contract[document.contrato_id] = document.id
+            documentos = [document for document in documentos if document.contrato_id is None or latest_document_by_contract.get(document.contrato_id) == document.id]
+    return {"solicitudes": [{"id": s.id, "proceso": s.proceso.nombre, "proceso_id": s.proceso_id, "cliente": s.cliente.nombre_completo, "cliente_id": s.cliente_id, "titulo": s.titulo, "instrucciones": s.instrucciones, "atendida_en": s.atendida_en, "fecha_limite": s.fecha_limite, "created_at": s.created_at} for s in solicitudes], "documentos": [{"id": d.id, "proceso": d.proceso.nombre, "proceso_id": d.proceso_id, "cliente": d.cliente.nombre_completo if d.cliente else "Usuario eliminado", "cliente_id": d.cliente_id, "solicitud_id": d.solicitud_id, "contrato_id": d.contrato_id, "nombre_archivo": d.nombre_archivo, "mime_type": d.mime_type, "estado_revision": d.estado_revision, "comentario_revision": d.comentario_revision, "created_at": d.created_at} for d in documentos]}
 
 
 @router.get("/documentos/{documento_id}/archivo")
@@ -809,6 +850,13 @@ def descargar_documento(
     documento = query.first()
     if not documento:
         raise HTTPException(status_code=404, detail="Documento no encontrado.")
+    if usuario.rol == models.RolUsuario.CLIENTE and documento.contrato_id is not None:
+        contrato = db.query(models.ContratoServicio).filter_by(id=documento.contrato_id).first()
+        documento_actual = db.query(models.DocumentoProceso).filter_by(contrato_id=documento.contrato_id).order_by(
+            models.DocumentoProceso.created_at.desc(), models.DocumentoProceso.id.desc(),
+        ).first()
+        if not contrato or contrato.estado not in {"FIRMADO", "TERMINADO"} or not documento_actual or documento_actual.id != documento.id:
+            raise HTTPException(status_code=404, detail="Documento no encontrado.")
 
     try:
         objeto = storage.get_r2_client().get_object(
@@ -1090,6 +1138,61 @@ def listar_eventos_agenda_abogado(fecha_desde: str | None = None, fecha_hasta: s
     return [_serializar_evento_firma(item) for item in query.order_by(models.EventoAgenda.fecha_inicio.asc()).limit(500).all()]
 
 
+@router.get("/agenda/actuaciones")
+def listar_actuaciones_agenda_abogado(proceso_id: int | None = None, db: Session = Depends(get_db),
+                                      usuario: models.Usuario = Depends(security.obtener_usuario_actual)):
+    """Actuaciones judiciales de los expedientes visibles para el abogado."""
+    _abogado(usuario)
+    query = (
+        db.query(models.Actuacion, models.Radicado, models.Proceso)
+        .join(models.Radicado, models.Radicado.id == models.Actuacion.radicado_id)
+        .join(models.ProcesoRadicado, models.ProcesoRadicado.radicado_id == models.Radicado.id)
+        .join(models.Proceso, models.Proceso.id == models.ProcesoRadicado.proceso_id)
+        .filter(models.Proceso.archivado_en.is_(None))
+    )
+    if usuario.rol != models.RolUsuario.ADMIN:
+        query = query.filter(models.Proceso.id.in_(lawyer_process_ids(db, usuario)))
+    if proceso_id is not None:
+        _proceso_abogado(proceso_id, usuario, db)
+        query = query.filter(models.Proceso.id == proceso_id)
+
+    rows = query.order_by(models.Actuacion.id.desc()).all()
+    process_ids = {proceso.id for _, _, proceso in rows}
+    clients_by_process: dict[int, list[int]] = {process_id: [] for process_id in process_ids}
+    client_links = db.query(models.ProcesoCliente).filter(models.ProcesoCliente.proceso_id.in_(process_ids)).all() if process_ids else []
+    for process_client in client_links:
+        clients_by_process[process_client.proceso_id].append(process_client.cliente_id)
+
+    result = []
+    for actuacion, radicado, proceso in rows:
+        raw_date = (actuacion.fecha_registro or actuacion.fecha_actuacion or "").strip()
+        parsed_date = None
+        for date_format in ("%d/%m/%Y", "%Y-%m-%d"):
+            try:
+                parsed_date = datetime.strptime(raw_date[:10], date_format).date()
+                break
+            except ValueError:
+                continue
+        if parsed_date is None:
+            try:
+                parsed_date = datetime.fromisoformat(raw_date.replace("Z", "+00:00")).date()
+            except ValueError:
+                continue
+        result.append({
+            "id": actuacion.id,
+            "titulo": (actuacion.actuacion or "").strip() or "Actuación judicial",
+            "descripcion": (actuacion.anotacion or "").strip(),
+            "fecha": f"{parsed_date.isoformat()}T12:00:00",
+            "proceso_id": proceso.id,
+            "proceso": proceso.nombre,
+            "abogado_id": proceso.abogado_id,
+            "cliente_ids": clients_by_process.get(proceso.id, []),
+            "radicado_id": radicado.id,
+            "radicado": radicado.numero,
+        })
+    return sorted(result, key=lambda item: (item["fecha"], item["id"]), reverse=True)
+
+
 @router.post("/agenda/eventos", status_code=status.HTTP_201_CREATED)
 def crear_evento_agenda_abogado(datos: schemas.EventoAgendaCreate, db: Session = Depends(get_db),
                                 usuario: models.Usuario = Depends(security.obtener_usuario_actual)):
@@ -1133,7 +1236,10 @@ def actualizar_evento_agenda_abogado(evento_id: int, datos: schemas.EventoAgenda
         raise HTTPException(status_code=404, detail="Evento no encontrado.")
     proceso = _proceso_abogado(evento.proceso_id, usuario, db)
     cliente = _cliente_asignado(proceso, datos.cliente_id, db) if datos.cliente_id else None
-    contrato = _validar_contrato_evento(proceso, datos.tipo, datos.contrato_id, cliente, db, usuario)
+    contrato = _validar_contrato_evento(
+        proceso, datos.tipo, datos.contrato_id, cliente, db, usuario,
+        permitir_firmado=evento.contrato_id == datos.contrato_id and evento.contrato_id is not None,
+    )
     if contrato and cliente is None:
         cliente = contrato.cliente
     responsable_id = datos.responsable_id or usuario.id
@@ -1402,7 +1508,7 @@ def obtener_proceso_detalle(proceso_id: int, db: Session = Depends(get_db), usua
         "puede_gestionar_equipo": puede_gestionar_equipo,
         "abogados_disponibles": abogados_disponibles,
         "radicados": [{"id": enlace.radicado.id, "numero": enlace.radicado.numero, "estado_consulta": enlace.radicado.estado_consulta, "actuaciones": [{"id": a.id, "fecha_actuacion": a.fecha_actuacion, "actuacion": a.actuacion, "anotacion": a.anotacion} for a in sorted(enlace.radicado.actuaciones, key=lambda a: a.orden)]} for enlace in proceso.radicados if enlace.radicado],
-        "clientes": [{"id": enlace.cliente.id, "nombre_completo": enlace.cliente.nombre_completo, "email": enlace.cliente.email, "whatsapp_numero": enlace.cliente.whatsapp_numero} for enlace in proceso.clientes if enlace.cliente and enlace.cliente.rol == models.RolUsuario.CLIENTE],
+        "clientes": [{"id": enlace.cliente.id, "nombre_completo": enlace.cliente.nombre_completo, "email": enlace.cliente.email, "whatsapp_numero": enlace.cliente.whatsapp_numero, "genero": enlace.cliente.genero, "numero_documento": enlace.cliente.numero_documento, "domicilio": enlace.cliente.domicilio, "direccion": enlace.cliente.direccion} for enlace in proceso.clientes if enlace.cliente and enlace.cliente.rol == models.RolUsuario.CLIENTE],
         "tareas": [{"id": t.id, "titulo": t.titulo, "descripcion": t.descripcion, "estado": t.estado.value, "prioridad": t.prioridad.value, "cliente_id": t.cliente_id, "fecha_limite": t.fecha_limite, "radicado_id": t.radicado_id, "actuacion_id": t.actuacion_id, "responsable": t.usuario.nombre_completo if t.usuario else None} for t in tareas],
         "solicitudes_documento": [{"id": s.id, "titulo": s.titulo, "instrucciones": s.instrucciones, "cliente_id": s.cliente_id, "cliente": s.cliente.nombre_completo, "atendida_en": s.atendida_en, "created_at": s.created_at} for s in proceso.solicitudes_documento if s.cliente and s.cliente.rol == models.RolUsuario.CLIENTE],
         "documentos": [{"id": d.id, "solicitud_id": d.solicitud_id, "nombre_archivo": d.nombre_archivo, "cliente": d.cliente.nombre_completo if d.cliente else "Usuario eliminado", "cliente_id": d.cliente_id, "mime_type": d.mime_type, "estado_revision": d.estado_revision, "comentario_revision": d.comentario_revision, "created_at": d.created_at} for d in proceso.documentos if d.cliente and d.cliente.rol == models.RolUsuario.CLIENTE],

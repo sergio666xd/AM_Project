@@ -119,11 +119,16 @@ class EventoAgendaUpdate(EventoAgendaCreate):
 
 class ContratoServicioCreate(BaseModel):
     cliente_id: int
-    contenido: str = Field(default="", max_length=120000)
+    campos: dict[str, str]
 
 
 class ContratoServicioUpdate(BaseModel):
-    contenido: str = Field(min_length=1, max_length=120000)
+    campos: dict[str, str]
+
+
+class ContratoVistaPrevia(BaseModel):
+    cliente_id: int
+    campos: dict[str, str]
 
 
 class ContratoServicioEstadoUpdate(BaseModel):
@@ -328,6 +333,11 @@ class PerfilUpdate(BaseModel):
     email: Optional[EmailStr] = None
     nombre_completo: Optional[str] = None
     whatsapp_numero: Optional[str] = None
+    genero: Optional[str] = Field(default=None, max_length=16)
+    numero_documento: Optional[str] = Field(default=None, max_length=40)
+    domicilio: Optional[str] = Field(default=None, max_length=120)
+    direccion: Optional[str] = Field(default=None, max_length=300)
+    tarjeta_profesional: Optional[str] = Field(default=None, max_length=40)
 
 
 class SolicitarCodigoSeguridad(BaseModel):
@@ -350,6 +360,10 @@ class SolicitudEdicionPerfilClienteCreate(BaseModel):
     email: EmailStr
     nombre_completo: str
     whatsapp_numero: str = ""
+    genero: Optional[str] = Field(default=None, max_length=16)
+    numero_documento: Optional[str] = Field(default=None, max_length=40)
+    domicilio: Optional[str] = Field(default=None, max_length=120)
+    direccion: Optional[str] = Field(default=None, max_length=300)
 
 
 class SolicitudEdicionPerfilClienteRevision(BaseModel):

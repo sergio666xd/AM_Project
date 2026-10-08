@@ -41,6 +41,7 @@ const operationsLinks: Item[] = [
 ];
 const documentLinks: Item[] = [
   { label: "Archivos recibidos", href: "/gestion-procesos/admin/documentos", icon: BookOpenText },
+  { label: "Contratos cargados", href: "/gestion-procesos/admin/documentos/contratos", icon: FileText },
   { label: "Solicitudes documentales", href: "/gestion-procesos/admin/documentos/solicitudes", icon: FileText },
 ];
 const auditLinks: Item[] = [
