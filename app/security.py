@@ -116,10 +116,15 @@ def _obtener_usuario_desde_token(
 
 def obtener_usuario_actual(token: str = Depends(oauth2_scheme), db: Session = Depends(get_db)) -> models.Usuario:
     usuario = _obtener_usuario_desde_token(token, db)
+    if usuario.estado != models.EstadoUsuario.ACTIVO:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="La cuenta no está activa.")
     if usuario.debe_cambiar_password:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Debes cambiar la contraseña temporal antes de continuar.")
     return usuario
 
 
 def obtener_usuario_para_cambio_password(token: str = Depends(oauth2_scheme), db: Session = Depends(get_db)) -> models.Usuario:
-    return _obtener_usuario_desde_token(token, db)
+    usuario = _obtener_usuario_desde_token(token, db)
+    if usuario.estado != models.EstadoUsuario.ACTIVO:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="La cuenta no está activa.")
+    return usuario

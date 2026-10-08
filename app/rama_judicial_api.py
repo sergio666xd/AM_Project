@@ -2,6 +2,7 @@
 
 import json
 import re
+import time
 from collections import Counter
 from datetime import datetime
 from urllib.error import HTTPError, URLError
@@ -15,6 +16,8 @@ from app import models
 
 API_BASE_URL = "https://consultaprocesos.ramajudicial.gov.co:448/api/v2"
 API_TIMEOUT_SECONDS = 30
+API_RETRYABLE_STATUSES = {429, 502, 503, 504}
+API_MAX_ATTEMPTS = 3
 API_HEADERS = {
     "Accept": "application/json",
     "User-Agent": "GestionProcesosSaaS/1.0",
@@ -71,17 +74,27 @@ def _obtener_json(ruta: str, parametros: dict | None = None) -> dict:
     if parametros:
         url = f"{url}?{urlencode(parametros)}"
 
-    try:
-        request = Request(url, headers=API_HEADERS)
-        with urlopen(request, timeout=API_TIMEOUT_SECONDS) as respuesta:
-            return json.loads(respuesta.read().decode("utf-8-sig"))
-    except HTTPError as exc:
-        raise RamaJudicialAPIError(f"HTTP {exc.code} al consultar la API") from exc
-    except URLError as exc:
-        raise RamaJudicialAPIError(f"No fue posible conectar con la API: {exc.reason}") from exc
-    except (UnicodeDecodeError, json.JSONDecodeError) as exc:
-        raise RamaJudicialAPIError("La API devolvió una respuesta no válida") from exc
+    for intento in range(1, API_MAX_ATTEMPTS + 1):
+        try:
+            request = Request(url, headers=API_HEADERS)
+            with urlopen(request, timeout=API_TIMEOUT_SECONDS) as respuesta:
+                return json.loads(respuesta.read().decode("utf-8-sig"))
+        except HTTPError as exc:
+            if exc.code in API_RETRYABLE_STATUSES and intento < API_MAX_ATTEMPTS:
+                retry_after = exc.headers.get("Retry-After")
+                try:
+                    espera = min(max(float(retry_after), 0), 10) if retry_after else intento * 2
+                except ValueError:
+                    espera = intento * 2
+                time.sleep(espera)
+                continue
+            raise RamaJudicialAPIError(f"HTTP {exc.code} al consultar la API") from exc
+        except URLError as exc:
+            raise RamaJudicialAPIError(f"No fue posible conectar con la API: {exc.reason}") from exc
+        except (UnicodeDecodeError, json.JSONDecodeError) as exc:
+            raise RamaJudicialAPIError("La API devolvio una respuesta no valida") from exc
 
+    raise RamaJudicialAPIError("No fue posible consultar la API")
 
 def _obtener_proceso(numero_radicado: str) -> dict | None:
     """Busca el proceso exacto, recorriendo las páginas de resultados si existen."""
@@ -103,18 +116,42 @@ def _obtener_proceso(numero_radicado: str) -> dict | None:
         pagina += 1
 
 
-def _obtener_actuaciones(id_proceso: int, limite: int | None = None) -> list[dict]:
-    """Descarga el historial de actuaciones, con límite opcional de seguridad."""
+def _clave_actuacion_api(actuacion: dict) -> tuple:
+    return _clave_actuacion(
+        {
+            "fecha_actuacion": _fecha_api(actuacion.get("fechaActuacion")),
+            "actuacion": (actuacion.get("actuacion") or "").strip(),
+            "anotacion": (actuacion.get("anotacion") or "").strip(),
+            "fecha_inicia_termino": _fecha_api(actuacion.get("fechaInicial")),
+            "fecha_finaliza_termino": _fecha_api(actuacion.get("fechaFinal")),
+            "fecha_registro": _fecha_api(actuacion.get("fechaRegistro")),
+        }
+    )
+
+
+def _obtener_actuaciones(
+    id_proceso: int,
+    limite: int | None = None,
+    claves_conocidas: set[tuple] | None = None,
+) -> list[dict]:
+    """Fetch recent pages and stop at the first known action when syncing incrementally."""
     actuaciones: list[dict] = []
     pagina = 1
 
     while True:
         respuesta = _obtener_json(f"/Proceso/Actuaciones/{id_proceso}", {"pagina": pagina})
-        actuaciones.extend(respuesta.get("actuaciones") or [])
+        limite_alcanzado = False
+        for actuacion in respuesta.get("actuaciones") or []:
+            actuaciones.append(actuacion)
+            if claves_conocidas and _clave_actuacion_api(actuacion) in claves_conocidas:
+                return actuaciones
+            if limite is not None and len(actuaciones) >= limite:
+                limite_alcanzado = True
+                break
 
-        # La API entrega las actuaciones más recientes primero. No seguimos
-        # descargando páginas cuando el plan ya alcanzó su capacidad.
-        if limite is not None and len(actuaciones) >= limite:
+        # Rama currently returns recent actions first, so the first known action
+        # is a safe pagination boundary for normal incremental synchronization.
+        if limite_alcanzado:
             return actuaciones[:limite]
 
         paginacion = respuesta.get("paginacion") or {}
@@ -148,28 +185,41 @@ def _clave_actuacion(actuacion: dict) -> tuple:
     )
 
 
-def ejecutar_consulta_api_radicado(db: Session, radicado_obj: models.Radicado) -> dict:
+def ejecutar_consulta_api_radicado(
+    db: Session,
+    radicado_obj: models.Radicado,
+    reconciliar_historial: bool = False,
+) -> dict:
     """Consulta un radicado por API, actualiza la base de datos y detecta novedades."""
     try:
-        proceso = _obtener_proceso(radicado_obj.numero)
-        if not proceso:
-            radicado_obj.estado_consulta = "no_encontrado"
-            radicado_obj.consultado_en = datetime.now().isoformat(timespec="minutes")
-            db.commit()
-            return {"estado": "no_encontrado", "total_actuaciones": 0, "actuaciones_nuevas": []}
+        estado_normalizado = (radicado_obj.estado_consulta or "").strip().upper().replace(" ", "_")
+        consulta_inicial = (
+            estado_normalizado == "SIN_CONSULTAR"
+            or not radicado_obj.id_proceso_rama
+        )
+        if consulta_inicial:
+            proceso = _obtener_proceso(radicado_obj.numero)
+            if not proceso:
+                radicado_obj.estado_consulta = "no_encontrado"
+                radicado_obj.consultado_en = datetime.now().isoformat(timespec="minutes")
+                db.commit()
+                return {"estado": "no_encontrado", "total_actuaciones": 0, "actuaciones_nuevas": []}
 
-        _actualizar_datos_generales(radicado_obj, proceso)
-        if proceso.get("esPrivado"):
-            radicado_obj.estado_consulta = "omitido: proceso privado"
-            radicado_obj.consultado_en = datetime.now().isoformat(timespec="minutes")
-            db.commit()
-            return {"estado": "omitido: proceso privado", "total_actuaciones": 0, "actuaciones_nuevas": []}
+            _actualizar_datos_generales(radicado_obj, proceso)
+            if proceso.get("esPrivado"):
+                radicado_obj.estado_consulta = "omitido: proceso privado"
+                radicado_obj.consultado_en = datetime.now().isoformat(timespec="minutes")
+                db.commit()
+                return {"estado": "omitido: proceso privado", "total_actuaciones": 0, "actuaciones_nuevas": []}
 
-        id_proceso = proceso.get("idProceso")
-        if not id_proceso:
-            raise RamaJudicialAPIError("La respuesta no contiene el identificador del proceso")
+            id_proceso = proceso.get("idProceso")
+            if not id_proceso:
+                raise RamaJudicialAPIError("La respuesta no contiene el identificador del proceso")
+            radicado_obj.id_proceso_rama = str(id_proceso)
+        else:
+            id_proceso = radicado_obj.id_proceso_rama
 
-        usuario_propietario = radicado_obj.usuario
+        usuario_propietario = radicado_obj.creador
         if usuario_propietario and usuario_propietario.rol == models.RolUsuario.ABOGADO:
             limite_actuaciones = (
                 usuario_propietario.plan.limite_ultimas_actuaciones
@@ -178,23 +228,48 @@ def ejecutar_consulta_api_radicado(db: Session, radicado_obj: models.Radicado) -
             )
         else:
             limite_actuaciones = None
+        if reconciliar_historial:
+            limite_actuaciones = None
+        actuaciones_conocidas = (
+            db.query(models.Actuacion)
+            .filter(models.Actuacion.radicado_id == radicado_obj.id)
+            .order_by(models.Actuacion.orden.asc())
+            .all()
+        )
+        claves_conocidas = Counter(
+            (
+                act.fecha_actuacion,
+                act.actuacion,
+                act.anotacion,
+                act.fecha_inicia_termino,
+                act.fecha_finaliza_termino,
+                act.fecha_registro,
+            )
+            for act in actuaciones_conocidas
+        )
         actuaciones_capturadas = []
-        for orden, actuacion in enumerate(
-            _obtener_actuaciones(int(id_proceso), limite_actuaciones), start=1
+        claves_capturadas = Counter()
+        for actuacion in _obtener_actuaciones(
+            int(id_proceso),
+            limite_actuaciones if consulta_inicial else None,
+            None if consulta_inicial or reconciliar_historial else set(claves_conocidas),
         ):
             actuacion_texto = (actuacion.get("actuacion") or "").strip()
-            actuaciones_capturadas.append(
-                {
-                    "orden": orden,
-                    "fecha_actuacion": _fecha_api(actuacion.get("fechaActuacion")),
-                    "actuacion": actuacion_texto,
-                    "anotacion": (actuacion.get("anotacion") or "").strip(),
-                    "fecha_inicia_termino": _fecha_api(actuacion.get("fechaInicial")),
-                    "fecha_finaliza_termino": _fecha_api(actuacion.get("fechaFinal")),
-                    "fecha_registro": _fecha_api(actuacion.get("fechaRegistro")),
-                    "es_fijacion": _es_fijacion_estado(actuacion_texto),
-                }
-            )
+            actuacion_capturada = {
+                "orden": len(actuaciones_capturadas) + 1,
+                "fecha_actuacion": _fecha_api(actuacion.get("fechaActuacion")),
+                "actuacion": actuacion_texto,
+                "anotacion": (actuacion.get("anotacion") or "").strip(),
+                "fecha_inicia_termino": _fecha_api(actuacion.get("fechaInicial")),
+                "fecha_finaliza_termino": _fecha_api(actuacion.get("fechaFinal")),
+                "fecha_registro": _fecha_api(actuacion.get("fechaRegistro")),
+                "es_fijacion": _es_fijacion_estado(actuacion_texto),
+            }
+            clave = _clave_actuacion(actuacion_capturada)
+            if claves_capturadas[clave]:
+                continue
+            claves_capturadas[clave] += 1
+            actuaciones_capturadas.append(actuacion_capturada)
     except RamaJudicialAPIError as exc:
         radicado_obj.estado_consulta = f"error_api: {exc}"
         db.commit()
@@ -205,48 +280,88 @@ def ejecutar_consulta_api_radicado(db: Session, radicado_obj: models.Radicado) -
         return {"estado": radicado_obj.estado_consulta}
 
     actuaciones_nuevas = []
-    actuaciones_existentes = Counter(
-            (
-                act.fecha_actuacion,
-                act.actuacion,
-                act.anotacion,
-                act.fecha_inicia_termino,
-                act.fecha_finaliza_termino,
-                act.fecha_registro,
-            )
-            for act in db.query(models.Actuacion)
-            .filter(models.Actuacion.radicado_id == radicado_obj.id)
-            .all()
+    if db.get_bind().dialect.name == "postgresql":
+        db.query(models.Radicado.id).filter(
+            models.Radicado.id == radicado_obj.id
+        ).with_for_update().scalar()
+
+    actuaciones_existentes = (
+        db.query(models.Actuacion)
+        .filter(models.Actuacion.radicado_id == radicado_obj.id)
+        .order_by(models.Actuacion.orden.asc())
+        .populate_existing()
+        .all()
     )
-    claves_existentes = [
+    claves_existentes = Counter(
+        (
+            act.fecha_actuacion,
+            act.actuacion,
+            act.anotacion,
+            act.fecha_inicia_termino,
+            act.fecha_finaliza_termino,
+            act.fecha_registro,
+        )
+        for act in actuaciones_existentes
+    )
+    claves_restantes = claves_existentes.copy()
+    for actuacion in actuaciones_capturadas:
+        clave = _clave_actuacion(actuacion)
+        if claves_restantes[clave]:
+            claves_restantes[clave] -= 1
+        else:
+            actuaciones_nuevas.append(actuacion)
+
+    historial_actualizado = actuaciones_capturadas.copy()
+    if not reconciliar_historial:
+        claves_historial = Counter(_clave_actuacion(actuacion) for actuacion in historial_actualizado)
+        for existente in actuaciones_existentes:
+            clave = (
+                existente.fecha_actuacion,
+                existente.actuacion,
+                existente.anotacion,
+                existente.fecha_inicia_termino,
+                existente.fecha_finaliza_termino,
+                existente.fecha_registro,
+            )
+            if claves_historial[clave]:
+                claves_historial[clave] -= 1
+                continue
+            historial_actualizado.append(
+                {
+                    "orden": existente.orden,
+                    "fecha_actuacion": existente.fecha_actuacion,
+                    "actuacion": existente.actuacion,
+                    "anotacion": existente.anotacion,
+                    "fecha_inicia_termino": existente.fecha_inicia_termino,
+                    "fecha_finaliza_termino": existente.fecha_finaliza_termino,
+                    "fecha_registro": existente.fecha_registro,
+                    "es_fijacion": existente.es_fijacion,
+                }
+            )
+
+    if limite_actuaciones is not None and not reconciliar_historial:
+        historial_actualizado = historial_actualizado[:limite_actuaciones]
+    claves_existentes_ordenadas = [
         (
             act.fecha_actuacion, act.actuacion, act.anotacion,
             act.fecha_inicia_termino, act.fecha_finaliza_termino, act.fecha_registro,
         )
-        for act in db.query(models.Actuacion)
-        .filter(models.Actuacion.radicado_id == radicado_obj.id)
-        .order_by(models.Actuacion.orden.asc())
-        .all()
+        for act in actuaciones_existentes
     ]
-    claves_capturadas = [_clave_actuacion(act) for act in actuaciones_capturadas]
+    claves_actualizadas = [_clave_actuacion(act) for act in historial_actualizado]
 
-    # No se reescribe el historial cuando la Rama devuelve exactamente lo mismo.
-    if claves_existentes != claves_capturadas:
+    if claves_existentes_ordenadas != claves_actualizadas:
         db.query(models.Actuacion).filter(models.Actuacion.radicado_id == radicado_obj.id).delete()
-
-        for act in actuaciones_capturadas:
-            db.add(models.Actuacion(radicado_id=radicado_obj.id, **act))
-            clave = _clave_actuacion(act)
-            if actuaciones_existentes[clave]:
-                actuaciones_existentes[clave] -= 1
-            else:
-                actuaciones_nuevas.append(act)
+        for orden, actuacion in enumerate(historial_actualizado, start=1):
+            actuacion["orden"] = orden
+            db.add(models.Actuacion(radicado_id=radicado_obj.id, **actuacion))
 
     radicado_obj.estado_consulta = "ok"
     radicado_obj.consultado_en = datetime.now().isoformat(timespec="minutes")
     db.commit()
     return {
         "estado": "ok",
-        "total_actuaciones": len(actuaciones_capturadas),
+        "total_actuaciones": len(historial_actualizado),
         "actuaciones_nuevas": actuaciones_nuevas,
+        "reconciliacion_completa": reconciliar_historial,
     }

@@ -111,7 +111,7 @@ const platformAdminSections: { label: string; items: MenuItem[] }[] = [
   },
 ];
 
-const lawyerMenuItems = (isSaas: boolean) => [
+const lawyerMenuItems = (isSaas: boolean, isFirmAdmin: boolean) => [
   { label: "Resumen", href: "/gestion-procesos/abogado", icon: LayoutDashboard },
   { label: "Procesos", href: "/gestion-procesos/abogado/procesos", icon: FolderOpen },
   { label: "Solicitudes de clientes", href: "/gestion-procesos/abogado/solicitudes-perfil", icon: UserCheck },
@@ -121,15 +121,21 @@ const lawyerMenuItems = (isSaas: boolean) => [
   { label: "Agenda", href: "/gestion-procesos/abogado/agenda", icon: CalendarDays },
   { label: "Documentos", href: "/gestion-procesos/abogado/documentos", icon: FileText },
   { label: "Notificaciones", href: "/gestion-procesos/abogado/notificaciones", icon: Bell },
+  ...(isFirmAdmin ? [{ label: "Métricas y carga", href: "/gestion-procesos/abogado/metricas", icon: LayoutDashboard }] : []),
 ];
 
-const clientMenuItems: MenuItem[] = [
-  { label: "Mis procesos", href: "/gestion-procesos/cliente", icon: FolderOpen },
-  { label: "Mis tareas", href: "/gestion-procesos/cliente/tareas", icon: ListChecks },
-  { label: "Documentos", href: "/gestion-procesos/cliente/documentos", icon: FolderOpen },
-  { label: "Mi perfil", href: "/gestion-procesos/cliente/perfil", icon: User },
-  { label: "Configuración", href: "/gestion-procesos/cliente/configuracion", icon: Settings },
-];
+  const clientMenuItems: MenuItem[] = [
+    { label: "Inicio", href: "/gestion-procesos/cliente", icon: LayoutDashboard },
+    { label: "Mis procesos", href: "/gestion-procesos/cliente/procesos", icon: FolderOpen },
+    { label: "Mis tareas", href: "/gestion-procesos/cliente/tareas", icon: ListChecks },
+    { label: "Documentos y solicitudes", href: "/gestion-procesos/cliente/documentos", icon: FileText },
+    { label: "Calendario", href: "/gestion-procesos/cliente/calendario", icon: CalendarDays },
+    { label: "Notificaciones", href: "/gestion-procesos/cliente/notificaciones", icon: Bell },
+    { label: "Mensajes", href: "/gestion-procesos/cliente/mensajes", icon: UserCheck },
+    { label: "Ayuda", href: "/gestion-procesos/cliente/ayuda", icon: ScrollText },
+    { label: "Mi perfil", href: "/gestion-procesos/cliente/perfil", icon: User },
+    { label: "Configuración", href: "/gestion-procesos/cliente/configuracion", icon: Settings },
+  ];
 
 export default function Sidebar({ variant }: SidebarProps) {
   const pathname = usePathname();
@@ -150,7 +156,7 @@ export default function Sidebar({ variant }: SidebarProps) {
 
   const menuRef = useRef<HTMLDivElement>(null);
 
-  const menuItems: MenuItem[] = variant === "client" ? clientMenuItems : lawyerMenuItems(user?.rol === "ABOGADO");
+  const menuItems: MenuItem[] = variant === "client" ? clientMenuItems : lawyerMenuItems(user?.rol === "ABOGADO", user?.rol === "ABOGADO_ADMIN");
   const homeHref = variant === "platform-admin" ? "/gestion-procesos/admin" : variant === "lawyer" || variant === "saas" ? "/gestion-procesos/abogado" : "/gestion-procesos/cliente";
   const accountBaseHref = variant === "platform-admin" ? "/gestion-procesos/admin" : variant === "lawyer" || variant === "saas" ? "/gestion-procesos/abogado" : "/gestion-procesos/cliente";
   const roleLabel = user?.rol === "ADMIN" ? "Administrador de plataforma" : user?.rol === "ABOGADO_ADMIN" ? "Abogado de la firma" : user?.rol === "ABOGADO" ? "Abogado SaaS" : "Cliente";
@@ -207,7 +213,7 @@ export default function Sidebar({ variant }: SidebarProps) {
       const isActive = getIsActive(pathname, item.href, variant);
       const Icon = item.icon;
       return (
-        <Link key={item.href} href={item.href} onClick={() => setMobileOpen(false)} className={`flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors ${isActive ? "bg-primary/10 text-primary" : "text-foreground-secondary hover:bg-surface-hover"}`}>
+        <Link key={item.href} href={item.href} prefetch={item.href !== "/gestion-procesos/admin/contenido"} onClick={(event) => { setMobileOpen(false); if (item.href === "/gestion-procesos/admin/contenido") { event.preventDefault(); window.location.assign(item.href); } }} aria-current={isActive ? "page" : undefined} className={`flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors ${isActive ? "bg-primary/10 text-primary" : "text-foreground-secondary hover:bg-surface-hover"}`}>
           <Icon className="size-4 shrink-0" />{item.label}
         </Link>
       );
@@ -231,7 +237,7 @@ export default function Sidebar({ variant }: SidebarProps) {
     }
 
     return (
-      <nav className="flex-1 space-y-1 p-4">
+      <nav aria-label="Navegación principal" className="flex-1 space-y-1 p-4">
         {menuItems.map(renderItem)}
       </nav>
     );
@@ -354,6 +360,8 @@ export default function Sidebar({ variant }: SidebarProps) {
         <button
           type="button"
           onClick={() => setMobileOpen(true)}
+          aria-expanded={mobileOpen}
+          aria-controls="app-navigation"
           className="flex h-10 w-10 items-center justify-center rounded-lg text-foreground-secondary transition-colors hover:bg-surface-hover"
           aria-label="Abrir menú"
         >
@@ -390,6 +398,8 @@ export default function Sidebar({ variant }: SidebarProps) {
 
       {/* Sidebar */}
       <aside
+        id="app-navigation"
+        aria-label={variant === "platform-admin" ? "Navegación administrativa" : "Navegación principal"}
         className={`fixed inset-y-0 left-0 z-50 flex h-screen w-[var(--sidebar-width)] flex-col border-r border-border bg-surface transition-transform duration-200 ${
           mobileOpen
             ? "translate-x-0"

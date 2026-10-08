@@ -55,6 +55,28 @@ export async function fetchApi(
   return response.json();
 }
 
+export async function iniciarWorkflowConsultaRadicado(
+  token: string,
+  input:
+    | { tipo: "AUTOMATICA_NUEVO"; radicado_id: number; consulta_id: number }
+    | { tipo: "MANUAL"; radicado_id: number }
+    | { tipo: "MANUAL"; radicado_ids: number[] },
+): Promise<{ workflow_run_id: string }> {
+  const response = await fetch("/workflow-admin/consultas/radicado", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(input),
+  });
+  const result = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    throw new Error(result.detail || "No fue posible iniciar el Workflow de consulta.");
+  }
+  return result as { workflow_run_id: string };
+}
+
 export async function fetchBlobApi(
   endpoint: string,
   options: FetchOptions = {},

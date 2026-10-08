@@ -5,6 +5,7 @@ import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { homeByRole } from "@/components/auth/RoleGate";
 import { useSession } from "@/context/SessionContext";
+import { safeInternalRedirect } from "@/lib/authRedirect";
 
 export default function GuestOnly({ children }: { children: ReactNode }) {
   const { user, loading } = useSession();
@@ -12,12 +13,17 @@ export default function GuestOnly({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     if (loading || !user) return;
+    const redirect = typeof window === "undefined"
+      ? null
+      : safeInternalRedirect(new URLSearchParams(window.location.search).get("redirect"));
     if (user.debe_cambiar_password) {
-      router.replace("/gestion-procesos/auth/cambiar-password");
+      router.replace(redirect
+        ? `/gestion-procesos/auth/cambiar-password?redirect=${encodeURIComponent(redirect)}`
+        : "/gestion-procesos/auth/cambiar-password");
       return;
     }
     const home = homeByRole[user.rol as keyof typeof homeByRole];
-    router.replace(home || "/gestion-procesos/auth/login");
+    router.replace(redirect || home || "/gestion-procesos/auth/login");
   }, [loading, router, user]);
 
   if (loading || user) {

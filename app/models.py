@@ -1,13 +1,40 @@
 import enum
 from datetime import datetime
-from sqlalchemy import Column, Integer, String, Boolean, DateTime, ForeignKey, Enum, Text, JSON
-from sqlalchemy.orm import relationship
+from sqlalchemy import Boolean, Column, DateTime, Enum, ForeignKey, Index, Integer, JSON, String, Table, Text, UniqueConstraint, event, select
+from sqlalchemy.orm import relationship, synonym
 from app.database import Base
+
+
+radicados_usuarios = Table(
+    "radicados_usuarios",
+    Base.metadata,
+    Column("usuario_id", Integer, ForeignKey("usuarios.id", ondelete="CASCADE"), primary_key=True),
+    Column("radicado_id", Integer, ForeignKey("radicados.id", ondelete="CASCADE"), primary_key=True),
+)
+
+
+TIPOS_NOTIFICACION = (
+    "ACCESO",
+    "ACTUACIONES",
+    "TAREAS",
+    "SUBTAREAS",
+    "RECORDATORIOS",
+    "DOCUMENTOS",
+    "RESUMENES",
+)
+
+
+def preferencias_notificacion_por_defecto() -> dict:
+    return {
+        tipo: {"email": True, "whatsapp": False}
+        for tipo in TIPOS_NOTIFICACION
+    }
 
 
 class EstadoUsuario(str, enum.Enum):
     PENDIENTE_APROBACION = "PENDIENTE_APROBACION"
     ACTIVO = "ACTIVO"
+    SUSPENDIDO = "SUSPENDIDO"
     RECHAZADO = "RECHAZADO"
 
 
@@ -41,6 +68,119 @@ class ConfiguracionSaas(Base):
     id = Column(Integer, primary_key=True, default=1)
     mostrar_planes = Column(Boolean, nullable=False, default=False)
 
+
+class ConfiguracionFirma(Base):
+    __tablename__ = "configuracion_firma"
+
+    id = Column(Integer, primary_key=True, default=1)
+    nombre = Column(String(180), nullable=False, default="Alejandra Muñoz Abogada y Asociados")
+    correo_contacto = Column(String(320), nullable=True, default="contacto@alejandramunozabogada.com")
+    correo_pqr = Column(String(320), nullable=True, default="pqr@alejandramunozabogada.com")
+    telefono = Column(String(40), nullable=True)
+    whatsapp = Column(String(40), nullable=True, default="3508809878")
+    direccion = Column(String(300), nullable=True)
+    ciudad = Column(String(120), nullable=True, default="Sabaneta, Antioquia")
+    pais = Column(String(120), nullable=True, default="Colombia")
+    logo_url = Column(String(1000), nullable=True, default="https://www.alejandramunozabogada.com/AM_logo_Recurso%202_Landscape_web.png")
+    sitio_web = Column(String(1000), nullable=True, default="https://www.alejandramunozabogada.com")
+    zona_horaria = Column(String(80), nullable=False, default="America/Bogota")
+    mostrar_contacto_publico = Column(Boolean, nullable=False, default=True)
+    preferencias_notificacion = Column(JSON, nullable=False, default=lambda: {"email": True, "whatsapp": True})
+    parametros_generales = Column(JSON, nullable=False, default=dict)
+    actualizado_por_id = Column(Integer, ForeignKey("usuarios.id", ondelete="SET NULL"), nullable=True)
+    updated_at = Column(DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+
+class ConfiguracionIntegraciones(Base):
+    """Credenciales globales SMTP y WhatsApp cifradas en la base de datos."""
+    __tablename__ = "configuracion_integraciones"
+
+    id = Column(Integer, primary_key=True, default=1)
+    smtp_host = Column(String(255), nullable=True)
+    smtp_port = Column(Integer, nullable=True)
+    smtp_from = Column(String(320), nullable=True)
+    smtp_starttls = Column(Boolean, nullable=True)
+    smtp_user = Column(String(320), nullable=True)
+    smtp_password_encrypted = Column(Text, nullable=True)
+    whatsapp_api_url_encrypted = Column(Text, nullable=True)
+    whatsapp_token_encrypted = Column(Text, nullable=True)
+    actualizado_por_id = Column(Integer, ForeignKey("usuarios.id", ondelete="SET NULL"), nullable=True)
+    updated_at = Column(DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+
+class ConfiguracionConsultas(Base):
+    __tablename__ = "configuracion_consultas"
+
+    id = Column(Integer, primary_key=True, default=1)
+    activa = Column(Boolean, nullable=False, default=False)
+    dias_habilitados = Column(JSON, nullable=False, default=lambda: [0, 1, 2, 3, 4])
+    actualizado_por_id = Column(Integer, ForeignKey("usuarios.id", ondelete="SET NULL"), nullable=True)
+    updated_at = Column(DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow)
+    ejecucion_activa_id = Column(String(36), nullable=True)
+    lease_hasta = Column(DateTime, nullable=True)
+
+
+class EventoAgenda(Base):
+    __tablename__ = "eventos_agenda"
+
+    id = Column(Integer, primary_key=True, index=True)
+    titulo = Column(String(255), nullable=False)
+    descripcion = Column(Text, nullable=True)
+    tipo = Column(String(20), nullable=False, default="EVENTO")
+    estado = Column(String(20), nullable=False, default="PROGRAMADO")
+    fecha_inicio = Column(DateTime, nullable=False, index=True)
+    fecha_fin = Column(DateTime, nullable=True)
+    responsable_id = Column(Integer, ForeignKey("usuarios.id", ondelete="SET NULL"), nullable=True, index=True)
+    proceso_id = Column(Integer, ForeignKey("procesos.id", ondelete="SET NULL"), nullable=True, index=True)
+    cliente_id = Column(Integer, ForeignKey("usuarios.id", ondelete="SET NULL"), nullable=True, index=True)
+    creado_por_id = Column(Integer, ForeignKey("usuarios.id", ondelete="SET NULL"), nullable=True)
+    created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
+    responsable = relationship("Usuario", foreign_keys=[responsable_id])
+    proceso = relationship("Proceso", foreign_keys=[proceso_id])
+    cliente = relationship("Usuario", foreign_keys=[cliente_id])
+
+
+class EjecucionBarrido(Base):
+    __tablename__ = "ejecuciones_barrido"
+    __table_args__ = (
+        UniqueConstraint("clave_idempotencia", name="uq_ejecuciones_barrido_clave"),
+        Index("ix_ejecuciones_barrido_estado_inicio", "estado", "inicio"),
+    )
+
+    id = Column(String(36), primary_key=True)
+    clave_idempotencia = Column(String(80), nullable=False)
+    token_lanzamiento = Column(String(80), nullable=False)
+    tipo = Column(String(20), nullable=False)
+    estado = Column(String(24), nullable=False, default="EN_PROCESO")
+    solicitada_por_id = Column(Integer, ForeignKey("usuarios.id", ondelete="SET NULL"), nullable=True)
+    inicio = Column(DateTime, nullable=False, default=datetime.utcnow)
+    finalizacion = Column(DateTime, nullable=True)
+    lease_hasta = Column(DateTime, nullable=True)
+    total_radicados = Column(Integer, nullable=False, default=0)
+    procesados = Column(Integer, nullable=False, default=0)
+    errores = Column(Integer, nullable=False, default=0)
+    actuaciones_nuevas = Column(Integer, nullable=False, default=0)
+
+
+class EjecucionRadicado(Base):
+    __tablename__ = "ejecuciones_radicados"
+    __table_args__ = (
+        UniqueConstraint("ejecucion_id", "radicado_id", name="uq_ejecucion_radicado"),
+        Index("ix_ejecuciones_radicados_estado", "estado"),
+    )
+
+    id = Column(Integer, primary_key=True, index=True)
+    ejecucion_id = Column(String(36), ForeignKey("ejecuciones_barrido.id", ondelete="CASCADE"), nullable=False)
+    radicado_id = Column(Integer, ForeignKey("radicados.id", ondelete="CASCADE"), nullable=False)
+    consulta_id = Column(Integer, ForeignKey("consultas_radicados.id", ondelete="SET NULL"), nullable=True)
+    estado = Column(String(24), nullable=False, default="EN_PROCESO")
+    inicio = Column(DateTime, nullable=False, default=datetime.utcnow)
+    finalizacion = Column(DateTime, nullable=True)
+    lease_hasta = Column(DateTime, nullable=True)
+    actuaciones_nuevas = Column(Integer, nullable=False, default=0)
+    error = Column(Text, nullable=True)
+
+
 class ContenidoPagina(Base):
     """Structured public-page content edited by platform administrators."""
     __tablename__ = "contenido_paginas"
@@ -67,7 +207,14 @@ class Usuario(Base):
     debe_cambiar_password = Column(Boolean, nullable=False, default=False)
     notificaciones_email = Column(Boolean, nullable=False, default=True)
     notificaciones_whatsapp = Column(Boolean, nullable=False, default=False)
+    preferencias_notificacion = Column(
+        JSON,
+        nullable=False,
+        default=preferencias_notificacion_por_defecto,
+    )
+    canal_notificacion_cliente = Column(String(16), nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
+    ultimo_acceso = Column(DateTime, nullable=True)
 
     tareas = relationship(
         "Tarea",
@@ -77,9 +224,34 @@ class Usuario(Base):
     )
     plan = relationship("Plan", back_populates="users")
     solicitud_registro = relationship("SolicitudRegistro", back_populates="usuario", uselist=False)
-    radicados = relationship("Radicado", back_populates="usuario", cascade="all, delete-orphan")
+    radicados = relationship(
+        "Radicado",
+        secondary=radicados_usuarios,
+        back_populates="usuarios_vinculados",
+    )
+    radicados_creados = relationship(
+        "Radicado",
+        back_populates="creador",
+        foreign_keys="Radicado.creado_por_id",
+    )
     creado_por_abogado = relationship("Usuario", remote_side=[id], foreign_keys=[creado_por_abogado_id])
     procesos = relationship("Proceso", back_populates="abogado", cascade="all, delete-orphan")
+
+
+class CodigoSeguridadUsuario(Base):
+    __tablename__ = "codigos_seguridad_usuario"
+
+    id = Column(String(36), primary_key=True)
+    usuario_id = Column(Integer, ForeignKey("usuarios.id", ondelete="CASCADE"), nullable=False, index=True)
+    accion = Column(String(16), nullable=False)
+    canal = Column(String(16), nullable=False)
+    codigo_hash = Column(String(64), nullable=False)
+    valor_pendiente = Column(Text, nullable=True)
+    expira_en = Column(DateTime, nullable=False)
+    reenviar_desde = Column(DateTime, nullable=False)
+    intentos = Column(Integer, nullable=False, default=0)
+    consumido_en = Column(DateTime, nullable=True)
+    creado_en = Column(DateTime, nullable=False, default=datetime.utcnow)
 
 
 class SolicitudRegistro(Base):
@@ -123,10 +295,24 @@ class InteresSaas(Base):
 
 class Radicado(Base):
     __tablename__ = "radicados"
+    __table_args__ = (
+        Index(
+            "uq_radicados_fuente_ambito_numero",
+            "fuente",
+            "ambito_key",
+            "numero_normalizado",
+            unique=True,
+        ),
+    )
 
     id = Column(Integer, primary_key=True, index=True)
     numero = Column(String(23), index=True, nullable=False)
-    usuario_id = Column(Integer, ForeignKey("usuarios.id"), nullable=False)
+    creado_por_id = Column(Integer, ForeignKey("usuarios.id"), nullable=False)
+    usuario_id = synonym("creado_por_id")
+    fuente = Column(String(50), nullable=False, default="RAMA_JUDICIAL_COLOMBIA")
+    ambito_key = Column(String(64), nullable=False, index=True)
+    numero_normalizado = Column(String(23), nullable=False)
+    id_proceso_rama = Column(String(64), nullable=True)
     
     estado_consulta = Column(String(50), default="sin consultar")
     despacho_departamento = Column(String(255), default="")
@@ -144,7 +330,13 @@ class Radicado(Base):
     cascade="all, delete-orphan",
 )
 
-    usuario = relationship("Usuario", back_populates="radicados")
+    creador = relationship("Usuario", back_populates="radicados_creados", foreign_keys=[creado_por_id])
+    usuario = synonym("creador")
+    usuarios_vinculados = relationship(
+        "Usuario",
+        secondary=radicados_usuarios,
+        back_populates="radicados",
+    )
     actuaciones = relationship(
         "Actuacion",
         back_populates="radicado_rel",
@@ -156,6 +348,31 @@ class Radicado(Base):
         cascade="all, delete-orphan"
     )
     procesos = relationship("ProcesoRadicado", back_populates="radicado", cascade="all, delete-orphan")
+
+
+@event.listens_for(Radicado, "before_insert")
+def establecer_identidad_radicado(mapper, connection, radicado: Radicado) -> None:
+    radicado.numero_normalizado = "".join(caracter for caracter in radicado.numero if caracter.isdigit())
+    role = connection.execute(
+        select(Usuario.rol).where(Usuario.id == radicado.creado_por_id)
+    ).scalar_one()
+    role_name = role.value if hasattr(role, "value") else str(role)
+    if role_name == RolUsuario.ABOGADO.value:
+        radicado.ambito_key = f"SAAS:{radicado.creado_por_id}"
+    elif role_name in (RolUsuario.ABOGADO_ADMIN.value, RolUsuario.ADMIN.value):
+        radicado.ambito_key = "FIRMA"
+    else:
+        raise ValueError("Solo abogados y administradores pueden crear radicados.")
+
+
+@event.listens_for(Radicado, "after_insert")
+def vincular_creador_radicado(mapper, connection, radicado: Radicado) -> None:
+    connection.execute(
+        radicados_usuarios.insert().values(
+            usuario_id=radicado.creado_por_id,
+            radicado_id=radicado.id,
+        )
+    )
 
 
 class Proceso(Base):
@@ -177,7 +394,7 @@ class Proceso(Base):
     clientes = relationship("ProcesoCliente", back_populates="proceso", cascade="all, delete-orphan")
     tareas = relationship("Tarea", back_populates="proceso")
     solicitudes_documento = relationship("SolicitudDocumento", back_populates="proceso", cascade="all, delete-orphan")
-    documentos = relationship("DocumentoProceso", back_populates="proceso", cascade="all, delete-orphan")
+    documentos = relationship("DocumentoProceso", back_populates="proceso")
 
 
 class ProcesoColaborador(Base):
@@ -186,6 +403,7 @@ class ProcesoColaborador(Base):
     proceso_id = Column(Integer, ForeignKey("procesos.id", ondelete="CASCADE"), primary_key=True)
     abogado_id = Column(Integer, ForeignKey("usuarios.id", ondelete="CASCADE"), primary_key=True)
     asignado_por_id = Column(Integer, ForeignKey("usuarios.id", ondelete="SET NULL"), nullable=True)
+    visible_cliente = Column(Boolean, nullable=False, default=False)
     created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
 
     proceso = relationship("Proceso", back_populates="colaboradores")
@@ -216,6 +434,7 @@ class SolicitudDocumento(Base):
     cliente_id = Column(Integer, ForeignKey("usuarios.id"), nullable=False, index=True)
     titulo = Column(String(255), nullable=False)
     instrucciones = Column(Text, nullable=True)
+    fecha_limite = Column(DateTime, nullable=True)
     atendida_en = Column(DateTime, nullable=True)
     created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
     proceso = relationship("Proceso", back_populates="solicitudes_documento")
@@ -226,12 +445,16 @@ class SolicitudDocumento(Base):
 class DocumentoProceso(Base):
     __tablename__ = "documentos_proceso"
     id = Column(Integer, primary_key=True, index=True)
-    proceso_id = Column(Integer, ForeignKey("procesos.id"), nullable=False, index=True)
-    cliente_id = Column(Integer, ForeignKey("usuarios.id"), nullable=False, index=True)
-    solicitud_id = Column(Integer, ForeignKey("solicitudes_documento.id"), nullable=False, index=True)
+    proceso_id = Column(Integer, ForeignKey("procesos.id"), nullable=True, index=True)
+    cliente_id = Column(Integer, ForeignKey("usuarios.id"), nullable=True, index=True)
+    solicitud_id = Column(Integer, ForeignKey("solicitudes_documento.id"), nullable=True, index=True)
     nombre_archivo = Column(String(255), nullable=False)
     ruta_archivo = Column(String(500), nullable=False)
     mime_type = Column(String(100), nullable=False)
+    estado_revision = Column(String(24), nullable=False, default="RECIBIDO")
+    comentario_revision = Column(Text, nullable=True)
+    revisado_por_id = Column(Integer, ForeignKey("usuarios.id", ondelete="SET NULL"), nullable=True)
+    revisado_en = Column(DateTime, nullable=True)
     created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
     proceso = relationship("Proceso", back_populates="documentos")
     cliente = relationship("Usuario", foreign_keys=[cliente_id])
@@ -253,6 +476,110 @@ class NotificacionProceso(Base):
     created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
 
 
+class ComunicacionProceso(Base):
+    """Entrada trazable de una comunicación o nota asociada al expediente."""
+    __tablename__ = "comunicaciones_proceso"
+
+    id = Column(Integer, primary_key=True, index=True)
+    proceso_id = Column(Integer, ForeignKey("procesos.id", ondelete="CASCADE"), nullable=False, index=True)
+    actor_id = Column(Integer, ForeignKey("usuarios.id", ondelete="SET NULL"), nullable=True, index=True)
+    cliente_id = Column(Integer, ForeignKey("usuarios.id", ondelete="SET NULL"), nullable=True, index=True)
+    visibilidad = Column(String(16), nullable=False, default="INTERNA", index=True)
+    canal = Column(String(16), nullable=False, default="INTERNO")
+    asunto = Column(String(255), nullable=False)
+    contenido = Column(Text, nullable=False)
+    created_at = Column(DateTime, nullable=False, default=datetime.utcnow, index=True)
+    leido_en = Column(DateTime, nullable=True)
+    proceso = relationship("Proceso")
+    actor = relationship("Usuario", foreign_keys=[actor_id])
+    cliente = relationship("Usuario", foreign_keys=[cliente_id])
+
+
+class LecturaNotificacionAbogado(Base):
+    __tablename__ = "lecturas_notificacion_abogado"
+    __table_args__ = (UniqueConstraint("usuario_id", "notificacion_id", name="uq_lectura_notificacion_abogado"),)
+
+    id = Column(Integer, primary_key=True, index=True)
+    usuario_id = Column(Integer, ForeignKey("usuarios.id", ondelete="CASCADE"), nullable=False, index=True)
+    notificacion_id = Column(String(120), nullable=False, index=True)
+    leida_en = Column(DateTime, nullable=False, default=datetime.utcnow)
+
+
+class LecturaNotificacionCliente(Base):
+    __tablename__ = "lecturas_notificacion_cliente"
+    __table_args__ = (UniqueConstraint("usuario_id", "notificacion_id", name="uq_lectura_notificacion_cliente"),)
+
+    id = Column(Integer, primary_key=True, index=True)
+    usuario_id = Column(Integer, ForeignKey("usuarios.id", ondelete="CASCADE"), nullable=False, index=True)
+    notificacion_id = Column(String(160), nullable=False, index=True)
+    leida_en = Column(DateTime, nullable=False, default=datetime.utcnow)
+
+
+class EntregaNotificacion(Base):
+    __tablename__ = "entregas_notificacion"
+    __table_args__ = (
+        UniqueConstraint("clave_idempotencia", name="uq_entrega_notificacion_clave"),
+        Index("ix_entrega_notificacion_estado", "estado", "created_at"),
+        Index("ix_entrega_notificacion_destinatario", "usuario_id", "created_at"),
+    )
+
+    id = Column(Integer, primary_key=True, index=True)
+    clave_idempotencia = Column(String(200), nullable=False)
+    usuario_id = Column(Integer, ForeignKey("usuarios.id", ondelete="CASCADE"), nullable=False)
+    tipo = Column(String(32), nullable=False)
+    canal = Column(String(16), nullable=False)
+    recordatorio_id = Column(
+        Integer,
+        ForeignKey("recordatorios_tareas.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
+    recordatorio_version = Column(Integer, nullable=True)
+    asunto = Column(String(255), nullable=False)
+    cuerpo = Column(Text, nullable=False)
+    estado = Column(String(20), nullable=False, default="PENDIENTE")
+    intentos = Column(Integer, nullable=False, default=0)
+    error = Column(Text, nullable=True)
+    created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
+    enviado_en = Column(DateTime, nullable=True)
+    lease_hasta = Column(DateTime, nullable=True)
+
+    actuaciones = relationship(
+        "EntregaNotificacionActuacion",
+        back_populates="entrega",
+        cascade="all, delete-orphan",
+    )
+
+
+class EntregaNotificacionActuacion(Base):
+    __tablename__ = "entregas_notificacion_actuaciones"
+    __table_args__ = (
+        UniqueConstraint(
+            "actuacion_id",
+            "usuario_id",
+            "canal",
+            name="uq_entrega_actuacion_usuario_canal",
+        ),
+    )
+
+    id = Column(Integer, primary_key=True, index=True)
+    entrega_id = Column(
+        Integer,
+        ForeignKey("entregas_notificacion.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    actuacion_id = Column(
+        Integer,
+        ForeignKey("actuaciones.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    usuario_id = Column(Integer, ForeignKey("usuarios.id", ondelete="CASCADE"), nullable=False)
+    canal = Column(String(16), nullable=False)
+
+    entrega = relationship("EntregaNotificacion", back_populates="actuaciones")
+
+
 class EventoAuditoria(Base):
     __tablename__ = "eventos_auditoria"
 
@@ -261,7 +588,21 @@ class EventoAuditoria(Base):
     accion = Column(String(100), nullable=False, index=True)
     tipo_recurso = Column(String(80), nullable=False)
     recurso_id = Column(String(64), nullable=True)
+    endpoint = Column(String(500), nullable=True)
+    metodo = Column(String(16), nullable=True)
+    metadata_json = Column(Text, nullable=True)
+    error_tecnico = Column(Text, nullable=True)
     created_at = Column(DateTime, nullable=False, default=datetime.utcnow, index=True)
+
+
+class LecturaNotificacionAdmin(Base):
+    __tablename__ = "lecturas_notificacion_admin"
+    __table_args__ = (UniqueConstraint("usuario_id", "notificacion_id", name="uq_lectura_notificacion_admin"),)
+
+    id = Column(Integer, primary_key=True, index=True)
+    usuario_id = Column(Integer, ForeignKey("usuarios.id", ondelete="CASCADE"), nullable=False, index=True)
+    notificacion_id = Column(String(120), nullable=False, index=True)
+    leida_en = Column(DateTime, nullable=False, default=datetime.utcnow)
 
 class Actuacion(Base):
     __tablename__ = "actuaciones"
@@ -298,7 +639,7 @@ class ConsultaRadicado(Base):
         index=True
     )
 
-    # MANUAL / AUTOMATICA
+    # MANUAL / AUTOMATICA / AUTOMATICA_NUEVO
     tipo = Column(String(20), nullable=False, default="AUTOMATICA")
 
     # ENCOLADA / EN_PROCESO / COMPLETADA / ERROR
@@ -528,11 +869,18 @@ class RecordatorioTarea(Base):
         default=CanalRecordatorio.WHATSAPP,
     )
 
+    notificar_email = Column(Boolean, nullable=False, default=False)
+    notificar_whatsapp = Column(Boolean, nullable=False, default=True)
+    interno_sistema = Column(Boolean, nullable=False, default=False, server_default="false", index=True)
+
     activo = Column(
         Boolean,
         nullable=False,
         default=True,
     )
+
+    version = Column(Integer, nullable=False, default=1, server_default="1")
+    workflow_version_lanzada = Column(Integer, nullable=False, default=0, server_default="0")
 
     # Momento exacto del recordatorio
     fecha_hora = Column(
@@ -556,3 +904,11 @@ class RecordatorioTarea(Base):
         "Tarea",
         back_populates="recordatorios",
     )
+
+    @property
+    def workflow_pendiente_lanzamiento(self) -> bool:
+        return (
+            self.activo
+            and self.enviado_en is None
+            and self.workflow_version_lanzada != self.version
+        )

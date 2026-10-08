@@ -6,7 +6,9 @@ import Image from "next/image";
 import { usePathname } from "next/navigation";
 import {
   Activity,
+  Bell,
   BookOpenText,
+  CalendarDays,
   ChevronRight,
   CreditCard,
   FileText,
@@ -16,15 +18,35 @@ import {
   LogOut,
   Menu,
   ScrollText,
+  Settings,
+  ServerCog,
   Users,
   UserCheck,
   UserRound,
   X,
 } from "lucide-react";
 import { useSession } from "@/context/SessionContext";
+import Breadcrumbs from "@/components/layout/Breadcrumbs";
+import { AdminAlertBell } from "@/components/admin/console/AdminAlertBell";
+import GlobalSearch from "@/components/layout/GlobalSearch";
 
 type Item = { label: string; href: string; icon: typeof LayoutDashboard };
 type Section = { title: string; scope: string; links: Item[] };
+
+const operationsLinks: Item[] = [
+  { label: "Resumen", href: "/gestion-procesos/admin/operacion", icon: Activity },
+  { label: "Consultas judiciales", href: "/gestion-procesos/admin/operacion/consultas", icon: CalendarDays },
+  { label: "Integraciones", href: "/gestion-procesos/admin/operacion/integraciones", icon: ServerCog },
+  { label: "Notificaciones", href: "/gestion-procesos/admin/operacion/notificaciones", icon: Bell },
+];
+const documentLinks: Item[] = [
+  { label: "Archivos recibidos", href: "/gestion-procesos/admin/documentos", icon: BookOpenText },
+  { label: "Solicitudes documentales", href: "/gestion-procesos/admin/documentos/solicitudes", icon: FileText },
+];
+const auditLinks: Item[] = [
+  { label: "Actividad", href: "/gestion-procesos/admin/actividad", icon: Activity },
+  { label: "Auditoría técnica", href: "/gestion-procesos/admin/auditoria", icon: ScrollText },
+];
 
 const sections: Section[] = [
   {
@@ -35,6 +57,17 @@ const sections: Section[] = [
         label: "Resumen",
         href: "/gestion-procesos/admin",
         icon: LayoutDashboard,
+      },
+      { label: "Métricas y carga", href: "/gestion-procesos/admin/metricas", icon: Activity },
+      {
+        label: "Alertas",
+        href: "/gestion-procesos/admin/alertas",
+        icon: Bell,
+      },
+      {
+        label: "Notificaciones",
+        href: "/gestion-procesos/admin/notificaciones",
+        icon: Bell,
       },
       {
         label: "Usuarios",
@@ -88,9 +121,19 @@ const sections: Section[] = [
         icon: ListChecks,
       },
       {
+        label: "Agenda",
+        href: "/gestion-procesos/admin/agenda",
+        icon: CalendarDays,
+      },
+      {
         label: "Documentos",
         href: "/gestion-procesos/admin/documentos",
         icon: BookOpenText,
+      },
+      {
+        label: "Configuración de firma",
+        href: "/gestion-procesos/admin/firma",
+        icon: Settings,
       },
     ],
   },
@@ -152,7 +195,9 @@ function activeScope(pathname: string) {
     return "Global · todas las modalidades";
   if (/\/admin\/(planes|solicitudes)(\/|$)/.test(pathname))
     return "SaaS · abogados externos";
-  if (/\/admin\/(procesos|radicados|tareas|documentos)(\/|$)/.test(pathname))
+  if (/\/admin\/(notificaciones|alertas|actividad|auditoria|operacion)(\/|$)/.test(pathname))
+    return "Global · todas las modalidades";
+  if (/\/admin\/(procesos|radicados|tareas|documentos|agenda|firma)(\/|$)/.test(pathname))
     return "Firma · Alejandra Muñoz Abogada y Asociados";
   return "Global · todas las modalidades";
 }
@@ -163,7 +208,7 @@ export default function AdminConsoleShell({
   children: ReactNode;
 }) {
   const pathname = usePathname();
-  const { user, logout } = useSession();
+  const { user, logout, token } = useSession();
   const [mobileOpen, setMobileOpen] = useState(false);
   const scope = activeScope(pathname);
 
@@ -180,17 +225,48 @@ export default function AdminConsoleShell({
         {section.links.map(({ label, href, icon: Icon }) => {
           const isActive = pathname === href || pathname.startsWith(`${href}/`);
           return (
-            <Link
-              key={`${section.title}-${href}`}
-              href={href}
-              onClick={() => setMobileOpen(false)}
-              aria-current={isActive ? "page" : undefined}
-              className={`flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition ${isActive ? "bg-primary/10 text-primary" : "text-(--foreground-secondary) hover:bg-surface-hover"}`}
-            >
-              <Icon className="size-4 shrink-0" />
-              {label}
-              {isActive && <ChevronRight className="ml-auto size-4" />}
-            </Link>
+            <div key={`${section.title}-${href}`}>
+              <Link
+                href={href}
+                prefetch={href !== "/gestion-procesos/admin/contenido"}
+                onClick={(event) => {
+                  setMobileOpen(false);
+                  if (href === "/gestion-procesos/admin/contenido") {
+                    // Bypass the App Router transition for the CMS route. Next 16.3
+                    // can fail while consuming a prefetched RSC navigation payload.
+                    event.preventDefault();
+                    window.location.assign(href);
+                  }
+                }}
+                aria-current={pathname === href ? "page" : undefined}
+                className={`flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition ${isActive ? "bg-primary/10 text-primary" : "text-(--foreground-secondary) hover:bg-surface-hover"}`}
+              >
+                <Icon className="size-4 shrink-0" />
+                {label}
+                {isActive && <ChevronRight className="ml-auto size-4" />}
+              </Link>
+              {href === "/gestion-procesos/admin/operacion" && isActive && (
+                <div className="ml-5 space-y-1 border-l border-border py-1 pl-3">
+                  {operationsLinks.map(({ label: childLabel, href: childHref, icon: ChildIcon }) => {
+                    const childActive = pathname === childHref;
+                    return (
+                      <Link
+                        key={childHref}
+                        href={childHref}
+                        onClick={() => setMobileOpen(false)}
+                        aria-current={childActive ? "page" : undefined}
+                        className={`flex items-center gap-2 rounded-md px-2 py-2 text-xs font-medium transition ${childActive ? "bg-primary/10 text-primary" : "text-(--foreground-secondary) hover:bg-surface-hover"}`}
+                      >
+                        <ChildIcon className="size-3.5 shrink-0" />
+                        {childLabel}
+                      </Link>
+                    );
+                  })}
+                </div>
+              )}
+              {href === "/gestion-procesos/admin/documentos" && isActive && <div className="ml-5 space-y-1 border-l border-border py-1 pl-3">{documentLinks.map(({ label: childLabel, href: childHref, icon: ChildIcon }) => <Link key={childHref} href={childHref} onClick={() => setMobileOpen(false)} aria-current={pathname === childHref ? "page" : undefined} className={`flex items-center gap-2 rounded-md px-2 py-2 text-xs font-medium ${pathname === childHref ? "bg-primary/10 text-primary" : "text-(--foreground-secondary) hover:bg-surface-hover"}`}><ChildIcon className="size-3.5" />{childLabel}</Link>)}</div>}
+              {href === "/gestion-procesos/admin/auditoria" && (pathname.startsWith("/gestion-procesos/admin/auditoria") || pathname.startsWith("/gestion-procesos/admin/actividad")) && <div className="ml-5 space-y-1 border-l border-border py-1 pl-3">{auditLinks.map(({ label: childLabel, href: childHref, icon: ChildIcon }) => <Link key={childHref} href={childHref} onClick={() => setMobileOpen(false)} aria-current={pathname === childHref ? "page" : undefined} className={`flex items-center gap-2 rounded-md px-2 py-2 text-xs font-medium ${pathname === childHref ? "bg-primary/10 text-primary" : "text-(--foreground-secondary) hover:bg-surface-hover"}`}><ChildIcon className="size-3.5" />{childLabel}</Link>)}</div>}
+            </div>
           );
         })}
       </section>
@@ -298,14 +374,15 @@ export default function AdminConsoleShell({
         </div>
       </aside>
       <main className="min-h-screen pt-16 md:ml-70 md:pt-0">
-        <div className="border-b border-border bg-surface px-5 py-3 md:px-8">
-          <p className="text-xs text-(--foreground-muted)">
-            Panel Administrativo <span className="px-1">/</span> Ámbito activo
-          </p>
-          <p className="mt-0.5 text-sm font-semibold text-foreground">
-            {scope}
-          </p>
-        </div>
+        <header className="sticky top-0 z-30 border-b border-border bg-surface/95 px-5 py-3 backdrop-blur md:px-8">
+          <div className="flex items-center justify-between gap-4">
+            <div className="min-w-0">
+              <Breadcrumbs />
+              <p className="mt-0.5 text-sm font-semibold text-foreground">{scope}</p>
+            </div>
+            <div className="flex items-center gap-2"><GlobalSearch /><AdminAlertBell token={token} /></div>
+          </div>
+        </header>
         <div className="p-5 md:p-8">{children}</div>
       </main>
     </div>

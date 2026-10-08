@@ -2,7 +2,7 @@ fastapi
 uvicorn[standard]
 sqlalchemy
 psycopg[binary]
-pydantic
+pydantic>=2.12,<3
 pydantic-settings
 email-validator
 python-dotenv
@@ -10,8 +10,6 @@ python-multipart
 passlib[bcrypt]
 bcrypt==4.0.1
 python-jose[cryptography]
-celery
-redis
+cryptography
 requests
 boto3
-qstash

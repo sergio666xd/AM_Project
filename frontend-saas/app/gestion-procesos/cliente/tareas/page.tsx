@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { Check, Clock3, ListChecks, RefreshCw } from "lucide-react";
+import { CalendarClock, Check, Clock3, ListChecks, RefreshCw } from "lucide-react";
 import { useSession } from "@/context/SessionContext";
 import { fetchApi } from "@/lib/api";
 import TaskMonthCalendar, {
@@ -9,6 +9,7 @@ import TaskMonthCalendar, {
 } from "@/components/calendar/TaskMonthCalendar";
 
 type Task = CalendarTask & {
+  proceso_id?: number | null;
   descripcion?: string | null;
   completada_en?: string | null;
   subtareas: {
@@ -21,6 +22,19 @@ type Task = CalendarTask & {
     actuacion_id?: number | null;
   }[];
 };
+type ClientProcess = { id: number; nombre: string };
+
+function fechaLocalParaInput(value?: string | null) {
+  if (!value) return "";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
+  const pad = (part: number) => String(part).padStart(2, "0");
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
+}
+
+function isOverdue(value?: string | null) {
+  return Boolean(value && Date.parse(value) < Date.now());
+}
 
 async function loadTasks(token: string): Promise<Task[]> {
   return fetchApi("/api/tareas", { method: "GET", token });
@@ -29,18 +43,26 @@ async function loadTasks(token: string): Promise<Task[]> {
 export default function TareasClientePage() {
   const { token, loading: sessionLoading } = useSession();
   const [tasks, setTasks] = useState<Task[]>([]);
+  const [processes, setProcesses] = useState<ClientProcess[]>([]);
   const [loading, setLoading] = useState(true);
   const [workingId, setWorkingId] = useState<number | null>(null);
   const [workingSubtaskId, setWorkingSubtaskId] = useState<number | null>(null);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
+  const [focusedTaskId, setFocusedTaskId] = useState<number | null>(null);
+  const [deadlineDrafts, setDeadlineDrafts] = useState<Record<number, string>>({});
+  const [deadlineBusyId, setDeadlineBusyId] = useState<number | null>(null);
 
   useEffect(() => {
     if (sessionLoading || !token) return;
     let active = true;
-    loadTasks(token)
-      .then((result) => {
-        if (active) setTasks(result);
+    Promise.all([loadTasks(token), fetchApi("/api/expedientes/procesos", { token }) as Promise<ClientProcess[]>])
+      .then(([result, processList]) => {
+        if (!active) return;
+        setTasks(result);
+        setProcesses(processList);
+        const requestedId = Number(new URLSearchParams(window.location.search).get("tarea"));
+        if (Number.isInteger(requestedId) && requestedId > 0) setFocusedTaskId(requestedId);
       })
       .catch((cause: unknown) => {
         if (active)
@@ -57,6 +79,11 @@ export default function TareasClientePage() {
       active = false;
     };
   }, [sessionLoading, token]);
+
+  useEffect(() => {
+    if (!focusedTaskId || !tasks.length) return;
+    document.getElementById(`tarea-${focusedTaskId}`)?.scrollIntoView({ behavior: "smooth", block: "center" });
+  }, [focusedTaskId, tasks]);
 
   async function refresh() {
     if (!token) return;
@@ -107,6 +134,29 @@ export default function TareasClientePage() {
     } finally {
       setWorkingId(null);
     }
+  }
+
+  async function updateDeadline(task: Task) {
+    if (!token) return;
+    const localValue = deadlineDrafts[task.id] ?? fechaLocalParaInput(task.fecha_limite);
+    const date = new Date(localValue);
+    if (!localValue || Number.isNaN(date.getTime())) {
+      setError("Elige una fecha y hora válida para reprogramar la tarea.");
+      return;
+    }
+    setDeadlineBusyId(task.id);
+    setError("");
+    setNotice("");
+    try {
+      await fetchApi(`/api/tareas/${task.id}`, {
+        method: "PUT", token, body: JSON.stringify({ fecha_limite: date.toISOString() }),
+      });
+      setTasks((current) => current.map((item) => item.id === task.id ? { ...item, fecha_limite: date.toISOString() } : item));
+      setDeadlineDrafts((current) => ({ ...current, [task.id]: "" }));
+      setNotice("Fecha actualizada. Los avisos programados se reprogramaron.");
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "No fue posible cambiar la fecha.");
+    } finally { setDeadlineBusyId(null); }
   }
 
   async function completeSubtask(taskId: number, subtaskId: number) {
@@ -160,6 +210,8 @@ export default function TareasClientePage() {
       ),
     [tasks],
   );
+  const completedTasks = tasks.filter((task) => task.estado === "COMPLETADA");
+  const processNames = new Map(processes.map((process) => [process.id, process.nombre]));
   const calendarTasks: CalendarTask[] = tasks
     .filter((task) => task.fecha_limite)
     .map((task) => ({
@@ -168,7 +220,7 @@ export default function TareasClientePage() {
       estado: task.estado,
       prioridad: task.prioridad,
       fecha_limite: task.fecha_limite,
-      href: undefined,
+      href: `/gestion-procesos/cliente/tareas?tarea=${task.id}#tarea-${task.id}`,
     }));
 
   return (
@@ -234,7 +286,8 @@ export default function TareasClientePage() {
                 {openTasks.map((task) => (
                   <li
                     key={task.id}
-                    className="flex flex-wrap items-center justify-between gap-4 px-4 py-3"
+                    id={`tarea-${task.id}`}
+                    className={`flex flex-wrap items-center justify-between gap-4 px-4 py-3 ${focusedTaskId === task.id ? "bg-primary/5" : ""}`}
                   >
                     <div className="min-w-0">
                       <p className="font-medium text-foreground">
@@ -245,6 +298,10 @@ export default function TareasClientePage() {
                           {task.descripcion}
                         </p>
                       )}
+                      <p className="mt-1 text-xs text-(--foreground-muted)">
+                        {task.proceso_id ? <>Proceso: <a className="text-primary underline" href={`/gestion-procesos/cliente/procesos/${task.proceso_id}`}>{processNames.get(task.proceso_id) || "Ver proceso"}</a></> : "Tarea general del despacho"}
+                        {isOverdue(task.fecha_limite) ? <span className="ml-2 font-semibold text-danger">Vencida</span> : task.fecha_limite ? <span className="ml-2 text-primary">Próxima</span> : null}
+                      </p>
                       {task.subtareas.filter((subtask) => !subtask.completada)
                         .length > 0 && (
                         <ul className="mt-3 space-y-2 border-l-2 border-border pl-3">
@@ -293,6 +350,13 @@ export default function TareasClientePage() {
                           : "Sin fecha límite"}{" "}
                         · {task.prioridad}
                       </p>
+                      <div className="mt-3 flex flex-wrap items-center gap-2">
+                        <label className="flex items-center gap-2 text-xs text-(--foreground-muted)">
+                          Cambiar fecha y hora
+                          <input aria-label={`Nueva fecha límite de ${task.titulo}`} type="datetime-local" value={deadlineDrafts[task.id] ?? fechaLocalParaInput(task.fecha_limite)} onChange={(event) => setDeadlineDrafts((current) => ({ ...current, [task.id]: event.target.value }))} className="rounded-md border border-border bg-surface-secondary px-2 py-1.5 text-xs text-foreground" />
+                        </label>
+                        <button type="button" disabled={deadlineBusyId === task.id} onClick={() => void updateDeadline(task)} className="inline-flex items-center gap-1.5 rounded-md border border-border px-2.5 py-1.5 text-xs font-medium hover:bg-surface-hover disabled:opacity-50"><CalendarClock className="size-3.5" />{deadlineBusyId === task.id ? "Reprogramando…" : "Guardar fecha"}</button>
+                      </div>
                     </div>
                     <button
                       type="button"
@@ -311,6 +375,10 @@ export default function TareasClientePage() {
                 No tienes tareas pendientes.
               </p>
             )}
+          </section>
+          <section className="overflow-hidden rounded-lg border border-border bg-surface">
+            <header className="flex items-center justify-between border-b border-border px-4 py-3"><div><h2 className="font-semibold">Completadas</h2><p className="text-xs text-(--foreground-muted)">{completedTasks.length} tarea(s)</p></div><Check className="size-5 text-success"/></header>
+            {completedTasks.length ? <ul className="divide-y divide-border">{completedTasks.map((task) => <li key={task.id} className="px-4 py-3"><p className="font-medium">{task.titulo}</p><p className="mt-1 text-xs text-(--foreground-muted)">{task.proceso_id ? processNames.get(task.proceso_id) || "Proceso relacionado" : "Tarea general"} · Completada</p></li>)}</ul> : <p className="px-4 py-6 text-sm text-(--foreground-muted)">Aún no has completado tareas.</p>}
           </section>
         </>
       )}

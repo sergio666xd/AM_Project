@@ -47,6 +47,7 @@ type Recordatorio = {
   fecha_hora?: string | null;
   anticipacion_minutos?: number | null;
   enviado_en?: string | null;
+  workflow_pendiente_lanzamiento?: boolean;
 };
 
 type Tarea = {
@@ -331,6 +332,9 @@ export default function TareaDetallePage() {
           }),
         }
       );
+      if (created.workflow_pendiente_lanzamiento) {
+        setError("Recordatorio guardado, pero el Workflow quedó pendiente de inicio. Se reintentará cuando el reconciliador esté disponible.");
+      }
 
       setTarea((current) =>
         current

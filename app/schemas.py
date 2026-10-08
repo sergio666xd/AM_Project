@@ -1,4 +1,4 @@
-from pydantic import BaseModel, EmailStr, field_serializer
+from pydantic import BaseModel, EmailStr, Field, field_serializer, field_validator
 from typing import Any, Literal, Optional
 from datetime import datetime, timezone
 from app.models import EstadoUsuario, RolUsuario
@@ -56,6 +56,105 @@ class ConfiguracionSaasOut(BaseModel):
 class ConfiguracionSaasUpdate(BaseModel):
     mostrar_planes: bool
 
+
+class ConfiguracionFirmaUpdate(BaseModel):
+    nombre: str = Field(min_length=2, max_length=180)
+    correo_contacto: EmailStr | None = None
+    correo_pqr: EmailStr | None = None
+    telefono: str = Field(default="", max_length=40)
+    whatsapp: str = Field(default="", max_length=40)
+    direccion: str = Field(default="", max_length=300)
+    ciudad: str = Field(default="", max_length=120)
+    pais: str = Field(default="Colombia", max_length=120)
+    logo_url: str = Field(default="", max_length=1000)
+    sitio_web: str = Field(default="", max_length=1000)
+    zona_horaria: str = Field(default="America/Bogota", max_length=80)
+    mostrar_contacto_publico: bool = True
+    preferencias_notificacion: dict[str, bool] = Field(default_factory=lambda: {"email": True, "whatsapp": True})
+    parametros_generales: dict[str, Any] = Field(default_factory=dict)
+
+
+class ConfiguracionIntegracionesUpdate(BaseModel):
+    smtp_host: str | None = Field(default=None, max_length=255)
+    smtp_port: int | None = Field(default=None, ge=1, le=65535)
+    smtp_from: str | None = Field(default=None, max_length=320)
+    smtp_starttls: bool | None = None
+    smtp_user: str | None = Field(default=None, max_length=320)
+    smtp_password: str | None = Field(default=None, max_length=4096)
+    borrar_smtp_password: bool = False
+    whatsapp_api_url: str | None = Field(default=None, max_length=2000)
+    whatsapp_token: str | None = Field(default=None, max_length=4096)
+    borrar_whatsapp_token: bool = False
+
+
+class ConfiguracionConsultasOut(BaseModel):
+    activa: bool
+    dias_habilitados: list[int]
+    horas_colombia: list[str] = ["12:00", "17:00"]
+    proxima_ejecucion: datetime | None = None
+    updated_at: datetime | None = None
+
+
+class ConfiguracionConsultasUpdate(BaseModel):
+    activa: bool
+    dias_habilitados: list[int]
+
+
+class EventoAgendaCreate(BaseModel):
+    titulo: str = Field(min_length=1, max_length=255)
+    descripcion: str | None = Field(default=None, max_length=4000)
+    tipo: Literal["EVENTO", "AUDIENCIA", "REUNION"] = "EVENTO"
+    estado: Literal["PROGRAMADO", "COMPLETADO", "CANCELADO"] = "PROGRAMADO"
+    fecha_inicio: datetime
+    fecha_fin: datetime | None = None
+    responsable_id: int | None = None
+    proceso_id: int | None = None
+    cliente_id: int | None = None
+
+
+class EventoAgendaUpdate(EventoAgendaCreate):
+    pass
+
+
+class WorkflowClaimConsulta(BaseModel):
+    clave_idempotencia: str
+    token_lanzamiento: str
+    tipo: Literal["AUTOMATICA", "MANUAL", "AUTOMATICA_NUEVO"]
+    fecha_local: str
+    hora_local: Literal["12:00", "17:00", "MANUAL", "NUEVO"]
+    solicitada_por_id: int | None = None
+    radicado_id: int | None = None
+    radicado_ids: list[int] | None = None
+    consulta_id: int | None = None
+
+class WorkflowConsultaRadicado(BaseModel):
+    actor_id: int
+    launch_token: str
+
+class WorkflowConsultaManualCreate(BaseModel):
+    actor_id: int
+    radicado_id: int
+
+class WorkflowActuacionNueva(BaseModel):
+    orden: int = 0
+    fecha_actuacion: str = ""
+    actuacion: str = ""
+    anotacion: str = ""
+    fecha_inicia_termino: str = ""
+    fecha_finaliza_termino: str = ""
+    fecha_registro: str = ""
+    es_fijacion: bool = False
+
+class WorkflowEventoActuaciones(BaseModel):
+    radicado_id: int
+    actuaciones_nuevas: list[WorkflowActuacionNueva]
+
+class WorkflowNovedadesPreparar(BaseModel):
+    eventos: list[WorkflowEventoActuaciones]
+
+class WorkflowRecordatorioPreparar(BaseModel):
+    version: int
+
 class ContenidoPaginaUpdate(BaseModel):
     contenido: dict[str, Any]
 
@@ -85,6 +184,31 @@ class AdminResourceUpdate(BaseModel):
     prioridad: Optional[PrioridadTarea] = None
     fecha_limite: Optional[datetime] = None
     nombre_archivo: Optional[str] = None
+    estado_revision: Literal["RECIBIDO", "EN_REVISION", "APROBADO", "REQUIERE_CORRECCION", "RECHAZADO"] | None = None
+    comentario_revision: Optional[str] = Field(default=None, max_length=4000)
+
+
+class DiagnosticoEnvioPrueba(BaseModel):
+    canal: Literal["EMAIL", "WHATSAPP"]
+    destinatario: str = Field(min_length=5, max_length=254)
+    confirmar_envio: bool = False
+
+
+class DiagnosticoIntegracion(BaseModel):
+    integracion: Literal["RAMA", "WORKFLOW", "SMTP", "WHATSAPP"]
+
+
+class AlertasAccionMasiva(BaseModel):
+    alerta_ids: list[str] = Field(min_length=1, max_length=5000)
+    estado: Literal["ATENDIDA", "DESCARTADA", "ELIMINADA"]
+
+
+class NotificacionesLeidasUpdate(BaseModel):
+    ids: list[str] = Field(default_factory=list, max_length=500)
+
+
+class AplicarMigracionRadicados(BaseModel):
+    confirmacion: Literal["CONFIRMO_BACKUP_VERIFICADO"]
 
 
 class AccionMasivaUsuarios(BaseModel):
@@ -116,8 +240,15 @@ class UsuarioAdminCreate(BaseModel):
 class UsuarioAdminUpdate(BaseModel):
     nombre_completo: Optional[str] = None
     whatsapp_numero: Optional[str] = None
+    rol: Optional[RolUsuario] = None
     plan_id: Optional[int] = None
     creado_por_abogado_id: Optional[int] = None
+
+
+class CanalesNotificacionTipo(BaseModel):
+    email: bool
+    whatsapp: bool
+
 
 class UsuarioOut(BaseModel):
     id: int
@@ -129,7 +260,12 @@ class UsuarioOut(BaseModel):
     plan: Optional[PlanOut] = None
     creado_por_abogado_id: Optional[int] = None
     debe_cambiar_password: bool = False
+    preferencias_notificacion: dict[str, CanalesNotificacionTipo] = Field(default_factory=dict)
+    canal_notificacion_cliente: Literal["EMAIL", "WHATSAPP"] | None = None
+    notificaciones_email: bool = True
+    notificaciones_whatsapp: bool = False
     created_at: Optional[datetime] = None
+    ultimo_acceso: Optional[datetime] = None
 
     class Config:
         from_attributes = True
@@ -167,6 +303,8 @@ class ConfirmacionRecuperacionPassword(BaseModel):
 
 
 class PreferenciasNotificacionUpdate(BaseModel):
+    preferencias: dict[str, CanalesNotificacionTipo] | None = None
+    canal_cliente: Literal["EMAIL", "WHATSAPP"] | None = None
     notificaciones_email: Optional[bool] = None
     notificaciones_whatsapp: Optional[bool] = None
 
@@ -175,6 +313,22 @@ class PerfilUpdate(BaseModel):
     email: Optional[EmailStr] = None
     nombre_completo: Optional[str] = None
     whatsapp_numero: Optional[str] = None
+
+
+class SolicitarCodigoSeguridad(BaseModel):
+    accion: Literal["email", "whatsapp", "password"]
+    canal: Literal["EMAIL", "WHATSAPP"]
+    valor: str | None = Field(default=None, max_length=320)
+    password_actual: str | None = Field(default=None, max_length=128)
+    password_nueva: str | None = Field(default=None, min_length=8, max_length=72)
+
+
+class ReenviarCodigoSeguridad(BaseModel):
+    canal: Literal["EMAIL", "WHATSAPP"]
+
+
+class VerificarCodigoSeguridad(BaseModel):
+    codigo: str = Field(min_length=6, max_length=6, pattern=r"^\d{6}$")
 
 
 class SolicitudEdicionPerfilClienteCreate(BaseModel):
@@ -193,6 +347,7 @@ class ClienteCreate(BaseModel):
     nombre_completo: str
     whatsapp_numero: str = ""
     password_temporal: str
+    canal_envio: Literal["EMAIL", "WHATSAPP"] = "EMAIL"
 
 
 class ClienteUpdate(BaseModel):
@@ -219,12 +374,18 @@ class ProcesoUpdate(BaseModel):
 
 class ProcesoColaboradorCreate(BaseModel):
     abogado_id: int
+    visible_cliente: bool = False
+
+
+class ProcesoColaboradorUpdate(BaseModel):
+    visible_cliente: bool
 
 
 class SolicitudDocumentoCreate(BaseModel):
     cliente_id: int
     titulo: str
     instrucciones: Optional[str] = None
+    fecha_limite: Optional[datetime] = None
 
 
 class NotificacionActuacionCreate(BaseModel):
@@ -264,6 +425,8 @@ class ActuacionOut(BaseModel):
 class RadicadoOut(BaseModel):
     id: int
     numero: str
+    mensaje: Optional[str] = None
+    consulta_id: Optional[int] = None
     estado_consulta: str
     despacho_departamento: str
     demandante: str
@@ -337,6 +500,8 @@ class SubtareaOut(BaseModel):
 
 class RecordatorioTareaCreate(BaseModel):
     canal: CanalRecordatorio = CanalRecordatorio.WHATSAPP
+    notificar_email: bool = False
+    notificar_whatsapp: bool = True
     fecha_hora: Optional[datetime] = None
     anticipacion_minutos: Optional[int] = None
     activo: bool = True
@@ -352,10 +517,13 @@ class RecordatorioTareaOut(BaseModel):
     id: int
     tarea_id: int
     canal: CanalRecordatorio
+    notificar_email: bool = False
+    notificar_whatsapp: bool = True
     activo: bool
     fecha_hora: Optional[datetime] = None
     anticipacion_minutos: Optional[int] = None
     enviado_en: Optional[datetime] = None
+    workflow_pendiente_lanzamiento: bool = False
 
     @field_serializer("fecha_hora", "enviado_en")
     def serialize_utc_datetime(self, value: Optional[datetime]) -> Optional[datetime]:
@@ -381,6 +549,32 @@ class TareaCreate(BaseModel):
     actuacion_id: Optional[int] = None
     proceso_id: Optional[int] = None
     cliente_id: Optional[int] = None
+
+
+class ComunicacionProcesoCreate(BaseModel):
+    asunto: str = Field(min_length=1, max_length=255)
+    contenido: str = Field(min_length=1, max_length=12000)
+    visibilidad: Literal["INTERNA", "CLIENTE"] = "INTERNA"
+    canal: Literal["INTERNO", "EMAIL", "WHATSAPP"] = "INTERNO"
+    cliente_id: int | None = None
+
+
+class ComunicacionClienteCreate(BaseModel):
+    asunto: str = Field(min_length=1, max_length=255)
+    contenido: str = Field(min_length=1, max_length=12000)
+
+
+class NotificacionesClienteLeidasUpdate(BaseModel):
+    ids: list[str] = Field(min_length=1, max_length=500)
+
+
+class DocumentoRevisionUpdate(BaseModel):
+    estado_revision: Literal["EN_REVISION", "APROBADO", "REQUIERE_CORRECCION", "RECHAZADO"]
+    comentario_revision: str = Field(default="", max_length=4000)
+
+
+class NotificacionesAbogadoLeidasUpdate(BaseModel):
+    ids: list[str] = Field(min_length=1, max_length=500)
 
 
 class TareaUpdate(BaseModel):
@@ -421,6 +615,11 @@ class TareaOut(BaseModel):
 
     subtareas: list[SubtareaOut] = []
     recordatorios: list[RecordatorioTareaOut] = []
+
+    @field_validator("recordatorios", mode="before")
+    @classmethod
+    def ocultar_recordatorios_internos(cls, value):
+        return [item for item in (value or []) if not getattr(item, "interno_sistema", False)]
 
     class Config:
         from_attributes = True

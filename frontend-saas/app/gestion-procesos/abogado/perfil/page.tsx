@@ -1,8 +1,9 @@
 "use client";
 
 import { apiRequest } from "@/lib/api";
+import Link from "next/link";
 
-import { FormEvent, useEffect, useState } from "react";
+import { FormEvent, useState } from "react";
 import {
   Eye,
   EyeOff,
@@ -19,8 +20,8 @@ import { useSession } from "@/context/SessionContext";
 export default function PerfilAbogadoPage() {
   const { user, token, refreshUser } = useSession();
 
-  const [nombre, setNombre] = useState("");
-  const [whatsapp, setWhatsapp] = useState("");
+  const [nombreEditado, setNombreEditado] = useState<{ userId: number; value: string } | null>(null);
+  const nombre = user && nombreEditado?.userId === user.id ? nombreEditado.value : user?.nombre_completo ?? "";
 
   const [savingProfile, setSavingProfile] = useState(false);
   const [savingPassword, setSavingPassword] = useState(false);
@@ -42,13 +43,6 @@ export default function PerfilAbogadoPage() {
     useState(false);
   const [showConfirmPassword, setShowConfirmPassword] =
     useState(false);
-
-  useEffect(() => {
-    if (!user) return;
-
-    setNombre(user.nombre_completo);
-    setWhatsapp(user.whatsapp_numero || "");
-  }, [user]);
 
   async function saveProfile(event: FormEvent) {
     event.preventDefault();
@@ -73,7 +67,6 @@ export default function PerfilAbogadoPage() {
           },
           body: JSON.stringify({
             nombre_completo: nombre.trim(),
-            whatsapp_numero: whatsapp.trim(),
           }),
         }
       );
@@ -88,6 +81,7 @@ export default function PerfilAbogadoPage() {
       }
 
       await refreshUser();
+      setNombreEditado(null);
 
       setProfileMessage(
         "Tus datos personales fueron actualizados correctamente."
@@ -215,6 +209,9 @@ export default function PerfilAbogadoPage() {
           Administra tus datos personales y la seguridad de tu
           cuenta.
         </p>
+        <Link href="/gestion-procesos/abogado/configuracion" className="mt-2 inline-block text-sm font-medium text-[var(--primary)] underline">
+          Cambiar correo, WhatsApp o contraseña con verificación
+        </Link>
       </header>
 
       {/* PERFIL */}
@@ -430,9 +427,7 @@ export default function PerfilAbogadoPage() {
                 id="nombre"
                 type="text"
                 value={nombre}
-                onChange={(event) =>
-                  setNombre(event.target.value)
-                }
+                onChange={(event) => user && setNombreEditado({ userId: user.id, value: event.target.value })}
                 required
                 className="w-full rounded-lg border px-3 py-2.5 text-sm outline-none transition focus:ring-2"
                 style={{
@@ -491,10 +486,8 @@ export default function PerfilAbogadoPage() {
               <input
                 id="whatsapp"
                 type="tel"
-                value={whatsapp}
-                onChange={(event) =>
-                  setWhatsapp(event.target.value)
-                }
+                value={user?.whatsapp_numero || ""}
+                readOnly
                 placeholder="Ej. +57 300 123 4567"
                 className="w-full rounded-lg border px-3 py-2.5 text-sm outline-none transition"
                 style={{
@@ -542,7 +535,7 @@ export default function PerfilAbogadoPage() {
       {/* SEGURIDAD */}
       <form
         onSubmit={changePassword}
-        className="overflow-hidden rounded-xl border"
+        className="hidden overflow-hidden rounded-xl border"
         style={{
           background: "var(--surface)",
           borderColor: "var(--border)",

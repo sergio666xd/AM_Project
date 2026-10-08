@@ -8,6 +8,7 @@ import { useRouter } from "next/navigation";
 import { useSession } from "@/context/SessionContext";
 import GuestOnly from "@/components/auth/GuestOnly";
 import { API_URL } from "@/lib/api";
+import { safeInternalRedirect } from "@/lib/authRedirect";
 
 function LoginForm() {
   const [email, setEmail] = useState("");
@@ -30,12 +31,16 @@ function LoginForm() {
       const data: { access_token?: string; detail?: string; debe_cambiar_password?: boolean } = await response.json().catch(() => ({}));
       if (!response.ok || !data.access_token) throw new Error(data.detail || "Credenciales inválidas o cuenta inactiva.");
       localStorage.setItem("token", data.access_token);
-      if (data.debe_cambiar_password) return router.push("/gestion-procesos/auth/cambiar-password");
+      const redirect = safeInternalRedirect(new URLSearchParams(window.location.search).get("redirect"));
+      if (data.debe_cambiar_password) {
+        const changePasswordUrl = "/gestion-procesos/auth/cambiar-password";
+        return router.push(redirect ? `${changePasswordUrl}?redirect=${encodeURIComponent(redirect)}` : changePasswordUrl);
+      }
       await refreshUser();
       const meResponse = await fetch(`${API_URL}/api/auth/me`, { headers: { Authorization: `Bearer ${data.access_token}` } });
       const me: { rol?: string; detail?: string } = await meResponse.json().catch(() => ({}));
       if (!meResponse.ok || !me.rol) throw new Error(me.detail || "No fue posible verificar los permisos de la cuenta.");
-      return router.push(me.rol === "ADMIN" ? "/gestion-procesos/admin" : me.rol === "ABOGADO_ADMIN" || me.rol === "ABOGADO" ? "/gestion-procesos/abogado" : "/gestion-procesos/cliente");
+      return router.push(redirect || (me.rol === "ADMIN" ? "/gestion-procesos/admin" : me.rol === "ABOGADO_ADMIN" || me.rol === "ABOGADO" ? "/gestion-procesos/abogado" : "/gestion-procesos/cliente"));
     } catch (loginError: unknown) {
       setError(loginError instanceof Error ? loginError.message : "No fue posible iniciar sesión.");
     } finally {

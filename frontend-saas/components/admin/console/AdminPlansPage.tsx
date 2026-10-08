@@ -54,6 +54,7 @@ export default function AdminPlansPage() {
   const [formOpen, setFormOpen] = useState(false);
   const [editing, setEditing] = useState<Plan | null>(null);
   const [form, setForm] = useState<FormState>(emptyForm);
+  const [selectedIds, setSelectedIds] = useState<number[]>([]);
   const token =
     typeof window === "undefined" ? "" : localStorage.getItem("token") || "";
 
@@ -230,6 +231,17 @@ export default function AdminPlansPage() {
     }
   }
 
+  async function setSelectedStatus(active: boolean) {
+    const selected = visible.filter((plan) => selectedIds.includes(plan.id) && plan.activo !== active);
+    if (!selected.length || !window.confirm(`¿${active ? "Activar" : "Desactivar"} ${selected.length} planes seleccionados?`)) return;
+    setWorking(true); setError(""); setNotice("");
+    const outcomes = await Promise.allSettled(selected.map((plan) => fetchApi(`/api/admin/planes/${plan.id}/estado?activo=${active}`, { method: "PATCH", token })));
+    const failed = outcomes.filter((result) => result.status === "rejected").length;
+    setNotice(`${outcomes.length - failed} planes actualizados${failed ? `; ${failed} con error` : ""}.`);
+    if (failed) setError(outcomes.filter((result): result is PromiseRejectedResult => result.status === "rejected").map((result) => result.reason instanceof Error ? result.reason.message : "Error al actualizar un plan.").join(" "));
+    setSelectedIds([]); setWorking(false); await reload();
+  }
+
   return (
     <section className="mx-auto max-w-6xl space-y-5">
       <header className="flex flex-wrap items-end justify-between gap-4">
@@ -302,9 +314,11 @@ export default function AdminPlansPage() {
         </select>
       </div>
       <div className="overflow-x-auto rounded-lg border border-border bg-surface">
+        <div className="flex flex-wrap items-center gap-2 border-b border-border p-3"><label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={visible.length > 0 && visible.every((plan) => selectedIds.includes(plan.id))} onChange={(event) => setSelectedIds((current) => event.target.checked ? [...new Set([...current, ...visible.map((plan) => plan.id)])] : current.filter((id) => !visible.some((plan) => plan.id === id)))} />Seleccionar planes visibles</label><span className="text-sm text-foreground-muted">{selectedIds.length} seleccionados</span><div className="ml-auto flex gap-2"><button type="button" onClick={() => void setSelectedStatus(true)} disabled={working || !selectedIds.length} className="rounded-md border border-border px-3 py-2 text-xs disabled:opacity-50">Activar selección</button><button type="button" onClick={() => void setSelectedStatus(false)} disabled={working || !selectedIds.length} className="rounded-md border border-border px-3 py-2 text-xs disabled:opacity-50">Desactivar selección</button></div></div>
         <table className="w-full min-w-212.5 text-left text-sm">
           <thead className="border-b border-border bg-surface-secondary text-xs uppercase text-foreground-muted">
             <tr>
+              <th className="px-4 py-3"><span className="sr-only">Selección</span></th>
               <th className="px-4 py-3">Plan</th>
               <th className="px-4 py-3">Precio</th>
               <th className="px-4 py-3">Radicados</th>
@@ -318,7 +332,7 @@ export default function AdminPlansPage() {
             {loading ? (
               <tr>
                 <td
-                  colSpan={7}
+                  colSpan={8}
                   className="px-4 py-10 text-center text-foreground-muted"
                 >
                   Cargando planes...
@@ -330,7 +344,8 @@ export default function AdminPlansPage() {
                   key={plan.id}
                   className="border-b border-border last:border-0"
                 >
-                  <td className="px-4 py-3 font-semibold">{plan.nombre}</td>
+                  <td className="px-4 py-3"><input type="checkbox" checked={selectedIds.includes(plan.id)} onChange={() => setSelectedIds((current) => current.includes(plan.id) ? current.filter((id) => id !== plan.id) : [...current, plan.id])} aria-label={`Seleccionar plan ${plan.nombre}`} /></td>
+                  <td className="px-4 py-3 font-semibold"><button type="button" onClick={() => openEdit(plan)} className="text-left hover:text-primary hover:underline">{plan.nombre}</button></td>
                   <td className="px-4 py-3">{moneda(plan.precio_mensual)}</td>
                   <td className="px-4 py-3">{plan.limite_radicados}</td>
                   <td className="px-4 py-3">
@@ -381,7 +396,7 @@ export default function AdminPlansPage() {
             ) : (
               <tr>
                 <td
-                  colSpan={7}
+                  colSpan={8}
                   className="px-4 py-12 text-center text-sm text-foreground-muted"
                 >
                   No hay planes en este filtro.

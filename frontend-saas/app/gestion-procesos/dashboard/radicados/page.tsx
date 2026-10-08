@@ -20,7 +20,7 @@ import {
   X,
 } from "lucide-react";
 
-import { fetchApi } from "@/lib/api";
+import { fetchApi, iniciarWorkflowConsultaRadicado } from "@/lib/api";
 import { useSession } from "@/context/SessionContext";
 
 interface Actuacion {
@@ -106,6 +106,7 @@ function obtenerEstadoVisual(estado: string) {
 export default function RadicadosPage() {
   const router = useRouter();
   const { user, token, loading: sessionLoading } = useSession();
+  const isAdmin = user?.rol === "ADMIN";
 
   const [radicados, setRadicados] = useState<Radicado[]>([]);
   const [loading, setLoading] = useState(true);
@@ -201,7 +202,6 @@ export default function RadicadosPage() {
     }
 
     if (!token) {
-      router.replace("/auth/login");
       return;
     }
 
@@ -434,13 +434,23 @@ export default function RadicadosPage() {
     try {
       setAdding(true);
 
-      await fetchApi("/api/radicados", {
+      const result = await fetchApi("/api/radicados", {
         method: "POST",
         token,
         body: JSON.stringify({
           numero,
         }),
       });
+
+      let successMessage = result?.mensaje || "Radicado agregado correctamente.";
+      if (typeof result?.consulta_id === "number") {
+        await iniciarWorkflowConsultaRadicado(token, {
+          tipo: "AUTOMATICA_NUEVO",
+          radicado_id: result.id,
+          consulta_id: result.consulta_id,
+        });
+        successMessage = `${successMessage} Workflow de consulta iniciado.`;
+      }
 
       await cargarRadicados(token);
 
@@ -449,7 +459,7 @@ export default function RadicadosPage() {
 
       mostrarNotificacion(
         "success",
-        "Radicado agregado correctamente."
+        successMessage
       );
     } catch (err) {
       console.error("Error agregando radicado:", err);
@@ -479,9 +489,9 @@ export default function RadicadosPage() {
     setProcessingIds((actual) => [...actual, id]);
 
     try {
-      await fetchApi(`/api/radicados/${id}/consultar`, {
-        method: "POST",
-        token,
+      await iniciarWorkflowConsultaRadicado(token, {
+        tipo: "MANUAL",
+        radicado_id: id,
       });
 
       setRadicados((actual) =>
@@ -497,7 +507,7 @@ export default function RadicadosPage() {
 
       mostrarNotificacion(
         "success",
-        "La consulta fue enviada a la cola."
+        "La consulta fue enviada al Workflow."
       );
     } catch (err) {
       console.error("Error consultando radicado:", err);
@@ -529,18 +539,19 @@ export default function RadicadosPage() {
       ...new Set([...actual, ...ids]),
     ]);
 
-    const resultados = await Promise.allSettled(
-      ids.map((id) =>
-        fetchApi(`/api/radicados/${id}/consultar`, {
-          method: "POST",
-          token,
-        })
-      )
-    );
-
-    const exitosos = resultados.filter(
-      (resultado) => resultado.status === "fulfilled"
-    ).length;
+    try {
+      await iniciarWorkflowConsultaRadicado(token, {
+        tipo: "MANUAL",
+        radicado_ids: ids,
+      });
+    } catch (err) {
+      mostrarNotificacion(
+        "error",
+        err instanceof Error ? err.message : "No fue posible iniciar el Workflow."
+      );
+      setProcessingIds((actual) => actual.filter((id) => !ids.includes(id)));
+      return;
+    }
 
     setRadicados((actual) =>
       actual.map((radicado) =>
@@ -559,19 +570,7 @@ export default function RadicadosPage() {
 
     setSelectedIds([]);
 
-    if (exitosos === ids.length) {
-      mostrarNotificacion(
-        "success",
-        `${exitosos} consulta${
-          exitosos === 1 ? "" : "s"
-        } enviada${exitosos === 1 ? "" : "s"} a la cola.`
-      );
-    } else {
-      mostrarNotificacion(
-        "warning",
-        `${exitosos} de ${ids.length} consultas fueron enviadas correctamente.`
-      );
-    }
+    mostrarNotificacion("success", `${ids.length} consultas enviadas al Workflow.`);
   }
 
   /*
@@ -943,23 +942,22 @@ export default function RadicadosPage() {
               <span>Agregar</span>
             </button>
 
-            <button
-              type="button"
-              onClick={consultarSeleccionados}
-              disabled={selectedIds.length === 0}
-              className="inline-flex items-center justify-center gap-2 rounded-lg border border-[var(--border)] px-3.5 py-2.5 text-sm font-medium text-[var(--foreground)] transition hover:bg-[var(--surface-secondary)] disabled:cursor-not-allowed disabled:opacity-40"
-            >
-              <RefreshCw className="h-4 w-4" />
-              <span className="hidden sm:inline">
-                Consultar
-              </span>
-
-              {selectedIds.length > 0 && (
-                <span className="rounded-full bg-[var(--surface-secondary)] px-1.5 py-0.5 text-xs">
-                  {selectedIds.length}
-                </span>
-              )}
-            </button>
+            {isAdmin && (
+              <button
+                type="button"
+                onClick={consultarSeleccionados}
+                disabled={selectedIds.length === 0}
+                className="inline-flex items-center justify-center gap-2 rounded-lg border border-[var(--border)] px-3.5 py-2.5 text-sm font-medium text-[var(--foreground)] transition hover:bg-[var(--surface-secondary)] disabled:cursor-not-allowed disabled:opacity-40"
+              >
+                <RefreshCw className="h-4 w-4" />
+                <span className="hidden sm:inline">Consultar</span>
+                {selectedIds.length > 0 && (
+                  <span className="rounded-full bg-[var(--surface-secondary)] px-1.5 py-0.5 text-xs">
+                    {selectedIds.length}
+                  </span>
+                )}
+              </button>
+            )}
 
             <button
               type="button"
@@ -1140,14 +1138,6 @@ export default function RadicadosPage() {
                     radicado.id
                   );
 
-                  const consultando = processingIds.includes(
-                    radicado.id
-                  );
-
-                  const eliminando = deletingIds.includes(
-                    radicado.id
-                  );
-
                   const estado = obtenerEstadoVisual(
                     radicado.estado_consulta
                   );
@@ -1292,33 +1282,25 @@ export default function RadicadosPage() {
               left: actionMenuPosition.left,
             }}
           >
-            <button
-              type="button"
-              onClick={() => {
-                setOpenActionMenu(null);
-                setActionMenuPosition(null);
-                consultarRadicado(radicadoMenuAbierto.id);
-              }}
-              disabled={
-                processingIds.includes(
-                  radicadoMenuAbierto.id
-                ) ||
-                deletingIds.includes(
-                  radicadoMenuAbierto.id
-                )
-              }
-              className="flex w-full items-center gap-2 rounded-lg px-3 py-2.5 text-sm text-[var(--foreground)] transition hover:bg-[var(--surface-secondary)] disabled:cursor-not-allowed disabled:opacity-40"
-            >
-              {processingIds.includes(
-                radicadoMenuAbierto.id
-              ) ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
-              ) : (
-                <RefreshCw className="h-4 w-4" />
-              )}
-
-              Consultar
-            </button>
+            {isAdmin && (
+              <button
+                type="button"
+                onClick={() => {
+                  setOpenActionMenu(null);
+                  setActionMenuPosition(null);
+                  consultarRadicado(radicadoMenuAbierto.id);
+                }}
+                disabled={processingIds.includes(radicadoMenuAbierto.id) || deletingIds.includes(radicadoMenuAbierto.id)}
+                className="flex w-full items-center gap-2 rounded-lg px-3 py-2.5 text-sm text-[var(--foreground)] transition hover:bg-[var(--surface-secondary)] disabled:cursor-not-allowed disabled:opacity-40"
+              >
+                {processingIds.includes(radicadoMenuAbierto.id) ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <RefreshCw className="h-4 w-4" />
+                )}
+                Consultar
+              </button>
+            )}
 
             <button
               type="button"

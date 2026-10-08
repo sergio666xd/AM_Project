@@ -3,10 +3,22 @@ import { Activity, BellRing, BriefcaseBusiness, ClipboardCheck, ShieldCheck } fr
 
 import { MarketingLayout } from "@/components/marketing/MarketingLayout";
 import { PlansAvailability } from "@/components/marketing/PlansAvailability";
+import { SITE_URL } from "@/lib/siteUrl";
 
 export const metadata: Metadata = {
   title: "Gestión de Procesos para abogados",
   description: "Consulta radicados y organiza tareas de tu práctica jurídica.",
+  alternates: { canonical: "/gestion-procesos" },
+  openGraph: {
+    type: "website",
+    locale: "es_CO",
+    siteName: "Alejandra Mu?oz Abogada y Asociados",
+    title: "Gesti?n de Procesos para abogados",
+    description: "Consulta radicados y organiza tareas de tu pr?ctica jur?dica.",
+    url: new URL("/gestion-procesos", SITE_URL).toString(),
+  },
+  twitter: { card: "summary" },
+  robots: { index: true, follow: true },
 };
 
 const benefits = [
@@ -26,10 +38,8 @@ export default function GestionProcesosPage() {
               <p className="text-sm font-bold uppercase text-[#ccb56b]">Servicio SaaS para abogados externos</p>
               <h1 className="mt-4 text-4xl font-semibold leading-tight sm:text-5xl">Gestión de Procesos</h1>
               <p className="mt-5 max-w-xl text-lg leading-8 text-white/80">Consulta radicados, detecta nuevas actuaciones y organiza el trabajo asociado a tu práctica.</p>
-              <a href="/gestion-procesos/auth/login" className="mt-7 inline-flex rounded-lg border border-white/50 px-5 py-3 font-semibold hover:bg-white/10">Ingresar a mi cuenta</a>
             </div>
             <div className="rounded-2xl border border-[#ccb56b]/60 bg-white/10 p-6 sm:p-8">
-              <h2 className="text-xl font-semibold">Planes disponibles</h2>
               <PlansAvailability />
             </div>
           </div>

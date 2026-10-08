@@ -22,6 +22,8 @@ import {
   ChevronRight,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
+import { useSession } from "@/context/SessionContext";
+import TaskMonthCalendar, { type CalendarTask } from "@/components/calendar/TaskMonthCalendar";
 
 
 type NivelTarea =
@@ -42,6 +44,7 @@ type Task = {
   radicado_id?: number | null;
   actuacion_id?: number | null;
   cliente_id?: number | null;
+  usuario_id: number;
 };
 
 type Process = {
@@ -184,6 +187,7 @@ function esVencida(task: Task) {
 
 export default function TareasPage() {
   const router = useRouter();
+  const { user } = useSession();
 
   const [tasks, setTasks] = useState<Task[]>([]);
   const [processes, setProcesses] = useState<Process[]>([]);
@@ -195,6 +199,12 @@ export default function TareasPage() {
   const [filtroEstado, setFiltroEstado] = useState("TODAS");
   const [filtroPrioridad, setFiltroPrioridad] = useState("TODAS");
   const [filtroNivel, setFiltroNivel] = useState("TODAS");
+  const [filtroResponsable, setFiltroResponsable] = useState("TODAS");
+  const [filtroProceso, setFiltroProceso] = useState("TODOS");
+  const [filtroCliente, setFiltroCliente] = useState("TODOS");
+  const [desde, setDesde] = useState("");
+  const [hasta, setHasta] = useState("");
+  const [vista, setVista] = useState<"LISTA" | "KANBAN" | "CALENDARIO">("LISTA");
 
   const [mostrarFiltros, setMostrarFiltros] = useState(false);
   const [mostrarModal, setMostrarModal] = useState(false);
@@ -273,7 +283,8 @@ export default function TareasPage() {
   }, [headers]);
 
   useEffect(() => {
-    void load();
+    const timer = window.setTimeout(() => void load(), 0);
+    return () => window.clearTimeout(timer);
   }, [load]);
 
   const request = useCallback(
@@ -354,12 +365,24 @@ export default function TareasPage() {
       const matchesLevel =
         filtroNivel === "TODAS" ||
         nivelTarea(task) === filtroNivel;
+      const matchesProcess = filtroProceso === "TODOS" || String(task.proceso_id || "") === filtroProceso;
+      const matchesClient = filtroCliente === "TODOS" || String(task.cliente_id || "") === filtroCliente;
+      const matchesResponsible = filtroResponsable === "TODAS" ||
+        (filtroResponsable === "MIA" && task.usuario_id === user?.id) ||
+        (filtroResponsable === "OTRAS" && task.usuario_id !== user?.id);
+      const due = task.fecha_limite ? new Date(task.fecha_limite) : null;
+      const dueDate = due && !Number.isNaN(due.getTime()) ? `${due.getFullYear()}-${String(due.getMonth() + 1).padStart(2, "0")}-${String(due.getDate()).padStart(2, "0")}` : "";
+      const matchesDueDate = (!desde || (dueDate && dueDate >= desde)) && (!hasta || (dueDate && dueDate <= hasta));
 
       return (
         matchesSearch &&
         matchesState &&
         matchesPriority &&
         matchesLevel
+        && matchesResponsible
+        && matchesProcess
+        && matchesClient
+        && matchesDueDate
       );
     });
   }, [
@@ -370,7 +393,18 @@ export default function TareasPage() {
     filtroEstado,
     filtroPrioridad,
     filtroNivel,
+    filtroResponsable,
+    filtroProceso,
+    filtroCliente,
+    desde,
+    hasta,
+    user?.id,
   ]);
+
+  const calendarTasks: CalendarTask[] = filteredTasks.filter((task) => task.fecha_limite).map((task) => ({
+    id: task.id, titulo: task.titulo, estado: task.estado, prioridad: task.prioridad,
+    fecha_limite: task.fecha_limite || null, href: `/gestion-procesos/abogado/tareas/${task.id}`,
+  }));
 
   const pendientes = tasks.filter(
     (task) =>
@@ -390,32 +424,6 @@ export default function TareasPage() {
 
   function openTask(taskId: number) {
     router.push(`/gestion-procesos/abogado/tareas/${taskId}`);
-  }
-
-  async function createTask(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-
-    const form = new FormData(event.currentTarget);
-    const titulo = String(form.get("titulo") || "").trim();
-
-    if (!titulo) return;
-
-    await request("/api/tareas", "POST", {
-      titulo,
-      descripcion:
-        String(form.get("descripcion") || "").trim() || null,
-      prioridad: String(form.get("prioridad") || "MEDIA"),
-      proceso_id: form.get("proceso_id")
-        ? Number(form.get("proceso_id"))
-        : null,
-      cliente_id: form.get("cliente_id")
-        ? Number(form.get("cliente_id"))
-        : null,
-      fecha_limite:
-        String(form.get("fecha_limite") || "") || null,
-    });
-
-    event.currentTarget.reset();
   }
 
   if (loading) {
@@ -607,6 +615,19 @@ export default function TareasPage() {
               <option value="ACTUACION">Actuaciones</option>
             </select>
 
+            <select value={filtroProceso} onChange={(event) => setFiltroProceso(event.target.value)} className="rounded-lg border px-3 py-2.5 text-sm outline-none" style={{ background: "var(--surface-muted)", borderColor: "var(--border)", color: "var(--foreground)" }}>
+              <option value="TODOS">Todos los procesos</option>{processes.map((process) => <option key={process.id} value={process.id}>{process.nombre}</option>)}
+            </select>
+            <select value={filtroCliente} onChange={(event) => setFiltroCliente(event.target.value)} className="rounded-lg border px-3 py-2.5 text-sm outline-none" style={{ background: "var(--surface-muted)", borderColor: "var(--border)", color: "var(--foreground)" }}>
+              <option value="TODOS">Todos los clientes</option>{clients.map((client) => <option key={client.id} value={client.id}>{client.nombre_completo}</option>)}
+            </select>
+
+            <select value={filtroResponsable} onChange={(event) => setFiltroResponsable(event.target.value)} className="rounded-lg border px-3 py-2.5 text-sm outline-none" style={{ background: "var(--surface-muted)", borderColor: "var(--border)", color: "var(--foreground)" }}>
+              <option value="TODAS">Todos los responsables</option><option value="MIA">Asignadas a mí</option><option value="OTRAS">Asignadas a otros</option>
+            </select>
+            <label className="text-xs text-foreground-muted">Vence desde<input type="date" value={desde} onChange={(event) => setDesde(event.target.value)} className="mt-1 w-full rounded-lg border px-3 py-2 text-sm" style={{ background: "var(--surface-muted)", borderColor: "var(--border)", color: "var(--foreground)" }} /></label>
+            <label className="text-xs text-foreground-muted">Vence hasta<input type="date" value={hasta} onChange={(event) => setHasta(event.target.value)} className="mt-1 w-full rounded-lg border px-3 py-2 text-sm" style={{ background: "var(--surface-muted)", borderColor: "var(--border)", color: "var(--foreground)" }} /></label>
+
             <select
               value={filtroPrioridad}
               onChange={(event) =>
@@ -677,6 +698,11 @@ export default function TareasPage() {
         </div>
       )}
 
+      <div className="flex flex-wrap gap-2" role="tablist" aria-label="Vista de tareas">
+        {([ ["LISTA", "Lista"], ["KANBAN", "Kanban"], ["CALENDARIO", "Calendario"] ] as const).map(([key, label]) => <button key={key} type="button" role="tab" aria-selected={vista === key} onClick={() => setVista(key)} className="rounded-lg border px-3 py-2 text-sm font-medium" style={{ borderColor: vista === key ? "var(--primary)" : "var(--border)", background: vista === key ? "var(--primary-light)" : "var(--surface)", color: vista === key ? "var(--primary)" : "var(--foreground-secondary)" }}>{label}</button>)}
+      </div>
+
+      {vista === "CALENDARIO" ? <TaskMonthCalendar tasks={calendarTasks} /> : vista === "KANBAN" ? <div className="grid gap-4 lg:grid-cols-4">{["PENDIENTE", "EN_CURSO", "COMPLETADA", "CANCELADA"].map((status) => <section key={status} className="min-h-48 rounded-xl border p-3" style={{ borderColor: "var(--border)", background: "var(--surface-muted)" }}><h2 className="mb-3 flex items-center justify-between text-sm font-semibold">{estadoLabel(status)}<span className="rounded-full bg-[var(--surface)] px-2 py-0.5 text-xs">{filteredTasks.filter((task) => task.estado === status).length}</span></h2><div className="space-y-2">{filteredTasks.filter((task) => task.estado === status).map((task) => <TaskCard key={task.id} task={task} processes={processes} clients={clients} onOpen={() => openTask(task.id)} onComplete={() => void request(`/api/tareas/${task.id}/completar`, "PATCH")} onDelete={() => { if (confirm("¿Eliminar tarea?")) void request(`/api/tareas/${task.id}`, "DELETE"); }} onStatusChange={(estado) => void request(`/api/tareas/${task.id}`, "PUT", { estado })} />)}</div></section>)}</div> : <>
       {/* ESCRITORIO */}
       <div
         className="hidden overflow-hidden rounded-xl border md:block"
@@ -780,6 +806,7 @@ export default function TareasPage() {
           ))
         )}
       </div>
+      </>}
 
       {/* MODAL */}
       {mostrarModal && (

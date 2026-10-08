@@ -1,8 +1,10 @@
+import ipaddress
 import os
-import redis
 import time
 import hashlib
+import hmac
 import logging
+import secrets
 from uuid import uuid4
 from collections import defaultdict, deque
 from fastapi import FastAPI, BackgroundTasks, Depends, HTTPException, Request, status, UploadFile, File, Form
@@ -12,21 +14,30 @@ from fastapi.responses import StreamingResponse
 from sqlalchemy import or_, text
 from sqlalchemy.orm import Session
 from fastapi.middleware.cors import CORSMiddleware
-from qstash import Receiver as QStashReceiver
-from datetime import datetime
-from urllib.parse import quote
+from datetime import datetime, timedelta
+from urllib.parse import quote, urlsplit
 from botocore.exceptions import BotoCoreError, ClientError
 from app.database import engine, Base, get_db
 from app import models, schemas, security, storage
 from app.email_service import enviar_correo
-from app.site_content import PUBLIC_CONTENT_PAGES
+from app.site_content import PUBLIC_CONTENT_PAGES, PUBLIC_PAGE_ROUTES
 from app.routers import admin
 from app.security import obtener_usuario_actual
-from app.routers import admin, tareas, expedientes
-from app.tasks import procesar_recordatorios_tareas
+from app.routers import admin, tareas, expedientes, workflows
+from app.radicados import (
+    iniciar_consulta_nuevo_radicado,
+    obtener_o_vincular_radicado,
+    radicado_vinculado_a_usuario,
+)
+from app.notification_policy import PREFERENCIA_PLAN_WHATSAPP, plan_whatsapp_habilitado
 from app.firm_access import require_roles
-from app.audit import registrar_evento_auditoria
+from app.audit import (
+    establecer_contexto_solicitud_auditoria,
+    limpiar_contexto_solicitud_auditoria,
+    registrar_evento_auditoria,
+)
 from app.firm_access import has_firm_wide_access, lawyer_process_ids, lawyer_scope_id
+from app.workflow_service import public_site_url
 
 # Crear las tablas en la BD
 models.Base.metadata.create_all(bind=engine)
@@ -37,6 +48,7 @@ def actualizar_esquema_planes() -> None:
     with engine.begin() as conexion:
         conexion.execute(text("ALTER TYPE rolusuario ADD VALUE IF NOT EXISTS 'ABOGADO_ADMIN'"))
         conexion.execute(text("ALTER TYPE rolusuario ADD VALUE IF NOT EXISTS 'CLIENTE'"))
+        conexion.execute(text("ALTER TYPE estadousuario ADD VALUE IF NOT EXISTS 'SUSPENDIDO'"))
         conexion.execute(text("ALTER TABLE planes ADD COLUMN IF NOT EXISTS limite_ultimas_actuaciones INTEGER DEFAULT 5"))
         conexion.execute(text("ALTER TABLE planes ADD COLUMN IF NOT EXISTS notificaciones_whatsapp_procesos BOOLEAN NOT NULL DEFAULT FALSE"))
         conexion.execute(text("ALTER TABLE planes ADD COLUMN IF NOT EXISTS notificaciones_whatsapp_tareas BOOLEAN NOT NULL DEFAULT FALSE"))
@@ -44,8 +56,43 @@ def actualizar_esquema_planes() -> None:
         conexion.execute(text("ALTER TABLE usuarios ADD COLUMN IF NOT EXISTS debe_cambiar_password BOOLEAN NOT NULL DEFAULT FALSE"))
         conexion.execute(text("ALTER TABLE usuarios ADD COLUMN IF NOT EXISTS notificaciones_email BOOLEAN NOT NULL DEFAULT TRUE"))
         conexion.execute(text("ALTER TABLE usuarios ADD COLUMN IF NOT EXISTS notificaciones_whatsapp BOOLEAN NOT NULL DEFAULT FALSE"))
+        conexion.execute(text("ALTER TABLE usuarios ADD COLUMN IF NOT EXISTS ultimo_acceso TIMESTAMP"))
+        conexion.execute(text("ALTER TABLE usuarios ADD COLUMN IF NOT EXISTS preferencias_notificacion JSON NOT NULL DEFAULT '{}'::json"))
+        conexion.execute(text("ALTER TABLE usuarios ADD COLUMN IF NOT EXISTS canal_notificacion_cliente VARCHAR(16)"))
+        conexion.execute(text("""
+            UPDATE usuarios
+            SET preferencias_notificacion = json_build_object(
+                'ACTUACIONES', json_build_object('email', notificaciones_email, 'whatsapp', notificaciones_whatsapp),
+                'ACCESO', json_build_object('email', notificaciones_email, 'whatsapp', notificaciones_whatsapp),
+                'TAREAS', json_build_object('email', notificaciones_email, 'whatsapp', notificaciones_whatsapp),
+                'SUBTAREAS', json_build_object('email', notificaciones_email, 'whatsapp', notificaciones_whatsapp),
+                'RECORDATORIOS', json_build_object('email', notificaciones_email, 'whatsapp', notificaciones_whatsapp),
+                'DOCUMENTOS', json_build_object('email', notificaciones_email, 'whatsapp', notificaciones_whatsapp),
+                'RESUMENES', json_build_object('email', notificaciones_email, 'whatsapp', notificaciones_whatsapp)
+            )
+            WHERE preferencias_notificacion::text = '{}'
+        """))
+        conexion.execute(text("""
+            UPDATE usuarios
+            SET canal_notificacion_cliente = CASE
+                WHEN notificaciones_email THEN 'EMAIL'
+                WHEN notificaciones_whatsapp AND whatsapp_numero <> '' THEN 'WHATSAPP'
+                ELSE 'EMAIL'
+            END
+            WHERE rol = 'CLIENTE' AND canal_notificacion_cliente IS NULL
+        """))
         conexion.execute(text("ALTER TABLE tareas ADD COLUMN IF NOT EXISTS proceso_id INTEGER"))
         conexion.execute(text("ALTER TABLE tareas ADD COLUMN IF NOT EXISTS cliente_id INTEGER"))
+        conexion.execute(text("ALTER TABLE recordatorios_tareas ADD COLUMN IF NOT EXISTS version INTEGER NOT NULL DEFAULT 1"))
+        conexion.execute(text("ALTER TABLE recordatorios_tareas ADD COLUMN IF NOT EXISTS workflow_version_lanzada INTEGER NOT NULL DEFAULT 0"))
+        conexion.execute(text("ALTER TABLE recordatorios_tareas ADD COLUMN IF NOT EXISTS notificar_email BOOLEAN NOT NULL DEFAULT FALSE"))
+        conexion.execute(text("ALTER TABLE recordatorios_tareas ADD COLUMN IF NOT EXISTS notificar_whatsapp BOOLEAN NOT NULL DEFAULT TRUE"))
+        conexion.execute(text("ALTER TABLE recordatorios_tareas ADD COLUMN IF NOT EXISTS interno_sistema BOOLEAN NOT NULL DEFAULT FALSE"))
+        conexion.execute(text("ALTER TABLE entregas_notificacion ADD COLUMN IF NOT EXISTS recordatorio_version INTEGER"))
+        conexion.execute(text("ALTER TABLE eventos_auditoria ADD COLUMN IF NOT EXISTS endpoint VARCHAR(500)"))
+        conexion.execute(text("ALTER TABLE eventos_auditoria ADD COLUMN IF NOT EXISTS metodo VARCHAR(16)"))
+        conexion.execute(text("ALTER TABLE eventos_auditoria ADD COLUMN IF NOT EXISTS metadata_json TEXT"))
+        conexion.execute(text("ALTER TABLE eventos_auditoria ADD COLUMN IF NOT EXISTS error_tecnico TEXT"))
         conexion.execute(text("ALTER TABLE subtareas ADD COLUMN IF NOT EXISTS cliente_id INTEGER"))
         conexion.execute(text("ALTER TABLE subtareas ADD COLUMN IF NOT EXISTS asignada_cliente BOOLEAN NOT NULL DEFAULT FALSE"))
         conexion.execute(text("ALTER TABLE subtareas ADD COLUMN IF NOT EXISTS proceso_id INTEGER REFERENCES procesos(id)"))
@@ -54,6 +101,16 @@ def actualizar_esquema_planes() -> None:
         conexion.execute(text("ALTER TABLE subtareas ADD COLUMN IF NOT EXISTS notificar_email BOOLEAN NOT NULL DEFAULT TRUE"))
         conexion.execute(text("ALTER TABLE subtareas ADD COLUMN IF NOT EXISTS notificar_whatsapp BOOLEAN NOT NULL DEFAULT TRUE"))
         conexion.execute(text("ALTER TABLE procesos ADD COLUMN IF NOT EXISTS archivado_en TIMESTAMP WITH TIME ZONE"))
+        conexion.execute(text("ALTER TABLE procesos_colaboradores ADD COLUMN IF NOT EXISTS visible_cliente BOOLEAN NOT NULL DEFAULT FALSE"))
+        conexion.execute(text("ALTER TABLE documentos_proceso ADD COLUMN IF NOT EXISTS estado_revision VARCHAR(24) NOT NULL DEFAULT 'RECIBIDO'"))
+        conexion.execute(text("ALTER TABLE documentos_proceso ADD COLUMN IF NOT EXISTS comentario_revision TEXT"))
+        conexion.execute(text("ALTER TABLE documentos_proceso ADD COLUMN IF NOT EXISTS revisado_por_id INTEGER REFERENCES usuarios(id) ON DELETE SET NULL"))
+        conexion.execute(text("ALTER TABLE documentos_proceso ADD COLUMN IF NOT EXISTS revisado_en TIMESTAMP"))
+        conexion.execute(text("ALTER TABLE documentos_proceso ALTER COLUMN proceso_id DROP NOT NULL"))
+        conexion.execute(text("ALTER TABLE documentos_proceso ALTER COLUMN cliente_id DROP NOT NULL"))
+        conexion.execute(text("ALTER TABLE documentos_proceso ALTER COLUMN solicitud_id DROP NOT NULL"))
+        conexion.execute(text("ALTER TABLE solicitudes_documento ADD COLUMN IF NOT EXISTS fecha_limite TIMESTAMP"))
+        conexion.execute(text("ALTER TABLE comunicaciones_proceso ADD COLUMN IF NOT EXISTS leido_en TIMESTAMP"))
 
 ALLOWED_CARD_TYPES = {"application/pdf", "image/jpeg", "image/png"}
 ALLOWED_CARD_EXTENSIONS = {".pdf", ".jpg", ".jpeg", ".png"}
@@ -71,9 +128,19 @@ app = FastAPI(
     version="1.0.0",
 )
 
+
+@app.middleware("http")
+async def registrar_contexto_tecnico_auditoria(request: Request, call_next):
+    token = establecer_contexto_solicitud_auditoria(request.method, request.url.path)
+    try:
+        return await call_next(request)
+    finally:
+        limpiar_contexto_solicitud_auditoria(token)
+
 app.include_router(admin.router)
 app.include_router(tareas.router)
 app.include_router(expedientes.router)
+app.include_router(workflows.router)
 
 
 def get_cors_origins() -> list[str]:
@@ -92,32 +159,8 @@ app.add_middleware(
 )
 
 
-@app.post("/api/cron/recordatorios-tareas")
-async def ejecutar_recordatorios_qstash(request: Request):
-    current_signing_key = os.getenv("QSTASH_CURRENT_SIGNING_KEY", "")
-    next_signing_key = os.getenv("QSTASH_NEXT_SIGNING_KEY", "")
-    endpoint_url = os.getenv("QSTASH_ENDPOINT_URL", "")
-    signature = request.headers.get("Upstash-Signature")
-    if not all((current_signing_key, next_signing_key, endpoint_url)):
-        raise HTTPException(status_code=503, detail="El endpoint de QStash no está configurado.")
-    if not signature:
-        raise HTTPException(status_code=401, detail="Firma de QStash requerida.")
-    raw_body = await request.body()
-    try:
-        QStashReceiver(
-            current_signing_key=current_signing_key,
-            next_signing_key=next_signing_key,
-        ).verify(
-            signature=signature,
-            body=raw_body.decode("utf-8"),
-            url=endpoint_url,
-        )
-    except Exception as exc:
-        raise HTTPException(status_code=401, detail="Firma de QStash inválida.") from exc
-    return procesar_recordatorios_tareas()
-
 # Protección ligera para el único endpoint público de captación. Para una
-# instalación con varias réplicas, conviene mover este contador a Redis/WAF.
+# instalación con varias réplicas, conviene mover este contador a una capa WAF.
 _interest_attempts: dict[str, deque[float]] = defaultdict(deque)
 
 
@@ -170,25 +213,31 @@ def _send_password_reset_email(email: str, reset_url: str) -> None:
     except Exception:
         logging.getLogger(__name__).exception("Password reset email delivery failed.")
 
-@app.get("/api/test-redis")
-def test_redis(usuario_actual: models.Usuario = Depends(security.obtener_usuario_actual)):
-    require_roles(usuario_actual, ["ADMIN"], action="consultar el estado de Redis")
-    redis_url = os.getenv("REDIS_URL")
 
-    if not redis_url:
-        return {"ok": False, "redis": "no configurado"}
+def _password_reset_frontend_url() -> str:
+    """Use a configured public frontend origin; ignore localhost in production."""
+    configured = os.getenv("FRONTEND_URL", "").strip()
+    candidate = configured if "://" in configured else f"https://{configured}" if configured else ""
+    parsed = urlsplit(candidate) if candidate else None
+    hostname = (parsed.hostname or "").lower() if parsed else ""
+    is_local = hostname in {"localhost", "localhost.localdomain"} or hostname.endswith(".localhost")
+    if hostname:
+        try:
+            address = ipaddress.ip_address(hostname)
+            is_local = is_local or address.is_loopback or address.is_unspecified
+        except ValueError:
+            pass
+    if parsed and parsed.scheme in {"http", "https"} and parsed.netloc and hostname and not is_local:
+        return candidate.rstrip("/")
 
-    try:
-        r = redis.from_url(redis_url)
-        r.ping()
-
-        return {
-            "ok": True,
-            "redis": "conectado"
-        }
-
-    except Exception:
-        return {"ok": False, "redis": "desconectado"}
+    canonical = public_site_url()
+    canonical_host = (urlsplit(canonical).hostname or "").lower()
+    if os.getenv("NODE_ENV") != "development" and (
+        canonical_host in {"localhost", "localhost.localdomain"}
+        or canonical_host.endswith(".localhost")
+    ):
+        return "https://www.alejandramunozabogada.com"
+    return canonical
 
 @app.on_event("startup")
 def crear_datos_iniciales():
@@ -204,6 +253,9 @@ def crear_datos_iniciales():
             db.commit()
         if not db.query(models.ConfiguracionSaas).filter_by(id=1).first():
             db.add(models.ConfiguracionSaas(id=1, mostrar_planes=True))
+            db.commit()
+        if not db.query(models.ConfiguracionConsultas).filter_by(id=1).first():
+            db.add(models.ConfiguracionConsultas(id=1, activa=False, dias_habilitados=[0, 1, 2, 3, 4]))
             db.commit()
         admin_email = os.getenv("ADMIN_EMAIL", "admin@sistema.local")
         admin_password = os.getenv("ADMIN_PASSWORD")
@@ -237,6 +289,18 @@ def obtener_contenido_publico(slug: str, db: Session = Depends(get_db)):
     if page is None:
         raise HTTPException(status_code=404, detail="La página usa su contenido base.")
     return {"slug": page.slug, "contenido": page.contenido, "updated_at": page.updated_at}
+
+
+@app.get("/api/contenido-publico/ruta/resolver")
+def resolver_ruta_contenido_publico(ruta: str, db: Session = Depends(get_db)):
+    normalized = ruta.rstrip("/") or "/"
+    for slug, default_route in PUBLIC_PAGE_ROUTES.items():
+        page = db.query(models.ContenidoPagina).filter_by(slug=slug).first()
+        saved_route = (page.contenido or {}).get("route") if page and isinstance(page.contenido, dict) else None
+        current_route = saved_route or default_route
+        if normalized == current_route:
+            return {"slug": slug, "ruta": current_route}
+    raise HTTPException(status_code=404, detail="Ruta de contenido pÃºblico no encontrada.")
 
 
 @app.get("/api/planes-publicos", response_model=list[schemas.PlanOut])
@@ -376,15 +440,22 @@ def login(
             detail="Tu cuenta aún no ha sido aprobada. Espera la verificación de tu Tarjeta Profesional.",
         )
 
+    if usuario.estado == models.EstadoUsuario.SUSPENDIDO:
+        raise HTTPException(status_code=403, detail="Tu cuenta está suspendida. Contacta al administrador de la plataforma.")
+
     if usuario.estado == models.EstadoUsuario.RECHAZADO:
         raise HTTPException(status_code=403, detail="Tu solicitud de registro fue rechazada.")
 
+    usuario.ultimo_acceso = datetime.utcnow()
+    db.commit()
     access_token = security.create_access_token(data={"sub": str(usuario.id)})
     return {"access_token": access_token, "token_type": "bearer", "debe_cambiar_password": usuario.debe_cambiar_password}
 
 
 @app.post("/api/auth/cambiar-password")
 def cambiar_password(datos: schemas.CambiarPasswordIn, usuario_actual: models.Usuario = Depends(security.obtener_usuario_para_cambio_password), db: Session = Depends(get_db)):
+    if not usuario_actual.debe_cambiar_password:
+        raise HTTPException(status_code=403, detail="Para cambiar tu contraseña, solicita y verifica un código desde Configuración > Seguridad.")
     if not security.verify_password(datos.password_actual, usuario_actual.password_hash):
         raise HTTPException(status_code=400, detail="La contraseña actual no es correcta.")
     if len(datos.password_nueva) < 8:
@@ -411,7 +482,7 @@ def solicitar_recuperacion_password(
     usuario = db.query(models.Usuario).filter(models.Usuario.email == email).first()
     if usuario and usuario.estado == models.EstadoUsuario.ACTIVO:
         token = security.create_password_reset_token(usuario.id, usuario.password_hash)
-        frontend_url = (os.getenv("FRONTEND_URL") or get_cors_origins()[0]).rstrip("/")
+        frontend_url = _password_reset_frontend_url()
         reset_url = f"{frontend_url}/gestion-procesos/auth/restablecer-password?token={quote(token, safe='')}"
         background_tasks.add_task(_send_password_reset_email, email, reset_url)
     return {"mensaje": PASSWORD_RESET_MESSAGE}
@@ -444,15 +515,238 @@ def restablecer_password(
 
 @app.patch("/api/auth/preferencias-notificaciones")
 def actualizar_preferencias_notificaciones(datos: schemas.PreferenciasNotificacionUpdate, usuario_actual: models.Usuario = Depends(obtener_usuario_actual), db: Session = Depends(get_db)):
-    if datos.notificaciones_email is not None: usuario_actual.notificaciones_email = datos.notificaciones_email
-    if datos.notificaciones_whatsapp is not None: usuario_actual.notificaciones_whatsapp = datos.notificaciones_whatsapp
+    if usuario_actual.rol == models.RolUsuario.CLIENTE:
+        if datos.preferencias is not None or datos.notificaciones_email is not None or datos.notificaciones_whatsapp is not None:
+            raise HTTPException(status_code=400, detail="Los clientes solo pueden seleccionar un canal obligatorio.")
+        if datos.canal_cliente is None:
+            raise HTTPException(status_code=400, detail="Selecciona un canal obligatorio.")
+        if datos.canal_cliente == "WHATSAPP" and not usuario_actual.whatsapp_numero.strip():
+            raise HTTPException(status_code=400, detail="Configura un número de WhatsApp antes de seleccionar ese canal.")
+        usuario_actual.canal_notificacion_cliente = datos.canal_cliente
+        usuario_actual.notificaciones_email = datos.canal_cliente == "EMAIL"
+        usuario_actual.notificaciones_whatsapp = datos.canal_cliente == "WHATSAPP"
+    else:
+        if datos.canal_cliente is not None:
+            raise HTTPException(status_code=400, detail="El canal obligatorio solo aplica a CLIENTE.")
+        preferencias = dict(usuario_actual.preferencias_notificacion or {})
+        if datos.preferencias is not None:
+            desconocidas = set(datos.preferencias) - set(models.TIPOS_NOTIFICACION)
+            if desconocidas:
+                raise HTTPException(status_code=400, detail="La solicitud contiene tipos de notificación desconocidos.")
+            for tipo, canales in datos.preferencias.items():
+                if canales.whatsapp and not usuario_actual.whatsapp_numero.strip():
+                    raise HTTPException(status_code=400, detail="Configura un número de WhatsApp antes de habilitar ese canal.")
+                funcion_plan = PREFERENCIA_PLAN_WHATSAPP.get(tipo)
+                if canales.whatsapp and funcion_plan and not plan_whatsapp_habilitado(usuario_actual, funcion_plan):
+                    raise HTTPException(status_code=403, detail="Tu plan no permite WhatsApp para ese tipo de notificación.")
+                preferencias[tipo] = canales.model_dump()
+        if datos.notificaciones_email is not None or datos.notificaciones_whatsapp is not None:
+            for tipo in models.TIPOS_NOTIFICACION:
+                canales = dict(preferencias.get(tipo) or {})
+                if datos.notificaciones_email is not None:
+                    canales["email"] = datos.notificaciones_email
+                if datos.notificaciones_whatsapp is not None:
+                    canales["whatsapp"] = datos.notificaciones_whatsapp
+                preferencias[tipo] = canales
+        usuario_actual.preferencias_notificacion = {
+            tipo: {
+                "email": bool((preferencias.get(tipo) or {}).get("email", True)),
+                "whatsapp": bool((preferencias.get(tipo) or {}).get("whatsapp", False)),
+            }
+            for tipo in models.TIPOS_NOTIFICACION
+        }
+        usuario_actual.notificaciones_email = any(
+            canales["email"] for canales in usuario_actual.preferencias_notificacion.values()
+        )
+        usuario_actual.notificaciones_whatsapp = any(
+            canales["whatsapp"] for canales in usuario_actual.preferencias_notificacion.values()
+        )
     registrar_evento_auditoria(db, usuario_actual, "auth.notificaciones.actualizar", "usuario", usuario_actual.id)
     db.commit()
-    return {"notificaciones_email": usuario_actual.notificaciones_email, "notificaciones_whatsapp": usuario_actual.notificaciones_whatsapp}
+    return {
+        "preferencias_notificacion": usuario_actual.preferencias_notificacion,
+        "canal_notificacion_cliente": usuario_actual.canal_notificacion_cliente,
+        "notificaciones_email": usuario_actual.notificaciones_email,
+        "notificaciones_whatsapp": usuario_actual.notificaciones_whatsapp,
+    }
+
+
+def _hash_codigo_seguridad(challenge_id: str, usuario_id: int, accion: str, codigo: str) -> str:
+    secreto = security.get_jwt_secret().encode()
+    mensaje = f"{challenge_id}:{usuario_id}:{accion}:{codigo}".encode()
+    return hmac.new(secreto, mensaje, hashlib.sha256).hexdigest()
+
+
+def _enviar_codigo_seguridad(usuario: models.Usuario, canal: str, codigo: str) -> bool:
+    mensaje = f"Tu código de seguridad es {codigo}. Vence en 3 minutos. Si no solicitaste este cambio, ignora este mensaje."
+    if canal == "EMAIL":
+        return enviar_correo(usuario.email, "Código de seguridad de tu cuenta", mensaje)
+    from app.whatsapp import enviar_mensaje_whatsapp
+    return bool(usuario.whatsapp_numero and enviar_mensaje_whatsapp(usuario.whatsapp_numero, mensaje))
+
+
+def _datos_codigo(challenge: models.CodigoSeguridadUsuario) -> dict:
+    return {
+        "id": challenge.id,
+        "accion": challenge.accion,
+        "canal": challenge.canal,
+        "expira_en": challenge.expira_en.isoformat() + "Z",
+        "reenviar_desde": challenge.reenviar_desde.isoformat() + "Z",
+    }
+
+
+@app.post("/api/auth/seguridad/codigos")
+def solicitar_codigo_seguridad(
+    datos: schemas.SolicitarCodigoSeguridad,
+    usuario: models.Usuario = Depends(obtener_usuario_actual),
+    db: Session = Depends(get_db),
+):
+    if datos.canal == "WHATSAPP" and not usuario.whatsapp_numero.strip():
+        raise HTTPException(status_code=400, detail="Tu cuenta no tiene un número de WhatsApp configurado.")
+    valor_pendiente = None
+    if datos.accion == "email":
+        if usuario.rol == models.RolUsuario.CLIENTE:
+            raise HTTPException(status_code=403, detail="Los clientes deben solicitar la edición de sus datos para aprobación.")
+        if not datos.valor:
+            raise HTTPException(status_code=400, detail="Ingresa el nuevo correo.")
+        from pydantic import TypeAdapter, ValidationError
+        try:
+            nuevo_email = str(TypeAdapter(schemas.EmailStr).validate_python(datos.valor)).strip().lower()
+        except ValidationError as exc:
+            raise HTTPException(status_code=422, detail="Ingresa un correo válido.") from exc
+        if db.query(models.Usuario).filter(models.Usuario.email == nuevo_email, models.Usuario.id != usuario.id).first():
+            raise HTTPException(status_code=409, detail="Este correo ya está asociado a otra cuenta.")
+        valor_pendiente = nuevo_email
+    elif datos.accion == "whatsapp":
+        if usuario.rol == models.RolUsuario.CLIENTE:
+            raise HTTPException(status_code=403, detail="Los clientes deben solicitar la edición de sus datos para aprobación.")
+        numero = "".join(char for char in (datos.valor or "") if char.isdigit())
+        if len(numero) < 10 or len(numero) > 15:
+            raise HTTPException(status_code=400, detail="Ingresa un número válido con indicativo de país.")
+        valor_pendiente = numero
+    else:
+        if not datos.password_actual or not security.verify_password(datos.password_actual, usuario.password_hash):
+            raise HTTPException(status_code=400, detail="La contraseña actual no es correcta.")
+        if not datos.password_nueva or len(datos.password_nueva) < 8 or len(datos.password_nueva.encode("utf-8")) > 72:
+            raise HTTPException(status_code=400, detail="La nueva contraseña debe tener entre 8 y 72 bytes UTF-8.")
+        valor_pendiente = security.hash_password(datos.password_nueva)
+
+    ahora = datetime.utcnow()
+    anterior = db.query(models.CodigoSeguridadUsuario).filter_by(
+        usuario_id=usuario.id, accion=datos.accion, consumido_en=None
+    ).first()
+    if anterior and anterior.expira_en > ahora and anterior.reenviar_desde > ahora:
+        raise HTTPException(status_code=429, detail="Ya hay un código vigente. Espera el tiempo indicado para solicitar otro.")
+
+    challenge_id = str(uuid4())
+    codigo = f"{secrets.randbelow(1_000_000):06d}"
+    if not _enviar_codigo_seguridad(usuario, datos.canal, codigo):
+        raise HTTPException(status_code=503, detail="No fue posible enviar el código por ese canal.")
+    if anterior:
+        anterior.consumido_en = ahora
+        anterior.valor_pendiente = None
+    challenge = models.CodigoSeguridadUsuario(
+        id=challenge_id, usuario_id=usuario.id, accion=datos.accion, canal=datos.canal,
+        codigo_hash=_hash_codigo_seguridad(challenge_id, usuario.id, datos.accion, codigo),
+        valor_pendiente=valor_pendiente, expira_en=ahora + timedelta(minutes=3),
+        reenviar_desde=ahora + timedelta(seconds=60),
+    )
+    db.add(challenge)
+    db.commit()
+    return _datos_codigo(challenge)
+
+
+@app.get("/api/auth/seguridad/codigos/activo")
+def obtener_codigo_seguridad_activo(
+    accion: str,
+    usuario: models.Usuario = Depends(obtener_usuario_actual),
+    db: Session = Depends(get_db),
+):
+    if accion not in {"email", "whatsapp", "password"}:
+        raise HTTPException(status_code=400, detail="Acción no válida.")
+    challenge = db.query(models.CodigoSeguridadUsuario).filter(
+        models.CodigoSeguridadUsuario.usuario_id == usuario.id,
+        models.CodigoSeguridadUsuario.accion == accion,
+        models.CodigoSeguridadUsuario.consumido_en.is_(None),
+        models.CodigoSeguridadUsuario.expira_en > datetime.utcnow(),
+    ).order_by(models.CodigoSeguridadUsuario.creado_en.desc()).first()
+    db.query(models.CodigoSeguridadUsuario).filter(
+        models.CodigoSeguridadUsuario.usuario_id == usuario.id,
+        models.CodigoSeguridadUsuario.expira_en <= datetime.utcnow(),
+        models.CodigoSeguridadUsuario.valor_pendiente.is_not(None),
+    ).update({models.CodigoSeguridadUsuario.valor_pendiente: None}, synchronize_session=False)
+    db.commit()
+    return _datos_codigo(challenge) if challenge else None
+
+
+@app.post("/api/auth/seguridad/codigos/{challenge_id}/reenviar")
+def reenviar_codigo_seguridad(
+    challenge_id: str,
+    datos: schemas.ReenviarCodigoSeguridad,
+    usuario: models.Usuario = Depends(obtener_usuario_actual),
+    db: Session = Depends(get_db),
+):
+    challenge = db.query(models.CodigoSeguridadUsuario).filter_by(id=challenge_id, usuario_id=usuario.id, consumido_en=None).with_for_update().first()
+    ahora = datetime.utcnow()
+    if not challenge or challenge.expira_en <= ahora:
+        raise HTTPException(status_code=410, detail="El código venció. Solicita uno nuevo.")
+    if challenge.reenviar_desde > ahora:
+        raise HTTPException(status_code=429, detail="Espera antes de reenviar o cambiar el canal.")
+    if datos.canal == "WHATSAPP" and not usuario.whatsapp_numero.strip():
+        raise HTTPException(status_code=400, detail="Tu cuenta no tiene un número de WhatsApp configurado.")
+    codigo = f"{secrets.randbelow(1_000_000):06d}"
+    if not _enviar_codigo_seguridad(usuario, datos.canal, codigo):
+        raise HTTPException(status_code=503, detail="No fue posible enviar el código por ese canal.")
+    challenge.canal = datos.canal
+    challenge.codigo_hash = _hash_codigo_seguridad(challenge.id, usuario.id, challenge.accion, codigo)
+    challenge.expira_en = ahora + timedelta(minutes=3)
+    challenge.reenviar_desde = ahora + timedelta(seconds=60)
+    challenge.intentos = 0
+    db.commit()
+    return _datos_codigo(challenge)
+
+
+@app.post("/api/auth/seguridad/codigos/{challenge_id}/verificar")
+def verificar_codigo_seguridad(
+    challenge_id: str,
+    datos: schemas.VerificarCodigoSeguridad,
+    usuario: models.Usuario = Depends(obtener_usuario_actual),
+    db: Session = Depends(get_db),
+):
+    challenge = db.query(models.CodigoSeguridadUsuario).filter_by(id=challenge_id, usuario_id=usuario.id, consumido_en=None).with_for_update().first()
+    ahora = datetime.utcnow()
+    if not challenge or challenge.expira_en <= ahora:
+        raise HTTPException(status_code=410, detail="El código venció. Solicita uno nuevo.")
+    if challenge.intentos >= 5:
+        challenge.consumido_en = ahora
+        challenge.valor_pendiente = None
+        db.commit()
+        raise HTTPException(status_code=429, detail="Se agotaron los intentos. Solicita un código nuevo.")
+    esperado = _hash_codigo_seguridad(challenge.id, usuario.id, challenge.accion, datos.codigo)
+    if not hmac.compare_digest(esperado, challenge.codigo_hash):
+        challenge.intentos += 1
+        db.commit()
+        raise HTTPException(status_code=400, detail="El código no es correcto.")
+    if challenge.accion == "email":
+        if db.query(models.Usuario).filter(models.Usuario.email == challenge.valor_pendiente, models.Usuario.id != usuario.id).first():
+            raise HTTPException(status_code=409, detail="Este correo ya está asociado a otra cuenta.")
+        usuario.email = challenge.valor_pendiente
+    elif challenge.accion == "whatsapp":
+        usuario.whatsapp_numero = challenge.valor_pendiente
+    else:
+        usuario.password_hash = challenge.valor_pendiente
+        usuario.debe_cambiar_password = False
+    challenge.consumido_en = ahora
+    registrar_evento_auditoria(db, usuario, f"auth.seguridad.{challenge.accion}", "usuario", usuario.id)
+    challenge.valor_pendiente = None
+    db.commit()
+    return {"mensaje": "Cambio de seguridad aplicado.", "email": usuario.email, "whatsapp_numero": usuario.whatsapp_numero}
 
 
 @app.patch("/api/auth/perfil")
 def actualizar_mi_perfil(datos: schemas.PerfilUpdate, usuario_actual: models.Usuario = Depends(obtener_usuario_actual), db: Session = Depends(get_db)):
+    if datos.email is not None or datos.whatsapp_numero is not None:
+        raise HTTPException(status_code=403, detail="Correo y WhatsApp solo se pueden cambiar con verificación OTP desde Configuración > Seguridad.")
     if usuario_actual.rol == models.RolUsuario.CLIENTE and any(
         value is not None
         for value in (datos.email, datos.nombre_completo, datos.whatsapp_numero)
@@ -513,6 +807,10 @@ def obtener_mi_usuario(
         "debe_cambiar_password": usuario.debe_cambiar_password,
         "notificaciones_email": usuario.notificaciones_email,
         "notificaciones_whatsapp": usuario.notificaciones_whatsapp,
+        "preferencias_notificacion": usuario.preferencias_notificacion or {},
+        "canal_notificacion_cliente": usuario.canal_notificacion_cliente,
+        "preferencias_notificacion": usuario.preferencias_notificacion,
+        "canal_notificacion_cliente": usuario.canal_notificacion_cliente,
         "plan": (
             {
                 "id": usuario.plan.id,
@@ -538,7 +836,7 @@ def obtener_dashboard(
     # ---------------------------------------------------------
     radicados = (
         db.query(models.Radicado)
-        .filter(models.Radicado.usuario_id == usuario_actual.id)
+        .filter(models.Radicado.usuarios_vinculados.any(models.Usuario.id == usuario_actual.id))
         .all()
     )
 
@@ -560,7 +858,7 @@ def obtener_dashboard(
             models.ConsultaRadicado.radicado_id == models.Radicado.id,
         )
         .filter(
-            models.Radicado.usuario_id == usuario_actual.id,
+            models.Radicado.usuarios_vinculados.any(models.Usuario.id == usuario_actual.id),
             models.ConsultaRadicado.estado.in_(
                 ["ENCOLADA", "EJECUTANDO"]
             ),
@@ -578,7 +876,7 @@ def obtener_dashboard(
             models.ConsultaRadicado.radicado_id == models.Radicado.id,
         )
         .filter(
-            models.Radicado.usuario_id == usuario_actual.id,
+            models.Radicado.usuarios_vinculados.any(models.Usuario.id == usuario_actual.id),
             models.ConsultaRadicado.actuaciones_nuevas > 0,
         )
         .all()
@@ -599,7 +897,7 @@ def obtener_dashboard(
             models.ConsultaRadicado.radicado_id == models.Radicado.id,
         )
         .filter(
-            models.Radicado.usuario_id == usuario_actual.id,
+            models.Radicado.usuarios_vinculados.any(models.Usuario.id == usuario_actual.id),
             models.ConsultaRadicado.estado == "ERROR",
         )
         .count()
@@ -657,7 +955,7 @@ def obtener_dashboard(
             models.ConsultaRadicado.radicado_id == models.Radicado.id,
         )
         .filter(
-            models.Radicado.usuario_id == usuario_actual.id
+            models.Radicado.usuarios_vinculados.any(models.Usuario.id == usuario_actual.id)
         )
         .order_by(models.ConsultaRadicado.inicio.desc())
         .limit(10)
@@ -856,7 +1154,7 @@ def radicados_visibles(usuario: models.Usuario, db: Session):
     )
     return query.filter(
         or_(
-            models.Radicado.usuario_id == responsible_lawyer_id,
+            models.Radicado.usuarios_vinculados.any(models.Usuario.id == responsible_lawyer_id),
             models.Radicado.id.in_(assigned_radicados),
         )
     )
@@ -877,35 +1175,47 @@ def agregar_radicado(
 
     if usuario_actual.rol == models.RolUsuario.ABOGADO and usuario_actual.plan is None:
         raise HTTPException(status_code=403, detail="Tu cuenta SaaS necesita un plan activo para agregar radicados.")
-    if usuario_actual.rol == models.RolUsuario.ABOGADO:
-        total_registrados = db.query(models.Radicado).filter(models.Radicado.usuario_id == usuario_actual.id).count()
-        if total_registrados >= usuario_actual.plan.limite_radicados:
-            raise HTTPException(status_code=400, detail="Has alcanzado el límite de radicados de tu plan.")
 
-    existente = (
-        db.query(models.Radicado)
-        .filter(
-            models.Radicado.numero == radicado_in.numero,
-            models.Radicado.usuario_id == usuario_actual.id,
+    vinculado_previamente = radicado_vinculado_a_usuario(
+        db,
+        usuario_actual,
+        radicado_in.numero,
+    )
+    try:
+        nuevo_radicado, creado = obtener_o_vincular_radicado(
+            db, usuario_actual, radicado_in.numero
         )
-        .first()
-    )
-    if existente:
-        raise HTTPException(status_code=400, detail="Este radicado ya está registrado en la firma.")
-
-    # 4. Guardar el nuevo radicado
-    nuevo_radicado = models.Radicado(
-        numero=radicado_in.numero,
-        usuario_id=usuario_actual.id,
-        estado_consulta="sin consultar",
-    )
-    db.add(nuevo_radicado)
-    db.flush()
-    registrar_evento_auditoria(db, usuario_actual, "radicado.crear", "radicado", nuevo_radicado.id)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    if usuario_actual.rol == models.RolUsuario.ABOGADO:
+        total_registrados = db.query(models.Radicado).join(
+            models.Radicado.usuarios_vinculados
+        ).filter(models.Usuario.id == usuario_actual.id).count()
+        if total_registrados > usuario_actual.plan.limite_radicados:
+            db.rollback()
+            raise HTTPException(status_code=400, detail="Has alcanzado el límite de radicados de tu plan.")
+    accion = "radicado.crear" if creado else "radicado.vincular"
+    registrar_evento_auditoria(db, usuario_actual, accion, "radicado", nuevo_radicado.id)
     db.commit()
     db.refresh(nuevo_radicado)
 
-    return nuevo_radicado
+    if creado or not vinculado_previamente:
+        mensaje, consulta_id = iniciar_consulta_nuevo_radicado(
+            db,
+            usuario_actual,
+            nuevo_radicado,
+        )
+    else:
+        mensaje, consulta_id = "El radicado ya estaba agregado; no se inició otra consulta.", None
+    limite = (
+        usuario_actual.plan.limite_ultimas_actuaciones
+        if usuario_actual.rol == models.RolUsuario.ABOGADO
+        else None
+    )
+    resultado = serializar_radicado(nuevo_radicado, limite)
+    resultado["mensaje"] = mensaje
+    resultado["consulta_id"] = consulta_id
+    return resultado
 
 
 @app.get("/api/radicados", response_model=list[schemas.RadicadoOut])
@@ -961,15 +1271,13 @@ def eliminar_radicado(
 
     if not radicado:
         raise HTTPException(status_code=404, detail="Radicado no encontrado en tu alcance.")
-    if usuario_actual.rol == models.RolUsuario.ABOGADO and radicado.usuario_id != usuario_actual.id:
-        raise HTTPException(status_code=403, detail="Solo puedes eliminar radicados bajo tu responsabilidad.")
+    if not any(vinculado.id == usuario_actual.id for vinculado in radicado.usuarios_vinculados):
+        raise HTTPException(status_code=403, detail="No tienes un vínculo directo con este radicado.")
 
-    registrar_evento_auditoria(db, usuario_actual, "radicado.eliminar", "radicado", radicado.id)
-    db.delete(radicado)
+    radicado.usuarios_vinculados.remove(usuario_actual)
+    registrar_evento_auditoria(db, usuario_actual, "radicado.desvincular", "radicado", radicado.id)
     db.commit()
-    return {"mensaje": f"Radicado {radicado.numero} eliminado correctamente."}
-
-from app.tasks import tarea_consultar_radicado
+    return {"mensaje": f"Radicado {radicado.numero} retirado de tu lista."}
 
 @app.post("/api/radicados/{radicado_id}/consultar")
 def consultar_radicado_manual(
@@ -977,55 +1285,9 @@ def consultar_radicado_manual(
     usuario_actual: models.Usuario = Depends(security.obtener_usuario_actual),
     db: Session = Depends(get_db),
 ):
-    """Encola la consulta del radicado en segundo plano sin congelar la API."""
-    require_roles(usuario_actual, ["ABOGADO", "ABOGADO_ADMIN", "ADMIN"], action="consultar radicados")
-    radicado = radicados_visibles(usuario_actual, db).filter(models.Radicado.id == radicado_id).first()
-
-    if not radicado:
-        raise HTTPException(status_code=404, detail="Radicado no encontrado en tu alcance.")
-
-    # Enviar tarea a Redis/Celery
-    consulta = models.ConsultaRadicado(
-    radicado_id=radicado.id,
-    tipo="MANUAL",
-    estado="ENCOLADA",
-    inicio=datetime.utcnow(),
-)
-
-    db.add(consulta)
-    db.commit()
-    db.refresh(consulta)
-
-    try:
-        task = tarea_consultar_radicado.delay(
-            radicado.id,
-            "MANUAL",
-            consulta.id,
-        )
-
-        consulta.task_id = task.id
-        registrar_evento_auditoria(
-            db, usuario_actual, "radicado.consulta.iniciar", "consulta_radicado", consulta.id
-        )
-        db.commit()
-
-    except Exception as exc:
-        consulta.estado = "ERROR"
-        consulta.finalizacion = datetime.utcnow()
-        consulta.error = str(exc)
-        registrar_evento_auditoria(
-            db, usuario_actual, "radicado.consulta.error", "consulta_radicado", consulta.id
-        )
-        db.commit()
-
-        raise HTTPException(
-            status_code=500,
-            detail="No fue posible encolar la consulta."
-        )
-
-    return {
-        "mensaje": "Consulta iniciada en segundo plano.",
-        "radicado": radicado.numero,
-        "task_id": task.id,
-        "consulta_id": consulta.id,
-    }
+    """Reject the legacy Celery path; manual calls start through the Next Workflow launcher."""
+    require_roles(usuario_actual, ["ADMIN"], action="consultar radicados manualmente")
+    raise HTTPException(
+        status_code=410,
+        detail="Este endpoint legacy fue deshabilitado. Inicia la consulta desde la interfaz ADMIN mediante Workflow.",
+    )
