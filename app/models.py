@@ -1,6 +1,6 @@
 import enum
 from datetime import datetime
-from sqlalchemy import Boolean, Column, DateTime, Enum, ForeignKey, Index, Integer, JSON, String, Table, Text, UniqueConstraint, event, select
+from sqlalchemy import Boolean, CheckConstraint, Column, DateTime, Enum, ForeignKey, Index, Integer, JSON, Numeric, String, Table, Text, UniqueConstraint, event, select
 from sqlalchemy.orm import relationship, synonym
 from app.database import Base
 
@@ -133,6 +133,7 @@ class EventoAgenda(Base):
     responsable_id = Column(Integer, ForeignKey("usuarios.id", ondelete="SET NULL"), nullable=True, index=True)
     proceso_id = Column(Integer, ForeignKey("procesos.id", ondelete="SET NULL"), nullable=True, index=True)
     cliente_id = Column(Integer, ForeignKey("usuarios.id", ondelete="SET NULL"), nullable=True, index=True)
+    contrato_id = Column(Integer, ForeignKey("contratos_servicios.id", ondelete="SET NULL"), nullable=True, index=True)
     creado_por_id = Column(Integer, ForeignKey("usuarios.id", ondelete="SET NULL"), nullable=True)
     created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
     responsable = relationship("Usuario", foreign_keys=[responsable_id])
@@ -395,6 +396,7 @@ class Proceso(Base):
     tareas = relationship("Tarea", back_populates="proceso")
     solicitudes_documento = relationship("SolicitudDocumento", back_populates="proceso", cascade="all, delete-orphan")
     documentos = relationship("DocumentoProceso", back_populates="proceso")
+    contratos = relationship("ContratoServicio", back_populates="proceso")
 
 
 class ProcesoColaborador(Base):
@@ -448,6 +450,7 @@ class DocumentoProceso(Base):
     proceso_id = Column(Integer, ForeignKey("procesos.id"), nullable=True, index=True)
     cliente_id = Column(Integer, ForeignKey("usuarios.id"), nullable=True, index=True)
     solicitud_id = Column(Integer, ForeignKey("solicitudes_documento.id"), nullable=True, index=True)
+    contrato_id = Column(Integer, ForeignKey("contratos_servicios.id", ondelete="SET NULL"), nullable=True, index=True)
     nombre_archivo = Column(String(255), nullable=False)
     ruta_archivo = Column(String(500), nullable=False)
     mime_type = Column(String(100), nullable=False)
@@ -912,3 +915,210 @@ class RecordatorioTarea(Base):
             and self.enviado_en is None
             and self.workflow_version_lanzada != self.version
         )
+
+
+class ContratoServicio(Base):
+    __tablename__ = "contratos_servicios"
+    __table_args__ = (
+        Index("ix_contratos_proceso_estado", "proceso_id", "estado"),
+    )
+
+    id = Column(Integer, primary_key=True, index=True)
+    proceso_id = Column(Integer, ForeignKey("procesos.id", ondelete="RESTRICT"), nullable=False, index=True)
+    cliente_id = Column(Integer, ForeignKey("usuarios.id", ondelete="SET NULL"), nullable=True, index=True)
+    abogado_id = Column(Integer, ForeignKey("usuarios.id", ondelete="SET NULL"), nullable=True, index=True)
+    estado = Column(String(24), nullable=False, default="BORRADOR", index=True)
+    version_actual = Column(Integer, nullable=False, default=1)
+    contenido_actual = Column(Text, nullable=False)
+    parte_cliente_snapshot = Column(JSON, nullable=False, default=dict)
+    emitido_en = Column(DateTime, nullable=True)
+    firmado_en = Column(DateTime, nullable=True)
+    terminado_en = Column(DateTime, nullable=True)
+    motivo_terminacion = Column(Text, nullable=True)
+    anulado_en = Column(DateTime, nullable=True)
+    motivo_anulacion = Column(Text, nullable=True)
+    creado_por_id = Column(Integer, ForeignKey("usuarios.id", ondelete="SET NULL"), nullable=True)
+    created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
+    updated_at = Column(DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow)
+    proceso = relationship("Proceso", back_populates="contratos")
+    cliente = relationship("Usuario", foreign_keys=[cliente_id])
+    abogado = relationship("Usuario", foreign_keys=[abogado_id])
+    creado_por = relationship("Usuario", foreign_keys=[creado_por_id])
+    versiones = relationship("ContratoServicioVersion", back_populates="contrato", cascade="all, delete-orphan", order_by="ContratoServicioVersion.version")
+
+
+class ContratoServicioVersion(Base):
+    __tablename__ = "contratos_servicios_versiones"
+    __table_args__ = (
+        UniqueConstraint("contrato_id", "version", name="uq_contrato_servicio_version"),
+    )
+
+    id = Column(Integer, primary_key=True)
+    contrato_id = Column(Integer, ForeignKey("contratos_servicios.id", ondelete="CASCADE"), nullable=False, index=True)
+    version = Column(Integer, nullable=False)
+    estado = Column(String(24), nullable=False)
+    contenido = Column(Text, nullable=False)
+    parte_cliente_snapshot = Column(JSON, nullable=False, default=dict)
+    hash_sha256 = Column(String(64), nullable=False)
+    creado_por_id = Column(Integer, ForeignKey("usuarios.id", ondelete="SET NULL"), nullable=True)
+    created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
+    contrato = relationship("ContratoServicio", back_populates="versiones")
+
+
+class EntregaCorreoContrato(Base):
+    __tablename__ = "entregas_correo_contrato"
+    id = Column(Integer, primary_key=True)
+    contrato_id = Column(Integer, ForeignKey("contratos_servicios.id", ondelete="RESTRICT"), nullable=False, index=True)
+    documento_id = Column(Integer, ForeignKey("documentos_proceso.id", ondelete="SET NULL"), nullable=True)
+    version = Column(Integer, nullable=False)
+    destinatario = Column(String(320), nullable=False)
+    estado = Column(String(16), nullable=False)
+    error = Column(Text, nullable=True)
+    creado_por_id = Column(Integer, ForeignKey("usuarios.id", ondelete="SET NULL"), nullable=True)
+    created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
+
+
+class CuentaCobro(Base):
+    __tablename__ = "cuentas_cobro"
+    __table_args__ = (
+        UniqueConstraint("numero", name="uq_cuenta_cobro_numero"),
+        Index("ix_cuenta_cobro_cliente_estado", "cliente_id", "estado"),
+        Index("ix_cuenta_cobro_abogado_estado", "abogado_id", "estado"),
+        CheckConstraint("total >= 0", name="ck_cuenta_cobro_total_no_negativo"),
+    )
+
+    id = Column(Integer, primary_key=True, index=True)
+    numero = Column(String(32), nullable=True)
+    abogado_id = Column(Integer, ForeignKey("usuarios.id", ondelete="SET NULL"), nullable=True, index=True)
+    cliente_id = Column(Integer, ForeignKey("usuarios.id", ondelete="SET NULL"), nullable=True, index=True)
+    proceso_id = Column(Integer, ForeignKey("procesos.id", ondelete="SET NULL"), nullable=True, index=True)
+    cliente_snapshot = Column(JSON, nullable=False, default=dict)
+    abogado_snapshot = Column(JSON, nullable=False, default=dict)
+    concepto = Column(String(255), nullable=False)
+    moneda = Column(String(3), nullable=False, default="COP")
+    total = Column(Numeric(14, 2), nullable=False, default=0)
+    estado = Column(String(16), nullable=False, default="BORRADOR", index=True)
+    fecha_emision = Column(DateTime, nullable=True)
+    fecha_vencimiento = Column(DateTime, nullable=True, index=True)
+    anulada_en = Column(DateTime, nullable=True)
+    motivo_anulacion = Column(Text, nullable=True)
+    creado_por_id = Column(Integer, ForeignKey("usuarios.id", ondelete="SET NULL"), nullable=True)
+    created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
+    updated_at = Column(DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow)
+    lineas = relationship("CuentaCobroLinea", back_populates="cuenta", cascade="all, delete-orphan", order_by="CuentaCobroLinea.id")
+
+
+class CuentaCobroLinea(Base):
+    __tablename__ = "cuentas_cobro_lineas"
+    __table_args__ = (
+        CheckConstraint("cantidad > 0", name="ck_cuenta_linea_cantidad_positiva"),
+        CheckConstraint("valor_unitario >= 0", name="ck_cuenta_linea_valor_no_negativo"),
+        CheckConstraint("total >= 0", name="ck_cuenta_linea_total_no_negativo"),
+    )
+
+    id = Column(Integer, primary_key=True)
+    cuenta_id = Column(Integer, ForeignKey("cuentas_cobro.id", ondelete="CASCADE"), nullable=False, index=True)
+    descripcion = Column(String(500), nullable=False)
+    cantidad = Column(Numeric(14, 2), nullable=False, default=1)
+    valor_unitario = Column(Numeric(14, 2), nullable=False)
+    total = Column(Numeric(14, 2), nullable=False)
+    cuenta = relationship("CuentaCobro", back_populates="lineas")
+
+
+class PagoFinanciero(Base):
+    __tablename__ = "pagos_financieros"
+    __table_args__ = (
+        UniqueConstraint("numero_recibo", name="uq_pago_numero_recibo"),
+        UniqueConstraint("clave_idempotencia", name="uq_pago_clave_idempotencia"),
+        CheckConstraint("importe > 0", name="ck_pago_importe_positivo"),
+        Index("ix_pago_cliente_fecha", "cliente_id", "fecha_pago"),
+    )
+
+    id = Column(Integer, primary_key=True, index=True)
+    numero_recibo = Column(String(32), nullable=True)
+    clave_idempotencia = Column(String(100), nullable=False)
+    abogado_id = Column(Integer, ForeignKey("usuarios.id", ondelete="SET NULL"), nullable=True, index=True)
+    cliente_id = Column(Integer, ForeignKey("usuarios.id", ondelete="SET NULL"), nullable=True, index=True)
+    proceso_id = Column(Integer, ForeignKey("procesos.id", ondelete="SET NULL"), nullable=True, index=True)
+    abogado_snapshot = Column(JSON, nullable=False, default=dict)
+    cliente_snapshot = Column(JSON, nullable=False, default=dict)
+    importe = Column(Numeric(14, 2), nullable=False)
+    moneda = Column(String(3), nullable=False, default="COP")
+    origen = Column(String(16), nullable=False, default="MANUAL")
+    metodo = Column(String(24), nullable=False)
+    referencia = Column(String(120), nullable=True)
+    estado = Column(String(16), nullable=False, default="REGISTRADO", index=True)
+    fecha_pago = Column(DateTime, nullable=False)
+    registrado_por_id = Column(Integer, ForeignKey("usuarios.id", ondelete="SET NULL"), nullable=True)
+    created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
+
+
+class AplicacionPago(Base):
+    __tablename__ = "aplicaciones_pago"
+    __table_args__ = (
+        CheckConstraint("importe > 0", name="ck_aplicacion_pago_importe_positivo"),
+        Index("ix_aplicacion_pago_cuenta_pago", "cuenta_id", "pago_id"),
+    )
+
+    id = Column(Integer, primary_key=True)
+    pago_id = Column(Integer, ForeignKey("pagos_financieros.id", ondelete="RESTRICT"), nullable=False, index=True)
+    cuenta_id = Column(Integer, ForeignKey("cuentas_cobro.id", ondelete="RESTRICT"), nullable=False, index=True)
+    importe = Column(Numeric(14, 2), nullable=False)
+    creado_por_id = Column(Integer, ForeignKey("usuarios.id", ondelete="SET NULL"), nullable=True)
+    created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
+
+
+class AjusteCuentaCobro(Base):
+    __tablename__ = "ajustes_cuenta_cobro"
+    __table_args__ = (
+        CheckConstraint("importe > 0", name="ck_ajuste_cuenta_importe_positivo"),
+    )
+
+    id = Column(Integer, primary_key=True)
+    cuenta_id = Column(Integer, ForeignKey("cuentas_cobro.id", ondelete="RESTRICT"), nullable=False, index=True)
+    tipo = Column(String(12), nullable=False)
+    importe = Column(Numeric(14, 2), nullable=False)
+    motivo = Column(Text, nullable=False)
+    creado_por_id = Column(Integer, ForeignKey("usuarios.id", ondelete="SET NULL"), nullable=True)
+    created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
+
+
+class ReversionPago(Base):
+    __tablename__ = "reversiones_pago"
+    __table_args__ = (
+        UniqueConstraint("pago_id", name="uq_reversion_pago"),
+    )
+
+    id = Column(Integer, primary_key=True)
+    pago_id = Column(Integer, ForeignKey("pagos_financieros.id", ondelete="RESTRICT"), nullable=False)
+    motivo = Column(Text, nullable=False)
+    revertido_por_id = Column(Integer, ForeignKey("usuarios.id", ondelete="SET NULL"), nullable=True)
+    created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
+
+
+class ConfiguracionCorreoFinanciero(Base):
+    __tablename__ = "configuracion_correo_financiero"
+    id = Column(Integer, primary_key=True, default=1)
+    remitente_nombre = Column(String(180), nullable=False, default="Alejandra Muñoz | Abogada y Asociados")
+    remitente_email = Column(String(320), nullable=True)
+    reply_to = Column(String(320), nullable=True)
+    actualizado_por_id = Column(Integer, ForeignKey("usuarios.id", ondelete="SET NULL"), nullable=True)
+    updated_at = Column(DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+
+class EntregaCorreoFinanciero(Base):
+    __tablename__ = "entregas_correo_financiero"
+    __table_args__ = (
+        CheckConstraint("cuenta_id IS NOT NULL OR pago_id IS NOT NULL", name="ck_entrega_financiera_recurso"),
+        Index("ix_entrega_financiera_estado_fecha", "estado", "created_at"),
+    )
+
+    id = Column(Integer, primary_key=True)
+    cuenta_id = Column(Integer, ForeignKey("cuentas_cobro.id", ondelete="SET NULL"), nullable=True, index=True)
+    pago_id = Column(Integer, ForeignKey("pagos_financieros.id", ondelete="SET NULL"), nullable=True, index=True)
+    destinatario = Column(String(320), nullable=False)
+    estado = Column(String(16), nullable=False)
+    version_datos = Column(Integer, nullable=True)
+    error = Column(Text, nullable=True)
+    creado_por_id = Column(Integer, ForeignKey("usuarios.id", ondelete="SET NULL"), nullable=True)
+    created_at = Column(DateTime, nullable=False, default=datetime.utcnow)

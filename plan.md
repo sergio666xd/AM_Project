@@ -1,2667 +1,288 @@
+# Plan de contratos y gestión financiero-contable
 
-# PLAN MAESTRO — EVOLUCIÓN INTEGRAL DE GESTIÓN DE PROCESOS SaaS
+## Propósito y alcance
 
-## 0. Propósito
+Construir en el sistema de gestión jurídica un flujo de contratos de prestación de servicios y un módulo de honorarios, cuentas de cobro, pagos y estados de cuenta. El abogado de la firma editará y generará los contratos para firma física; después adjuntará el escaneado firmado al proceso para que el cliente pueda verlo/descargarlo y reciba una copia por correo. También podrá cobrar a sus clientes, comunicar documentos financieros y consultar/descargar sus PDF desde los paneles. `ADMIN` tendrá supervisión y administración global.
 
-Este documento define la hoja de ruta para evolucionar el proyecto `AM_Project` desde su estado funcional actual hacia una plataforma integral de gestión jurídica con tres experiencias diferenciadas:
+El desarrollo se hará primero sin conexión a una pasarela: los registros y flujos de cobro manuales deberán funcionar de forma completa antes de conectar ePayco. Las últimas fases integrarán ePayco sobre las interfaces de proveedor diseñadas en las fases iniciales.
 
-- `ADMIN`: administración global de la plataforma y de la firma.
-- `ABOGADO_ADMIN`: operación diaria de la firma, clientes y procesos.
-- `CLIENTE`: portal privado orientado a claridad, participación y confianza.
+Este plan no autoriza implementar todas las fases de una vez. En cada instrucción de continuación se implementará solamente la siguiente fase pendiente, se validará, se actualizará este archivo y se detendrá.
 
-Además, se incluye la transformación del módulo de **edición del sitio público** desde un formulario rígido basado en campos hacia un **CMS visual con bloques, edición enriquecida, vista previa, borradores, publicación e historial de versiones**.
+## Reglas de negocio y actores
 
-El objetivo no es simplemente agregar páginas o CRUDs.
+- **ABOGADO_ADMIN (acreedor/remitente del cobro):** crea cuentas de cobro para clientes relacionados con sus procesos, registra pagos recibidos, consulta estados de cuenta y gestiona los documentos financieros que emitió. El producto representa el cobro de honorarios/servicios del abogado o despacho.
+- **CLIENTE (deudor/pagador):** solo consulta obligaciones, pagos y documentos propios, puede descargar sus PDF y, cuando se habilite ePayco, iniciar el pago de una obligación suya.
+- **ADMIN (administración de plataforma):** puede consultar, corregir por acciones auditadas, administrar y reportar toda la información financiera. ADMIN supervisa el módulo, pero no es el acreedor ni recibe por defecto el dinero del cliente.
+- **ABOGADO:** no recibe por defecto privilegios financieros por su rol. Se definirá en Fase 0 si algún permiso de consulta limitado es necesario; no podrá emitir cobros ni alterar pagos sin autorización explícita.
+- Una obligación debe enlazar al cliente y al abogado responsable; opcionalmente a uno de los procesos de ese cliente. No se permitirá cruzar cobros entre clientes o abogados. El backend validará cada vínculo, aunque el frontend oculte acciones.
+- Se inicia con la firma única existente; no se introducirán organizaciones o multi-tenancy.
+- Moneda inicial: COP. Los importes se almacenan como enteros en pesos o tipo decimal exacto, nunca `float`; el formato localizado es solo presentación. No se aplicarán impuestos automáticamente: los componentes tributarios y retenciones deben ser explícitos y revisados antes de emitir documentos.
+- Los documentos financieros emitidos guardarán en la base de datos una instantánea inmutable de emisor, cliente, concepto, fechas, importes y referencias. Su PDF es una representación generada bajo demanda y no se almacena como archivo. Una corrección posterior se hará mediante anulación y nuevo documento o ajuste trazable; no se reescribe silenciosamente el documento histórico.
+- Los contratos guardarán su contenido editable y versiones en base de datos. El PDF aún no firmado se genera bajo demanda y no se almacena. El ejemplar firmado que `ABOGADO_ADMIN` cargue tras escanearlo sí se conserva como archivo del expediente con los controles documentales existentes, y puede enviarse como adjunto al cliente.
+- Un saldo se calcula a partir de obligaciones, pagos asignados y ajustes/reversiones registrados. No se edita directamente un campo de saldo.
+- Las transacciones y eventos financieros no se borran físicamente desde operaciones normales. Pagos incorrectos se corrigen con reversión/ajuste compensatorio y motivo, conservando autor, fecha y evidencia.
 
-La evolución debe conseguir que:
+## Alcance documental y tributario
 
-> **ADMIN controle y supervise.**
-> **ABOGADO_ADMIN trabaje y gestione.**
-> **CLIENTE entienda, participe y confíe.**
+El sistema debe diferenciar tres conceptos:
 
----
+1. **Cuenta de cobro:** documento de solicitud/recaudo generado por el despacho, con número, emisor, cliente, concepto, proceso opcional, fecha de emisión y vencimiento, detalle de valores, saldo y medios de pago. No afirmar que por sí sola es factura electrónica, título valor o documento equivalente.
+2. **Recibo de pago:** comprobante interno que acredita el pago recibido y su aplicación a una o varias obligaciones. Debe identificar importe, fecha, medio, referencia y quién lo registró; para pagos electrónicos incluir identificadores del proveedor una vez exista esa integración.
+3. **Factura electrónica:** documento regulado que se emitirá mediante un proveedor tecnológico autorizado/solución DIAN solo si el despacho está obligado o decide implementarlo. Queda fuera del alcance de las fases iniciales y no se simulará una factura oficial con un PDF interno.
 
-# 1. Contexto actual
+La DIAN indica que las personas o empresas que prestan servicios deben facturar salvo excepciones legales. Por ello, Fase 0 deberá confirmar con el responsable contable/tributario del despacho quién factura, cuál es el tratamiento de honorarios, impuestos/retenciones y si se requiere integración de factura electrónica. Hasta tener esa decisión, los PDF del módulo se titularán claramente “Cuenta de cobro” y “Recibo de pago”, con una nota de alcance configurable y sin afirmar cumplimiento fiscal.
 
-## 1.1 Proyecto
+Referencias oficiales para revisión antes de producción:
 
-Repositorio:
+- [DIAN — ¿Debe facturar electrónicamente?](https://micrositios.dian.gov.co/sistema-de-facturacion-electronica/debes-facturar-electronicamente/)
+- [DIAN — trámites tributarios y obligación de facturar](https://www.dian.gov.co/tramiteservicios/tramites-y-servicios/tributarios/Paginas/tramites-tributarios.aspx)
+- [DIAN — Concepto 7217 de 2026](https://normograma.dian.gov.co/dian/compilacion/docs/oficio_dian_7217_2026.htm), relevante para distinguir cuentas de cobro de factura electrónica.
+- [Ley 527 de 1999 — mensajes de datos y comercio electrónico](https://www.funcionpublica.gov.co/eva/gestornormativo/norma_pdf.php?i=4276). Conservar integridad, fecha, autor y trazabilidad de registros electrónicos.
 
-`sergio666xd/AM_Project`
+Esto es una decisión de producto y de documentación, no un concepto tributario. El responsable del despacho debe confirmar las obligaciones concretas con su contador/asesor antes de emitir documentos a clientes.
 
-Rama de trabajo actual de referencia:
+## Sistema de contratos
 
-`test-workflows`
+El módulo administrará contratos de prestación de servicios jurídicos asociados obligatoriamente a un expediente. El cliente y abogado responsable deben corresponder a las relaciones de ese expediente; no se crearán contratos independientes sin expediente. En el repositorio ya están `CPS.pdf` y `CPS.docx`: **`CPS.pdf` será la referencia visual canónica** de la estructura final —paginación, líneas, imágenes, figuras y posiciones—; el DOCX servirá como fuente auxiliar para recuperar texto y contenido, no como garantía de que una conversión preserve el diseño. No convertir el DOCX a PDF esperando fidelidad de posiciones. `ABOGADO_ADMIN` podrá editar todo el contenido del contrato dentro del panel; no quedará limitado a rellenar campos predefinidos. El contrato editable debe reproducir el diseño de referencia del PDF y sus campos variables podrán tomar datos del cliente, abogado, expediente, honorarios y fechas, siempre editables antes de emitir la versión para firma.
 
-Stack principal:
+El contrato tendrá contenido editable, metadatos, expediente obligatorio, cliente vinculado al expediente, abogado responsable, fechas de creación/actualización, historial de versiones, estado, autor y relación al evento de firma. Al preparar una versión para firma se conserva una instantánea inmutable del texto y los datos usados. Cambiar el texto luego crea una nueva versión o un nuevo contrato; no altera lo ya generado o firmado.
 
-- Backend: FastAPI
-- ORM: SQLAlchemy
-- Base de datos: PostgreSQL
-- Autenticación: JWT
-- Frontend: Next.js 16.3.6
-- Tailwind CSS
-- Integraciones externas existentes, incluyendo consultas judiciales y WhatsApp
+Estados de contrato propuestos:
 
-Frontend principal:
+- `BORRADOR`: contenido editable, aún no preparado para firma.
+- `LISTO_PARA_FIRMA`: versión de contenido cerrada para generar/imprimir el documento; si requiere cambios, se crea una nueva versión borrador.
+- `EN_FIRMA`: documento entregado para firma física; la fecha agendada vive como evento independiente en el proceso.
+- `FIRMADO`: `ABOGADO_ADMIN` cargó el escaneado firmado y quedó asociado a la versión correspondiente. No se marca firmado solo por agendar una cita o generar el PDF.
+- `TERMINADO`: contrato firmado cuya relación contractual finalizó; requiere registrar fecha y motivo/causal, conserva versiones y escaneado y no equivale a anularlo ni eliminarlo.
+- `ANULADO`: contrato invalidado con motivo y trazabilidad; no se borra.
 
-`frontend-saas/`
+Transiciones: el ciclo normal es `BORRADOR` → `LISTO_PARA_FIRMA` → `EN_FIRMA` → `FIRMADO` → `TERMINADO`. `ANULADO` es una transición excepcional con motivo y auditoría desde un estado permitido por la política jurídica definida en Fase 0. Un contrato `TERMINADO` o `ANULADO` queda de solo lectura; correcciones posteriores se registran como nuevo contrato/versionado según corresponda.
 
----
+Flujo previsto:
 
-# 2. Reglas arquitectónicas fundamentales
+1. `ABOGADO_ADMIN` crea el contrato desde la ficha del expediente, selecciona un cliente asociado a ese expediente, edita íntegramente su contenido y guarda borrador/versiones. La edición parte del texto/contenido recuperado de `CPS.docx` cuando sea útil, pero el resultado visual se ajusta a `CPS.pdf`.
+2. Al dejarlo listo, el sistema genera el PDF bajo demanda para vista previa/descarga e impresión. El PDF sin firmar no se persiste; se puede volver a generar desde la instantánea.
+3. Desde los eventos del proceso, `ABOGADO_ADMIN` agenda una fecha/hora de firma mediante un evento `FIRMA_CONTRATO` vinculado al contrato. El evento registra lugar/instrucciones, participantes y estado de agenda, pero no cambia por sí mismo el contrato a firmado.
+4. Tras la firma física, `ABOGADO_ADMIN` carga el escaneado firmado y lo relaciona con la versión emitida. El sistema conserva ese archivo como documento del proceso; no lo modifica ni reemplaza sin historial.
+5. El cliente relacionado con el expediente puede ver y descargar el escaneado desde su proceso/documentos. Al cargarlo, el sistema envía una copia al correo registrado del cliente y registra destinatario, fecha, versión, archivo/documento y resultado del envío. Un fallo de correo permite reintento sin duplicar contrato ni documento.
 
-Estas reglas son obligatorias durante toda la implementación.
+El acceso se valida en backend: el abogado solo gestiona contratos de sus clientes/procesos accesibles, el cliente solo consulta contratos ligados a su relación, y `ADMIN` puede administrar todo con auditoría. Los contratos y escaneados son documentos confidenciales; no se usan enlaces públicos permanentes. La carga valida tipo/tamaño y reutiliza almacenamiento, escaneo y permisos documentales existentes. El email y la copia del contrato firmado reutilizan SMTP; el correo de contratos puede tener plantilla propia y debe enviarse al email del cliente.
 
-## 2.1 No introducir multi-tenancy
+## Diseño del estado de cuenta y pagos
 
-La organización actual corresponde a una única firma:
+El estado de cuenta se deriva del historial completo del cliente y muestra, por obligación: número/fecha, concepto, vencimiento, valor original, pagos aplicados, notas/ajustes, saldo y estado. Debe ofrecer filtros por cliente, proceso, periodo y estado, además de saldo total y exportación/descarga cuando corresponda. El cliente ve únicamente su propio estado; el abogado ve el de sus clientes autorizados; ADMIN ve el global.
 
-**Alejandra Muñoz | Abogada y Asociados**
+Estados sugeridos para **obligaciones** (confirmar compatibilidad con datos existentes en Fase 0): `BORRADOR`, `EMITIDA`, `PENDIENTE`, `PARCIAL`, `PAGADA`, `VENCIDA`, `ANULADA`. El vencimiento es derivable por fecha, saldo y estado abierto; no marcar como vencida una obligación pagada/anulada. Los estados deben tener transiciones autorizadas y registrarse en auditoría.
 
-No implementar:
+Estados sugeridos para **intentos/transacciones de pago**: `INICIADA`, `PENDIENTE`, `APROBADA`, `RECHAZADA`, `FALLIDA`, `ANULADA`, `REEMBOLSADA`, `EN_DISPUTA`. En la primera entrega solo se usarán los estados que correspondan al registro manual y no se simulará respuesta de pasarela. Separar estado del intento del saldo real de la obligación.
 
-- tenants
-- múltiples firmas
-- organizaciones independientes
-- separación por tenant
-- selector de firma
+Un pago puede aplicarse parcial o totalmente a una o varias obligaciones, según las reglas que se aprueben. Toda aplicación debe conservar importe aplicado, obligación, fecha y responsable. Los reembolsos/reversiones generan movimientos compensatorios y pueden recalcular saldos; nunca se elimina la transacción original. Evitar duplicados mediante claves idempotentes internas y, para ePayco, los identificadores únicos del proveedor.
 
-La existencia del rol `ADMIN` no significa que el sistema sea multi-firma.
+Controles mínimos del libro auxiliar: secuencia/numeración no ambigua por tipo documental, importes exactos, fecha de negocio y fecha de registro, autor, origen (manual/pasarela), referencia/evidencia, estado, vínculo a obligación, cliente, abogado y proceso opcional, auditoría de cambios y conciliación entre movimientos y saldo. Los reportes deben poder explicar el saldo mostrando cada movimiento que lo compone.
 
----
+## Correo financiero
 
-## 2.2 Mantener separación de responsabilidades
+- Los mensajes financieros son transaccionales y se envían **siempre al correo registrado del cliente** al emitir una cuenta de cobro, al registrar un pago/recibo, al emitir una corrección/anulación relevante y en otros eventos definidos por fase. No dependen de las preferencias de notificación de marketing o avisos ordinarios.
+- Registrar intento, destinatario usado, versión de datos del documento, fecha, resultado y error técnico resumido; ofrecer reintento administrativo sin duplicar movimientos ni versiones del documento. No almacenar el PDF ni el adjunto enviado.
+- La identidad del correo financiero (nombre y dirección `From`, `Reply-To` y plantillas) se configura independientemente de la identidad de notificaciones. Reutiliza el mismo host, puerto, TLS, usuario y secreto SMTP cifrado de la configuración existente; no crea un segundo servidor SMTP ni copia credenciales.
+- Mantener privacidad: no incluir información de otros clientes ni datos sensibles innecesarios en asunto/cuerpo; generar el PDF desde la instantánea vigente justo antes del envío y adjuntarlo de forma transitoria, sin persistir el archivo. Añadir un botón autenticado para abrir/descargarlo. El enlace no sustituye los controles de sesión/autorización.
+- Guardar evidencia del envío sin almacenar contraseñas/tokens SMTP en logs. Manejar rebotes/fallos como entrega pendiente y mostrarlo al personal.
 
-### ADMIN
+## ePayco: investigación y diseño de integración
 
-Debe responder:
+La integración se pospone a las últimas fases. Antes de activarla, confirmar en la cuenta real de ePayco las llaves, el entorno de pruebas/producción, métodos disponibles, tarifas, tiempos de abono, reembolsos, disputa/contracargo, moneda, límites y condiciones del comercio. La documentación cambia; verificarla de nuevo al ejecutar la fase, no codificar contra recuerdos de esta investigación.
 
-> ¿Qué está pasando en la plataforma y en la firma?
+### Flujo documentado de Smart Checkout
 
-Responsabilidades:
+La documentación oficial consultada describe ePayco Smart Checkout v2 de este modo:
 
-- supervisión
-- administración
-- usuarios
-- operación
-- auditoría
-- configuración
-- planes SaaS
-- solicitudes
-- contenido público
-- visión global
+1. El backend del comercio autentica contra `POST https://apify.epayco.co/login` enviando autenticación Basic con `PUBLIC_KEY:PRIVATE_KEY` codificado en Base64, y obtiene un token.
+2. El backend crea una sesión con `POST https://apify.epayco.co/payment/session/create`, autorización Bearer y datos de la transacción. La documentación muestra `checkout_version: "2"`, `name`, `currency`, `amount` como requeridos y campos como `invoice`, `description`, `country`, `response`, `confirmation`, impuestos, método y cuotas como opciones.
+3. El servidor asocia `invoice`/referencia del comercio a una obligación abierta y conserva el `sessionId`/referencias necesarias; nunca acepta del navegador el precio como autoridad.
+4. El frontend carga `https://checkout.epayco.co/checkout-v2.js` y abre el checkout con `ePayco.checkout.configure({ sessionId, type: "onpage" | "standard", test: true | false })`. `test` debe permanecer habilitado en sandbox y solo cambia mediante configuración controlada en producción.
+5. La URL `response` y hooks del navegador sirven para mostrar al pagador que el flujo terminó y actualizar la interfaz, pero no prueban el pago. Puede cerrarse el navegador o manipularse la respuesta.
+6. La URL HTTPS `confirmation` recibe la notificación servidor-a-servidor. Validar la firma `x_signature`, el comercio, referencia/`invoice`, transacción, importe y moneda contra la obligación local. La fórmula documentada es `SHA256(p_cust_id_cliente^p_key^x_ref_payco^x_transaction_id^x_amount^x_currency_code)`; verificar que coincida con la versión actual de la documentación/cuenta antes de activarla. Procesar de forma idempotente, guardar el evento original necesario para auditoría, responder rápido con HTTP 200 cuando se haya recibido de forma segura y hacer el trabajo pesado en segundo plano si hace falta. Reintentos de webhook no deben duplicar pago/recibo.
+7. Si hay duda o demora, consultar desde el backend la referencia mediante el endpoint de validación vigente (la documentación actual del flujo de confirmación indica `GET https://secure.epayco.co/validation/v1/reference/{ref_payco}`); documentar este paso con las referencias reales del SDK/cuenta durante la fase de integración. Nunca marcar pagado solo porque el navegador vuelva con “Aceptada”.
 
----
+Los secretos ePayco serán de servidor, cifrados en reposo y editables por ADMIN con auditoría. No exponer `PRIVATE_KEY`, `P_KEY`, tokens Apify ni secretos de firma en frontend, variables públicas, URLs o logs. Separar sandbox y producción. No almacenar números completos de tarjeta ni CVC; el checkout alojado/tokenización del proveedor debe manejar credenciales de tarjeta.
 
-### ABOGADO_ADMIN
+No habilitar inicialmente tokenización de tarjetas, cobros recurrentes, suscripciones ni `split payment`. El acreedor es el abogado/despacho; no se requiere dividir el pago entre beneficiarios salvo que una futura decisión de negocio/legal lo autorice.
 
-Debe responder:
+Fuentes oficiales de ePayco consultadas (releerlas en la fase de integración):
 
-> ¿Qué tengo que hacer y qué está pasando con mis asuntos?
+- [Smart Checkout — implementación](https://docs.epayco.com/docs/checkout-implementacion)
+- [Smart Checkout — respuesta y confirmación](https://docs.epayco.com/docs/checkout-respuesta-y-confirmacion)
+- [URL de confirmación (documentación de recaudo)](https://docs.epayco.com/docs/url-de-confirmacion)
+- [Documentación general de ePayco](https://docs.epayco.com/)
+- [API de ePayco](https://docs.epayco.com/docs/api)
+- [Tokenización](https://docs.epayco.com/docs/cobrar-con-token) — referencia para evaluar posteriormente, no habilitar en las primeras entregas.
 
-Responsabilidades:
+## Fases
 
-- procesos
-- clientes
-- radicados
-- actuaciones
-- tareas
-- agenda
-- documentos
-- solicitudes
-- comunicaciones
-- seguimiento
-- trabajo jurídico
+Al crear este plan, todas las fases iniciaron como **Pendientes**. No se asume trabajo completado por el plan anterior. Las fases posteriores a la solicitada se mantienen sin implementar.
 
-No convertirlo en un segundo ADMIN.
+### Fase 0 — Descubrimiento y decisiones de contratos/finanzas
 
----
+**Objetivo:** verificar solo los modelos, roles, procesos/clientes, eventos, documentos, auditoría, SMTP y patrones de editor/PDF/permisos que inciden en contratos y pagos; decidir reglas antes de persistir movimientos.
 
-### CLIENTE
+- Confirmar identidad del acreedor (abogado responsable/despacho), datos que se imprimirán en cuentas/recibos, quién recibe el recaudo y si existe un único comercio ePayco para toda la firma.
+- Inspeccionar `CPS.pdf` como autoridad de diseño (páginas, coordenadas, líneas, figuras, imágenes y elementos fijos) y `CPS.docx` como fuente auxiliar de texto. Determinar cómo mantener la fidelidad visual y permitir edición integral sin depender de una conversión DOCX que altere posiciones; definir campos dinámicos, historial, permisos, retención del escaneado firmado y plantilla de correo.
+- Revisar el calendario/eventos y los documentos existentes para vincular fecha de firma al proceso, reusar carga segura y evitar duplicar almacenamiento. Agendar firma no equivale a contrato firmado.
+- Acordar catálogo de conceptos, vencimientos, pagos parciales, aplicación de pagos, anticipos, descuentos, ajustes, anulaciones, reembolsos, impuestos/retenciones y zona horaria.
+- Confirmar con responsable contable si corresponde factura electrónica y tratamiento tributario. Delimitar con precisión qué valor probatorio/tributario se atribuirá a cuenta de cobro y recibo internos.
+- Inspeccionar únicamente el proveedor SMTP actual, modelo de usuario/roles, vínculo abogado-cliente-proceso, auditoría, generación/descarga bajo demanda de PDF y migrations/schema updater que se reutilizarían.
+- Entregar mapa de entidades/API/permisos, riesgos de consistencia y reglas firmadas para construir el libro auxiliar; revisar vigencia de endpoints/documentación ePayco sin pedir ni escribir secretos.
 
-Debe responder:
+**Aceptación:** decisiones y acceso a la plantilla anotados antes de construir contratos/pagos; ningún cobro real ni llamada ePayco en esta fase.
 
-> ¿Qué está pasando con mi caso y qué tengo que hacer?
+### Fase 1 — Contratos de prestación de servicios
 
-Responsabilidades:
+**Objetivo:** implementar el ciclo de preparación, firma física y entrega al cliente usando `CPS.pdf` como referencia visual canónica y `CPS.docx` como fuente auxiliar de contenido.
 
-- consultar sus procesos
-- consultar actualizaciones
-- entregar documentos
-- completar tareas
-- responder solicitudes
-- consultar fechas
-- comunicarse con el despacho
-- recibir notificaciones
-- participar en su proceso
+- Reproducir la estructura visual de `CPS.pdf`, incluidas líneas, imágenes, figuras y posiciones, y ofrecer a `ABOGADO_ADMIN` edición integral del contenido, no solo sustitución de campos. Puede aprovecharse el texto de `CPS.docx`, pero no usar una conversión directa como resultado final si desplaza elementos. Facilitar campos dinámicos editables para cliente, abogado, expediente, servicios, honorarios, obligaciones y fechas.
+- Guardar contenido fuente, metadatos y versiones en base de datos; congelar una instantánea al pasar a `LISTO_PARA_FIRMA`/`EN_FIRMA`. Registrar actor y cambios importantes.
+- Implementar estados `BORRADOR`, `LISTO_PARA_FIRMA`, `EN_FIRMA`, `FIRMADO`, `TERMINADO` y `ANULADO`, transiciones autorizadas, fecha/motivo de terminación, motivo de anulación e historial. No inferir firma desde fecha/evento.
+- Generar PDF sin firmar bajo demanda para vista, descarga e impresión desde la instantánea. No almacenar ese PDF generado.
+- Desde el proceso, permitir crear/vincular un evento `FIRMA_CONTRATO` con fecha, hora, participantes, lugar/instrucciones y estado. Reutilizar los eventos existentes si cubren el flujo.
+- Permitir que `ABOGADO_ADMIN` cargue el escaneado firmado, enlazarlo a contrato y versión, conservar el original en el almacenamiento documental existente y mostrarlo al cliente relacionado para ver/descargar.
+- Enviar automáticamente una copia del escaneado firmado al correo registrado del cliente; auditar entrega, adjunto/referencia y reintentos. Conservar archivo cargado una sola vez; reintentar correo no duplica documento ni contrato.
+- `ADMIN` puede ver/administrar todos los contratos y documentos con trazabilidad; los clientes no pueden acceder a archivos de otros clientes.
 
-No mostrar información interna del despacho.
+**Aceptación:** ciclo de borrador a firmado trazable; el PDF previo a firma se genera sin quedar almacenado, el escaneado sí se conserva; el cliente autorizado ve/descarga el firmado y recibe copia por correo.
 
----
+### Fase 2 — Modelo de dominio y persistencia manual
 
-## 2.3 Diferencia entre Proceso y Radicado
+**Objetivo:** crear la fuente de verdad del sistema financiero sin conectividad de pago.
 
-Mantener estrictamente esta distinción:
+- Diseñar persistencia para obligaciones/cuentas, líneas de concepto, pagos recibidos, asignaciones de pagos, ajustes/anulaciones, recibos, configuración de correo financiero y trazas de entrega.
+- Implementar importes exactos, secuencias seguras, transiciones de estado, autor/fechas, instantáneas documentales e integridad de relaciones cliente-abogado-proceso.
+- Crear servicio de dominio para emitir/anular cuentas, registrar pago manual, aplicar pago y producir saldo; un pago debe ser transaccional y no duplicable.
+- Crear una abstracción `PaymentProvider`/equivalente y un origen de pago manual. Definir referencias/campos externos e idempotencia para ePayco, pero no instalar SDK ni realizar llamadas al proveedor.
+- Migración compatible, restricciones e índices necesarios; no confiar en creación automática de tablas como único despliegue.
 
-**Proceso**
+**Aceptación:** balances recalculables desde movimientos, estados coherentes y datos existentes intactos; las operaciones manuales funcionan con proveedor deshabilitado.
 
-Es la entidad/concepto principal dentro de la aplicación.
+### Fase 3 — API y permisos de operación
 
-**Radicado**
+**Objetivo:** habilitar flujos del abogado y controles administrativos en servidor.
 
-Es el número/registro judicial que se consulta.
+- Endpoints protegidos para listar/detallar clientes, cuentas, movimientos, registrar pagos manuales, asignar pagos, emitir recibos, anular/corregir con motivo y consultar historial.
+- ABOGADO_ADMIN solo opera clientes/procesos a los que tiene acceso y aparece como actor/acreededor responsable.
+- ADMIN consulta y administra globalmente, con motivo y auditoría reforzada al corregir datos financieros.
+- CLIENTE queda limitado a consultar sus propios datos (las acciones del portal se incorporarán en Fase 5); impedir acceso por IDOR y vínculos cruzados.
+- Paginación, filtros, validación de importes/moneda/fecha, errores funcionales claros y claves idempotentes para peticiones de registro.
 
-Un proceso puede contener uno o varios radicados.
+**Aceptación:** permisos comprobados en API, historial inmutable de operaciones y casos negativos de aislamiento cubiertos por pruebas.
 
-No mezclar ambos conceptos en la UI, API ni modelos nuevos.
+### Fase 4 — PDF, correo financiero y panel del abogado
 
----
+**Objetivo:** emitir y entregar documentos financieros desde el flujo diario del abogado.
 
-# 3. Principios generales de UX
+- Generar bajo demanda PDF legibles e imprimibles de cuenta de cobro y recibo, usando únicamente la instantánea financiera persistida en la base de datos: numeración, datos de emisor y cliente, concepto, detalle, total, vencimiento, pagos, saldo, medio/referencia y nota tributaria aprobada.
+- Ver/descargar los documentos desde el panel abogado generando el PDF en esa petición (o en una vista previa); transmitirlo al navegador con controles de autorización y sin guardarlo en disco, almacenamiento de objetos ni como blob en base de datos.
+- Configurar remitente financiero (nombre, `From`, `Reply-To`, plantilla y datos de contacto) separado del remitente de avisos; reutilizar el transporte y secreto SMTP existentes.
+- Envío transaccional forzado al email vigente del cliente al emitir cuenta o recibo: generar el PDF desde los datos persistidos, adjuntarlo durante el envío y descartarlo al terminar. Incluir botón autenticado a su detalle. Guardar destino, identificador/versión de datos, resultado y fecha, nunca el binario; avisar al abogado si entrega falla y permitir reintento regenerando el PDF.
+- No permitir que preferencias de avisos ordinarios desactiven el correo que entrega un documento financiero solicitado/emitido.
 
-Todos los paneles deben evolucionar hacia una interfaz consistente.
+**Aceptación:** los datos y versiones documentales están conservados en la base de datos; cada vista, descarga o correo genera el PDF al momento y no deja un archivo persistido. Correo auditado; reintentos no duplican cobros ni versiones y regeneran el adjunto.
 
-## 3.1 Lenguaje
+### Fase 5 — Portal del cliente y estado de cuenta
 
-Usar lenguaje humano y orientado a la acción.
+**Objetivo:** ofrecer al cliente visibilidad clara de lo que debe y de lo que ya pagó.
 
-Evitar mostrar innecesariamente:
+- Pantalla de resumen con saldo total y cuentas pendientes, parciales, pagadas y vencidas.
+- Detalle cronológico por obligación con movimientos, pagos aplicados, recibos, correcciones y documentos descargables.
+- Generación bajo demanda y descarga del estado de cuenta PDF y de cada cuenta/recibo; encabezado claro sobre periodo y fecha de corte, sin conservar los archivos generados.
+- Si se habilita pago fuera de línea: mostrar únicamente instrucciones aprobadas por el despacho y flujo opcional para reportar soporte. Ese reporte no marca la obligación como pagada ni reemplaza la verificación del abogado.
+- Email transaccional con enlace contextual mantiene sesión requerida; nunca incluir enlaces públicos permanentes a documentos financieros.
 
-- IDs internos
-- estados técnicos
-- errores internos
-- nombres de endpoints
-- información de scraping
-- logs
-- estructuras internas
+**Aceptación:** cliente A no puede consultar datos/documentos de cliente B alterando ruta, ID o petición; estado de cuenta concilia con todos los movimientos.
 
-Especialmente para CLIENTE.
+### Fase 6 — Consola ADMIN, configuración e informes
 
----
+**Objetivo:** permitir administración y supervisión financiera global.
 
-## 3.2 Estados visuales
+- Listado global filtrable por cliente, abogado, proceso, estado, vencimiento, período, origen y referencia; detalle con vista previa del PDF generado al abrir, registro del correo enviado e historial de auditoría. No se guardan PDFs.
+- Acciones administrativas con permisos y motivo: corrección compensatoria, anulación controlada, reintento de correo, conciliación manual y bloqueo de nuevas operaciones ante anomalía. No borrar movimientos.
+- Panel de configuración del remitente financiero y política de envío independiente; credenciales SMTP compartidas sin duplicación.
+- Reportes de cartera/saldos por período, abogado, cliente y estado; exportación controlada, consistente con los filtros. Mostrar fecha de corte y reglas de cómputo.
+- Tablero de conciliación de cuentas, recibos, pagos sin aplicar, correos fallidos y diferencias; sin llamar ePayco todavía.
 
-Utilizar estados consistentes:
+**Aceptación:** ADMIN puede localizar y administrar cualquier registro sin aparecer como acreedor, cada acción queda auditada y exportaciones respetan filtros/permisos.
 
-- Normal
-- Atención
-- Riesgo
-- Pendiente
-- Vencido
-- Completado
-- En revisión
-- Rechazado
-- Archivado
+### Fase 7 — Endurecimiento, conciliación y preparación de proveedor
 
-No inventar estados incompatibles con los modelos existentes.
+**Objetivo:** dejar el núcleo manual fiable y revisar la integración en sandbox antes de habilitar pagos en vivo.
 
-Primero revisar los enums/valores actuales.
+- Pruebas de importes, pagos parciales, pagos múltiples, doble envío, idempotencia, concurrencia de numeración, saldos, anulaciones/reversiones y permisos.
+- Procedimientos de conciliación manual, cierre de período, respaldo/retención de los datos financieros y snapshots documentales, manejo de incidentes y reintento de entrega. No hay recuperación de archivos PDF almacenados; se regeneran desde su snapshot.
+- Definir interfaz de proveedor, configuración cifrada y separada por ambiente; mostrar estado “no conectado” sin afectar pagos manuales.
+- Inspección de seguridad y revisión contable/tributaria de PDF, correos, auditoría, retención y nomenclatura.
+- Aceptación de ambiente ePayco sandbox y credenciales por el propietario autorizado, fuera del código y sin exponerlas.
 
----
+**Aceptación:** no hay defectos críticos conocidos, se concilian saldos y se puede operar manualmente si ePayco está apagado o falla.
 
-## 3.3 Estados de interfaz
+### Fase 8 — ePayco Smart Checkout en sandbox
 
-Todas las vistas nuevas deben contemplar:
+**Objetivo:** integrar el flujo de cobro electrónico en pruebas sin acreditar una obligación por una respuesta de navegador.
 
-- loading
-- empty state
-- error state
-- success feedback
-- disabled state
-- skeleton cuando tenga sentido
-- responsive
-- mobile
-- estados de permisos
+- Implementar autenticación backend Apify, creación de sesiones por obligación, checkout v2 en frontend y retorno `response` solo como interfaz informativa.
+- Validar importe/saldo/moneda y estado de obligación en servidor antes de crear sesión; guardar intento pendiente, `invoice` único/referencia local y datos externos mínimos.
+- Implementar endpoint HTTPS `confirmation`, validación de firma en tiempo constante, coincidencia de importe/moneda/referencia/merchant y protección idempotente ante reintentos y eventos fuera de orden.
+- Persistir notificación recibida y resultado de procesamiento; responder sin redirección y dentro del SLA de ePayco; trabajos lentos en cola. Consultar API de validación cuando se requiera confirmar discrepancias.
+- Solo una confirmación autenticada y verificada crea pago aplicado y recibo; rechazo/fallo deja saldo pendiente. La pantalla de respuesta nunca es autoridad.
+- Sandbox exclusivamente, pruebas de firmas inválidas, webhook duplicado/retrasado, pagos aprobados/rechazados, usuario que abandona checkout y API no disponible.
 
-No implementar únicamente el "happy path".
+**Aceptación:** conciliación entre obligación, intento, confirmación y recibo demostrada en sandbox; funciones manuales siguen operativas.
 
----
+### Fase 9 — Habilitación gradual y operación de ePayco
 
-## 3.4 Consistencia visual
+**Objetivo:** llevar pagos a producción con control de riesgo y soporte.
 
-Reutilizar:
+- Validar llaves/cuenta y datos legales/comerciales, URLs HTTPS públicas, webhook productivo, correos, monto, moneda y entorno `test: false` con doble control ADMIN.
+- Habilitación gradual con interruptor para desactivar nuevo checkout sin perder registros ni impedir pagos manuales; límites y monitoreo de transacciones pendientes.
+- Conciliación diaria contra reportes ePayco y seguimiento de comisiones, abonos, reversos, reembolsos y contracargos; determinar explícitamente si esos eventos deben producir ajuste, deuda abierta o investigación.
+- Alertas para webhook ausente, firma inválida, diferencias de valores, reintentos agotados, alta tasa de rechazo y discrepancias de conciliación; guía operativa de soporte.
+- Revisar obligaciones de factura electrónica/proveedor DIAN antes de ofrecer documentos como facturas oficiales. Una eventual integración se planificará aparte.
 
-- AppShell
-- Sidebar
-- componentes existentes
-- tarjetas
-- botones
-- modales
-- tablas
-- estados
-- tokens visuales
-- sistema dark/light ya existente
+**Aceptación:** conciliación de producción verificada, ruta de reversión/desactivación ensayada, secretos protegidos y soporte con trazabilidad; lanzamiento aprobado por el propietario del comercio.
 
-No crear un segundo sistema visual independiente.
+## Decisiones aprobadas
 
----
+Completar durante Fase 0. Hasta entonces se asumen solo estos límites seguros: acreedor = abogado/despacho responsable; pagador = cliente vinculado; ADMIN = supervisor global; COP como moneda inicial; cuenta de cobro/recibo interno no se presentan como factura DIAN; ePayco desactivado hasta las Fases 8–9.
 
-# 4. FASE 0 — Auditoría y preparación
+| Decisión | Responsable | Estado |
+|---|---|---|
+| Identidad legal y datos que identifican al acreedor en los PDF | Despacho | Pendiente |
+| Confirmar responsable de recaudo y si se usa una única cuenta ePayco de la firma | Despacho | Pendiente |
+| Tratamiento de honorarios, IVA, retenciones y obligación de factura electrónica | Contador/asesor del despacho | Pendiente |
+| Política de vencimientos, pagos parciales, anticipos, descuentos y aplicación de un pago a varias cuentas | Despacho | Pendiente |
+| Política de anulación, devolución, reversión, disputa y soportes | Despacho | Pendiente |
+| Retención y acceso a documentos financieros después de cerrar/archivar un proceso | Despacho | Pendiente |
+| Campos del remitente financiero y correo de respuesta | Despacho | Pendiente |
+| `CPS.pdf` como referencia visual y `CPS.docx` como contenido auxiliar; fidelidad visual/editorial requerida | Despacho | Archivos presentes; método de edición por definir en Fase 0 |
+| Datos y cláusulas editables del contrato; flujo para generar nuevas versiones/adendas | Despacho/asesor jurídico | Pendiente |
+| Información de evento de firma (lugar, participantes, instrucciones y notificaciones) | Despacho | Pendiente |
+| Retención del escaneado firmado y política de reenvío al correo del cliente | Despacho | Pendiente |
 
-## Objetivo
+## Criterios de ejecución para cada fase
 
-Antes de modificar código, comprender exactamente el estado actual.
+1. Leer este plan y solo los archivos directamente relacionados con la fase pendiente; no auditar el repositorio completo.
+2. Reutilizar modelos, autorización, auditoría, SMTP, generación de PDF bajo demanda, componentes y patrones de API existentes cuando sirvan. No introducir almacenamiento persistente de PDFs.
+3. No implementar funcionalidad de fases futuras ni hacer refactors ajenos al módulo financiero.
+4. Ejecutar validaciones focalizadas apropiadas a los archivos cambiados; no afirmar pruebas no ejecutadas.
+5. Actualizar el estado de la fase, decisiones relevantes, archivos/modelos/API tocados, migraciones y validaciones en este documento.
+6. Detenerse al finalizar esa fase y esperar instrucciones.
 
-## Obligatorio
+## Registro de progreso
 
-Codex debe revisar:
-
-### Backend
-
-- `app/main.py`
-- `app/models.py`
-- `app/schemas.py`
-- `app/security.py`
-- routers existentes
-- servicios
-- tareas
-- permisos
-- autenticación
-- modelos relacionados con:
-  - usuarios
-  - procesos
-  - clientes
-  - radicados
-  - actuaciones
-  - tareas
-  - documentos
-  - solicitudes
-  - notificaciones
-  - contenido público
-  - auditoría
-
-### Frontend
-
-Revisar:
-
-- `frontend-saas/app/`
-- `frontend-saas/components/`
-- `frontend-saas/lib/`
-- `SessionContext`
-- `AppShell`
-- `Sidebar`
-- componentes ADMIN
-- componentes ABOGADO_ADMIN
-- componentes CLIENTE
-- módulo de páginas públicas
-- `publicPageContent.ts`
-- APIs utilizadas por el frontend
-
-### Tests
-
-Revisar:
-
-- `tests/`
-- configuración de testing
-- workflows existentes
-- lint
-- typecheck
-- build
-
----
-
-## Regla crítica
-
-NO comenzar implementando.
-
-Primero producir un diagnóstico interno de:
-
-1. qué existe;
-2. qué funciona;
-3. qué está incompleto;
-4. qué puede reutilizarse;
-5. qué debe modificarse;
-6. qué debe crearse;
-7. qué riesgos de regresión existen.
-
-No reescribir componentes existentes sin necesidad.
-
----
-
-# 5. FASE 1 — Sistema transversal de diseño, permisos y navegación
-
-## Objetivo
-
-Crear una base común para que las fases posteriores no dupliquen código.
-
-### Implementar/revisar
-
-- AppShell
-- Sidebar
-- Header
-- navegación por rol
-- breadcrumbs
-- estados de carga
-- estados vacíos
-- alertas
-- modales
-- confirmaciones
-- toast/feedback
-- cards
-- tablas
-- filtros
-- paginación
-- botones de acción
-- badges
-- responsive
-
----
-
-## Permisos
-
-Centralizar la lógica de permisos.
-
-No confiar únicamente en ocultar elementos del frontend.
-
-El backend debe seguir validando permisos.
-
-Cada endpoint nuevo debe comprobar:
-
-- usuario autenticado
-- rol
-- relación con el recurso
-- propiedad/visibilidad
-- permisos específicos
-
----
-
-# 6. FASE 2 — ADMIN: Dashboard de comando
-
-## Objetivo
-
-Convertir el dashboard ADMIN en un verdadero centro de control.
-
-Actualmente la información administrativa existe, pero debe pasar de:
-
-> "consultar registros"
-
-a:
-
-> "entender qué necesita atención".
-
----
-
-## Dashboard
-
-Debe incluir:
-
-### Encabezado
-
-- saludo
-- fecha
-- contexto de la firma
-- acciones rápidas
-
-### Resumen
-
-Cards para:
-
-- usuarios activos
-- solicitudes pendientes
-- procesos activos
-- tareas pendientes
-- documentos pendientes
-- alertas
-- errores operativos
-
----
-
-## Sección "Requiere atención"
-
-Mostrar elementos como:
-
-- solicitudes pendientes
-- usuarios pendientes de aprobación
-- procesos en riesgo
-- tareas vencidas
-- documentos pendientes
-- consultas judiciales con error
-- errores de operación
-- notificaciones críticas
-
-Cada tarjeta debe permitir navegar directamente al recurso.
-
----
-
-## Actividad reciente
-
-Timeline legible:
-
-- usuario creado
-- solicitud aprobada
-- proceso actualizado
-- documento cargado
-- tarea completada
-- radicado consultado
-- error detectado
-
-Evitar mostrar únicamente JSON o logs técnicos.
-
----
-
-## Procesos críticos
-
-Tabla con:
-
-- proceso
-- cliente
-- responsable
-- estado
-- última actividad
-- riesgo
-- próxima acción
-
-Filtros:
-
-- todos
-- atención
-- riesgo
-- sin actividad
-- vencidos
-
----
-
-## Acciones rápidas
-
-Ejemplos:
-
-- Crear usuario
-- Revisar solicitudes
-- Ver procesos
-- Ver documentos pendientes
-- Ver operación
-- Abrir auditoría
-- Editar sitio público
-
----
-
-# 7. FASE 3 — ADMIN: Alertas y centro de atención
-
-## Crear módulo
-
-`/gestion-procesos/admin/alertas`
-
-Debe centralizar:
-
-- pendientes
-- advertencias
-- errores
-- riesgos
-- eventos importantes
-
-Cada alerta debe incluir:
-
-- tipo
-- prioridad
-- fecha
-- descripción
-- recurso relacionado
-- acción recomendada
-- estado
-
-Acciones:
-
-- marcar como atendida
-- abrir recurso
-- descartar cuando corresponda
-
-No crear alertas falsas simplemente para llenar la interfaz.
-
----
-
-# 8. FASE 4 — ADMIN: Actividad y auditoría
-
-## Actividad
-
-Crear una vista humana de actividad.
-
-Ejemplo:
-
-> Sergio aprobó la solicitud de registro de un abogado.
-
-en lugar de:
-
-> `POST /api/admin/users/approve 200`
-
----
-
-## Auditoría
-
-Mantener el detalle técnico disponible mediante drawer/modal.
-
-Debe existir:
-
-### Vista humana
-
-- quién
-- qué hizo
-- sobre qué
-- cuándo
-- resultado
-
-### Detalle técnico
-
-- endpoint
-- método
-- recurso
-- ID
-- metadata
-- error técnico si existe
-
-Filtros:
-
-- usuario
-- acción
-- módulo
-- fecha
-- resultado
-
----
-
-# 9. FASE 5 — ADMIN: Usuarios, equipo y clientes
-
-## Usuarios
-
-Mejorar la administración de usuarios.
-
-Ficha detallada:
-
-- datos personales
-- rol
-- estado
-- actividad
-- procesos asociados
-- tareas
-- documentos
-- solicitudes
-- último acceso
-
-Acciones según permisos:
-
-- editar
-- activar/desactivar
-- cambiar rol cuando corresponda
-- revisar solicitudes
-- restablecer acceso
-- consultar actividad
-
----
-
-## Desactivación
-
-Cuando sea jurídicamente y técnicamente apropiado, preferir desactivación lógica sobre eliminación física.
-
-No eliminar datos históricos de procesos por una eliminación accidental de usuario.
-
----
-
-## Equipo
-
-Diferenciar claramente:
-
-- usuarios de plataforma
-- abogados del despacho
-- clientes
-- administradores
-
-No mezclar todo en una tabla sin contexto.
-
----
-
-# 10. FASE 6 — ADMIN: Procesos y salud operativa
-
-Crear una visión global de procesos.
-
-Debe permitir detectar:
-
-- procesos activos
-- procesos sin actividad
-- procesos con tareas vencidas
-- procesos con documentos pendientes
-- procesos con problemas en consultas
-- procesos sin responsable
-
----
-
-## Salud del proceso
-
-Implementar una clasificación visual:
-
-### Normal
-
-Todo está en orden.
-
-### Atención
-
-Existe algo que revisar.
-
-### Riesgo
-
-Existe una situación que requiere intervención.
-
-### Archivado
-
-Proceso cerrado/inactivo.
-
-La lógica debe derivarse de datos reales.
-
-No almacenar una etiqueta redundante si puede calcularse correctamente, salvo que exista una razón clara.
-
----
-
-# 11. FASE 7 — ADMIN: Agenda, tareas y documentos
-
-## Agenda
-
-Implementar vistas:
-
-- día
-- semana
-- mes
-
-Separar conceptualmente:
-
-- eventos
-- tareas
-- vencimientos
-- audiencias
-- reuniones
-- recordatorios
-
-Filtros:
-
-- responsable
-- proceso
-- cliente
-- tipo
-- estado
-
----
-
-## Tareas
-
-Agregar:
-
-- lista
-- Kanban
-- calendario
-
-Estados:
-
-- pendientes
-- en curso
-- vencidas
-- completadas
-
-Mostrar responsable y proceso.
-
----
-
-## Documentos
-
-Crear centro documental administrativo.
-
-Estados:
-
-- solicitado
-- pendiente
-- recibido
-- en revisión
-- aprobado
-- requiere corrección
-- rechazado
-- vencido
-
-Mantener trazabilidad.
-
----
-
-# 12. FASE 8 — ADMIN: Comunicaciones y notificaciones
-
-Crear centro de notificaciones.
-
-Categorías:
-
-- procesos
-- tareas
-- documentos
-- solicitudes
-- usuarios
-- operación
-- sistema
-
-Permitir:
-
-- leer/no leído
-- marcar todo como leído
-- abrir recurso relacionado
-
----
-
-## Comunicaciones
-
-Preparar arquitectura para:
-
-- mensajes internos
-- comunicaciones abogado-cliente
-- historial
-- contexto del proceso
-
-No implementar un chat complejo antes de tener definida la persistencia y seguridad.
-
----
-
-# 13. FASE 9 — ADMIN: Operación y automatizaciones
-
-El módulo "Operación" debe ser un monitor administrativo.
-
-Mostrar:
-
-- tareas/background jobs
-- consultas judiciales
-- errores
-- reintentos
-- integraciones
-- estado de servicios
-
-No exponer esto a CLIENTE.
-
----
-
-## Automatizaciones
-
-Diseñar base para workflows futuros:
-
-Ejemplo:
-
-> Cuando se crea un proceso → crear tarea → notificar responsable → registrar actividad.
-
-Otro:
-
-> Cuando se solicita documento → notificar cliente.
-
-La arquitectura debe evitar acoplar todas estas acciones directamente dentro de los routers.
-
----
-
-# 14. FASE 10 — ADMIN: Configuración de firma
-
-Crear configuración central de:
-
-- datos de la firma
-- contacto
-- logo
-- información pública
-- canales de comunicación
-- preferencias de notificación
-- parámetros generales
-
-No mezclar configuración de plataforma SaaS con configuración de la firma.
-
----
-
-# 15. FASE 11 — CMS PÚBLICO VISUAL
-
-Esta fase transforma radicalmente el módulo actual de "Páginas del sitio".
-
-## Objetivo
-
-Pasar de:
-
-> formularios rígidos por campos
-
-a:
-
-> editor visual basado en bloques.
-
-Debe conservarse la capacidad de la página pública actual.
-
----
-
-# 16. Arquitectura del CMS
-
-No guardar simplemente HTML arbitrario.
-
-Utilizar una estructura de contenido estructurada.
-
-Conceptualmente:
-
-```text
-Página
- ├── metadatos
- ├── draft
- │    └── bloques
- ├── published
- │    └── bloques
- ├── versión
- └── timestamps
-```
-
----
-
-## Bloques iniciales
-
-Crear únicamente los necesarios.
-
-### Texto
-
-- párrafo
-- título
-- subtítulo
-- lista
-- cita
-
-### Media
-
-- imagen
-- imagen + texto
-
-### Acción
-
-- botón
-- grupo de botones
-
-### Layout
-
-- sección
-- dos columnas
-- tres columnas
-
-### Contenido jurídico
-
-- servicio
-- tarjeta
-- testimonio
-- miembro del equipo
-- información de contacto
-
-Los bloques deben reutilizar componentes existentes cuando sea posible.
-
----
-
-# 17. Editor visual
-
-El administrador debe poder:
-
-- agregar bloques
-- eliminar bloques
-- duplicar bloques
-- mover bloques
-- reordenar
-- editar contenido
-- editar propiedades
-- ver resultado visual
-- deshacer
-- rehacer
-
----
-
-## Editor de texto enriquecido
-
-Dentro de los bloques de texto:
-
-- negrita
-- cursiva
-- subrayado
-- títulos
-- listas
-- enlaces
-- alineación
-- citas
-- separación
-
-No intentar convertirlo en Microsoft Word completo.
-
-El objetivo es una experiencia suficientemente familiar.
-
----
-
-# 18. Media
-
-El editor debe permitir:
-
-- cargar imágenes
-- seleccionar imágenes existentes
-- previsualizar
-- reemplazar
-- eliminar cuando corresponda
-- texto alternativo
-- dimensiones/responsive cuando corresponda
-
-Validar:
-
-- tipo
-- tamaño
-- seguridad
-
----
-
-# 19. Drag & Drop
-
-Los bloques deben poder reorganizarse visualmente.
-
-Debe existir:
-
-- indicador de posición
-- feedback visual
-- persistencia del orden
-- undo/redo
-
-No guardar cambios en cada movimiento.
-
-Usar estado local y guardar explícitamente.
-
----
-
-# 20. Vista previa
-
-Debe existir:
-
-### Vista previa del borrador
-
-El administrador ve exactamente cómo quedaría la página antes de publicar.
-
-Idealmente:
-
-- misma estructura
-- mismos componentes
-- mismos estilos
-
-Evitar crear una versión visual diferente únicamente para preview.
-
----
-
-# 21. Borrador y publicación
-
-Estados:
-
-```text
-Borrador
-Publicado
-```
-
-Flujo:
-
-```text
-Editar
-  ↓
-Guardar borrador
-  ↓
-Vista previa
-  ↓
-Publicar
-  ↓
-Contenido público actualizado
-```
-
-Nunca publicar automáticamente por guardar.
-
----
-
-# 22. Historial de versiones
-
-Registrar:
-
-- número de versión
-- usuario
-- fecha
-- estado
-- contenido
-
-Acciones:
-
-- visualizar
-- comparar cuando sea viable
-- restaurar
-
-Restaurar debe generar una nueva versión, no destruir el historial.
-
----
-
-# 23. Seguridad CMS
-
-Nunca confiar en HTML recibido desde el navegador.
-
-Sanitizar contenido enriquecido.
-
-Validar:
-
-- URLs
-- imágenes
-- enlaces
-- archivos
-- tipos MIME
-- permisos
-
-El cliente nunca debe poder modificar contenido público.
-
----
-
-# 24. SEO del CMS
-
-Cada página debe poder tener:
-
-- título SEO
-- descripción SEO
-- slug
-- imagen social/Open Graph si aplica
-
-No mezclar SEO con el contenido visual.
-
----
-
-# 25. Migración del contenido actual
-
-No eliminar el sistema actual inmediatamente.
-
-Crear una estrategia de migración:
-
-```text
-Contenido actual
-      ↓
-Adaptador
-      ↓
-Bloques
-      ↓
-Nuevo CMS
-```
-
-Mantener compatibilidad durante la transición.
-
-No perder contenido existente.
-
----
-
-# 26. FASE 12 — ABOGADO_ADMIN: Dashboard profesional
-
-El dashboard debe convertirse en centro de trabajo.
-
-Debe responder:
-
-> ¿Qué requiere mi atención hoy?
-
----
-
-## Resumen
-
-Cards:
-
-- procesos activos
-- tareas pendientes
-- tareas vencidas
-- documentos pendientes
-- solicitudes de clientes
-- consultas judiciales con error
-- próximos eventos
-
----
-
-## Requiere atención
-
-Mostrar:
-
-- tareas vencidas
-- tareas próximas
-- procesos en riesgo
-- procesos sin actividad
-- documentos pendientes
-- solicitudes pendientes
-- errores judiciales
-- procesos sin responsable
-
----
-
-## Actividad reciente
-
-Mostrar:
-
-- cambios en procesos
-- actuaciones
-- documentos
-- tareas
-- clientes
-- solicitudes
-- comunicaciones
-
----
-
-## Acciones rápidas
-
-- nuevo proceso
-- nuevo cliente
-- agregar radicado
-- crear tarea
-- solicitar documento
-- agendar evento
-
----
-
-# 27. FASE 13 — ABOGADO_ADMIN: Procesos
-
-La lista de procesos debe evolucionar hacia una herramienta de trabajo.
-
-Filtros:
-
-- todos
-- propios
-- colaborativos
-- activos
-- atención
-- riesgo
-- archivados
-
-Buscar por:
-
-- nombre
-- cliente
-- radicado
-- responsable
-
----
-
-## Salud del proceso
-
-Mostrar:
-
-- estado
-- última actividad
-- próxima actividad
-- tareas pendientes
-- documentos pendientes
-- radicados
-- responsable
-
----
-
-# 28. FASE 14 — ABOGADO_ADMIN: Detalle del proceso
-
-El detalle actual es una de las partes fuertes del sistema.
-
-No reemplazarlo.
-
-Evolucionarlo.
-
-Debe funcionar como:
-
-> expediente digital.
-
----
-
-## Cabecera
-
-- nombre
-- cliente
-- responsable
-- estado
-- salud
-- última actualización
-- acciones rápidas
-
----
-
-## Secciones
-
-- resumen
-- actividad
-- clientes
-- colaboradores
-- radicados
-- actuaciones
-- tareas
-- documentos
-- solicitudes
-- comunicaciones
-
----
-
-# 29. Timeline del proceso
-
-Crear timeline unificado.
-
-Eventos posibles:
-
-- creación
-- modificación
-- actuación
-- documento
-- tarea
-- solicitud
-- comunicación
-- consulta judicial
-
-Cada evento debe indicar:
-
-- fecha
-- actor
-- acción
-- descripción
-- recurso
-
----
-
-# 30. Visibilidad de eventos
-
-Introducir concepto de:
-
-```text
-INTERNAL
-CLIENT_VISIBLE
-```
-
-o equivalente.
-
-Esto es fundamental.
-
-No todo lo que ocurre internamente en un proceso debe mostrarse al cliente.
-
-El backend debe filtrar.
-
-No confiar solamente en el frontend.
-
----
-
-# 31. FASE 15 — ABOGADO_ADMIN: Tareas
-
-Implementar:
-
-### Lista
-
-Filtros por:
-
-- responsable
-- proceso
-- cliente
-- estado
-- vencimiento
-
-### Kanban
-
-Columnas configurables según estados existentes.
-
-### Calendario
-
-Visualización por fecha.
-
----
-
-## Tareas para clientes
-
-Agregar diferenciación entre:
-
-- tarea interna
-- tarea visible para cliente
-
-Una tarea visible para cliente debe tener lenguaje accionable.
-
-Ejemplo:
-
-> "Entrega tu certificado laboral"
-
-No:
-
-> "Revisión documental etapa 2".
-
----
-
-# 32. FASE 16 — ABOGADO_ADMIN: Agenda
-
-La agenda actual debe evolucionar.
-
-Vistas:
-
-- día
-- semana
-- mes
-
-Tipos:
-
-- audiencia
-- reunión
-- vencimiento
-- recordatorio
-- cita
-- evento procesal
-
-Debe distinguirse claramente de las tareas.
-
----
-
-# 33. FASE 17 — ABOGADO_ADMIN: Clientes
-
-Evolucionar clientes hacia un pequeño CRM jurídico.
-
-Ficha:
-
-- información personal
-- procesos
-- documentos
-- tareas
-- solicitudes
-- actividad
-- comunicaciones
-- último contacto
-
----
-
-## Estado de relación
-
-Mostrar indicadores como:
-
-- activo
-- pendiente
-- requiere atención
-
-No crear estados que no tengan soporte en negocio.
-
----
-
-# 34. FASE 18 — ABOGADO_ADMIN: Documentos
-
-Centro documental más completo.
-
-Estados:
-
-- solicitado
-- pendiente
-- recibido
-- revisión
-- aprobado
-- corrección
-- rechazado
-- vencido
-
-Acciones:
-
-- solicitar
-- revisar
-- aprobar
-- rechazar
-- solicitar corrección
-- descargar
-
----
-
-# 35. FASE 19 — ABOGADO_ADMIN: Comunicaciones
-
-Crear historial de comunicación por cliente/proceso.
-
-Debe poder distinguir:
-
-- comunicación interna
-- comunicación con cliente
-
-Preparar integración futura con:
-
-- correo
-- WhatsApp
-- mensajes internos
-
-No mezclar automáticamente canales hasta tener trazabilidad clara.
-
----
-
-# 36. FASE 20 — ABOGADO_ADMIN: Notificaciones
-
-Centro de notificaciones funcional.
-
-Categorías:
-
-- proceso
-- tarea
-- documento
-- cliente
-- solicitud
-- radicado
-- sistema
-
-Debe existir contador de no leídas.
-
----
-
-# 37. FASE 21 — CLIENTE: Rediseño completo del portal
-
-El CLIENTE no debe sentir que está usando una versión recortada del panel del abogado.
-
-Debe sentirse como:
-
-> Portal privado del cliente.
-
-Objetivos:
-
-- claridad
-- confianza
-- participación
-- transparencia
-- simplicidad
-
----
-
-# 38. FASE 22 — CLIENTE: Dashboard
-
-La ruta:
-
-`/gestion-procesos/cliente`
-
-debe evolucionar desde una simple lista de procesos hacia un dashboard.
-
----
-
-## Encabezado
-
-Mostrar:
-
-- saludo
-- fecha
-- nombre del despacho
-- acceso a notificaciones
-
----
-
-## Resumen
-
-Cards:
-
-- mis procesos
-- pendientes
-- documentos por entregar
-- próximos eventos
-
----
-
-## "Tienes pendiente"
-
-Priorizar acciones:
-
-- entregar documento
-- completar tarea
-- responder solicitud
-- revisar información
-- asistir a evento
-
----
-
-## Mis procesos
-
-Cada proceso debe mostrar:
-
-- nombre
-- estado amigable
-- abogado responsable
-- última actualización
-- próxima acción
-- documentos pendientes
-- tareas pendientes
-
----
-
-## Actividad reciente
-
-Mostrar únicamente actividad visible para cliente.
-
----
-
-# 39. FASE 23 — CLIENTE: Detalle del proceso
-
-Crear:
-
-`/gestion-procesos/cliente/procesos/[id]`
-
-Debe tener:
-
-### Resumen
-
-- qué es el proceso
-- estado
-- responsable
-- próxima acción
-
-### Actualizaciones
-
-Timeline simplificado.
-
-### Documentos
-
-Documentos relacionados.
-
-### Tareas
-
-Tareas que el cliente debe realizar.
-
-### Radicados
-
-Información comprensible.
-
----
-
-# 40. FASE 24 — CLIENTE: Estado comprensible
-
-No exponer estados técnicos sin explicación.
-
-Ejemplo:
-
-En lugar de:
-
-> `ACTIVO_JUDICIAL_3`
-
-mostrar:
-
-> **En trámite**
-
-Y opcionalmente:
-
-> "El despacho está realizando seguimiento al proceso."
-
----
-
-# 41. FASE 25 — CLIENTE: Timeline
-
-Crear timeline filtrado.
-
-Ejemplos:
-
-- proceso iniciado
-- documento recibido
-- actualización judicial
-- actuación relevante
-- reunión
-- solicitud
-- tarea completada
-
-Nunca exponer automáticamente todo el timeline interno.
-
----
-
-# 42. FASE 26 — CLIENTE: Tareas
-
-La funcionalidad actual de tareas debe mantenerse.
-
-Evolucionar hacia:
-
-- pendientes
-- próximas
-- completadas
-- vencidas
-
-Cada tarea debe explicar:
-
-- qué debe hacer
-- por qué
-- fecha límite
-- proceso relacionado
-
-El cliente debe poder completarla cuando corresponda.
-
----
-
-# 43. FASE 27 — CLIENTE: Documentos
-
-El módulo actual ya es funcional y debe evolucionar.
-
-Centro documental:
-
-### Por entregar
-
-Documentos solicitados.
-
-### En revisión
-
-Documentos enviados.
-
-### Aprobados
-
-Documentos aceptados.
-
-### Requieren corrección
-
-Documentos que deben reemplazarse.
-
-### Compartidos por el despacho
-
-Documentos disponibles para consulta.
-
----
-
-## Acciones
-
-- cargar
-- descargar
-- reemplazar
-- consultar estado
-
----
-
-# 44. FASE 28 — CLIENTE: Calendario
-
-Crear calendario simplificado.
-
-Mostrar solamente eventos relevantes para el cliente:
-
-- citas
-- reuniones
-- audiencias
-- fechas importantes
-- vencimientos que requieran acción
-
-No mostrar agenda interna del abogado.
-
----
-
-# 45. FASE 29 — CLIENTE: Notificaciones
-
-Crear centro:
-
-`/gestion-procesos/cliente/notificaciones`
-
-Tipos:
-
-- nueva actualización
-- documento solicitado
-- documento revisado
-- tarea
-- recordatorio
-- evento
-- mensaje
-
-Acciones:
-
-- leer
-- marcar todo como leído
-- abrir recurso
-
----
-
-# 46. FASE 30 — CLIENTE: Comunicación
-
-Crear arquitectura para comunicación abogado-cliente.
-
-Idealmente contextual:
-
-```text
-Proceso
-  └── Conversación
-```
-
-Debe registrar:
-
-- remitente
-- destinatario
-- fecha
-- mensaje
-- archivos si se implementan
-- estado de lectura
-
-Nunca mezclar conversaciones de otros clientes.
-
----
-
-# 47. FASE 31 — CLIENTE: Contacto del abogado
-
-Mostrar:
-
-- nombre
-- cargo
-- foto si existe
-- correo
-- WhatsApp si está habilitado
-- botón de contacto
-
-Debe ser información controlada por permisos.
-
----
-
-# 48. FASE 32 — CLIENTE: Solicitudes, aprobaciones y firma
-
-Preparar soporte para:
-
-- solicitudes de información
-- aprobación de documentos
-- aceptación de información
-- firma electrónica/firma integrada futura
-
-No implementar firma electrónica real hasta definir proveedor y requisitos jurídicos.
-
----
-
-# 49. FASE 33 — CLIENTE: Perfil y configuración
-
-Mantener funcionalidades actuales:
-
-- solicitud de edición de perfil
-- historial de solicitudes
-- preferencias de notificación
-
-Mejorar interfaz.
-
-Agregar cuando corresponda:
-
-- cambio de contraseña
-- sesiones
-- seguridad
-- privacidad
-
----
-
-# 50. FASE 34 — CLIENTE: Ayuda
-
-Crear sección sencilla:
-
-- preguntas frecuentes
-- cómo entregar documentos
-- cómo consultar procesos
-- cómo funcionan las notificaciones
-- cómo contactar al despacho
-
-No convertirlo inicialmente en un sistema de soporte complejo.
-
----
-
-# 51. FASE 35 — Seguridad y privacidad transversal
-
-Revisar todos los endpoints.
-
-Especialmente:
-
-- procesos
-- clientes
-- documentos
-- tareas
-- radicados
-- actuaciones
-- comunicaciones
-- notificaciones
-
-Un CLIENTE solo puede acceder a recursos que realmente le pertenecen o le hayan sido compartidos.
-
----
-
-## Reglas
-
-Nunca confiar exclusivamente en:
-
-```text
-if (user.role === "CLIENTE")
-```
-
-Debe verificarse relación real con el recurso.
-
----
-
-# 52. FASE 36 — Sistema de visibilidad
-
-Introducir, donde sea necesario, conceptos equivalentes a:
-
-```text
-INTERNAL
-CLIENT_VISIBLE
-```
-
-Aplicarlo a:
-
-- eventos
-- tareas
-- documentos
-- comunicaciones
-- actualizaciones
-- notas
-
-No exponer notas internas.
-
----
-
-# 53. FASE 37 — Búsqueda global
-
-Para ADMIN y ABOGADO_ADMIN:
-
-Implementar búsqueda global tipo:
-
-`Ctrl + K`
-
-Buscar:
-
-- clientes
-- procesos
-- radicados
-- tareas
-- documentos
-
-CLIENTE puede tener una búsqueda mucho más limitada o incluso no necesitarla inicialmente.
-
----
-
-# 54. FASE 38 — Métricas y carga de trabajo
-
-Para ADMIN y ABOGADO_ADMIN:
-
-Mostrar:
-
-- procesos por responsable
-- tareas por responsable
-- vencimientos
-- actividad
-- carga de trabajo
-
-No utilizar esto para CLIENTE.
-
----
-
-# 55. FASE 39 — Pruebas
-
-Cada fase debe incluir pruebas.
-
-## Backend
-
-- endpoints
-- permisos
-- errores
-- casos límite
-- aislamiento por rol
-
-## Frontend
-
-- navegación
-- loading
-- empty
-- error
-- responsive
-- permisos
-
-## Seguridad
-
-Probar explícitamente:
-
-- CLIENTE intentando acceder a otro proceso
-- CLIENTE intentando acceder a documentos ajenos
-- CLIENTE intentando modificar contenido público
-- ABOGADO_ADMIN intentando acceder a módulos ADMIN
-- ADMIN manteniendo acceso global según diseño
-
----
-
-# 56. FASE 40 — Regresión
-
-Antes de considerar terminada cada fase:
-
-```text
-lint
-typecheck
-tests
-build
-```
-
-Cuando corresponda.
-
-No avanzar si una modificación rompe funcionalidades existentes.
-
----
-
-# 57. Orden de implementación recomendado
-
-La ejecución debe seguir este orden:
-
-## Bloque A — Fundaciones
-
-1. Auditoría
-2. permisos
-3. componentes UI comunes
-4. navegación
-5. estados
-6. sistema de notificaciones transversal
-
----
-
-## Bloque B — ADMIN
-
-7. Dashboard
-8. Alertas
-9. Actividad
-10. Usuarios
-11. Procesos/riesgo
-12. Agenda
-13. Tareas
-14. Documentos
-15. Operación
-16. Auditoría
-17. Configuración
-
----
-
-## Bloque C — CMS
-
-18. modelo de bloques
-19. API
-20. editor
-21. rich text
-22. media
-23. drag & drop
-24. preview
-25. draft/publish
-26. historial
-27. migración
-
----
-
-## Bloque D — ABOGADO_ADMIN
-
-28. Dashboard
-29. procesos
-30. timeline
-31. tareas
-32. agenda
-33. clientes
-34. documentos
-35. notificaciones
-36. comunicaciones
-
----
-
-## Bloque E — CLIENTE
-
-37. Dashboard
-38. detalle de proceso
-39. estado/timeline
-40. tareas
-41. documentos
-42. calendario
-43. notificaciones
-44. comunicaciones
-45. contacto abogado
-46. perfil/configuración
-47. ayuda
-
----
-
-## Bloque F — Seguridad y calidad
-
-48. aislamiento por rol
-49. visibilidad interna/cliente
-50. pruebas
-51. regresión
-52. optimización
-53. revisión final
-
----
-
-# 58. Reglas para Codex durante la implementación
-
-Estas instrucciones son obligatorias.
-
-## Regla 1 — No ejecutar todo el plan de una vez
-
-El plan es un roadmap.
-
-Codex debe trabajar **una fase por vez**.
-
-No intentar implementar todas las fases en una sola ejecución.
-
----
-
-## Regla 2 — Auditar antes de modificar
-
-Antes de tocar una funcionalidad:
-
-1. localizar archivos;
-2. leer implementación actual;
-3. localizar endpoints;
-4. localizar modelos;
-5. localizar schemas;
-6. localizar componentes;
-7. comprobar reutilización posible;
-8. identificar dependencias.
-
----
-
-## Regla 3 — No reescribir innecesariamente
-
-Si una funcionalidad existe:
-
-> evolucionarla.
-
-No:
-
-> reemplazarla desde cero.
-
-Especialmente:
-
-- proceso detail
-- documentos
-- tareas
-- perfil
-- autenticación
-- AppShell
-- Sidebar
-
----
-
-## Regla 4 — No inventar APIs
-
-Antes de crear un endpoint comprobar:
-
-- si ya existe
-- si existe uno equivalente
-- si puede ampliarse
-- qué schema utiliza
-- qué permisos aplica
-
----
-
-## Regla 5 — Backend primero cuando haya cambio de datos
-
-Si una funcionalidad requiere:
-
-- modelo
-- campo
-- relación
-- endpoint
-- permiso
-
-resolver primero el contrato backend.
-
-Después adaptar frontend.
-
----
-
-## Regla 6 — No duplicar lógica
-
-Preferir:
-
-- servicios
-- helpers
-- componentes reutilizables
-- hooks
-- schemas compartidos
-- funciones de permisos
-
-Evitar copiar y pegar lógica entre roles.
-
----
-
-## Regla 7 — Mantener contratos existentes
-
-Si se cambia un endpoint utilizado actualmente:
-
-1. localizar consumidores;
-2. adaptar consumidores;
-3. probar;
-4. evitar romper respuestas existentes sin necesidad.
-
----
-
-## Regla 8 — Migraciones
-
-Toda modificación de modelo persistente debe considerar:
-
-- migración
-- datos existentes
-- valores por defecto
-- compatibilidad
-
-Nunca asumir que una base de datos vacía es el único escenario.
-
----
-
-# 59. Regla especial para el CMS
-
-El CMS no debe convertirse en un editor HTML sin estructura.
-
-Preferir:
-
-```text
-Block
- ├── type
- ├── order
- ├── content
- └── settings
-```
-
-sobre almacenar una página completa como HTML arbitrario.
-
-El renderizador público y el editor deben utilizar el mismo concepto de bloque.
-
----
-
-# 60. Regla especial para CLIENTE
-
-Antes de exponer cualquier información preguntarse:
-
-> ¿El cliente necesita saber esto?
-
-Si la respuesta es no:
-
-no mostrarlo.
-
-Ejemplos que deben permanecer internos:
-
-- notas internas
-- logs
-- errores técnicos
-- información de otros clientes
-- carga de trabajo
-- datos administrativos
-- auditoría
-- configuración
-- procesos internos
-- tareas internas
-- detalles técnicos de scraping
-
----
-
-# 61. Regla especial para ADMIN
-
-ADMIN sí puede tener visión amplia, pero la interfaz debe priorizar información accionable.
-
-No convertir el dashboard en una pared de estadísticas.
-
-La pregunta principal debe ser:
-
-> ¿Qué requiere atención?
-
----
-
-# 62. Regla especial para ABOGADO_ADMIN
-
-No convertirlo en:
-
-> ADMIN con menos opciones.
-
-Debe ser una herramienta de productividad.
-
-La pregunta principal debe ser:
-
-> ¿Qué tengo que hacer hoy y qué procesos necesitan atención?
-
----
-
-# 63. Criterios generales de aceptación
-
-La evolución se considera satisfactoria cuando:
-
-### ADMIN
-
-Puede:
-
-- entender el estado general
-- detectar problemas
-- administrar usuarios
-- supervisar procesos
-- revisar actividad
-- controlar operación
-- administrar contenido público
-- auditar acciones
-
----
-
-### ABOGADO_ADMIN
-
-Puede:
-
-- saber qué requiere atención
-- gestionar procesos
-- gestionar clientes
-- gestionar tareas
-- consultar radicados
-- gestionar documentos
-- gestionar agenda
-- comunicarse con clientes
-- consultar historial
-
----
-
-### CLIENTE
-
-Puede:
-
-- entender sus procesos
-- saber qué está pasando
-- conocer qué debe hacer
-- entregar documentos
-- completar tareas
-- consultar actualizaciones
-- recibir notificaciones
-- consultar fechas
-- comunicarse con el despacho
-
----
-
-### CMS
-
-El ADMIN puede:
-
-- editar visualmente
-- crear bloques
-- ordenar bloques
-- editar texto enriquecido
-- subir imágenes
-- previsualizar
-- guardar borrador
-- publicar
-- consultar historial
-- restaurar versiones
-
-sin tener que editar manualmente JSON, HTML o múltiples campos rígidos.
-
----
-
-# 64. Estrategia para evitar consumo innecesario de créditos
-
-Codex debe utilizar una estrategia incremental.
-
-## Antes de cada fase
-
-Leer solamente:
-
-- archivos directamente relacionados
-- dependencias inmediatas
-- modelos/endpoints necesarios
-
-No volver a inspeccionar todo el repositorio si ya existe un diagnóstico vigente.
-
----
-
-## Después de cada fase
-
-Ejecutar únicamente las validaciones necesarias.
-
-Por ejemplo:
-
-```text
-typecheck
-lint
-tests relacionados
-```
-
-No ejecutar una batería gigantesca después de cada pequeño cambio si no es necesario.
-
----
-
-## Commits
-
-Hacer commits pequeños y semánticos:
-
-```text
-feat(admin): add attention dashboard
-feat(admin): add activity center
-feat(cms): add block model
-feat(cms): add visual editor
-feat(client): add process detail
-```
-
-Esto permite identificar fácilmente regresiones.
-
----
-
-# 65. Protocolo de trabajo de Codex
-
-Para cada fase:
-
-### PASO 1
-
-Leer esta fase del `plan.md`.
-
-### PASO 2
-
-Auditar únicamente los archivos relacionados.
-
-### PASO 3
-
-Crear una lista breve:
-
-```text
-EXISTE
-REUTILIZAR
-MODIFICAR
-CREAR
-```
-
-### PASO 4
-
-Implementar.
-
-### PASO 5
-
-Validar.
-
-### PASO 6
-
-Corregir errores introducidos.
-
-### PASO 7
-
-Actualizar este `plan.md` marcando la fase como completada.
-
-### PASO 8
-
-Informar:
-
-- archivos modificados
-- archivos creados
-- endpoints creados/modificados
-- modelos modificados
-- migraciones
-- tests
-- validaciones
-- problemas pendientes
-
-### PASO 9
-
-DETENERSE.
-
-No comenzar automáticamente la siguiente fase.
-
----
-
-# 66. Formato de estado
-
-Codex debe mantener una sección de progreso:
-
-```text
-FASE 0 — [x]
-FASE 1 — [x]
-FASE 2 — [x]
-FASE 3 — [x]
-FASE 4 — [x]
-FASE 5 — [x]
-FASE 6 — [x]
-FASE 7 — [x]
-FASE 8 — [x]
-FASE 9 — [x]
-FASE 10 — [x]
-FASE 11 — [ ]
-...
-```
-
-Y debajo:
-
-```text
-Última fase completada:
-Fase 38 — Métricas y carga de trabajo (7 de octubre de 2026)
-
-Siguiente fase:
-Fase 39 — Pruebas
-
-Bloqueadores:
-La validación de Python de las fases 35–38 no pudo ejecutarse: Windows bloqueó el acceso a `python.exe` y `py.exe`. TypeScript, ESLint focalizado y `git diff --check` se ejecutaron correctamente.
-```
-
-### Registro de implementación — Fases 7–10 (6 de octubre de 2026)
-
-- **Fase 7 — Agenda, tareas y documentos:** se ampliaron las vistas de agenda de firma a día, semana, mes y listado; se añadieron filtros por responsable/proceso/cliente/estado/tipo, CRUD de eventos, audiencias y reuniones, y visibilidad de tareas y recordatorios existentes. Las tareas administrativas cuentan con lista/Kanban/calendario; el centro documental relaciona solicitudes con archivos y permite actualizar estado de revisión y comentario con trazabilidad. Se añadió fecha límite opcional a solicitudes documentales.
-- **Fase 8 — Comunicaciones y notificaciones:** se creó un centro administrativo de notificaciones por categoría, estado leído/no leído y recurso relacionado, con marcar individual y todo como leído. El estado de lectura es por usuario ADMIN. Se reutiliza el historial existente de comunicaciones/notificaciones de proceso; no se creó chat ni persistencia paralela.
-- **Fase 9 — Operación y automatizaciones:** se reutilizaron las páginas operativas ya separadas para resumen, consultas, integraciones y notificaciones, con estado de ejecuciones, errores/reintentos y salud de servicios. Se mantiene el acceso restringido a ADMIN y la ejecución durable desacoplada de los routers mediante los workflows existentes; no se duplicó esta infraestructura.
-- **Fase 10 — Configuración de firma:** se añadió una configuración central editable para identidad, contacto, logo, información pública, canales, preferencias y parámetros generales, separada de la configuración SaaS. Los correos del sistema consumen los datos públicos configurados y mantienen valores predeterminados compatibles.
-- **Backend/endpoints:** `/api/admin/agenda/tareas` amplía filtros y respuesta con recordatorios; se añadieron `/api/admin/agenda/eventos` (GET/POST/PATCH/DELETE), `/api/admin/documentos/solicitudes` (GET), `/api/admin/notificaciones/leer` (POST), `/api/admin/notificaciones/leer-todas` (POST), y `/api/admin/configuracion/firma` (GET/PUT). Los recursos documentales ADMIN incorporan estado y comentario de revisión.
-- **Modelos y migración:** se añadieron `EventoAgenda`, `ConfiguracionFirma` y `LecturaNotificacionAdmin`; `DocumentoProceso` incorpora campos de revisión. El inicio aplica columnas nuevas a tablas existentes y `create_all` crea las tablas nuevas. No se añadió archivo de migración Alembic.
-- **Validación:** `tsc --noEmit` aprobado; `git diff --check` aprobado. ESLint de archivos relacionados reporta un error en `AdminNotificationCenterPage` que se corrigió, y otro preexistente en `app/gestion-procesos/abogado/documentos/page.tsx` (`react-hooks/set-state-in-effect` en la carga inicial); las advertencias detectadas son imports sin uso preexistentes e `<img>` en vista previa. No fue posible ejecutar `py_compile` porque el launcher Python del entorno no es accesible. No se ejecutaron pruebas automatizadas.
-- **Archivos principales:** backend `app/models.py`, `app/schemas.py`, `app/main.py`, `app/routers/admin.py`, `app/routers/expedientes.py`, `app/integration_settings.py`, `app/email_service.py`; frontend `AdminFirmAgendaPage`, `AdminResourcePage`, `AdminAlertBell`, `AdminNotificationCenterPage`, `AdminFirmSettingsPage`, `AdminConsoleShell`, y las rutas ADMIN correspondientes; formulario de solicitudes de documento en el área de abogado.
-
-### Registro de preparación — Fase 0 (6 de octubre de 2026)
-
-Auditoría de preparación completada sobre los puntos de entrada y componentes compartidos directamente relacionados. No se modificó código funcional.
-
-- **EXISTE — backend:** `app/main.py` registra los routers ADMIN, tareas, expedientes y workflows y contiene autenticación, perfil, dashboard, solicitudes, registro, preferencias y radicados. `app/models.py` separa Proceso y Radicado y relaciona procesos con múltiples clientes/radicados; también modela actuaciones, tareas, subtareas, recordatorios, solicitudes/documentos, notificaciones, auditoría y contenido público. Hay servicios para acceso a firma/proceso, auditoría, notificaciones, almacenamiento, documentos y workflows. Los routers ofrecen operaciones de procesos/clientes/documentos/notificaciones, administración global, tareas y ejecución de workflows.
-- **EXISTE — frontend:** Next.js separa layouts y controles de rol para ADMIN, ABOGADO/ABOGADO_ADMIN y CLIENTE. Cuenta con `SessionContext`, `AdminConsoleShell`, `AppShell`, `Sidebar`, páginas de las tres áreas, pantallas públicas que consumen `publicPageContent.ts` y funciones API compartidas. El contenido público editable actual persiste JSON por página con valores por defecto en el cliente.
-- **FUNCIONA SEGÚN EVIDENCIA ESTÁTICA:** Las protecciones de backend están centralizadas en dependencias/helpers para usuario autenticado, ADMIN, acceso a proceso y gestión de tareas; frontend `RoleGate` también limita navegación por rol. Los tests existentes cubren, entre otros, aislamiento de ámbito, permisos por rol y recurso, carga/descarga de documentos, contenido público, auditoría, notificaciones, tareas y workflows. Esto confirma cobertura automatizada existente, no el estado de ejecución actual.
-- **REUTILIZAR:** Modelos/relaciones actuales, dependencias de autenticación y helpers de acceso, servicios de auditoría/notificación, las dos estructuras de shell ya existentes, navegación y utilidades API/componentes por rol. El dominio existente corresponde a una firma y ámbitos internos/SaaS; no hace falta introducir multi-tenancy.
-- **MODIFICAR:** No se identifican cambios transversales obligatorios a partir de esta auditoría. En cada fase concreta se deben evolucionar sus endpoints/componentes existentes cuando cubran el requisito, después de verificar los archivos de esa fase.
-- **CREAR:** Fase 0 no requiere crear archivos funcionales. Para las fases siguientes, la necesidad de nuevos componentes, endpoints o modelos se determina contra sus requisitos específicos; esta auditoría no los anticipa.
-- **INCOMPLETO / POR VERIFICAR:** No se verificó comportamiento en ejecución ni se ejecutaron tests, lint o build. Frontend declara `lint`, `build` y `test:workflow`; no tiene script `typecheck`. Backend tiene una suite `pytest` concentrada en `tests/test_security_tenant.py`, pero `pytest` no está declarado en `pyproject.toml` ni `requirements.txt`. No aparecieron manifiestos de CI en la búsqueda de configuraciones de workflows habituales.
-- **RIESGOS:** El control de permisos debe permanecer en backend con validación de rol y relación/visibilidad, sin depender solo del frontend. Mantener distintos Proceso y Radicado. `publicPageContent.ts` consume una URL de API fija y cae a defaults ante fallos; revisar ese comportamiento solo si la fase CMS lo requiere. La auditoría estática y acotada no certifica funcionamiento integral ni descarta regresiones.
-
-**Siguiente paso:** seguir el estado de fases consignado arriba y auditar únicamente los archivos directamente vinculados a la siguiente fase solicitada. Esta entrada no autoriza implementación de fases posteriores.
-
-### Registro de implementación — Fase 1 (6 de octubre de 2026)
-
-- Se integraron breadcrumbs y encabezados compartidos en `AppShell` y `AdminConsoleShell`; la navegación indica la ruta activa y el menú móvil expone su estado accesible.
-- Se añadió `ToastProvider` global y componentes reutilizables para botones, badges, cards, alertas, estados de carga/vacío, filtros, tablas, paginación, modales y confirmaciones. Los componentes usan los tokens existentes, ampliados con tonos claros ya presentes en el tema.
-- La política de gestión de tareas se trasladó a `app.firm_access` junto a los helpers existentes de rol/acceso. Se mantienen los endpoints actuales y se conserva la importación desde el router de tareas para compatibilidad.
-- No se añadieron endpoints, modelos ni migraciones.
-- **Validación:** typecheck aprobado; ESLint sobre los archivos de Fase 1 aprobado; 4 pruebas existentes de permisos aprobadas. `git diff --check` aprobado.
-- **Pendiente de entorno:** el lint global encuentra errores preexistentes en otras páginas/contexto; el build no puede resolver `workflow` y el escaneo del plugin `@workflow/next` falla al leer `../../../../..` desde este entorno restringido. No se modificó esa configuración ajena al alcance.
-
-### Registro de implementación — Fase 2 (6 de octubre de 2026)
-
-- Se completó el dashboard ADMIN con saludo y contexto de firma, acciones rápidas, métricas agregadas, alertas accionables con enlaces, actividad reciente en lenguaje legible y una tabla filtrable de procesos críticos.
-- El endpoint existente `/api/admin/dashboard` agrega los datos desde la base de datos y mantiene las claves anteriores de respuesta. Se reutilizaron la autorización ADMIN y los componentes compartidos de Fase 1; no se añadieron modelos, migraciones ni endpoints.
-- **Validación:** `tests/test_admin_dashboard.py` aprobado (1 prueba); ESLint del dashboard aprobado; `tsc --noEmit` aprobado; `git diff --check` aprobado.
-- **Pendiente de entorno:** `npm run build` se detuvo durante el escaneo de Next.js por acceso denegado al directorio `../../../../..` y no pudo resolver `workflow` desde `workflows/task-reminder.ts`. No se alteró la configuración/dependencia ajena al alcance.
-
-### Registro de implementación — Fase 3 (6 de octubre de 2026)
-
-- Se creó `/gestion-procesos/admin/alertas` y se añadió a la navegación ADMIN. El centro presenta pendientes, advertencias, errores, riesgos y eventos importantes con prioridad, fecha, descripción, recurso, recomendación y estado, además de filtros por categoría/estado.
-- El backend genera alertas únicamente desde solicitudes, tareas urgentes/vencidas, documentos pendientes, consultas/entregas fallidas y eventos de auditoría existentes. Permite marcarlas atendidas; el descarte solo está habilitado para eventos informativos. Las decisiones se conservan en la auditoría y no requieren tablas ni migraciones.
-- **Validación:** pruebas focalizadas de alertas y dashboard aprobadas (2); `py_compile`, ESLint de los archivos ADMIN relacionados, `tsc --noEmit` y `git diff --check` aprobados.
-
-### Registro de implementación — Fase 4 (6 de octubre de 2026)
-
-- Se amplió la vista ADMIN de auditoría con modos Actividad y Auditoría. La actividad usa descripciones humanas; la tabla muestra quién, qué hizo, sobre qué, cuándo y el estado de registro. El drawer presenta los datos técnicos conocidos y enlace al recurso.
-- El endpoint existente ahora enriquece los eventos con actor y nombres de módulo, y filtra por usuario, acción, módulo, fecha y resultado. Middleware captura endpoint y método para nuevos eventos; el esquema soporta metadata/error opcionales. Los eventos históricos conservan esos campos vacíos y se muestran como no registrados.
-- **Validación:** prueba focalizada de descripción, detalle técnico y filtros aprobada; py_compile, ESLint del componente, typecheck TypeScript y diff check aprobados.
-
-### Registro de implementación — Fase 5 (6 de octubre de 2026)
-
-- La consola separa Firma, Clientes, Abogados SaaS y Administradores; las cuentas de administrador de plataforma son visibles en modo consulta.
-- La ficha ADMIN muestra datos personales, rol/estado, plan/responsable, último acceso, procesos, tareas, documentos, solicitudes y actividad. Las acciones existentes permiten editar datos, activar/suspender lógicamente y exigir cambio de contraseña; los cambios de rol se permiten solo para cuentas activas sin información asociada y con validación de plan/responsable.
-- Se registra `ultimo_acceso` al iniciar sesión y se agrega la columna de forma compatible en el actualizador de esquema; no se eliminan cuentas ni datos históricos.
-- Antes del paso a Fase 6 se corrigió la ruta de suspensión (la ruta masiva estaba detrás de una ruta dinámica), se añadió el estado `SUSPENDIDO` con bloqueo de inicio de sesión y una ruta por usuario para suspender/reactivar. La eliminación física requiere confirmación y se rechaza cuando hay procesos, radicados, tareas, documentos, solicitudes, notificaciones u otro historial vinculado; en esos casos se conserva la opción de suspensión.
-- **Validación:** prueba focalizada de segmentación, ficha y guardas de cambio de rol aprobada; `py_compile`, ESLint de las pantallas, `tsc --noEmit` y `git diff --check` aprobados.
-
-### Registro de implementación — Fase 6 (6 de octubre de 2026)
-
-- El inventario ADMIN de procesos deriva Normal, Atención, Riesgo o Archivado a partir de actividad registrada, tareas vencidas, solicitudes de documentos pendientes, consultas judiciales fallidas y estado del responsable. Expone la última actividad y las señales detectadas; no almacena etiquetas de salud.
-- La tabla permite filtrar por salud y conserva la vista separada de procesos archivados. No se añadieron modelos, migraciones ni endpoints.
-- **Validación:** prueba focalizada del inventario y aislamiento por sector aprobada; `py_compile`, ESLint, `tsc --noEmit` y `git diff --check` aprobados.
-
-
-
----
-
-# 67. Regla de no sobreingeniería
-
-No implementar una funcionalidad compleja simplemente porque está contemplada en el plan.
-
-Si una fase puede resolverse reutilizando arquitectura existente:
-
-hacerlo.
-
-Si una funcionalidad futura no es necesaria para completar la fase:
-
-no implementarla anticipadamente.
-
-Especialmente:
-
-- chat avanzado
-- firma electrónica
-- automatizaciones complejas
-- analítica avanzada
-- IA
-- multicanal avanzado
-
-deben permanecer fuera hasta que su fase llegue.
-
----
-
-# 68. Arquitectura objetivo
-
-La arquitectura conceptual final debe aproximarse a:
-
-```text
-                         PLATAFORMA
-                              │
-             ┌────────────────┼────────────────┐
-             │                │                │
-           ADMIN        ABOGADO_ADMIN       CLIENTE
-             │                │                │
-       CONTROL GLOBAL      OPERACIÓN        PARTICIPACIÓN
-             │                │                │
-             └────────────────┼────────────────┘
-                              │
-                       DOMINIO COMPARTIDO
-                              │
-       ┌──────────┬───────────┼──────────┬───────────┐
-       │          │           │          │           │
-   Procesos   Clientes    Radicados   Tareas    Documentos
-       │          │           │          │           │
-       └──────────┴───────────┼──────────┴───────────┘
-                              │
-                        Notificaciones
-                              │
-                         Comunicaciones
-                              │
-                           Auditoría
-                              │
-                         Automatización
-```
-
-Y el CMS:
-
-```text
-                    ADMIN
-                      │
-                      ▼
-                EDITOR VISUAL
-                      │
-              ┌───────┴───────┐
-              │               │
-           DRAFT           PREVIEW
-              │
-              ▼
-          PUBLICACIÓN
-              │
-              ▼
-        SITIO PÚBLICO
-```
-
----
-
-# 69. Prioridad final
-
-Si el tiempo o presupuesto obliga a reducir alcance, priorizar:
-
-## Prioridad crítica
-
-1. Seguridad/permisos
-2. Dashboard ADMIN
-3. Dashboard ABOGADO_ADMIN
-4. Dashboard CLIENTE
-5. Detalle de proceso
-6. Timeline
-7. Tareas
-8. Documentos
-9. Notificaciones
-10. CMS visual básico
-
-## Prioridad alta
-
-11. Agenda
-12. Clientes/CRM
-13. Alertas
-14. Actividad
-15. Comunicaciones
-16. Historial CMS
-
-## Prioridad media
-
-17. Kanban
-18. Métricas
-19. Automatizaciones
-20. Ayuda
-21. SEO avanzado
-22. Firma/aprobaciones
-
----
-
-# 70. Instrucción maestra para ejecutar este plan
-
-Cuando se solicite a Codex continuar con este plan, utilizar esta instrucción:
-
-> **"Trabaja exclusivamente sobre la siguiente fase pendiente de `plan.md`. Antes de modificar código, audita únicamente los archivos, modelos, endpoints y componentes directamente relacionados con esa fase. No implementes fases futuras. No reescribas funcionalidades existentes si pueden evolucionarse. Reutiliza la arquitectura actual y respeta estrictamente la separación ADMIN / ABOGADO_ADMIN / CLIENTE y la distinción Proceso / Radicado. Implementa la fase completa, valida los cambios con las pruebas y verificaciones apropiadas, corrige cualquier regresión introducida, actualiza `plan.md` marcando la fase como completada y reporta archivos modificados, endpoints/modelos afectados, migraciones y validaciones realizadas. Después de eso, DETENTE y espera instrucciones. No hagas trabajo adicional."**
-
----
-
-# 71. Instrucción para ahorrar créditos
-
-Para continuar el desarrollo de forma eficiente, usar preferiblemente:
-
-> **"Continúa desde la última fase completada de `plan.md`. No vuelvas a auditar todo el repositorio. Lee únicamente el estado de `plan.md` y los archivos directamente relacionados con la siguiente fase. Implementa solo esa fase. No hagas refactors no relacionados ni anticipes fases futuras. Al terminar, ejecuta únicamente las validaciones necesarias, actualiza `plan.md`, resume los cambios y DETENTE."**
-
-Esta debe ser la **instrucción estándar de continuación** para cada sesión de Codex.
-
----
-
-# 72. Resultado esperado
-
-El resultado final no debe sentirse como tres paneles CRUD independientes.
-
-Debe sentirse como una única plataforma coherente con tres experiencias:
-
-```text
-ADMIN
-"Yo controlo y superviso."
-
-        ↓
-
-ABOGADO_ADMIN
-"Yo gestiono y trabajo."
-
-        ↓
-
-CLIENTE
-"Yo entiendo y participo."
-```
-
-Y un CMS que permita al despacho modificar su presencia pública sin depender del desarrollador:
-
-```text
-ADMIN
-  ↓
-Editor visual
-  ↓
-Borrador
-  ↓
-Vista previa
-  ↓
-Publicar
-  ↓
-Sitio público
-```
-
-La meta final es pasar de una aplicación funcional a un **producto jurídico integral, visualmente consistente, seguro, accionable y mantenible**.
-
-### Registro de implementación — Fases 12–20 (7 de octubre de 2026)
-
-- **Fase 12 — Dashboard profesional:** agrega indicadores reales, lista de asuntos que requieren atención, actividad reciente y accesos rápidos a los módulos de trabajo del abogado.
-- **Fase 13 — Procesos:** incorpora filtros por ámbito/atención/riesgo y búsqueda por proceso, cliente, radicado y responsable; muestra salud, actividad reciente/próxima, tareas y documentos pendientes.
-- **Fase 14 — Expediente digital:** la ficha conserva las secciones existentes y organiza resumen, clientes, radicados/actuaciones, agenda, tareas, documentos, solicitudes, comunicaciones y timeline. Las tareas pueden crearse dentro del proceso y opcionalmente ligarse a cliente, radicado y actuación; el backend valida que el radicado y la actuación correspondan al proceso. La revisión documental se realiza en vista emergente.
-- **Fases 15–16 — Tareas y agenda:** se añaden lista/Kanban/calendario y filtros de responsable, proceso, cliente, estado, contexto y vencimiento. La agenda de abogado distingue tareas de eventos, ofrece día/semana/mes/lista y permite registrar eventos desde la ficha del proceso.
-- **Fase 17 — Clientes:** la ficha incorpora relación derivada de procesos vigentes, último contacto y actividad/comunicaciones relacionadas, incluidas notificaciones de actuaciones existentes; las consultas quedan limitadas a procesos accesibles al abogado.
-- **Fase 18 — Documentos:** el centro permite previsualizar imágenes/PDF en modal, revisar, aprobar, rechazar o solicitar correcciones con comentario y trazabilidad.
-- **Fases 19–20 — Comunicaciones y notificaciones:** la ficha conserva historial interno/visible al cliente por proceso sin enviar automáticamente por canales externos. El centro de notificaciones agrega categorías, lectura individual/masiva, filtros y navegación al recurso; el contador refleja pendientes de lectura.
-- **Modelos/API:** se añadieron persistencia de comunicaciones del proceso y lecturas de notificaciones de abogado, CRUD de eventos de agenda, endpoints de timeline/comunicaciones/revisión y validaciones de ámbito para tareas. No se implementó funcionalidad de fases 21 en adelante.
-- **Validación:** `tsc --noEmit`, ESLint focalizado (sin errores; quedan avisos de `<img>` en previsualizaciones), `py_compile` de modelos/esquemas/routers y `git diff --check` aprobados. No se ejecutaron pruebas automatizadas.
-
-### Registro de implementación — Fases 21–34 (7 de octubre de 2026)
-
-- **Fases 21–22 — Portal y dashboard del cliente:** la navegación del rol ahora incluye inicio, procesos, tareas, documentos/solicitudes, calendario, notificaciones, mensajes, ayuda, perfil y configuración. El inicio resume procesos, pendientes, solicitudes documentales, eventos, actividad compartida y avisos sin leer.
-- **Fases 23–25 — Detalle, estado y actividad:** cada proceso tiene una ficha privada con estado explicado, responsable, próximas citas, documentos, tareas, radicados, timeline y conversación. El timeline del cliente filtra eventos por su relación y anonimiza las anotaciones judiciales; no se devuelven auditorías internas.
-- **Fases 26–27 — Tareas y documentos:** las tareas del cliente indican contexto del proceso, fecha y estado, permiten completar/reprogramar y separan las completadas. El centro documental organiza lo solicitado y agrupa archivos por estado de revisión, muestra comentarios y permite descargar o reemplazar documentos que requieren corrección. Los documentos compartidos por el despacho aparecen cuando están asociados al cliente mediante el modelo documental actual.
-- **Fases 28–29 — Calendario y notificaciones:** el calendario utiliza eventos asignados al cliente y sus vencimientos. El centro de avisos ofrece lectura individual y masiva con enlaces al recurso relacionado.
-- **Fases 30–32 — Comunicación y solicitudes:** se habilita mensajería contextual por proceso, con remitente, fecha y estado de lectura. Las solicitudes y revisiones documentales permiten entregar, consultar aprobación o corregir. La firma electrónica queda expresamente pendiente de un proveedor y definición jurídica; no se simula una firma.
-- **Fases 33–34 — Cuenta y ayuda:** se conserva la solicitud de cambio de perfil e historial, las preferencias de notificación y se añade el cambio de contraseña protegido con el flujo OTP existente (persistencia del reto vigente, temporizador y reenvío/cambio de canal). Se incorpora ayuda con instrucciones de documentos, procesos, avisos y contacto.
-- **API cliente:** se añaden consultas protegidas para ficha, agenda, actividad compartida, notificaciones/lectura y mensajes; todas validan rol y vínculo cliente-proceso. La migración de `leido_en` para mensajes es compatible con instalaciones existentes.
-- **Última actuación:** el cliente ve únicamente la actuación más reciente por radicado, tanto en la ficha como en los timelines/actividad compartida; las vistas de abogado conservan el historial completo.
-- **Validación:** `tsc --noEmit`, ESLint focalizado de las rutas y componentes del cliente, `py_compile` de modelos/esquemas/routers y `git diff --check` aprobados. No se ejecutaron pruebas automatizadas.
-
-### Progreso actualizado — Fases 35–38 (7 de octubre de 2026)
-
-FASE 35 — [x] Seguridad y privacidad transversal
-FASE 36 — [x] Sistema de visibilidad
-FASE 37 — [x] Búsqueda global
-FASE 38 — [x] Métricas y carga de trabajo
-
-- **Fase 35:** los endpoints autenticados ahora rechazan cuentas suspendidas/no activas incluso cuando presentan un token emitido antes del cambio de estado. Se mantienen las verificaciones de vínculo cliente-proceso/documento/tarea existentes. Búsqueda y métricas limitan el alcance de `ABOGADO_ADMIN` a procesos propios/compartidos; `CLIENTE` no puede consumirlas.
-- **Fase 36:** se formalizaron `INTERNA` y `CLIENTE` en `app/visibility.py` y se reutilizan en el timeline del proceso. El timeline del cliente sigue filtrando comunicaciones por visibilidad y vínculo exacto con el cliente; las notas internas se mantienen solo en la vista de personal. Tareas, eventos y documentos conservan su visibilidad derivada de su asignación/vínculo.
-- **Fase 37:** endpoint de búsqueda global limitado por rol y ámbito, con resultados acotados de clientes, procesos, radicados, tareas y documentos. La paleta `Ctrl+K` aparece solo para ADMIN/ABOGADO_ADMIN y tiene también un botón visible.
-- **Fase 38:** endpoint y páginas de métricas con procesos/tareas por responsable, tareas abiertas y vencimientos (vencidas / próximos 7 días), más actividad reciente. La navegación expone métricas solo a ADMIN/ABOGADO_ADMIN.
-- **Modelos/migraciones:** no se añadieron campos ni tablas; se reutilizaron los vínculos actuales y valores de visibilidad persistidos.
-- **Validación:** `tsc --noEmit`, ESLint focalizado y `git diff --check` aprobados. `py_compile` no se pudo ejecutar: Windows bloqueó el acceso a `python.exe` y `py.exe`. No se ejecutaron pruebas automatizadas y no se comenzó la Fase 39.
-- **Siguiente fase:** Fase 39 — Pruebas.
+- Rama de trabajo: `financiero-contable`, creada desde `origin/main`.
+- Plan anterior reemplazado por esta hoja de ruta independiente.
+- Investigación documental para ePayco y DIAN incorporada con enlaces oficiales; la documentación de ePayco debe revalidarse al ejecutar Fases 8–9.
+- Contratos añadidos como Fase 1, antes de las fases financieras; `CPS.pdf` y `CPS.docx` están presentes en el repositorio.
+- `CPS.pdf` es la referencia visual canónica para conservar estructura/posiciones; `CPS.docx` es una fuente auxiliar de contenido y no se asumirá que convertirlo conserva su diseño. El escaneado firmado se conserva en el expediente; el PDF previo a firma se genera bajo demanda.
+- **Fase 0 — descubrimiento:** inspeccionados los modelos de proceso/cliente, calendario, documentos, roles, SMTP, almacenamiento R2 y el inicializador de esquema. Se confirmó que `CPS.pdf` tiene tres páginas carta, no contiene campos de formulario y el proyecto no incluye un motor PDF. Quedan pendientes decisiones tributarias/contables del despacho (facturación DIAN, impuestos/retenciones, tratamiento y recepción del recaudo); no se presume cumplimiento fiscal. Sin llamadas a ePayco ni pagos reales.
+- **Fase 1 — contratos: EN PROGRESO, no aceptada todavía.** Se añadieron persistencia de contratos/versiones/entregas, endpoints protegidos bajo `/api/contratos`, evento `FIRMA_CONTRATO`, pestaña en la ficha del abogado, consola Admin, carga del original firmado a R2, descarga del cliente, email adjunto/reintento y estados incluido `TERMINADO`. El registro `LISTO_PARA_FIRMA` congela versión y solo agendar el evento lleva a `EN_FIRMA`; el cliente sigue viendo el firmado al terminarse el contrato. Los PDFs previos a firma no se guardan: el panel imprime desde el contenido persistido. **Pendiente de aceptación:** esa impresión refluye el texto y no reproduce líneas, figuras, imágenes y posiciones de `CPS.pdf`; el PDF no tiene campos editables y no hay renderer/compositor PDF en las dependencias. Tampoco se implementó aún edición posicional del documento de referencia. No afirmar que Fase 1 está completa hasta resolver este punto.
+- **Fase 2 — persistencia financiera manual: IMPLEMENTADA.** Se añadieron tablas de cuentas/líneas, pagos/idempotencia, aplicaciones parciales repetibles, ajustes, reversiones, snapshots, configuración y trazas de entrega de correo; `Numeric(14,2)`, restricciones e índices; servicio de dominio para crear/emitir/anular, registrar, aplicar/revertir pagos y recalcular saldo/estado. Se definió `PaymentProvider` con proveedor deshabilitado: ningún SDK ni llamada externa. Migración PostgreSQL idempotente: `migrations/2026_10_08_contracts_finance.sql`; se conservaron las alteraciones compatibles del inicializador existente para columnas `contrato_id`. Fase 2 no añade todavía endpoints/UI (Fase 3 en adelante).
+- **Validaciones ejecutadas:** `py_compile` para modelos, schemas, routers, servicio financiero, `main.py` y correo; configuración de mappers SQLAlchemy (46 tablas); `tsc --noEmit -p frontend-saas/tsconfig.json`; ESLint focalizado (sin errores, un warning de `<img>` preexistente en la ficha del abogado); `git diff --check`. No se ejecutaron pruebas automatizadas.
+- **Assets de plantilla:** `CPS.docx` y `CPS.pdf` permanecen como archivos locales no versionados; el backend espera encontrarlos en la raíz del proyecto. Deben incluirse en el despliegue/versionado antes de publicar el flujo de contratos.

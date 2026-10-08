@@ -71,7 +71,12 @@ def _html_correo(cuerpo: str, firma: dict[str, str | bool] | None = None) -> str
 </body></html>"""
 
 
-def enviar_correo(destinatario: str, asunto: str, cuerpo: str) -> bool:
+def enviar_correo(
+    destinatario: str,
+    asunto: str,
+    cuerpo: str,
+    adjunto: tuple[str, bytes, str] | None = None,
+) -> bool:
     config = get_integration_settings()
     firma = get_firm_settings()
     host = config["smtp_host"]
@@ -91,6 +96,15 @@ def enviar_correo(destinatario: str, asunto: str, cuerpo: str) -> bool:
         cte="quoted-printable",
     )
     mensaje.add_alternative(_html_correo(cuerpo, firma), subtype="html", charset="utf-8")
+    if adjunto:
+        nombre_archivo, contenido, mime_type = adjunto
+        maintype, _, subtype = mime_type.partition("/")
+        mensaje.add_attachment(
+            contenido,
+            maintype=maintype or "application",
+            subtype=subtype or "octet-stream",
+            filename=nombre_archivo,
+        )
     puerto = int(config["smtp_port"] or 587)
     usuario = config["smtp_user"]
     password = config["smtp_password"]

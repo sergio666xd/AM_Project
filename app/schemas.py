@@ -103,17 +103,32 @@ class ConfiguracionConsultasUpdate(BaseModel):
 class EventoAgendaCreate(BaseModel):
     titulo: str = Field(min_length=1, max_length=255)
     descripcion: str | None = Field(default=None, max_length=4000)
-    tipo: Literal["EVENTO", "AUDIENCIA", "REUNION"] = "EVENTO"
+    tipo: Literal["EVENTO", "AUDIENCIA", "REUNION", "FIRMA_CONTRATO"] = "EVENTO"
     estado: Literal["PROGRAMADO", "COMPLETADO", "CANCELADO"] = "PROGRAMADO"
     fecha_inicio: datetime
     fecha_fin: datetime | None = None
     responsable_id: int | None = None
     proceso_id: int | None = None
     cliente_id: int | None = None
+    contrato_id: int | None = None
 
 
 class EventoAgendaUpdate(EventoAgendaCreate):
     pass
+
+
+class ContratoServicioCreate(BaseModel):
+    cliente_id: int
+    contenido: str = Field(default="", max_length=120000)
+
+
+class ContratoServicioUpdate(BaseModel):
+    contenido: str = Field(min_length=1, max_length=120000)
+
+
+class ContratoServicioEstadoUpdate(BaseModel):
+    estado: Literal["LISTO_PARA_FIRMA", "EN_FIRMA", "TERMINADO", "ANULADO"]
+    motivo: str | None = Field(default=None, max_length=4000)
 
 
 class WorkflowClaimConsulta(BaseModel):

@@ -2,6 +2,7 @@
 
 import logging
 import os
+import hashlib
 from datetime import datetime, timedelta, timezone
 from uuid import uuid4
 from zoneinfo import ZoneInfo
@@ -195,7 +196,38 @@ def _serializar_evento_firma(evento: models.EventoAgenda) -> dict:
             "estado": evento.estado, "fecha_inicio": evento.fecha_inicio, "fecha_fin": evento.fecha_fin,
             "responsable_id": evento.responsable_id, "responsable": evento.responsable.nombre_completo if evento.responsable else None,
             "proceso_id": evento.proceso_id, "proceso": evento.proceso.nombre if evento.proceso else None,
-            "cliente_id": evento.cliente_id, "cliente": evento.cliente.nombre_completo if evento.cliente else None}
+            "cliente_id": evento.cliente_id, "cliente": evento.cliente.nombre_completo if evento.cliente else None,
+            "contrato_id": evento.contrato_id}
+
+
+def _validar_contrato_evento(proceso: models.Proceso, tipo: str, contrato_id: int | None, cliente: models.Usuario | None, db: Session, actor: models.Usuario):
+    if tipo != "FIRMA_CONTRATO":
+        if contrato_id is not None:
+            raise HTTPException(status_code=400, detail="Solo los eventos de firma pueden asociarse a un contrato.")
+        return None
+    if contrato_id is None:
+        raise HTTPException(status_code=400, detail="Selecciona el contrato cuya firma se va a agendar.")
+    contrato = db.query(models.ContratoServicio).filter_by(
+        id=contrato_id, proceso_id=proceso.id,
+    ).with_for_update().first()
+    if not contrato or contrato.cliente_id is None or (cliente and cliente.id != contrato.cliente_id):
+        raise HTTPException(status_code=400, detail="El contrato debe pertenecer a este expediente y al cliente seleccionado.")
+    if contrato.estado not in {"LISTO_PARA_FIRMA", "EN_FIRMA"}:
+        raise HTTPException(status_code=409, detail="El contrato debe estar listo para firma antes de agendarla.")
+    if cliente is None:
+        raise HTTPException(status_code=400, detail="Selecciona el cliente que asistirá a la firma.")
+    if contrato.estado == "LISTO_PARA_FIRMA":
+        contrato.estado = "EN_FIRMA"
+        version_number = max([version.version for version in contrato.versiones] or [contrato.version_actual]) + 1
+        contrato.version_actual = version_number
+        db.add(models.ContratoServicioVersion(
+            contrato_id=contrato.id, version=version_number, estado="EN_FIRMA",
+            contenido=contrato.contenido_actual, parte_cliente_snapshot=contrato.parte_cliente_snapshot,
+            hash_sha256=hashlib.sha256(contrato.contenido_actual.encode("utf-8")).hexdigest(),
+            creado_por_id=actor.id,
+        ))
+        registrar_evento_auditoria(db, actor, "contrato.estado", "contrato_servicio", contrato.id, {"estado": "EN_FIRMA", "origen": "evento_agenda"})
+    return contrato
 
 
 def _abogado_puede_gestionar_cliente(
@@ -1066,6 +1098,9 @@ def crear_evento_agenda_abogado(datos: schemas.EventoAgendaCreate, db: Session =
         raise HTTPException(status_code=400, detail="Asocia el evento a un proceso.")
     proceso = _proceso_abogado(datos.proceso_id, usuario, db)
     cliente = _cliente_asignado(proceso, datos.cliente_id, db) if datos.cliente_id else None
+    contrato = _validar_contrato_evento(proceso, datos.tipo, datos.contrato_id, cliente, db, usuario)
+    if contrato and cliente is None:
+        cliente = contrato.cliente
     responsable_id = datos.responsable_id or usuario.id
     responsible_allowed = responsable_id == proceso.abogado_id or responsable_id == usuario.id or any(link.abogado_id == responsable_id for link in proceso.colaboradores)
     responsable = db.query(models.Usuario).filter_by(id=responsable_id, estado=models.EstadoUsuario.ACTIVO).first()
@@ -1077,7 +1112,8 @@ def crear_evento_agenda_abogado(datos: schemas.EventoAgendaCreate, db: Session =
         raise HTTPException(status_code=400, detail="La fecha final debe ser posterior al inicio.")
     evento = models.EventoAgenda(titulo=datos.titulo.strip(), descripcion=datos.descripcion, tipo=datos.tipo, estado=datos.estado,
                                  fecha_inicio=inicio, fecha_fin=fin, responsable_id=responsable_id, proceso_id=proceso.id,
-                                 cliente_id=cliente.id if cliente else None, creado_por_id=usuario.id)
+                                 cliente_id=cliente.id if cliente else None, contrato_id=contrato.id if contrato else None,
+                                 creado_por_id=usuario.id)
     db.add(evento); db.flush()
     registrar_evento_auditoria(db, usuario, "proceso.evento_agenda.crear", "proceso", proceso.id)
     db.commit(); db.refresh(evento)
@@ -1097,6 +1133,9 @@ def actualizar_evento_agenda_abogado(evento_id: int, datos: schemas.EventoAgenda
         raise HTTPException(status_code=404, detail="Evento no encontrado.")
     proceso = _proceso_abogado(evento.proceso_id, usuario, db)
     cliente = _cliente_asignado(proceso, datos.cliente_id, db) if datos.cliente_id else None
+    contrato = _validar_contrato_evento(proceso, datos.tipo, datos.contrato_id, cliente, db, usuario)
+    if contrato and cliente is None:
+        cliente = contrato.cliente
     responsable_id = datos.responsable_id or usuario.id
     responsible_allowed = responsable_id == proceso.abogado_id or responsable_id == usuario.id or any(link.abogado_id == responsable_id for link in proceso.colaboradores)
     responsable = db.query(models.Usuario).filter_by(id=responsable_id, estado=models.EstadoUsuario.ACTIVO).first()
@@ -1111,6 +1150,7 @@ def actualizar_evento_agenda_abogado(evento_id: int, datos: schemas.EventoAgenda
         setattr(evento, field, getattr(datos, field))
     evento.fecha_inicio = inicio; evento.fecha_fin = fin; evento.responsable_id = responsable_id
     evento.cliente_id = cliente.id if cliente else None
+    evento.contrato_id = contrato.id if contrato else None
     registrar_evento_auditoria(db, usuario, "proceso.evento_agenda.actualizar", "proceso", proceso.id)
     db.commit(); db.refresh(evento)
     destinatario = cliente or cliente_anterior
@@ -1366,6 +1406,7 @@ def obtener_proceso_detalle(proceso_id: int, db: Session = Depends(get_db), usua
         "tareas": [{"id": t.id, "titulo": t.titulo, "descripcion": t.descripcion, "estado": t.estado.value, "prioridad": t.prioridad.value, "cliente_id": t.cliente_id, "fecha_limite": t.fecha_limite, "radicado_id": t.radicado_id, "actuacion_id": t.actuacion_id, "responsable": t.usuario.nombre_completo if t.usuario else None} for t in tareas],
         "solicitudes_documento": [{"id": s.id, "titulo": s.titulo, "instrucciones": s.instrucciones, "cliente_id": s.cliente_id, "cliente": s.cliente.nombre_completo, "atendida_en": s.atendida_en, "created_at": s.created_at} for s in proceso.solicitudes_documento if s.cliente and s.cliente.rol == models.RolUsuario.CLIENTE],
         "documentos": [{"id": d.id, "solicitud_id": d.solicitud_id, "nombre_archivo": d.nombre_archivo, "cliente": d.cliente.nombre_completo if d.cliente else "Usuario eliminado", "cliente_id": d.cliente_id, "mime_type": d.mime_type, "estado_revision": d.estado_revision, "comentario_revision": d.comentario_revision, "created_at": d.created_at} for d in proceso.documentos if d.cliente and d.cliente.rol == models.RolUsuario.CLIENTE],
+        "contratos": [{"id": contract.id, "cliente_id": contract.cliente_id, "cliente": contract.cliente.nombre_completo if contract.cliente else contract.parte_cliente_snapshot.get("nombre", "Cliente"), "estado": contract.estado, "version_actual": contract.version_actual, "emitido_en": contract.emitido_en, "firmado_en": contract.firmado_en, "terminado_en": contract.terminado_en, "documento_firmado": ({"id": signed.id, "nombre_archivo": signed.nombre_archivo, "mime_type": signed.mime_type, "created_at": signed.created_at} if (signed := db.query(models.DocumentoProceso).filter_by(contrato_id=contract.id).order_by(models.DocumentoProceso.created_at.desc()).first()) else None)} for contract in db.query(models.ContratoServicio).filter_by(proceso_id=proceso.id).order_by(models.ContratoServicio.created_at.desc()).all()],
         "notificaciones": [
             {
                 "id": notificacion.id,
@@ -1446,7 +1487,8 @@ def detalle_proceso_cliente(proceso_id: int, db: Session = Depends(get_db), usua
         } for link in proceso.radicados if link.radicado],
         "tareas": [{"id": task.id, "titulo": task.titulo, "descripcion": task.descripcion, "estado": task.estado.value, "prioridad": task.prioridad.value, "fecha_limite": task.fecha_limite, "radicado_id": task.radicado_id, "actuacion_id": task.actuacion_id} for task in tareas],
         "solicitudes_documento": [{"id": request.id, "titulo": request.titulo, "instrucciones": request.instrucciones, "fecha_limite": request.fecha_limite, "atendida_en": request.atendida_en, "created_at": request.created_at} for request in solicitudes],
-        "documentos": [{"id": document.id, "solicitud_id": document.solicitud_id, "nombre_archivo": document.nombre_archivo, "mime_type": document.mime_type, "estado_revision": document.estado_revision, "comentario_revision": document.comentario_revision, "created_at": document.created_at} for document in documentos],
+        "documentos": [{"id": document.id, "solicitud_id": document.solicitud_id, "contrato_id": document.contrato_id, "nombre_archivo": document.nombre_archivo, "mime_type": document.mime_type, "estado_revision": document.estado_revision, "comentario_revision": document.comentario_revision, "created_at": document.created_at} for document in documentos],
+        "contratos": [{"id": contract.id, "estado": contract.estado, "version_actual": contract.version_actual, "firmado_en": contract.firmado_en, "documento_firmado": ({"id": signed.id, "nombre_archivo": signed.nombre_archivo, "mime_type": signed.mime_type, "created_at": signed.created_at} if (signed := db.query(models.DocumentoProceso).filter_by(contrato_id=contract.id).order_by(models.DocumentoProceso.created_at.desc()).first()) else None)} for contract in db.query(models.ContratoServicio).filter(models.ContratoServicio.proceso_id == proceso.id, models.ContratoServicio.cliente_id == usuario.id, models.ContratoServicio.estado.in_({"FIRMADO", "TERMINADO"})).order_by(models.ContratoServicio.firmado_en.desc()).all() if db.query(models.DocumentoProceso.id).filter_by(contrato_id=contract.id).first()],
         "eventos": [{"id": event.id, "titulo": event.titulo, "descripcion": event.descripcion, "tipo": event.tipo, "estado": event.estado, "fecha_inicio": event.fecha_inicio, "fecha_fin": event.fecha_fin} for event in eventos],
         "comunicaciones": [{"id": message.id, "asunto": message.asunto, "contenido": message.contenido, "remitente": message.actor.nombre_completo if message.actor else "Despacho", "es_mio": message.actor_id == usuario.id, "leido_en": message.leido_en, "created_at": message.created_at} for message in comunicaciones],
         "timeline": _timeline_cliente_visible(proceso, db, usuario.id),

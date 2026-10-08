@@ -1,6 +1,7 @@
 import os
 import re
 import smtplib
+import hashlib
 from uuid import uuid4
 from urllib.error import HTTPError, URLError
 from urllib.parse import urljoin, urlsplit
@@ -1858,7 +1859,7 @@ def _fecha_agenda_utc(value: datetime) -> datetime:
     return value.astimezone(timezone.utc).replace(tzinfo=None)
 
 
-def _validar_vinculos_evento_agenda(db: Session, responsable_id: int | None, proceso_id: int | None, cliente_id: int | None):
+def _validar_vinculos_evento_agenda(db: Session, responsable_id: int | None, proceso_id: int | None, cliente_id: int | None, tipo: str = "EVENTO", contrato_id: int | None = None, actor: models.Usuario | None = None):
     if responsable_id is not None:
         responsable = db.query(models.Usuario).filter_by(id=responsable_id, estado=models.EstadoUsuario.ACTIVO).first()
         if not responsable or responsable.rol not in (models.RolUsuario.ABOGADO_ADMIN, models.RolUsuario.ADMIN):
@@ -1872,6 +1873,26 @@ def _validar_vinculos_evento_agenda(db: Session, responsable_id: int | None, pro
         cliente = db.query(models.Usuario).filter_by(id=cliente_id, rol=models.RolUsuario.CLIENTE, estado=models.EstadoUsuario.ACTIVO).first()
         if not cliente or (proceso and not db.query(models.ProcesoCliente).filter_by(proceso_id=proceso.id, cliente_id=cliente.id).first()):
             raise HTTPException(status_code=400, detail="El cliente no está asignado al proceso seleccionado.")
+    if tipo == "FIRMA_CONTRATO":
+        if contrato_id is None or proceso is None or cliente_id is None:
+            raise HTTPException(status_code=400, detail="La firma debe vincularse a contrato, expediente y cliente.")
+        contract = db.query(models.ContratoServicio).filter_by(id=contrato_id, proceso_id=proceso.id).with_for_update().first()
+        if not contract or contract.cliente_id != cliente_id or contract.estado not in {"LISTO_PARA_FIRMA", "EN_FIRMA"}:
+            raise HTTPException(status_code=400, detail="El contrato no está listo para firma en el expediente y cliente seleccionados.")
+        if contract.estado == "LISTO_PARA_FIRMA":
+            contract.estado = "EN_FIRMA"
+            version_number = max([version.version for version in contract.versiones] or [contract.version_actual]) + 1
+            contract.version_actual = version_number
+            db.add(models.ContratoServicioVersion(
+                contrato_id=contract.id, version=version_number, estado="EN_FIRMA",
+                contenido=contract.contenido_actual, parte_cliente_snapshot=contract.parte_cliente_snapshot,
+                hash_sha256=hashlib.sha256(contract.contenido_actual.encode("utf-8")).hexdigest(),
+                creado_por_id=actor.id if actor else None,
+            ))
+            if actor:
+                registrar_evento_auditoria(db, actor, "contrato.estado", "contrato_servicio", contract.id, {"estado": "EN_FIRMA", "origen": "evento_agenda"})
+    elif contrato_id is not None:
+        raise HTTPException(status_code=400, detail="Solo los eventos de firma pueden asociarse a un contrato.")
 
 
 @router.get("/agenda/eventos")
@@ -1909,12 +1930,13 @@ def listar_eventos_agenda_admin(
         "responsable": event.responsable.nombre_completo if event.responsable else None,
         "proceso_id": event.proceso_id, "proceso": event.proceso.nombre if event.proceso else None,
         "cliente_id": event.cliente_id, "cliente": event.cliente.nombre_completo if event.cliente else None,
+        "contrato_id": event.contrato_id,
     } for event in eventos]
 
 
 @router.post("/agenda/eventos", status_code=status.HTTP_201_CREATED)
 def crear_evento_agenda_admin(datos: schemas.EventoAgendaCreate, db: Session = Depends(get_db), admin: models.Usuario = Depends(verificar_admin)):
-    _validar_vinculos_evento_agenda(db, datos.responsable_id, datos.proceso_id, datos.cliente_id)
+    _validar_vinculos_evento_agenda(db, datos.responsable_id, datos.proceso_id, datos.cliente_id, datos.tipo, datos.contrato_id, admin)
     inicio = _fecha_agenda_utc(datos.fecha_inicio)
     fin = _fecha_agenda_utc(datos.fecha_fin) if datos.fecha_fin else None
     if fin and fin < inicio:
@@ -1923,7 +1945,7 @@ def crear_evento_agenda_admin(datos: schemas.EventoAgendaCreate, db: Session = D
         titulo=datos.titulo.strip(), descripcion=datos.descripcion, tipo=datos.tipo,
         estado=datos.estado, fecha_inicio=inicio, fecha_fin=fin,
         responsable_id=datos.responsable_id, proceso_id=datos.proceso_id,
-        cliente_id=datos.cliente_id, creado_por_id=admin.id,
+        cliente_id=datos.cliente_id, contrato_id=datos.contrato_id, creado_por_id=admin.id,
     )
     db.add(evento)
     db.flush()
@@ -1937,12 +1959,12 @@ def actualizar_evento_agenda_admin(evento_id: int, datos: schemas.EventoAgendaUp
     evento = db.query(models.EventoAgenda).filter_by(id=evento_id).first()
     if not evento:
         raise HTTPException(status_code=404, detail="El evento no existe.")
-    _validar_vinculos_evento_agenda(db, datos.responsable_id, datos.proceso_id, datos.cliente_id)
+    _validar_vinculos_evento_agenda(db, datos.responsable_id, datos.proceso_id, datos.cliente_id, datos.tipo, datos.contrato_id, admin)
     inicio = _fecha_agenda_utc(datos.fecha_inicio)
     fin = _fecha_agenda_utc(datos.fecha_fin) if datos.fecha_fin else None
     if fin and fin < inicio:
         raise HTTPException(status_code=400, detail="La fecha de finalización debe ser posterior al inicio.")
-    for key in ("titulo", "descripcion", "tipo", "estado", "responsable_id", "proceso_id", "cliente_id"):
+    for key in ("titulo", "descripcion", "tipo", "estado", "responsable_id", "proceso_id", "cliente_id", "contrato_id"):
         setattr(evento, key, getattr(datos, key))
     evento.fecha_inicio = inicio
     evento.fecha_fin = fin

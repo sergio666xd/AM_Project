@@ -2,6 +2,7 @@
 
 import { apiRequest } from "@/lib/api";
 import { iniciarWorkflowConsultaRadicado } from "@/lib/api";
+import ProcessContracts from "@/components/contracts/ProcessContracts";
 
 import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
@@ -54,7 +55,8 @@ type Process = {
   abogados_disponibles: { id: number; nombre_completo: string }[];
   clientes: Client[];
   radicados: Radicado[];
-  eventos: { id: number; titulo: string; descripcion?: string | null; tipo: "EVENTO" | "AUDIENCIA" | "REUNION"; estado: "PROGRAMADO" | "COMPLETADO" | "CANCELADO"; fecha_inicio: string; fecha_fin?: string | null; cliente_id?: number | null; cliente?: string | null }[];
+  eventos: { id: number; titulo: string; descripcion?: string | null; tipo: "EVENTO" | "AUDIENCIA" | "REUNION" | "FIRMA_CONTRATO"; estado: "PROGRAMADO" | "COMPLETADO" | "CANCELADO"; fecha_inicio: string; fecha_fin?: string | null; cliente_id?: number | null; cliente?: string | null; contrato_id?: number | null }[];
+  contratos: { id: number; cliente_id: number; cliente: string; estado: string; version_actual: number; emitido_en?: string | null; firmado_en?: string | null; terminado_en?: string | null; documento_firmado: { id: number; nombre_archivo: string; mime_type: string; created_at: string } | null }[];
   tareas: {
     id: number;
     titulo: string;
@@ -148,10 +150,11 @@ export default function ProcesoDetallePage() {
   const [communicationClientId, setCommunicationClientId] = useState("");
   const [agendaTitle, setAgendaTitle] = useState("");
   const [agendaDescription, setAgendaDescription] = useState("");
-  const [agendaType, setAgendaType] = useState<"EVENTO" | "AUDIENCIA" | "REUNION">("AUDIENCIA");
+  const [agendaType, setAgendaType] = useState<"EVENTO" | "AUDIENCIA" | "REUNION" | "FIRMA_CONTRATO">("AUDIENCIA");
   const [agendaStatus, setAgendaStatus] = useState<"PROGRAMADO" | "COMPLETADO" | "CANCELADO">("PROGRAMADO");
   const [agendaDate, setAgendaDate] = useState("");
   const [agendaClientId, setAgendaClientId] = useState("");
+  const [agendaContractId, setAgendaContractId] = useState("");
   const [editingAgendaId, setEditingAgendaId] = useState<number | null>(null);
   const [selectedColleagueId, setSelectedColleagueId] = useState("");
   const [selectedColleagueVisible, setSelectedColleagueVisible] = useState(false);
@@ -426,6 +429,7 @@ export default function ProcesoDetallePage() {
       titulo: agendaTitle.trim(), descripcion: agendaDescription.trim() || null, tipo: agendaType, estado: agendaStatus,
       fecha_inicio: new Date(agendaDate).toISOString(), fecha_fin: null, proceso_id: Number(id),
       cliente_id: agendaClientId ? Number(agendaClientId) : null,
+      contrato_id: agendaType === "FIRMA_CONTRATO" && agendaContractId ? Number(agendaContractId) : null,
     });
     if (ok) { setShowAgendaModal(false); setEditingAgendaId(null); }
   }
@@ -434,6 +438,7 @@ export default function ProcesoDetallePage() {
     setEditingAgendaId(event?.id ?? null);
     setAgendaTitle(event?.titulo ?? ""); setAgendaDescription(event?.descripcion ?? ""); setAgendaType(event?.tipo ?? "AUDIENCIA");
     setAgendaStatus(event?.estado ?? "PROGRAMADO");
+    setAgendaContractId(event?.contrato_id ? String(event.contrato_id) : "");
     if (event) { const date = new Date(event.fecha_inicio); date.setMinutes(date.getMinutes() - date.getTimezoneOffset()); setAgendaDate(date.toISOString().slice(0, 16)); }
     else { const date = new Date(); date.setMinutes(date.getMinutes() - date.getTimezoneOffset()); setAgendaDate(date.toISOString().slice(0, 16)); }
     setAgendaClientId(event?.cliente_id ? String(event.cliente_id) : ""); setShowAgendaModal(true);
@@ -516,6 +521,7 @@ export default function ProcesoDetallePage() {
     { id: "agenda", label: "Agenda" },
     { id: "tareas", label: "Tareas" },
     { id: "documentos", label: "Documentos" },
+    { id: "contratos", label: "Contratos" },
     { id: "actividad", label: "Actividad" },
     { id: "comunicaciones", label: "Comunicaciones" },
     ...(process?.admite_colaboradores ? [{ id: "equipo", label: "Equipo" }] : []),
@@ -1062,6 +1068,11 @@ export default function ProcesoDetallePage() {
           </div>
         </section>
 
+        {/* CONTRATOS */}
+        <section id="panel-contratos" role="tabpanel" aria-labelledby="tab-contratos" style={{ display: activeTab === "contratos" ? undefined : "none" }} className="scroll-mt-20 rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-4">
+          <ProcessContracts processId={process.id} clients={process.clientes} onChange={load} />
+        </section>
+
         {/* NOTIFICACIONES */}
         <section id="panel-comunicaciones" role="tabpanel" aria-labelledby="tab-comunicaciones" style={{ display: activeTab === "comunicaciones" ? undefined : "none" }} className="scroll-mt-20 rounded-2xl border border-[var(--border)] bg-[var(--surface)]">
           <div className="border-b border-[var(--border)] px-5 py-4">
@@ -1139,7 +1150,7 @@ export default function ProcesoDetallePage() {
         </section>
       </div>
 
-      {showAgendaModal && <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"><form onSubmit={(event) => void saveAgendaEvent(event)} className="max-h-[92vh] w-full max-w-xl space-y-4 overflow-y-auto rounded-xl border border-[var(--border)] bg-[var(--surface)] p-5 shadow-2xl"><header className="flex items-start justify-between gap-3"><div><h2 className="text-lg font-semibold">{editingAgendaId ? "Editar actividad" : "Agendar en este proceso"}</h2><p className="mt-1 text-sm text-[var(--foreground-muted)]">La actividad queda vinculada a {process.nombre}.</p></div><button type="button" onClick={() => setShowAgendaModal(false)} aria-label="Cerrar" className="rounded-md p-1 hover:bg-[var(--surface-secondary)]"><X className="size-5" /></button></header><label className="block text-sm font-medium">Título<input required maxLength={255} value={agendaTitle} onChange={(event) => setAgendaTitle(event.target.value)} className="mt-1 w-full rounded-lg border border-[var(--border)] bg-[var(--surface-secondary)] px-3 py-2.5" /></label><div className="grid gap-3 sm:grid-cols-2"><label className="block text-sm font-medium">Tipo<select value={agendaType} onChange={(event) => setAgendaType(event.target.value as typeof agendaType)} className="mt-1 w-full rounded-lg border border-[var(--border)] bg-[var(--surface-secondary)] px-3 py-2.5"><option value="AUDIENCIA">Audiencia</option><option value="REUNION">Reunión</option><option value="EVENTO">Evento</option></select></label><label className="block text-sm font-medium">Estado<select value={agendaStatus} onChange={(event) => setAgendaStatus(event.target.value as typeof agendaStatus)} className="mt-1 w-full rounded-lg border border-[var(--border)] bg-[var(--surface-secondary)] px-3 py-2.5"><option value="PROGRAMADO">Programado</option><option value="COMPLETADO">Completado</option><option value="CANCELADO">Cancelado</option></select></label></div><label className="block text-sm font-medium">Fecha y hora<input required type="datetime-local" value={agendaDate} onChange={(event) => setAgendaDate(event.target.value)} className="mt-1 w-full rounded-lg border border-[var(--border)] bg-[var(--surface-secondary)] px-3 py-2.5" /></label><label className="block text-sm font-medium">Cliente (opcional)<select value={agendaClientId} onChange={(event) => setAgendaClientId(event.target.value)} className="mt-1 w-full rounded-lg border border-[var(--border)] bg-[var(--surface-secondary)] px-3 py-2.5"><option value="">Solo equipo interno</option>{process.clientes.map((client) => <option key={client.id} value={client.id}>{client.nombre_completo}</option>)}</select></label><label className="block text-sm font-medium">Descripción<textarea rows={3} maxLength={4000} value={agendaDescription} onChange={(event) => setAgendaDescription(event.target.value)} className="mt-1 w-full rounded-lg border border-[var(--border)] bg-[var(--surface-secondary)] px-3 py-2.5" /></label><div className="flex justify-end gap-2 border-t border-[var(--border)] pt-4"><button type="button" disabled={working} onClick={() => setShowAgendaModal(false)} className="rounded-lg border border-[var(--border)] px-4 py-2 text-sm">Cancelar</button><button type="submit" disabled={working || !agendaTitle.trim() || !agendaDate} className="rounded-lg bg-[var(--primary)] px-4 py-2 text-sm font-semibold text-white disabled:opacity-50">Guardar actividad</button></div></form></div>}
+      {showAgendaModal && <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"><form onSubmit={(event) => void saveAgendaEvent(event)} className="max-h-[92vh] w-full max-w-xl space-y-4 overflow-y-auto rounded-xl border border-[var(--border)] bg-[var(--surface)] p-5 shadow-2xl"><header className="flex items-start justify-between gap-3"><div><h2 className="text-lg font-semibold">{editingAgendaId ? "Editar actividad" : "Agendar en este proceso"}</h2><p className="mt-1 text-sm text-[var(--foreground-muted)]">La actividad queda vinculada a {process.nombre}.</p></div><button type="button" onClick={() => setShowAgendaModal(false)} aria-label="Cerrar" className="rounded-md p-1 hover:bg-[var(--surface-secondary)]"><X className="size-5" /></button></header><label className="block text-sm font-medium">Título<input required maxLength={255} value={agendaTitle} onChange={(event) => setAgendaTitle(event.target.value)} className="mt-1 w-full rounded-lg border border-[var(--border)] bg-[var(--surface-secondary)] px-3 py-2.5" /></label><div className="grid gap-3 sm:grid-cols-2"><label className="block text-sm font-medium">Tipo<select value={agendaType} onChange={(event) => setAgendaType(event.target.value as typeof agendaType)} className="mt-1 w-full rounded-lg border border-[var(--border)] bg-[var(--surface-secondary)] px-3 py-2.5"><option value="AUDIENCIA">Audiencia</option><option value="REUNION">Reunión</option><option value="FIRMA_CONTRATO">Firma de contrato</option><option value="EVENTO">Evento</option></select></label><label className="block text-sm font-medium">Estado<select value={agendaStatus} onChange={(event) => setAgendaStatus(event.target.value as typeof agendaStatus)} className="mt-1 w-full rounded-lg border border-[var(--border)] bg-[var(--surface-secondary)] px-3 py-2.5"><option value="PROGRAMADO">Programado</option><option value="COMPLETADO">Completado</option><option value="CANCELADO">Cancelado</option></select></label></div><label className="block text-sm font-medium">Fecha y hora<input required type="datetime-local" value={agendaDate} onChange={(event) => setAgendaDate(event.target.value)} className="mt-1 w-full rounded-lg border border-[var(--border)] bg-[var(--surface-secondary)] px-3 py-2.5" /></label><label className="block text-sm font-medium">Cliente (opcional)<select value={agendaClientId} onChange={(event) => setAgendaClientId(event.target.value)} className="mt-1 w-full rounded-lg border border-[var(--border)] bg-[var(--surface-secondary)] px-3 py-2.5"><option value="">Solo equipo interno</option>{process.clientes.map((client) => <option key={client.id} value={client.id}>{client.nombre_completo}</option>)}</select></label>{agendaType === "FIRMA_CONTRATO" && <label className="block text-sm font-medium">Contrato<select required value={agendaContractId} onChange={(event) => setAgendaContractId(event.target.value)} className="mt-1 w-full rounded-lg border border-[var(--border)] bg-[var(--surface-secondary)] px-3 py-2.5"><option value="">Selecciona contrato listo para firma</option>{process.contratos.filter((contract) => ["LISTO_PARA_FIRMA", "EN_FIRMA"].includes(contract.estado)).map((contract) => <option key={contract.id} value={contract.id}>Contrato #{contract.id} · {contract.cliente} · {contract.estado}</option>)}</select><span className="mt-1 block text-xs text-[var(--foreground-muted)]">El cliente debe ser el mismo que figura en el contrato.</span></label>}<label className="block text-sm font-medium">Descripción<textarea rows={3} maxLength={4000} value={agendaDescription} onChange={(event) => setAgendaDescription(event.target.value)} className="mt-1 w-full rounded-lg border border-[var(--border)] bg-[var(--surface-secondary)] px-3 py-2.5" /></label><div className="flex justify-end gap-2 border-t border-[var(--border)] pt-4"><button type="button" disabled={working} onClick={() => setShowAgendaModal(false)} className="rounded-lg border border-[var(--border)] px-4 py-2 text-sm">Cancelar</button><button type="submit" disabled={working || !agendaTitle.trim() || !agendaDate || (agendaType === "FIRMA_CONTRATO" && (!agendaContractId || !agendaClientId))} className="rounded-lg bg-[var(--primary)] px-4 py-2 text-sm font-semibold text-white disabled:opacity-50">Guardar actividad</button></div></form></div>}
 
       {showDocumentRequestModal && (
         <div role="dialog" aria-modal="true" aria-labelledby="document-request-title" className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm">

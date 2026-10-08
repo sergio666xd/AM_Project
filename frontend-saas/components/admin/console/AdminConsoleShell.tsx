@@ -131,6 +131,11 @@ const sections: Section[] = [
         icon: BookOpenText,
       },
       {
+        label: "Contratos",
+        href: "/gestion-procesos/admin/contratos",
+        icon: FileText,
+      },
+      {
         label: "Configuración de firma",
         href: "/gestion-procesos/admin/firma",
         icon: Settings,

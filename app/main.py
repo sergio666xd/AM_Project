@@ -23,7 +23,7 @@ from app.email_service import enviar_correo
 from app.site_content import PUBLIC_CONTENT_PAGES, PUBLIC_PAGE_ROUTES
 from app.routers import admin
 from app.security import obtener_usuario_actual
-from app.routers import admin, tareas, expedientes, workflows
+from app.routers import admin, tareas, expedientes, workflows, contratos
 from app.radicados import (
     iniciar_consulta_nuevo_radicado,
     obtener_o_vincular_radicado,
@@ -111,6 +111,8 @@ def actualizar_esquema_planes() -> None:
         conexion.execute(text("ALTER TABLE documentos_proceso ALTER COLUMN solicitud_id DROP NOT NULL"))
         conexion.execute(text("ALTER TABLE solicitudes_documento ADD COLUMN IF NOT EXISTS fecha_limite TIMESTAMP"))
         conexion.execute(text("ALTER TABLE comunicaciones_proceso ADD COLUMN IF NOT EXISTS leido_en TIMESTAMP"))
+        conexion.execute(text("ALTER TABLE eventos_agenda ADD COLUMN IF NOT EXISTS contrato_id INTEGER REFERENCES contratos_servicios(id) ON DELETE SET NULL"))
+        conexion.execute(text("ALTER TABLE documentos_proceso ADD COLUMN IF NOT EXISTS contrato_id INTEGER REFERENCES contratos_servicios(id) ON DELETE SET NULL"))
 
 ALLOWED_CARD_TYPES = {"application/pdf", "image/jpeg", "image/png"}
 ALLOWED_CARD_EXTENSIONS = {".pdf", ".jpg", ".jpeg", ".png"}
@@ -141,6 +143,7 @@ app.include_router(admin.router)
 app.include_router(tareas.router)
 app.include_router(expedientes.router)
 app.include_router(workflows.router)
+app.include_router(contratos.router)
 
 
 def get_cors_origins() -> list[str]:
