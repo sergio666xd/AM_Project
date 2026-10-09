@@ -262,12 +262,19 @@ def crear_datos_iniciales():
     """Aplica compatibilidad y siembra planes SaaS solo si aún no existen."""
     actualizar_esquema_planes()
     ruta_plantillas = Path(__file__).resolve().parents[1] / "migrations" / "2026_10_10_mensajes_configurables.sql"
-    if not ruta_plantillas.is_file():
-        raise RuntimeError("No se encontró la migración de plantillas de mensajes.")
-    with engine.begin() as conexion:
+    try:
+        if not ruta_plantillas.is_file():
+            raise FileNotFoundError(f"No se encontró la migración de plantillas: {ruta_plantillas}")
         ddl, datos_plantillas = ruta_plantillas.read_text(encoding="utf-8").split("\n\n", maxsplit=1)
-        conexion.exec_driver_sql(ddl)
-        conexion.exec_driver_sql(datos_plantillas)
+        with engine.begin() as conexion:
+            conexion.exec_driver_sql(ddl)
+            conexion.exec_driver_sql(datos_plantillas)
+    except Exception:
+        # A fallida message-template migration must not take down authentication
+        # and the rest of the API during startup.
+        logging.getLogger(__name__).exception(
+            "No se pudieron preparar las plantillas de mensajes; la API continuará iniciando."
+        )
     db = next(get_db())
     try:
         if not db.query(models.Plan).first():
