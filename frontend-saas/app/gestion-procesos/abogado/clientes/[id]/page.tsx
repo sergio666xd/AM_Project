@@ -30,6 +30,8 @@ type Client = {
   email: string;
   whatsapp_numero: string;
   canal_notificacion_cliente?: "EMAIL" | "WHATSAPP" | null;
+  notificaciones_email?: boolean;
+  notificaciones_whatsapp?: boolean;
   estado_relacion: "ACTIVO" | "SIN_PROCESOS";
   ultimo_contacto?: string | null;
   procesos: {
@@ -568,7 +570,7 @@ export default function ClienteDetalle() {
                       <p className="mt-1 text-sm text-[var(--foreground-secondary)]">{item.descripcion}</p>
                       <p className="mt-1 text-xs text-[var(--foreground-muted)]">{item.proceso || "Cliente"}{item.actor ? ` · ${item.actor}` : ""} · {item.visibilidad === "CLIENTE" ? "Visible al cliente" : "Uso interno"}</p>
                     </div>
-                    {item.proceso_id && <Link href={`/gestion-procesos/abogado/procesos/${item.proceso_id}#actividad`} className="shrink-0 text-xs font-medium text-[var(--primary)] hover:underline">Abrir proceso</Link>}
+                    {item.proceso_id && <Link href={`/gestion-procesos/abogado/procesos/${item.proceso_id}/actividad`} className="shrink-0 text-xs font-medium text-[var(--primary)] hover:underline">Abrir proceso</Link>}
                   </div>
                 ))}
               </div>
@@ -691,14 +693,10 @@ export default function ClienteDetalle() {
 
             <div className="p-5">
               <p className="text-sm text-[var(--foreground-muted)]">
-                Canal obligatorio elegido por el cliente
+                Canales elegidos por el cliente
               </p>
               <p className="mt-2 font-medium text-[var(--foreground)]">
-                {client.canal_notificacion_cliente === "WHATSAPP"
-                  ? `WhatsApp · ${client.whatsapp_numero || "sin número configurado"}`
-                  : client.canal_notificacion_cliente === "EMAIL"
-                    ? `Correo · ${client.email}`
-                    : "Sin canal configurado"}
+                {[client.notificaciones_email && `Correo · ${client.email}`, client.notificaciones_whatsapp && `WhatsApp · ${client.whatsapp_numero || "sin número configurado"}`].filter(Boolean).join(" y ") || "Sin canal configurado"}
               </p>
             </div>
           </section>
@@ -799,5 +797,6 @@ function formatDate(value: string) {
 
   return new Intl.DateTimeFormat("es-CO", {
     dateStyle: "medium",
+    timeZone: "America/Bogota",
   }).format(date);
 }

@@ -20,6 +20,8 @@ type Request = {
 	proceso: string;
 	titulo: string;
 	instrucciones?: string | null;
+	estado: string;
+	documentos_requeridos: { id: string; nombre: string; estado: string; documento?: { id: number; nombre_archivo: string; comentario_revision?: string | null } | null }[];
 	atendida_en?: string | null;
 	created_at: string;
 };
@@ -51,7 +53,7 @@ async function fetchDocuments(token: string): Promise<DocumentsData> {
 export default function DocumentosClientePage() {
 	const { token, loading: sessionLoading } = useSession();
 	const [data, setData] = useState<DocumentsData>({ solicitudes: [], documentos: [] });
-	const [files, setFiles] = useState<Record<number, File | null>>({});
+	const [files, setFiles] = useState<Record<string, File | null>>({});
 	const [loading, setLoading] = useState(true);
 	const [workingId, setWorkingId] = useState<number | null>(null);
 	const [downloadingId, setDownloadingId] = useState<number | null>(null);
@@ -82,24 +84,25 @@ export default function DocumentosClientePage() {
 		}
 	}
 
-	function selectFile(requestId: number, event: ChangeEvent<HTMLInputElement>) {
+	function selectFile(fileKey: string, event: ChangeEvent<HTMLInputElement>) {
 		const file = event.target.files?.[0] ?? null;
 		setError("");
 		if (file && !ALLOWED_TYPES.has(file.type)) {
-			setFiles((current) => ({ ...current, [requestId]: null }));
+			setFiles((current) => ({ ...current, [fileKey]: null }));
 			setError("El archivo debe ser PDF, JPG, PNG o DOCX.");
 			return;
 		}
 		if (file && file.size > MAX_FILE_SIZE) {
-			setFiles((current) => ({ ...current, [requestId]: null }));
+			setFiles((current) => ({ ...current, [fileKey]: null }));
 			setError("El archivo no puede superar 15 MB.");
 			return;
 		}
-		setFiles((current) => ({ ...current, [requestId]: file }));
+		setFiles((current) => ({ ...current, [fileKey]: file }));
 	}
 
-	async function upload(requestId: number) {
-		const file = files[requestId];
+	async function upload(requestId: number, itemId: string) {
+		const fileKey = `${requestId}:${itemId}`;
+		const file = files[fileKey];
 		if (!token || !file) return;
 		setWorkingId(requestId);
 		setError("");
@@ -107,6 +110,7 @@ export default function DocumentosClientePage() {
 		try {
 			const form = new FormData();
 			form.append("archivo", file);
+			form.append("item_id", itemId);
 			const response = await apiRequest(`/api/expedientes/solicitudes-documento/${requestId}/archivo`, {
 				method: "POST",
 				headers: { Authorization: `Bearer ${token}` },
@@ -114,7 +118,7 @@ export default function DocumentosClientePage() {
 			});
 			const result: { detail?: string } = await response.json().catch(() => ({}));
 			if (!response.ok) throw new Error(result.detail || "No fue posible cargar el documento.");
-			setFiles((current) => ({ ...current, [requestId]: null }));
+			setFiles((current) => ({ ...current, [fileKey]: null }));
 			setNotice("Documento entregado correctamente.");
 			await reload();
 		} catch (cause) {
@@ -190,6 +194,8 @@ export default function DocumentosClientePage() {
 	];
 	const contractDocuments = data.documentos.filter((document) => Boolean(document.contrato_id));
 	const uploadedDocuments = data.documentos.filter((document) => !document.contrato_id);
+	const requestStatusLabel: Record<string, string> = { FALTAN_DOCUMENTOS: "Faltan documentos", DOCUMENTOS_SUMINISTRADOS: "Documentos suministrados", EN_REVISION: "En revisión", RECHAZADO: "Rechazado", APROBADO: "Aprobado" };
+	const itemStatusLabel: Record<string, string> = { FALTANTE: "Pendiente", RECIBIDO: "Recibido", EN_REVISION: "En revisión", REQUIERE_CORRECCION: "Rechazado · requiere reemplazo", RECHAZADO: "Rechazado", APROBADO: "Aprobado" };
 
 	return (
 		<section className="mx-auto max-w-5xl space-y-6">
@@ -208,29 +214,20 @@ export default function DocumentosClientePage() {
 			{notice && <div role="status" className="flex items-center gap-2 rounded-lg border border-emerald-700/20 bg-surface p-4 text-sm text-emerald-700"><CheckCircle2 className="size-4 shrink-0" />{notice}</div>}
 
 			{loading || sessionLoading ? <div className="flex min-h-40 items-center justify-center gap-3 text-sm text-(--foreground-muted)"><RefreshCw className="size-5 animate-spin" />Cargando documentos...</div> : <>
-				<section className="space-y-3">
-					<div><h2 className="font-semibold text-foreground">Solicitudes pendientes</h2><p className="mt-1 text-sm text-(--foreground-muted)">Entrega los archivos solicitados por tu abogado.</p></div>
-					{data.solicitudes.filter((item) => !item.atendida_en).length ? data.solicitudes.filter((item) => !item.atendida_en).map((request) => (
+								<section className="space-y-3">
+					<div><h2 className="font-semibold text-foreground">Solicitudes de documentos</h2><p className="mt-1 text-sm text-(--foreground-muted)">Carga cada archivo solicitado y consulta el estado individual de su revisión.</p></div>
+					{data.solicitudes.length ? data.solicitudes.map((request) => (
 						<article id={`solicitud-${request.id}`} key={request.id} className="rounded-lg border border-border bg-surface p-4 sm:p-5">
-							<div className="flex flex-wrap items-start justify-between gap-3">
-								<div><p className="text-xs text-(--foreground-muted)">{request.proceso}</p><h3 className="mt-1 font-medium text-foreground">{request.titulo}</h3>{request.instrucciones && <p className="mt-1 text-sm text-(--foreground-muted)">{request.instrucciones}</p>}</div>
-								<span className="rounded-md bg-amber-500/10 px-2.5 py-1 text-xs text-amber-700">Pendiente</span>
-							</div>
-							<div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center">
-								<label className="flex-1 text-sm"><span className="sr-only">Archivo para {request.titulo}</span><input type="file" accept=".pdf,.jpg,.jpeg,.png,.docx,application/pdf,image/jpeg,image/png,application/vnd.openxmlformats-officedocument.wordprocessingml.document" onChange={(event) => selectFile(request.id, event)} className="block w-full text-sm text-(--foreground-muted) file:mr-3 file:rounded-md file:border file:border-border file:bg-surface-secondary file:px-3 file:py-2 file:text-sm file:font-medium file:text-foreground" /></label>
-								<button type="button" onClick={() => void upload(request.id)} disabled={!files[request.id] || workingId !== null} className="inline-flex items-center justify-center gap-2 rounded-lg bg-[var(--primary)] px-4 py-2.5 text-sm font-medium text-white disabled:cursor-not-allowed disabled:opacity-50"><Upload className="size-4" />{workingId === request.id ? "Entregando..." : "Entregar archivo"}</button>
+							<div className="flex flex-wrap items-start justify-between gap-3"><div><p className="text-xs text-(--foreground-muted)">{request.proceso}</p><h3 className="mt-1 font-medium text-foreground">{request.titulo}</h3>{request.instrucciones && <p className="mt-1 text-sm text-(--foreground-muted)">{request.instrucciones}</p>}</div><span className="rounded-md bg-amber-500/10 px-2.5 py-1 text-xs text-amber-700">{requestStatusLabel[request.estado] || request.estado}</span></div>
+							<div className="mt-4 divide-y divide-border rounded-md border border-border">
+								{request.documentos_requeridos.map((item) => { const fileKey = `${request.id}:${item.id}`; const canUpload = ["FALTANTE", "REQUIERE_CORRECCION"].includes(item.estado); return <div key={item.id} className="space-y-2 p-3"><div className="flex flex-wrap items-center justify-between gap-2"><div><p className="text-sm font-medium">{item.nombre}</p>{item.documento && <p className="text-xs text-(--foreground-muted)">Archivo: {item.documento.nombre_archivo}</p>}</div><span className="rounded bg-surface-secondary px-2 py-1 text-xs">{itemStatusLabel[item.estado] || item.estado}</span></div>{item.documento?.comentario_revision && <p className="text-sm text-amber-800">Observación: {item.documento.comentario_revision}</p>}{canUpload && <div className="flex flex-col gap-2 sm:flex-row sm:items-center"><label className="flex-1 text-sm"><span className="sr-only">Archivo para {item.nombre}</span><input type="file" accept=".pdf,.jpg,.jpeg,.png,.docx,application/pdf,image/jpeg,image/png,application/vnd.openxmlformats-officedocument.wordprocessingml.document" onChange={(event) => selectFile(fileKey, event)} className="block w-full text-sm text-(--foreground-muted) file:mr-3 file:rounded-md file:border file:border-border file:bg-surface-secondary file:px-3 file:py-2 file:text-sm file:font-medium file:text-foreground" /></label><button type="button" onClick={() => void upload(request.id, item.id)} disabled={!files[fileKey] || workingId !== null} className="inline-flex items-center justify-center gap-2 rounded-lg bg-[var(--primary)] px-4 py-2.5 text-sm font-medium text-white disabled:cursor-not-allowed disabled:opacity-50"><Upload className="size-4" />{workingId === request.id ? "Entregando..." : "Entregar archivo"}</button></div>}</div>; })}
 							</div>
 							<p className="mt-2 text-xs text-(--foreground-muted)">PDF, JPG, PNG o DOCX; máximo 15 MB.</p>
 						</article>
-					)) : <div className="rounded-lg border border-dashed border-border px-5 py-8 text-center text-sm text-(--foreground-muted)"><FileUp className="mx-auto mb-2 size-6" />No tienes solicitudes pendientes.</div>}
+					)) : <div className="rounded-lg border border-dashed border-border px-5 py-8 text-center text-sm text-(--foreground-muted)"><FileUp className="mx-auto mb-2 size-6" />No tienes solicitudes de documentos.</div>}
 				</section>
 
-				<section className="space-y-3">
-					<div><h2 className="font-semibold text-foreground">Documentos entregados</h2><p className="mt-1 text-sm text-(--foreground-muted)">Archivos asociados a tus procesos.</p></div>
-					{uploadedDocuments.length ? <div className="space-y-4">{documentGroups.map((group) => { const documents = uploadedDocuments.filter((document) => (document.estado_revision || "RECIBIDO") === group.key); return documents.length ? <section key={group.key} className="overflow-hidden rounded-lg border border-border bg-surface"><h3 className="border-b border-border px-4 py-3 text-sm font-semibold">{group.title} <span className="text-(--foreground-muted)">({documents.length})</span></h3>{documents.map((document, index) => <div key={document.id} className={`flex flex-wrap items-center justify-between gap-4 px-4 py-3 ${index ? "border-t border-border" : ""}`}><div className="flex min-w-0 items-center gap-3"><FileText className="size-5 shrink-0 text-[var(--primary)]" /><div className="min-w-0"><p className="truncate text-sm font-medium text-foreground">{document.nombre_archivo}</p><p className="mt-0.5 truncate text-xs text-(--foreground-muted)">{document.proceso} · {new Date(document.created_at).toLocaleDateString("es-CO")}</p>{document.comentario_revision && <p className="mt-1 text-sm text-amber-800">Comentario: {document.comentario_revision}</p>}</div></div><div className="flex gap-2"><Link href={`/gestion-procesos/cliente/documentos#solicitud-${document.solicitud_id}`} className="inline-flex items-center rounded-md border border-border px-3 py-2 text-sm hover:bg-surface-hover">{document.estado_revision === "REQUIERE_CORRECCION" ? "Reemplazar" : "Ver solicitud"}</Link><button type="button" onClick={() => void download(document)} disabled={downloadingId !== null} aria-label={`Descargar ${document.nombre_archivo}`} className="inline-flex items-center gap-2 rounded-md border border-border px-3 py-2 text-sm text-foreground hover:bg-surface-hover disabled:opacity-50">{downloadingId === document.id && documentAction === "download" ? <Loader2 className="size-4 animate-spin" /> : <Download className="size-4" />}{downloadingId === document.id && documentAction === "download" ? "Descargando…" : "Descargar"}</button></div></div>)}</section> : null; })}</div> : <div className="rounded-lg border border-dashed border-border px-5 py-8 text-center text-sm text-(--foreground-muted)"><FileText className="mx-auto mb-2 size-6" />Aún no has entregado documentos.</div>}
-				</section>
-
-				<section className="space-y-3"><div><h2 className="font-semibold text-foreground">Contratos firmados</h2><p className="mt-1 text-sm text-(--foreground-muted)">Documentos oficiales asociados a tus procesos.</p></div>{contractDocuments.length ? <div className="overflow-hidden rounded-lg border border-border bg-surface">{contractDocuments.map((document, index) => <article key={document.id} className={`flex flex-wrap items-center justify-between gap-4 px-4 py-3 ${index ? "border-t border-border" : ""}`}><div className="flex min-w-0 items-center gap-3"><FileText className="size-5 shrink-0 text-[var(--primary)]" /><div className="min-w-0"><p className="truncate text-sm font-medium text-foreground">{document.nombre_archivo}</p><p className="mt-1 truncate text-xs text-(--foreground-muted)">{document.proceso} · Contrato #{document.contrato_id} · {new Date(document.created_at).toLocaleDateString("es-CO")}</p></div></div><div className="flex gap-2"><button type="button" onClick={() => void preview(document)} disabled={downloadingId !== null} className="inline-flex items-center gap-2 rounded-md border border-border px-3 py-2 text-sm hover:bg-surface-hover disabled:opacity-50">{downloadingId === document.id && documentAction === "view" ? <><Loader2 className="size-4 animate-spin" />Abriendo…</> : "Ver PDF"}</button><button type="button" onClick={() => void download(document)} disabled={downloadingId !== null} className="inline-flex items-center gap-2 rounded-md border border-border px-3 py-2 text-sm hover:bg-surface-hover disabled:opacity-50">{downloadingId === document.id && documentAction === "download" ? <Loader2 className="size-4 animate-spin" /> : <Download className="size-4" />}{downloadingId === document.id && documentAction === "download" ? "Descargando…" : "Descargar"}</button></div></article>)}</div> : <div className="rounded-lg border border-dashed border-border px-5 py-8 text-center text-sm text-(--foreground-muted)"><FileText className="mx-auto mb-2 size-6" />Los contratos firmados de tus procesos aparecerán aquí.</div>}</section>
+				<section className="space-y-3"><div><h2 className="font-semibold text-foreground">Contratos firmados</h2><p className="mt-1 text-sm text-(--foreground-muted)">Documentos oficiales asociados a tus procesos.</p></div>{contractDocuments.length ? <div className="overflow-hidden rounded-lg border border-border bg-surface">{contractDocuments.map((document, index) => <article key={document.id} className={`flex flex-wrap items-center justify-between gap-4 px-4 py-3 ${index ? "border-t border-border" : ""}`}><div className="flex min-w-0 items-center gap-3"><FileText className="size-5 shrink-0 text-[var(--primary)]" /><div className="min-w-0"><p className="truncate text-sm font-medium text-foreground">{document.nombre_archivo}</p><p className="mt-1 truncate text-xs text-(--foreground-muted)">{document.proceso} · Contrato #{document.contrato_id} · {new Date(document.created_at).toLocaleDateString("es-CO", { timeZone: "America/Bogota" })}</p></div></div><div className="flex gap-2"><button type="button" onClick={() => void preview(document)} disabled={downloadingId !== null} className="inline-flex items-center gap-2 rounded-md border border-border px-3 py-2 text-sm hover:bg-surface-hover disabled:opacity-50">{downloadingId === document.id && documentAction === "view" ? <><Loader2 className="size-4 animate-spin" />Abriendo…</> : "Ver PDF"}</button><button type="button" onClick={() => void download(document)} disabled={downloadingId !== null} className="inline-flex items-center gap-2 rounded-md border border-border px-3 py-2 text-sm hover:bg-surface-hover disabled:opacity-50">{downloadingId === document.id && documentAction === "download" ? <Loader2 className="size-4 animate-spin" /> : <Download className="size-4" />}{downloadingId === document.id && documentAction === "download" ? "Descargando…" : "Descargar"}</button></div></article>)}</div> : <div className="rounded-lg border border-dashed border-border px-5 py-8 text-center text-sm text-(--foreground-muted)"><FileText className="mx-auto mb-2 size-6" />Los contratos firmados de tus procesos aparecerán aquí.</div>}</section>
 			</>}
 		</section>
 	);

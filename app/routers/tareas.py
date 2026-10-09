@@ -19,6 +19,7 @@ from app.notification_service import emitir_notificacion_workflow
 from app.notification_policy import plan_whatsapp_habilitado
 from app.reminder_workflow import iniciar_workflow_recordatorio, normalizar_utc_naive
 from app.workflow_service import public_site_url
+from app.timezone import format_colombia_datetime
 
 
 router = APIRouter(
@@ -81,8 +82,8 @@ def _crear_recordatorios_sistema(db: Session, tarea: models.Tarea) -> list[int]:
     if destinatario is None or destinatario.estado != models.EstadoUsuario.ACTIVO:
         return []
     if destinatario.rol == models.RolUsuario.CLIENTE:
-        email = destinatario.canal_notificacion_cliente == "EMAIL" and bool(destinatario.email)
-        whatsapp = destinatario.canal_notificacion_cliente == "WHATSAPP" and bool(destinatario.whatsapp_numero.strip())
+        email = bool(destinatario.notificaciones_email and destinatario.email)
+        whatsapp = bool(destinatario.notificaciones_whatsapp and destinatario.whatsapp_numero.strip())
     else:
         preferencias = (destinatario.preferencias_notificacion or {}).get("RECORDATORIOS", {})
         email = bool(preferencias.get("email", destinatario.notificaciones_email)) and bool(destinatario.email)
@@ -126,7 +127,7 @@ def _notificar_cambio_tarea(
         destinatarios.append(tarea.usuario)
     if not destinatarios:
         return
-    due = tarea.fecha_limite.strftime("%d/%m/%Y %H:%M UTC") if tarea.fecha_limite else "Sin fecha límite"
+    due = format_colombia_datetime(tarea.fecha_limite) if tarea.fecha_limite else "Sin fecha límite"
     process = tarea.proceso.nombre if tarea.proceso else "Tarea general"
     radicado = tarea.radicado.numero if tarea.radicado else "No asociado"
     actuacion = tarea.actuacion_rel.actuacion if tarea.actuacion_rel else "No asociada"
@@ -625,7 +626,7 @@ def actualizar_tarea(
         db.commit()
         _lanzar_recordatorios_pendientes(db, tarea, recordatorio_ids)
         db.refresh(tarea)
-        _notificar_cambio_tarea(db, tarea, usuario_actual, "cambió la fecha límite", f"Fecha anterior: {anterior.strftime('%d/%m/%Y %H:%M UTC') if anterior else 'Sin fecha'}. Nueva fecha: {nueva_fecha.strftime('%d/%m/%Y %H:%M UTC')}.")
+        _notificar_cambio_tarea(db, tarea, usuario_actual, "cambió la fecha límite", f"Fecha anterior: {format_colombia_datetime(anterior) if anterior else 'Sin fecha'}. Nueva fecha: {format_colombia_datetime(nueva_fecha)}.")
         return serializar_tarea_para_usuario(tarea, usuario_actual)
 
     estado_anterior = tarea.estado
@@ -680,7 +681,7 @@ def actualizar_tarea(
     cambios = []
     if datos.estado is not None: cambios.append(f"estado {datos.estado.value}")
     if datos.prioridad is not None: cambios.append(f"prioridad {datos.prioridad.value}")
-    if fecha_cambio: cambios.append(f"vencimiento actualizado desde {fecha_anterior.strftime('%d/%m/%Y %H:%M UTC') if fecha_anterior else 'sin fecha'}")
+    if fecha_cambio: cambios.append(f"vencimiento actualizado desde {format_colombia_datetime(fecha_anterior) if fecha_anterior else 'sin fecha'}")
     _notificar_cambio_tarea(db, tarea, usuario_actual, "actualizó la tarea", "; ".join(cambios) or "Se actualizaron sus datos.")
     return serializar_tarea_para_usuario(tarea, usuario_actual)
 

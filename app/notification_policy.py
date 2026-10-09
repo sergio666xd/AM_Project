@@ -97,12 +97,12 @@ def canales_habilitados(
         return ()
 
     if usuario.rol == models.RolUsuario.CLIENTE:
-        canal = usuario.canal_notificacion_cliente
-        if canal == "EMAIL" and usuario.email:
-            return ("EMAIL",)
-        if canal == "WHATSAPP" and usuario.whatsapp_numero.strip():
-            return ("WHATSAPP",)
-        return ()
+        resultado = []
+        if usuario.notificaciones_email and usuario.email:
+            resultado.append("EMAIL")
+        if usuario.notificaciones_whatsapp and whatsapp_habilitado(usuario):
+            resultado.append("WHATSAPP")
+        return tuple(resultado)
 
     preferencias = usuario.preferencias_notificacion or {}
     canales = preferencias.get(tipo)

@@ -2,7 +2,7 @@
 
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { KeyRound, Pencil, Plus, RefreshCw, Search, Trash2, X } from "lucide-react";
+import { KeyRound, Mail, Pencil, Plus, RefreshCw, Search, Trash2, X } from "lucide-react";
 import { fetchApi } from "@/lib/api";
 
 type Role = "ABOGADO_ADMIN" | "ABOGADO" | "CLIENTE" | "ADMIN";
@@ -288,6 +288,21 @@ export default function AdminUsersPage() {
     }
   }
 
+  async function sendPasswordReset(user: User) {
+    if (!window.confirm(`¿Enviar a ${user.email} un enlace para restablecer su contraseña?`)) return;
+    setWorking(true);
+    setError("");
+    setNotice("");
+    try {
+      const result = await fetchApi(`/api/admin/usuarios/${user.id}/enviar-restablecimiento`, { method: "POST", token });
+      setNotice(result.mensaje || `Se solicitó el envío a ${user.email}.`);
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "No fue posible enviar el restablecimiento.");
+    } finally {
+      setWorking(false);
+    }
+  }
+
   async function bulkUserAction(action: "ACTIVATE" | "SUSPEND" | "DELETE") {
     const selected = visible.filter((user) => selectedIds.includes(user.id) && user.rol !== "ADMIN");
     const eligible = selected.filter((user) => action === "ACTIVATE" ? user.estado === "SUSPENDIDO" || user.estado === "RECHAZADO" : action === "SUSPEND" ? user.estado === "ACTIVO" : true);
@@ -476,6 +491,16 @@ export default function AdminUsersPage() {
                   </td>
                   <td className="px-4 py-3">
                     <div className="flex justify-end gap-1">
+                      <button
+                        type="button"
+                        disabled={working}
+                        onClick={() => void sendPasswordReset(user)}
+                        aria-label={`Enviar restablecimiento de contraseña a ${user.nombre_completo}`}
+                        title="Enviar enlace para restablecer contraseña"
+                        className="grid size-9 place-items-center rounded-md border border-border hover:bg-surface-hover disabled:opacity-50"
+                      >
+                        <Mail className="size-4" />
+                      </button>
                       {user.rol !== "ADMIN" && <>
                       <button
                         type="button"

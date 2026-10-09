@@ -10,7 +10,7 @@ from urllib.request import Request, urlopen
 
 import requests
 from email_validator import EmailNotValidError, validate_email
-from fastapi import APIRouter, Body, Depends, File, Form, HTTPException, Query, Request, UploadFile, status
+from fastapi import APIRouter, BackgroundTasks, Body, Depends, File, Form, HTTPException, Query, Request, UploadFile, status
 from botocore.exceptions import BotoCoreError, ClientError
 from datetime import date, datetime, timedelta, timezone
 from zoneinfo import ZoneInfo
@@ -21,6 +21,7 @@ from sqlalchemy.orm import Session
 from app import models, schemas, security, storage
 from app.audit import registrar_evento_auditoria
 from app.database import engine, get_db
+from app.password_reset import password_reset_url, send_password_reset_email
 from app.email_service import enviar_correo
 from app.document_validation import (
     ALLOWED_DOCUMENT_TYPES,
@@ -49,6 +50,7 @@ from app.workflow_service import (
 )
 from app.notification_service import emitir_notificacion_workflow
 from app.workflow_service import public_site_url
+from app.timezone import format_colombia_datetime
 from app.message_templates import render_message
 from app.reminder_workflow import iniciar_workflow_recordatorio
 import json
@@ -1534,10 +1536,18 @@ def actualizar_recurso_admin(
             item.estado_revision = values["estado_revision"]
             item.revisado_por_id = admin.id
             item.revisado_en = datetime.utcnow()
-            if item.solicitud and values["estado_revision"] in {"APROBADO", "RECHAZADO"}:
-                item.solicitud.atendida_en = item.revisado_en
-            elif item.solicitud and values["estado_revision"] == "REQUIERE_CORRECCION":
-                item.solicitud.atendida_en = None
+            if item.solicitud:
+                required_items = item.solicitud.documentos_requeridos or [{"id": "legacy", "nombre": item.solicitud.titulo}]
+                latest_by_item = {}
+                for uploaded in sorted(item.solicitud.documentos, key=lambda row: (row.created_at, row.id)):
+                    item_id = uploaded.solicitud_item_id or (required_items[0].get("id", "legacy") if len(required_items) == 1 else None)
+                    if item_id:
+                        latest_by_item[item_id] = uploaded
+                item.solicitud.atendida_en = datetime.utcnow() if all(
+                    str(required.get("id", "legacy")) in latest_by_item
+                    and latest_by_item[str(required.get("id", "legacy"))].estado_revision != "REQUIERE_CORRECCION"
+                    for required in required_items
+                ) else None
         if "comentario_revision" in values:
             item.comentario_revision = values["comentario_revision"]
     else:
@@ -2022,8 +2032,8 @@ def _notificar_evento_agenda_admin(db: Session, evento: models.EventoAgenda, adm
             plantilla_clave="EVENTO_AGENDA",
             variables={"nombre": cliente.nombre_completo, "actor": admin.nombre_completo, "accion": accion,
                        "proceso": proceso.nombre, "actividad": evento.titulo, "tipo": evento.tipo,
-                       "estado": evento.estado, "inicio": evento.fecha_inicio.strftime('%d/%m/%Y %H:%M UTC'),
-                       "fin": evento.fecha_fin.strftime('%d/%m/%Y %H:%M UTC') if evento.fecha_fin else 'No indicada',
+                       "estado": evento.estado, "inicio": format_colombia_datetime(evento.fecha_inicio),
+                       "fin": format_colombia_datetime(evento.fecha_fin) if evento.fecha_fin else 'No indicada',
                        "responsable": evento.responsable.nombre_completo if evento.responsable else 'No asignado',
                        "detalle": evento.descripcion or 'Sin detalles adicionales'},
             enlace_texto="Ver proceso", enlace_url=link_url,
@@ -2079,8 +2089,8 @@ def _notificar_agenda_tras_reactivacion(db: Session, usuario: models.Usuario, ac
         active_system_reminders = [item for item in task.recordatorios if item.interno_sistema and item.activo and item.enviado_en is None]
         if task.fecha_limite and destinatario_recordatorio and destinatario_recordatorio.estado == models.EstadoUsuario.ACTIVO and not active_system_reminders:
             if destinatario_recordatorio.rol == models.RolUsuario.CLIENTE:
-                email_enabled = destinatario_recordatorio.canal_notificacion_cliente == "EMAIL" and bool(destinatario_recordatorio.email)
-                whatsapp_enabled = destinatario_recordatorio.canal_notificacion_cliente == "WHATSAPP" and bool(destinatario_recordatorio.whatsapp_numero.strip())
+                email_enabled = bool(destinatario_recordatorio.notificaciones_email and destinatario_recordatorio.email)
+                whatsapp_enabled = bool(destinatario_recordatorio.notificaciones_whatsapp and destinatario_recordatorio.whatsapp_numero.strip())
             else:
                 reminder_preferences = (destinatario_recordatorio.preferencias_notificacion or {}).get("RECORDATORIOS", {})
                 email_enabled = bool(reminder_preferences.get("email", destinatario_recordatorio.notificaciones_email)) and bool(destinatario_recordatorio.email)
@@ -2110,7 +2120,7 @@ def _notificar_agenda_tras_reactivacion(db: Session, usuario: models.Usuario, ac
                 "Tarea pendiente tras reactivar tu cuenta", "", emisor=actor, incluir_email=True,
                 plantilla_clave="REACTIVACION_TAREA",
                 variables={"nombre": usuario.nombre_completo, "tarea": task.titulo, "proceso": process,
-                           "estado": task.estado.value, "fecha_limite": task.fecha_limite.strftime("%d/%m/%Y %H:%M UTC") if task.fecha_limite else "Sin fecha límite"},
+                           "estado": task.estado.value, "fecha_limite": format_colombia_datetime(task.fecha_limite) if task.fecha_limite else "Sin fecha límite"},
                 enlace_texto="Ver tarea", enlace_url=recipient_url,
             )
         except Exception:
@@ -2121,14 +2131,15 @@ def _notificar_agenda_tras_reactivacion(db: Session, usuario: models.Usuario, ac
         if not process:
             continue
         role_path = "cliente" if usuario.rol == models.RolUsuario.CLIENTE else "dashboard" if usuario.rol == models.RolUsuario.ABOGADO else "abogado"
-        recipient_url = f"{public_site_url()}/gestion-procesos/{role_path}/procesos/{process.id}#agenda"
+        section_path = "/agenda" if role_path == "abogado" else "#agenda"
+        recipient_url = f"{public_site_url()}/gestion-procesos/{role_path}/procesos/{process.id}{section_path}"
         try:
             emitir_notificacion_workflow(
                 db, usuario, "RESUMENES", f"REACTIVACION:{usuario.id}:EVENTO:{event.id}:{marca_reactivacion}",
                 "Actividad próxima tras reactivar tu cuenta", "", emisor=actor, incluir_email=True,
                 plantilla_clave="REACTIVACION_EVENTO",
                 variables={"nombre": usuario.nombre_completo, "actividad": event.titulo, "proceso": process.nombre,
-                           "tipo": event.tipo, "fecha": event.fecha_inicio.strftime("%d/%m/%Y %H:%M UTC"),
+                           "tipo": event.tipo, "fecha": format_colombia_datetime(event.fecha_inicio),
                            "descripcion": event.descripcion or "Sin detalles adicionales"},
                 enlace_texto="Ver agenda", enlace_url=recipient_url,
             )
@@ -2140,14 +2151,15 @@ def _notificar_agenda_tras_reactivacion(db: Session, usuario: models.Usuario, ac
         if not process:
             continue
         role_path = "cliente" if usuario.rol == models.RolUsuario.CLIENTE else "dashboard" if usuario.rol == models.RolUsuario.ABOGADO else "abogado"
-        recipient_url = f"{public_site_url()}/gestion-procesos/{role_path}/procesos/{process.id}#comunicaciones"
+        section_path = "/comunicaciones" if role_path == "abogado" else "#comunicaciones"
+        recipient_url = f"{public_site_url()}/gestion-procesos/{role_path}/procesos/{process.id}{section_path}"
         try:
             emitir_notificacion_workflow(
                 db, usuario, "RESUMENES", f"REACTIVACION:{usuario.id}:COMUNICACION:{communication.id}:{marca_reactivacion}",
                 f"Comunicación pendiente: {communication.asunto}", "", emisor=actor, incluir_email=True,
                 plantilla_clave="REACTIVACION_COMUNICACION",
                 variables={"nombre": usuario.nombre_completo, "proceso": process.nombre,
-                           "asunto": communication.asunto, "fecha": communication.created_at.strftime("%d/%m/%Y %H:%M UTC"),
+                           "asunto": communication.asunto, "fecha": format_colombia_datetime(communication.created_at),
                            "mensaje": communication.contenido},
                 enlace_texto="Ver conversación", enlace_url=recipient_url,
             )
@@ -2273,8 +2285,34 @@ def listar_solicitudes_documento_admin(
     resultado = []
     for solicitud in solicitudes:
         documento = solicitud.documentos[-1] if solicitud.documentos else None
-        vencida = bool(solicitud.fecha_limite and solicitud.fecha_limite < datetime.utcnow() and not solicitud.atendida_en and not documento)
-        estado = documento.estado_revision if documento else ("VENCIDO" if vencida else "RECIBIDO" if solicitud.atendida_en else "SOLICITADO")
+        required_items = solicitud.documentos_requeridos or [{"id": "legacy", "nombre": solicitud.titulo}]
+        current_by_item = {}
+        for uploaded in sorted(solicitud.documentos, key=lambda item: (item.created_at, item.id)):
+            item_id = uploaded.solicitud_item_id or (required_items[0].get("id", "legacy") if len(required_items) == 1 else None)
+            if item_id:
+                current_by_item[item_id] = uploaded
+        requested_items = [{
+            "id": str(item.get("id", "legacy")),
+            "nombre": str(item.get("nombre", solicitud.titulo)),
+            "estado": current_by_item[str(item.get("id", "legacy"))].estado_revision if str(item.get("id", "legacy")) in current_by_item else "FALTANTE",
+            "archivo": current_by_item[str(item.get("id", "legacy"))].nombre_archivo if str(item.get("id", "legacy")) in current_by_item else None,
+            "comentario": current_by_item[str(item.get("id", "legacy"))].comentario_revision if str(item.get("id", "legacy")) in current_by_item else None,
+            "documento_id": current_by_item[str(item.get("id", "legacy"))].id if str(item.get("id", "legacy")) in current_by_item else None,
+        } for item in required_items]
+        item_states = [item["estado"] for item in requested_items]
+        if "FALTANTE" in item_states:
+            estado = "FALTAN_DOCUMENTOS"
+        elif any(state in {"REQUIERE_CORRECCION", "RECHAZADO"} for state in item_states):
+            estado = "RECHAZADO"
+        elif "EN_REVISION" in item_states:
+            estado = "EN_REVISION"
+        elif item_states and all(state == "APROBADO" for state in item_states):
+            estado = "APROBADO"
+        else:
+            estado = "DOCUMENTOS_SUMINISTRADOS"
+        vencida = bool(solicitud.fecha_limite and solicitud.fecha_limite < datetime.utcnow() and estado == "FALTAN_DOCUMENTOS")
+        if vencida:
+            estado = "VENCIDO"
         resultado.append({
             "id": solicitud.id,
             "titulo": solicitud.titulo,
@@ -2285,6 +2323,7 @@ def listar_solicitudes_documento_admin(
             "estado": estado,
             "documento": documento.nombre_archivo if documento else None,
             "documento_id": documento.id if documento else None,
+            "documentos_requeridos": requested_items,
             "solicitado_en": solicitud.created_at,
             "fecha_limite": solicitud.fecha_limite,
             "atendida_en": solicitud.atendida_en,
@@ -2720,6 +2759,29 @@ def forzar_cambio_password_admin(
     registrar_evento_auditoria(db, admin, "admin.usuario.forzar_cambio_password", "usuario", usuario.id)
     db.commit()
     return {"mensaje": "El usuario deberá cambiar su contraseña en el próximo ingreso."}
+
+
+@router.post("/usuarios/{usuario_id}/enviar-restablecimiento")
+def enviar_restablecimiento_password_admin(
+    usuario_id: int,
+    background_tasks: BackgroundTasks,
+    db: Session = Depends(get_db),
+    admin: models.Usuario = Depends(verificar_admin),
+):
+    usuario = db.query(models.Usuario).filter_by(id=usuario_id).first()
+    if not usuario:
+        raise HTTPException(status_code=404, detail="Usuario no encontrado.")
+    token = security.create_password_reset_token(usuario.id, usuario.password_hash)
+    background_tasks.add_task(
+        send_password_reset_email,
+        usuario.email,
+        password_reset_url(token),
+    )
+    registrar_evento_auditoria(
+        db, admin, "admin.usuario.password.restablecimiento_enviado", "usuario", usuario.id,
+    )
+    db.commit()
+    return {"mensaje": f"Se programó el envío del enlace de restablecimiento a {usuario.email}."}
 
 
 @router.post("/solicitudes/accion-masiva")

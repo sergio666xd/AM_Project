@@ -1,8 +1,5 @@
-"use client";
-import Link from "next/link";
-import { useEffect, useState } from "react";
-import { MessageCircle, RefreshCw } from "lucide-react";
-import { useSession } from "@/context/SessionContext";
-import { fetchApi } from "@/lib/api";
-type Process={id:number;nombre:string;responsable?:{nombre_completo:string};estado_visible:string};
-export default function MensajesClientePage(){const{token,loading:sessionLoading}=useSession();const[items,setItems]=useState<Process[]>([]);const[loading,setLoading]=useState(true);const[error,setError]=useState("");useEffect(()=>{if(!token||sessionLoading)return;fetchApi("/api/expedientes/procesos",{token}).then(setItems).catch((cause)=>setError(cause instanceof Error?cause.message:"No fue posible cargar tus procesos.")).finally(()=>setLoading(false));},[token,sessionLoading]);return <section className="mx-auto max-w-4xl space-y-5"><header><p className="text-sm text-(--foreground-muted)">Portal del cliente</p><h1 className="mt-1 text-2xl font-semibold">Mensajes</h1><p className="mt-1 text-sm text-(--foreground-muted)">Cada conversación está asociada a un proceso para mantener el contexto.</p></header>{error&&<p role="alert" className="text-sm text-danger">{error}</p>}{loading?<p className="py-10 text-center"><RefreshCw className="inline size-4 animate-spin"/></p>:items.length?<div className="space-y-3">{items.map(item=><Link key={item.id} href={`/gestion-procesos/cliente/procesos/${item.id}#comunicacion`} className="flex items-center justify-between gap-3 rounded-xl border border-border bg-surface p-4 hover:bg-surface-hover"><span><span className="block font-medium">{item.nombre}</span><span className="text-sm text-(--foreground-muted)">Contacto: {item.responsable?.nombre_completo||"Despacho"} · {item.estado_visible}</span></span><MessageCircle className="size-5 text-primary"/></Link>)}</div>:<p className="rounded-xl border border-dashed border-border p-8 text-center text-sm text-(--foreground-muted)">No hay procesos compartidos para iniciar una conversación.</p>}</section>}
+import { redirect } from "next/navigation";
+
+export default function LegacyClientMessagesRoute() {
+  redirect("/gestion-procesos/cliente/chat");
+}

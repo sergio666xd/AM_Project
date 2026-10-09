@@ -1,19 +1,11 @@
 "use client";
 
-import { apiRequest } from "@/lib/api";
 import Link from "next/link";
+import { apiRequest } from "@/lib/api";
 
 import { FormEvent, useState } from "react";
-import {
-  Eye,
-  EyeOff,
-  KeyRound,
-  Mail,
-  Phone,
-  Save,
-  ShieldCheck,
-  UserRound,
-} from "lucide-react";
+import { SecurityChangeButton } from "@/components/security/SecurityChangeButton";
+import { Mail, Phone, Save, ShieldCheck, UserRound } from "lucide-react";
 import { useSession } from "@/context/SessionContext";
 
 
@@ -22,34 +14,19 @@ export default function PerfilAbogadoPage() {
   const [contractProfileEdits, setContractProfileEdits] = useState<Partial<{ genero: string; numero_documento: string; domicilio: string; tarjeta_profesional: string }>>({});
   const contractProfile = {
     genero: contractProfileEdits.genero ?? user?.genero ?? "",
-    numero_documento: contractProfileEdits.numero_documento ?? user?.numero_documento ?? "",
+    numero_documento: (contractProfileEdits.numero_documento ?? user?.numero_documento ?? "").replace(/\./g, ""),
     domicilio: contractProfileEdits.domicilio ?? user?.domicilio ?? "",
-    tarjeta_profesional: contractProfileEdits.tarjeta_profesional ?? user?.tarjeta_profesional ?? "",
+    tarjeta_profesional: (contractProfileEdits.tarjeta_profesional ?? user?.tarjeta_profesional ?? "").replace(/\./g, ""),
   };
 
   const [nombreEditado, setNombreEditado] = useState<{ userId: number; value: string } | null>(null);
   const nombre = user && nombreEditado?.userId === user.id ? nombreEditado.value : user?.nombre_completo ?? "";
 
   const [savingProfile, setSavingProfile] = useState(false);
-  const [savingPassword, setSavingPassword] = useState(false);
 
   const [profileMessage, setProfileMessage] = useState("");
   const [profileError, setProfileError] = useState("");
 
-  const [passwordMessage, setPasswordMessage] = useState("");
-  const [passwordError, setPasswordError] = useState("");
-
-  const [passwordActual, setPasswordActual] = useState("");
-  const [passwordNueva, setPasswordNueva] = useState("");
-  const [passwordConfirmacion, setPasswordConfirmacion] =
-    useState("");
-
-  const [showCurrentPassword, setShowCurrentPassword] =
-    useState(false);
-  const [showNewPassword, setShowNewPassword] =
-    useState(false);
-  const [showConfirmPassword, setShowConfirmPassword] =
-    useState(false);
 
   async function saveProfile(event: FormEvent) {
     event.preventDefault();
@@ -103,93 +80,6 @@ export default function PerfilAbogadoPage() {
       );
     } finally {
       setSavingProfile(false);
-    }
-  }
-
-  async function changePassword(event: FormEvent) {
-    event.preventDefault();
-
-    setPasswordError("");
-    setPasswordMessage("");
-
-    if (!token) {
-      setPasswordError("La sesión no está disponible.");
-      return;
-    }
-
-    if (!passwordActual) {
-      setPasswordError("Ingresa tu contraseña actual.");
-      return;
-    }
-
-    if (!passwordNueva) {
-      setPasswordError("Ingresa la nueva contraseña.");
-      return;
-    }
-
-    if (passwordNueva.length < 8) {
-      setPasswordError(
-        "La nueva contraseña debe tener al menos 8 caracteres."
-      );
-      return;
-    }
-
-    if (passwordNueva !== passwordConfirmacion) {
-      setPasswordError(
-        "La confirmación no coincide con la nueva contraseña."
-      );
-      return;
-    }
-
-    if (passwordActual === passwordNueva) {
-      setPasswordError(
-        "La nueva contraseña debe ser diferente a la actual."
-      );
-      return;
-    }
-
-    setSavingPassword(true);
-
-    try {
-      const response = await apiRequest(
-        `/api/auth/cambiar-password`,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`,
-          },
-          body: JSON.stringify({
-            password_actual: passwordActual,
-            password_nueva: passwordNueva,
-          }),
-        }
-      );
-
-      const data = await response.json().catch(() => null);
-
-      if (!response.ok) {
-        throw new Error(
-          data?.detail ||
-            "No fue posible cambiar la contraseña."
-        );
-      }
-
-      setPasswordActual("");
-      setPasswordNueva("");
-      setPasswordConfirmacion("");
-
-      setPasswordMessage(
-        "Tu contraseña fue actualizada correctamente."
-      );
-    } catch (cause) {
-      setPasswordError(
-        cause instanceof Error
-          ? cause.message
-          : "No fue posible cambiar la contraseña."
-      );
-    } finally {
-      setSavingPassword(false);
     }
   }
 
@@ -448,74 +338,9 @@ export default function PerfilAbogadoPage() {
               />
             </div>
 
-            {/* CORREO */}
-            <div>
-              <label
-                htmlFor="email"
-                className="mb-1.5 block text-sm font-medium"
-                style={{ color: "var(--foreground)" }}
-              >
-                Correo electrónico
-              </label>
+            <div><p className="text-sm font-medium">Correo electrónico</p><p className="mt-1 text-sm text-[var(--foreground-muted)]">{user?.email || "No configurado"}</p></div>
 
-              <input
-                id="email"
-                type="email"
-                value={user?.email || ""}
-                readOnly
-                className="w-full cursor-not-allowed rounded-lg border px-3 py-2.5 text-sm outline-none"
-                style={{
-                  background: "var(--surface-muted)",
-                  borderColor: "var(--border)",
-                  color: "var(--foreground-muted)",
-                }}
-              />
-
-              <p
-                className="mt-1.5 text-xs"
-                style={{
-                  color: "var(--foreground-muted)",
-                }}
-              >
-                El correo electrónico identifica tu cuenta y no
-                puede modificarse desde aquí.
-              </p>
-            </div>
-
-            {/* WHATSAPP */}
-            <div>
-              <label
-                htmlFor="whatsapp"
-                className="mb-1.5 block text-sm font-medium"
-                style={{ color: "var(--foreground)" }}
-              >
-                Número de WhatsApp
-              </label>
-
-              <input
-                id="whatsapp"
-                type="tel"
-                value={user?.whatsapp_numero || ""}
-                readOnly
-                placeholder="Ej. +57 300 123 4567"
-                className="w-full rounded-lg border px-3 py-2.5 text-sm outline-none transition"
-                style={{
-                  background: "var(--surface-muted)",
-                  borderColor: "var(--border)",
-                  color: "var(--foreground)",
-                }}
-              />
-
-              <p
-                className="mt-1.5 text-xs"
-                style={{
-                  color: "var(--foreground-muted)",
-                }}
-              >
-                Este número puede utilizarse para las
-                notificaciones habilitadas en tu cuenta.
-              </p>
-            </div>
+            <div><p className="text-sm font-medium">WhatsApp</p><p className="mt-1 text-sm text-[var(--foreground-muted)]">{user?.whatsapp_numero || "No configurado"}</p></div>
             <fieldset className="grid gap-4 rounded-lg border border-[var(--border)] p-4 sm:grid-cols-2">
               <legend className="px-2 text-sm font-semibold">Datos para los contratos</legend>
               <label className="text-sm font-medium">Género<select value={contractProfile.genero} onChange={(event) => setContractProfileEdits({ ...contractProfileEdits, genero: event.target.value })} className="mt-1 w-full rounded-lg border border-[var(--border)] bg-[var(--surface-muted)] px-3 py-2.5"><option value="">Sin especificar</option><option value="MASCULINO">Masculino</option><option value="FEMENINO">Femenino</option></select></label>
@@ -549,299 +374,14 @@ export default function PerfilAbogadoPage() {
       </div>
 
       {/* SEGURIDAD */}
-      <form
-        onSubmit={changePassword}
-        className="hidden overflow-hidden rounded-xl border"
-        style={{
-          background: "var(--surface)",
-          borderColor: "var(--border)",
-          boxShadow: "var(--shadow-sm)",
-        }}
-      >
-        <div
-          className="border-b px-5 py-4"
-          style={{ borderColor: "var(--border)" }}
-        >
-          <div className="flex items-center gap-3">
-            <div
-              className="flex size-9 items-center justify-center rounded-lg"
-              style={{
-                background: "var(--primary-light)",
-                color: "var(--primary)",
-              }}
-            >
-              <KeyRound size={18} />
-            </div>
-
-            <div>
-              <h2
-                className="font-semibold"
-                style={{ color: "var(--foreground)" }}
-              >
-                Seguridad
-              </h2>
-
-              <p
-                className="mt-0.5 text-xs"
-                style={{
-                  color: "var(--foreground-muted)",
-                }}
-              >
-                Cambia la contraseña utilizada para acceder a
-                tu cuenta.
-              </p>
-            </div>
-          </div>
+      <section className="space-y-4 rounded-xl border p-5" style={{ background: "var(--surface)", borderColor: "var(--border)" }}>
+        <h2 className="font-semibold">Seguridad de la cuenta</h2>
+        <div className="flex flex-wrap gap-3">
+          <SecurityChangeButton action="email" title="Cambiar correo" token={token} whatsappAvailable={Boolean(user?.whatsapp_numero)} onComplete={refreshUser} />
+          <SecurityChangeButton action="whatsapp" title="Cambiar WhatsApp" token={token} whatsappAvailable={Boolean(user?.whatsapp_numero)} onComplete={refreshUser} />
+          <SecurityChangeButton action="password" title="Cambiar contraseña" token={token} whatsappAvailable={Boolean(user?.whatsapp_numero)} onComplete={refreshUser} />
         </div>
-
-        <div className="space-y-5 p-5">
-          {passwordError && (
-            <div
-              className="rounded-lg border px-4 py-3 text-sm"
-              style={{
-                background: "var(--danger-light)",
-                borderColor: "var(--danger)",
-                color: "var(--danger)",
-              }}
-            >
-              {passwordError}
-            </div>
-          )}
-
-          {passwordMessage && (
-            <div
-              className="rounded-lg border px-4 py-3 text-sm"
-              style={{
-                background: "var(--success-light)",
-                borderColor: "var(--success)",
-                color: "var(--success)",
-              }}
-            >
-              {passwordMessage}
-            </div>
-          )}
-
-          <div className="grid gap-5 md:grid-cols-2">
-            {/* CONTRASEÑA ACTUAL */}
-            <div className="md:col-span-2">
-              <label
-                htmlFor="passwordActual"
-                className="mb-1.5 block text-sm font-medium"
-                style={{ color: "var(--foreground)" }}
-              >
-                Contraseña actual
-              </label>
-
-              <div className="relative">
-                <input
-                  id="passwordActual"
-                  type={
-                    showCurrentPassword
-                      ? "text"
-                      : "password"
-                  }
-                  value={passwordActual}
-                  onChange={(event) =>
-                    setPasswordActual(event.target.value)
-                  }
-                  autoComplete="current-password"
-                  className="w-full rounded-lg border px-3 py-2.5 pr-11 text-sm outline-none transition"
-                  style={{
-                    background: "var(--surface-muted)",
-                    borderColor: "var(--border)",
-                    color: "var(--foreground)",
-                  }}
-                />
-
-                <button
-                  type="button"
-                  aria-label={
-                    showCurrentPassword
-                      ? "Ocultar contraseña"
-                      : "Mostrar contraseña"
-                  }
-                  onClick={() =>
-                    setShowCurrentPassword(
-                      (visible) => !visible
-                    )
-                  }
-                  className="absolute right-2 top-1/2 -translate-y-1/2 rounded-md p-1.5 transition"
-                  style={{
-                    color: "var(--foreground-muted)",
-                  }}
-                >
-                  {showCurrentPassword ? (
-                    <EyeOff size={17} />
-                  ) : (
-                    <Eye size={17} />
-                  )}
-                </button>
-              </div>
-            </div>
-
-            {/* NUEVA CONTRASEÑA */}
-            <div>
-              <label
-                htmlFor="passwordNueva"
-                className="mb-1.5 block text-sm font-medium"
-                style={{ color: "var(--foreground)" }}
-              >
-                Nueva contraseña
-              </label>
-
-              <div className="relative">
-                <input
-                  id="passwordNueva"
-                  type={
-                    showNewPassword ? "text" : "password"
-                  }
-                  value={passwordNueva}
-                  onChange={(event) =>
-                    setPasswordNueva(event.target.value)
-                  }
-                  autoComplete="new-password"
-                  className="w-full rounded-lg border px-3 py-2.5 pr-11 text-sm outline-none transition"
-                  style={{
-                    background: "var(--surface-muted)",
-                    borderColor: "var(--border)",
-                    color: "var(--foreground)",
-                  }}
-                />
-
-                <button
-                  type="button"
-                  aria-label={
-                    showNewPassword
-                      ? "Ocultar contraseña"
-                      : "Mostrar contraseña"
-                  }
-                  onClick={() =>
-                    setShowNewPassword(
-                      (visible) => !visible
-                    )
-                  }
-                  className="absolute right-2 top-1/2 -translate-y-1/2 rounded-md p-1.5"
-                  style={{
-                    color: "var(--foreground-muted)",
-                  }}
-                >
-                  {showNewPassword ? (
-                    <EyeOff size={17} />
-                  ) : (
-                    <Eye size={17} />
-                  )}
-                </button>
-              </div>
-
-              <p
-                className="mt-1.5 text-xs"
-                style={{
-                  color: "var(--foreground-muted)",
-                }}
-              >
-                Mínimo 8 caracteres.
-              </p>
-            </div>
-
-            {/* CONFIRMACIÓN */}
-            <div>
-              <label
-                htmlFor="passwordConfirmacion"
-                className="mb-1.5 block text-sm font-medium"
-                style={{ color: "var(--foreground)" }}
-              >
-                Confirmar nueva contraseña
-              </label>
-
-              <div className="relative">
-                <input
-                  id="passwordConfirmacion"
-                  type={
-                    showConfirmPassword
-                      ? "text"
-                      : "password"
-                  }
-                  value={passwordConfirmacion}
-                  onChange={(event) =>
-                    setPasswordConfirmacion(
-                      event.target.value
-                    )
-                  }
-                  autoComplete="new-password"
-                  className="w-full rounded-lg border px-3 py-2.5 pr-11 text-sm outline-none transition"
-                  style={{
-                    background: "var(--surface-muted)",
-                    borderColor: "var(--border)",
-                    color: "var(--foreground)",
-                  }}
-                />
-
-                <button
-                  type="button"
-                  aria-label={
-                    showConfirmPassword
-                      ? "Ocultar contraseña"
-                      : "Mostrar contraseña"
-                  }
-                  onClick={() =>
-                    setShowConfirmPassword(
-                      (visible) => !visible
-                    )
-                  }
-                  className="absolute right-2 top-1/2 -translate-y-1/2 rounded-md p-1.5"
-                  style={{
-                    color: "var(--foreground-muted)",
-                  }}
-                >
-                  {showConfirmPassword ? (
-                    <EyeOff size={17} />
-                  ) : (
-                    <Eye size={17} />
-                  )}
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <div
-          className="flex flex-col gap-3 border-t px-5 py-4 sm:flex-row sm:items-center sm:justify-between"
-          style={{ borderColor: "var(--border)" }}
-        >
-          <div className="flex items-center gap-2">
-            <ShieldCheck
-              size={16}
-              style={{ color: "var(--success)" }}
-            />
-
-            <p
-              className="text-xs"
-              style={{
-                color: "var(--foreground-muted)",
-              }}
-            >
-              Tu contraseña se utiliza para proteger el acceso
-              a tu cuenta.
-            </p>
-          </div>
-
-          <button
-            type="submit"
-            disabled={savingPassword}
-            className="inline-flex items-center justify-center gap-2 rounded-lg px-4 py-2.5 text-sm font-medium transition disabled:cursor-not-allowed disabled:opacity-50"
-            style={{
-              background: "var(--primary)",
-              color: "var(--primary-foreground)",
-            }}
-          >
-            <KeyRound size={17} />
-
-            {savingPassword
-              ? "Cambiando..."
-              : "Cambiar contraseña"}
-          </button>
-        </div>
-      </form>
+      </section>
     </section>
   );
 }

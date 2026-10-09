@@ -82,6 +82,8 @@ type Process = {
     cliente: string;
     atendida_en?: string | null;
     created_at: string;
+    estado: string;
+    documentos_requeridos: { id: string; nombre: string; estado: string; documento?: { nombre_archivo: string; comentario_revision?: string | null } | null }[];
   }[];
   documentos: {
     id: number;
@@ -125,7 +127,7 @@ async function requestProcessDetail(id: string, token: string) {
   return { processData, clientData, radicadoData };
 }
 
-export default function ProcesoDetallePage() {
+export default function ProcesoDetallePage({ section }: { section?: string }) {
   const { id } = useParams<{ id: string }>();
 
   const [process, setProcess] = useState<Process | null>(null);
@@ -144,6 +146,7 @@ export default function ProcesoDetallePage() {
   const [taskRadicadoId, setTaskRadicadoId] = useState("");
   const [taskActuationId, setTaskActuationId] = useState("");
   const [documentTitle, setDocumentTitle] = useState("");
+  const [documentItems, setDocumentItems] = useState("");
   const [documentInstructions, setDocumentInstructions] = useState("");
   const [documentClientId, setDocumentClientId] = useState("");
   const [notificationActuationId, setNotificationActuationId] = useState("");
@@ -163,7 +166,7 @@ export default function ProcesoDetallePage() {
   const [editingAgendaId, setEditingAgendaId] = useState<number | null>(null);
   const [selectedColleagueId, setSelectedColleagueId] = useState("");
   const [selectedColleagueVisible, setSelectedColleagueVisible] = useState(false);
-  const [activeTab, setActiveTab] = useState("resumen");
+  const [activeTab, setActiveTab] = useState(section || "resumen");
   const [contractFocusId, setContractFocusId] = useState<number | null>(null);
 
   const [clientQuery, setClientQuery] = useState("");
@@ -249,7 +252,7 @@ export default function ProcesoDetallePage() {
         hashTab = rawHash;
       }
       if (hashTab.startsWith("panel-")) hashTab = hashTab.slice("panel-".length);
-      const requestedTab = hashTab || params.get("tab") || (requestedContractId > 0 ? "contratos" : "resumen");
+      const requestedTab = hashTab || params.get("tab") || (requestedContractId > 0 ? "contratos" : section || "resumen");
       const validTabs = ["resumen", "relaciones", "agenda", "tareas", "documentos", "contratos", "actividad", "comunicaciones", "equipo"];
       const nextTab = validTabs.includes(requestedTab) ? requestedTab : "resumen";
       setActiveTab(nextTab);
@@ -265,7 +268,7 @@ export default function ProcesoDetallePage() {
       window.removeEventListener("hashchange", syncLocation);
       window.removeEventListener("popstate", syncLocation);
     };
-  }, [id]);
+  }, [id, section]);
 
   useEffect(() => {
     if (!notice) return;
@@ -509,9 +512,9 @@ export default function ProcesoDetallePage() {
       const radicado = process?.radicados.find((entry) => entry.actuaciones.some((actuacion) => actuacion.id === item.recurso_id));
       if (radicado) return `/gestion-procesos/abogado/radicados/${radicado.id}`;
     }
-    if (item.recurso === "Agenda") return "#agenda";
-    if (item.recurso === "Comunicación" || item.recurso === "Nota interna") return "#comunicaciones";
-    return "#resumen";
+    if (item.recurso === "Agenda") return `/gestion-procesos/abogado/procesos/${id}/agenda`;
+    if (item.recurso === "Comunicación" || item.recurso === "Nota interna") return `/gestion-procesos/abogado/procesos/${id}/comunicaciones`;
+    return `/gestion-procesos/abogado/procesos/${id}/resumen`;
   }
 
   const availableRadicados = useMemo(() => {
@@ -551,7 +554,7 @@ export default function ProcesoDetallePage() {
     [process]
   );
 
-  const processTabs: { id: string; label: string }[] = [
+  const processSections: { id: string; label: string }[] = [
     { id: "resumen", label: "Resumen" },
     { id: "relaciones", label: "Clientes y radicados" },
     { id: "agenda", label: "Agenda" },
@@ -559,7 +562,7 @@ export default function ProcesoDetallePage() {
     { id: "documentos", label: "Documentos" },
     { id: "contratos", label: "Contratos" },
     { id: "actividad", label: "Actividad" },
-    { id: "comunicaciones", label: "Comunicaciones" },
+    { id: "comunicaciones", label: "Chat" },
     ...(process?.admite_colaboradores ? [{ id: "equipo", label: "Equipo" }] : []),
   ];
 
@@ -679,8 +682,8 @@ export default function ProcesoDetallePage() {
         </div>
       </header>
 
-      <nav role="tablist" aria-label="Secciones del expediente" className="sticky top-0 z-20 flex gap-2 overflow-x-auto rounded-xl border border-[var(--border)] bg-[var(--surface)]/95 p-2 backdrop-blur">
-        {processTabs.map((tab) => <button key={tab.id} type="button" role="tab" id={`tab-${tab.id}`} aria-selected={activeTab === tab.id} aria-controls={`panel-${tab.id}`} onClick={() => setActiveTab(tab.id)} className={`shrink-0 rounded-lg px-3 py-2 text-xs font-medium transition ${activeTab === tab.id ? "bg-[var(--primary)] text-white" : "text-[var(--foreground-secondary)] hover:bg-[var(--surface-secondary)] hover:text-[var(--foreground)]"}`}>{tab.label}</button>)}
+      <nav aria-label="Subpáginas del proceso" className="flex gap-2 overflow-x-auto rounded-xl border border-[var(--border)] bg-[var(--surface)] p-2">
+        {processSections.map((item) => <Link key={item.id} href={`/gestion-procesos/abogado/procesos/${id}/${item.id}`} aria-current={activeTab === item.id ? "page" : undefined} className={`shrink-0 rounded-lg px-3 py-2 text-xs font-medium transition ${activeTab === item.id ? "bg-[var(--primary)] text-white" : "text-[var(--foreground-secondary)] hover:bg-[var(--surface-secondary)] hover:text-[var(--foreground)]"}`}>{item.label}</Link>)}
       </nav>
 
       {process.admite_colaboradores && (
@@ -1010,12 +1013,12 @@ export default function ProcesoDetallePage() {
 
       <section id="panel-agenda" role="tabpanel" aria-labelledby="tab-agenda" style={{ display: activeTab === "agenda" ? undefined : "none" }} className="scroll-mt-20 rounded-2xl border border-[var(--border)] bg-[var(--surface)]">
         <header className="flex flex-wrap items-center justify-between gap-3 border-b border-[var(--border)] px-5 py-4"><div><h2 className="text-sm font-semibold text-[var(--foreground)]">Agenda del proceso</h2><p className="mt-1 text-xs text-[var(--foreground-muted)]">Audiencias, reuniones y eventos asociados a este expediente.</p></div><button type="button" onClick={() => openAgendaEvent()} className="inline-flex items-center gap-2 rounded-lg bg-[var(--primary)] px-3 py-2 text-xs font-semibold text-white"><Plus className="size-4" />Agendar actividad</button></header>
-        {process.eventos.length ? <div className="divide-y divide-[var(--border)]">{process.eventos.map((event) => <article key={event.id} className="flex flex-wrap items-center justify-between gap-3 px-5 py-3"><div><p className="text-sm font-medium">{event.tipo === "AUDIENCIA" ? "Audiencia" : event.tipo === "REUNION" ? "Reunión" : "Evento"}: {event.titulo}</p><p className="mt-1 text-xs text-[var(--foreground-muted)]">{new Date(event.fecha_inicio).toLocaleString("es-CO")} · {event.estado.replaceAll("_", " ")}{event.cliente ? ` · ${event.cliente}` : ""}</p></div><div className="flex gap-3 text-xs"><button type="button" onClick={() => openAgendaEvent(event)} className="text-[var(--primary)] hover:underline">Editar</button><button type="button" onClick={() => { if (window.confirm(`¿Eliminar ${event.titulo} de la agenda?`)) void action(`/api/expedientes/agenda/eventos/${event.id}`, "DELETE"); }} className="text-red-600 hover:underline">Eliminar</button></div></article>)}</div> : <p className="px-5 py-8 text-center text-sm text-[var(--foreground-muted)]">No hay actividades programadas para este proceso.</p>}
+        {process.eventos.length ? <div className="divide-y divide-[var(--border)]">{process.eventos.map((event) => <article key={event.id} className="flex flex-wrap items-center justify-between gap-3 px-5 py-3"><div><p className="text-sm font-medium">{event.tipo === "AUDIENCIA" ? "Audiencia" : event.tipo === "REUNION" ? "Reunión" : "Evento"}: {event.titulo}</p><p className="mt-1 text-xs text-[var(--foreground-muted)]">{new Date(event.fecha_inicio).toLocaleString("es-CO", { timeZone: "America/Bogota" })} · {event.estado.replaceAll("_", " ")}{event.cliente ? ` · ${event.cliente}` : ""}</p></div><div className="flex gap-3 text-xs"><button type="button" onClick={() => openAgendaEvent(event)} className="text-[var(--primary)] hover:underline">Editar</button><button type="button" onClick={() => { if (window.confirm(`¿Eliminar ${event.titulo} de la agenda?`)) void action(`/api/expedientes/agenda/eventos/${event.id}`, "DELETE"); }} className="text-red-600 hover:underline">Eliminar</button></div></article>)}</div> : <p className="px-5 py-8 text-center text-sm text-[var(--foreground-muted)]">No hay actividades programadas para este proceso.</p>}
       </section>
 
       <section id="panel-actividad" role="tabpanel" aria-labelledby="tab-actividad" style={{ display: activeTab === "actividad" ? undefined : "none" }} className="scroll-mt-20 rounded-2xl border border-[var(--border)] bg-[var(--surface)]">
         <header className="border-b border-[var(--border)] px-5 py-4"><h2 className="text-sm font-semibold text-[var(--foreground)]">Actividad del expediente</h2><p className="mt-1 text-xs text-[var(--foreground-muted)]">Timeline de actuaciones judiciales, tareas, documentos y comunicaciones, con la visibilidad asignada en el servidor.</p></header>
-        {process.timeline.length ? <ol className="divide-y divide-[var(--border)]">{process.timeline.slice(0, 100).map((item) => <li key={item.id} className="flex gap-3 px-5 py-4"><span className={`mt-1 size-2 shrink-0 rounded-full ${item.visibilidad === "CLIENTE" ? "bg-emerald-500" : "bg-slate-400"}`} title={item.visibilidad === "CLIENTE" ? "Visible al cliente" : "Solo equipo interno"} /><div className="min-w-0 flex-1"><div className="flex flex-wrap items-center gap-2"><p className="text-sm font-medium text-[var(--foreground)]">{item.titulo}</p><span className="rounded-full bg-[var(--surface-secondary)] px-2 py-0.5 text-[10px] uppercase text-[var(--foreground-muted)]">{item.tipo}</span><span className={`rounded-full px-2 py-0.5 text-[10px] ${item.visibilidad === "CLIENTE" ? "bg-emerald-500/10 text-emerald-700" : "bg-slate-500/10 text-slate-600"}`}>{item.visibilidad === "CLIENTE" ? "Cliente visible" : "Interno"}</span><Link href={timelineResourceHref(item)} className="text-xs font-medium text-[var(--primary)] hover:underline">Abrir {item.recurso.toLowerCase()}</Link></div><p className="mt-1 whitespace-pre-wrap text-xs leading-5 text-[var(--foreground-secondary)]">{item.descripcion}</p><p className="mt-1 text-[11px] text-[var(--foreground-muted)]">{item.actor || item.recurso}{item.fecha ? ` · ${new Date(item.fecha).toLocaleString("es-CO")}` : ""}</p></div></li>)}</ol> : <p className="p-8 text-center text-sm text-[var(--foreground-muted)]">Aún no hay actividad registrada.</p>}
+        {process.timeline.length ? <ol className="divide-y divide-[var(--border)]">{process.timeline.slice(0, 100).map((item) => <li key={item.id} className="flex gap-3 px-5 py-4"><span className={`mt-1 size-2 shrink-0 rounded-full ${item.visibilidad === "CLIENTE" ? "bg-emerald-500" : "bg-slate-400"}`} title={item.visibilidad === "CLIENTE" ? "Visible al cliente" : "Solo equipo interno"} /><div className="min-w-0 flex-1"><div className="flex flex-wrap items-center gap-2"><p className="text-sm font-medium text-[var(--foreground)]">{item.titulo}</p><span className="rounded-full bg-[var(--surface-secondary)] px-2 py-0.5 text-[10px] uppercase text-[var(--foreground-muted)]">{item.tipo}</span><span className={`rounded-full px-2 py-0.5 text-[10px] ${item.visibilidad === "CLIENTE" ? "bg-emerald-500/10 text-emerald-700" : "bg-slate-500/10 text-slate-600"}`}>{item.visibilidad === "CLIENTE" ? "Cliente visible" : "Interno"}</span><Link href={timelineResourceHref(item)} className="text-xs font-medium text-[var(--primary)] hover:underline">Abrir {item.recurso.toLowerCase()}</Link></div><p className="mt-1 whitespace-pre-wrap text-xs leading-5 text-[var(--foreground-secondary)]">{item.descripcion}</p><p className="mt-1 text-[11px] text-[var(--foreground-muted)]">{item.actor || item.recurso}{item.fecha ? ` · ${new Date(item.fecha).toLocaleString("es-CO", { timeZone: "America/Bogota" })}` : ""}</p></div></li>)}</ol> : <p className="p-8 text-center text-sm text-[var(--foreground-muted)]">Aún no hay actividad registrada.</p>}
       </section>
 
       {/* MÓDULOS SECUNDARIOS */}
@@ -1087,19 +1090,19 @@ export default function ProcesoDetallePage() {
               <div className="flex size-9 items-center justify-center rounded-lg bg-[var(--primary)]/10 text-[var(--primary)]"><FileText className="size-4" /></div>
               <div><h2 className="text-sm font-semibold text-[var(--foreground)]">Documentos</h2><p className="text-xs text-[var(--foreground-muted)]">{process.documentos.length} entregado{process.documentos.length === 1 ? "" : "s"}</p></div>
             </div>
-            <button type="button" disabled={!process.clientes.length || working} onClick={() => { setDocumentTitle(""); setDocumentInstructions(""); setDocumentClientId(String(process.clientes[0]?.id ?? "")); setShowDocumentRequestModal(true); }} className="inline-flex items-center gap-2 rounded-lg border border-[var(--border)] px-3 py-2 text-xs font-medium text-[var(--foreground)] hover:bg-[var(--surface-secondary)] disabled:opacity-50"><Plus className="size-4" />Solicitar</button>
+            <button type="button" disabled={!process.clientes.length || working} onClick={() => { setDocumentTitle(""); setDocumentItems(""); setDocumentInstructions(""); setDocumentClientId(String(process.clientes[0]?.id ?? "")); setShowDocumentRequestModal(true); }} className="inline-flex items-center gap-2 rounded-lg border border-[var(--border)] px-3 py-2 text-xs font-medium text-[var(--foreground)] hover:bg-[var(--surface-secondary)] disabled:opacity-50"><Plus className="size-4" />Solicitar</button>
           </div>
 
           <div className="space-y-4 p-4">
             <div>
               <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-[var(--foreground-muted)]">Solicitudes</h3>
               {process.solicitudes_documento.length ? <div className="space-y-2">{process.solicitudes_documento.map((request) => <div key={request.id} className="rounded-lg border border-[var(--border)] bg-[var(--surface-secondary)] p-3">
-                <div className="flex items-start justify-between gap-3"><div className="min-w-0"><p className="text-sm font-medium text-[var(--foreground)]">{request.titulo}</p><p className="mt-1 text-xs text-[var(--foreground-muted)]">{request.cliente}</p>{request.instrucciones && <p className="mt-2 text-xs text-[var(--foreground-muted)]">{request.instrucciones}</p>}<Link href={`/gestion-procesos/abogado/documentos?proceso=${id}#solicitud-${request.id}`} className="mt-2 inline-block text-xs font-medium text-[var(--primary)] hover:underline">Abrir solicitud documental</Link></div><span className={`shrink-0 rounded-md px-2 py-1 text-[10px] font-medium ${request.atendida_en ? "bg-emerald-500/10 text-emerald-700" : "bg-amber-500/10 text-amber-700"}`}>{request.atendida_en ? "Entregada" : "Pendiente"}</span></div>
+                <div className="flex items-start justify-between gap-3"><div className="min-w-0"><p className="text-sm font-medium text-[var(--foreground)]">{request.titulo}</p><p className="mt-1 text-xs text-[var(--foreground-muted)]">{request.cliente}</p>{request.instrucciones && <p className="mt-2 text-xs text-[var(--foreground-muted)]">{request.instrucciones}</p>}<ul className="mt-2 space-y-1 text-xs">{request.documentos_requeridos.map((item) => <li key={item.id}><span className="font-medium">{item.nombre}</span><span className="text-[var(--foreground-muted)]"> · {item.estado.replaceAll("_", " ")}</span>{item.documento?.nombre_archivo && <span className="text-[var(--foreground-muted)]"> ({item.documento.nombre_archivo})</span>}{item.documento?.comentario_revision && <span className="block text-amber-700">Observación: {item.documento.comentario_revision}</span>}</li>)}</ul><Link href={`/gestion-procesos/abogado/documentos?proceso=${id}#solicitud-${request.id}`} className="mt-2 inline-block text-xs font-medium text-[var(--primary)] hover:underline">Abrir solicitud documental</Link></div><span className="shrink-0 rounded-md bg-[var(--primary-light)] px-2 py-1 text-[10px] font-medium text-[var(--primary)]">{request.estado.replaceAll("_", " ")}</span></div>
               </div>)}</div> : <p className="rounded-lg border border-dashed border-[var(--border)] px-3 py-5 text-center text-xs text-[var(--foreground-muted)]">No hay solicitudes para este proceso.</p>}
             </div>
             <div>
               <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-[var(--foreground-muted)]">Archivos entregados</h3>
-              {process.documentos.length ? <div className="space-y-2">{process.documentos.map((document) => <div key={document.id} className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-[var(--border)] bg-[var(--surface-secondary)] px-3 py-2.5"><div className="flex min-w-0 items-center gap-2"><FileText className="size-4 shrink-0 text-[var(--primary)]" /><div className="min-w-0"><p className="truncate text-sm font-medium text-[var(--foreground)]">{document.nombre_archivo}</p><p className="truncate text-xs text-[var(--foreground-muted)]">{document.cliente} · {new Date(document.created_at).toLocaleDateString("es-CO")} · {document.estado_revision.replaceAll("_", " ")}</p><Link href={`/gestion-procesos/abogado/documentos?proceso=${id}#documento-${document.id}`} className="mt-1 inline-block text-xs font-medium text-[var(--primary)] hover:underline">Abrir en carpeta documental</Link></div></div><div className="flex shrink-0 items-center gap-2"><button type="button" disabled={downloadingDocumentId !== null} onClick={() => void openDocumentPreview(document)} className="rounded-md border border-[var(--border)] bg-[var(--surface)] px-2.5 py-2 text-xs hover:bg-[var(--surface-hover)] disabled:opacity-50">{downloadingDocumentId === document.id ? "Abriendo…" : "Previsualizar y revisar"}</button><button type="button" disabled={downloadingDocumentId !== null} onClick={() => void downloadDocument(document.id, document.nombre_archivo)} aria-label={`Descargar ${document.nombre_archivo}`} className="inline-flex items-center gap-1.5 rounded-md border border-[var(--border)] bg-[var(--surface)] px-2.5 py-2 text-xs text-[var(--foreground)] hover:bg-[var(--surface-hover)] disabled:opacity-50">{downloadingDocumentId === document.id ? <Loader2 className="size-3.5 animate-spin" /> : <Download className="size-3.5" />}{downloadingDocumentId === document.id ? "Descargando…" : "Descargar"}</button></div></div>)}</div> : <p className="rounded-lg border border-dashed border-[var(--border)] px-3 py-5 text-center text-xs text-[var(--foreground-muted)]">Aún no se han entregado archivos.</p>}
+              {process.documentos.length ? <div className="space-y-2">{process.documentos.map((document) => <div key={document.id} className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-[var(--border)] bg-[var(--surface-secondary)] px-3 py-2.5"><div className="flex min-w-0 items-center gap-2"><FileText className="size-4 shrink-0 text-[var(--primary)]" /><div className="min-w-0"><p className="truncate text-sm font-medium text-[var(--foreground)]">{document.nombre_archivo}</p><p className="truncate text-xs text-[var(--foreground-muted)]">{document.cliente} · {new Date(document.created_at).toLocaleDateString("es-CO", { timeZone: "America/Bogota" })} · {document.estado_revision.replaceAll("_", " ")}</p><Link href={`/gestion-procesos/abogado/documentos?proceso=${id}#documento-${document.id}`} className="mt-1 inline-block text-xs font-medium text-[var(--primary)] hover:underline">Abrir en carpeta documental</Link></div></div><div className="flex shrink-0 items-center gap-2"><button type="button" disabled={downloadingDocumentId !== null} onClick={() => void openDocumentPreview(document)} className="rounded-md border border-[var(--border)] bg-[var(--surface)] px-2.5 py-2 text-xs hover:bg-[var(--surface-hover)] disabled:opacity-50">{downloadingDocumentId === document.id ? "Abriendo…" : "Previsualizar y revisar"}</button><button type="button" disabled={downloadingDocumentId !== null} onClick={() => void downloadDocument(document.id, document.nombre_archivo)} aria-label={`Descargar ${document.nombre_archivo}`} className="inline-flex items-center gap-1.5 rounded-md border border-[var(--border)] bg-[var(--surface)] px-2.5 py-2 text-xs text-[var(--foreground)] hover:bg-[var(--surface-hover)] disabled:opacity-50">{downloadingDocumentId === document.id ? <Loader2 className="size-3.5 animate-spin" /> : <Download className="size-3.5" />}{downloadingDocumentId === document.id ? "Descargando…" : "Descargar"}</button></div></div>)}</div> : <p className="rounded-lg border border-dashed border-[var(--border)] px-3 py-5 text-center text-xs text-[var(--foreground-muted)]">Aún no se han entregado archivos.</p>}
             </div>
           </div>
         </section>
@@ -1119,18 +1122,23 @@ export default function ProcesoDetallePage() {
 
               <div>
                 <h2 className="text-sm font-semibold text-[var(--foreground)]">
-                  Comunicaciones y avisos
+                  Chat y comunicaciones anteriores
                 </h2>
 
                 <p className="text-xs text-[var(--foreground-muted)]">
-                  Historial interno y mensajes visibles al cliente
+                  Conversaciones rápidas con clientes y equipo de trabajo
                 </p>
               </div>
             </div>
           </div>
 
+          <div className="flex flex-wrap gap-2 border-b border-[var(--border)] px-5 py-3">
+            {process.clientes.map((client) => <Link key={client.id} href={`/gestion-procesos/abogado/chat/${process.id}/${client.id}`} className="rounded-lg bg-[var(--primary)] px-3 py-2 text-xs font-semibold text-white">Chat con {client.nombre_completo}</Link>)}
+            <Link href={`/gestion-procesos/abogado/chat/${process.id}/colaboradores`} className="rounded-lg border border-[var(--border)] px-3 py-2 text-xs font-semibold">Chat de colaboradores</Link>
+          </div>
+
           <div className="space-y-4 p-4">
-            <form onSubmit={(event) => void saveCommunication(event)} className="space-y-3 rounded-lg border border-[var(--border)] bg-[var(--surface-secondary)] p-3">
+            <form onSubmit={(event) => void saveCommunication(event)} className="hidden space-y-3 rounded-lg border border-[var(--border)] bg-[var(--surface-secondary)] p-3">
               <h3 className="text-xs font-semibold uppercase tracking-wide text-[var(--foreground-muted)]">Registrar comunicación</h3>
               <label className="block text-xs font-medium">Visibilidad<select value={communicationVisibility} onChange={(event) => { setCommunicationVisibility(event.target.value as "INTERNA" | "CLIENTE"); setCommunicationClientId(""); }} className="mt-1 w-full rounded-md border border-[var(--border)] bg-[var(--surface)] px-3 py-2"><option value="INTERNA">Nota solo para el equipo</option><option value="CLIENTE">Mensaje visible en el portal del cliente</option></select></label>
               {communicationVisibility === "CLIENTE" && <label className="block text-xs font-medium">Cliente<select required value={communicationClientId} onChange={(event) => setCommunicationClientId(event.target.value)} className="mt-1 w-full rounded-md border border-[var(--border)] bg-[var(--surface)] px-3 py-2"><option value="">Selecciona cliente</option>{process.clientes.map((client) => <option key={client.id} value={client.id}>{client.nombre_completo}</option>)}</select></label>}
@@ -1139,7 +1147,7 @@ export default function ProcesoDetallePage() {
               <button type="submit" disabled={working || !communicationSubject.trim() || !communicationBody.trim() || (communicationVisibility === "CLIENTE" && !communicationClientId)} className="rounded-md bg-[var(--primary)] px-3 py-2 text-xs font-semibold text-white disabled:opacity-50">Guardar en el expediente</button>
               <p className="text-[10px] text-[var(--foreground-muted)]">El registro queda trazable; no envía correos ni WhatsApp automáticamente.</p>
             </form>
-            <div><h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-[var(--foreground-muted)]">Historial</h3>{process.comunicaciones.length ? <div className="space-y-2">{process.comunicaciones.map((item) => <article key={item.id} className="rounded-lg border border-[var(--border)] p-3"><div className="flex flex-wrap items-center justify-between gap-2"><p className="text-sm font-medium">{item.asunto}</p><span className={`rounded-full px-2 py-1 text-[10px] ${item.visibilidad === "CLIENTE" ? "bg-emerald-500/10 text-emerald-700" : "bg-slate-500/10 text-slate-600"}`}>{item.visibilidad === "CLIENTE" ? `Visible para ${item.cliente || "cliente"}` : "Interna"}</span></div><p className="mt-2 whitespace-pre-wrap text-xs leading-5 text-[var(--foreground-secondary)]">{item.contenido}</p><p className="mt-1 text-[10px] text-[var(--foreground-muted)]">{item.actor || "Equipo"} · {new Date(item.created_at).toLocaleString("es-CO")}</p></article>)}</div> : <p className="text-xs text-[var(--foreground-muted)]">No hay comunicaciones registradas.</p>}</div>
+            <div><h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-[var(--foreground-muted)]">Historial</h3>{process.comunicaciones.length ? <div className="space-y-2">{process.comunicaciones.map((item) => <article key={item.id} className="rounded-lg border border-[var(--border)] p-3"><div className="flex flex-wrap items-center justify-between gap-2"><p className="text-sm font-medium">{item.asunto}</p><span className={`rounded-full px-2 py-1 text-[10px] ${item.visibilidad === "CLIENTE" ? "bg-emerald-500/10 text-emerald-700" : "bg-slate-500/10 text-slate-600"}`}>{item.visibilidad === "CLIENTE" ? `Visible para ${item.cliente || "cliente"}` : "Interna"}</span></div><p className="mt-2 whitespace-pre-wrap text-xs leading-5 text-[var(--foreground-secondary)]">{item.contenido}</p><p className="mt-1 text-[10px] text-[var(--foreground-muted)]">{item.actor || "Equipo"} · {new Date(item.created_at).toLocaleString("es-CO", { timeZone: "America/Bogota" })}</p></article>)}</div> : <p className="text-xs text-[var(--foreground-muted)]">No hay comunicaciones registradas.</p>}</div>
             {availableActuations.length > 0 && process.clientes.length > 0 ? (
               <form
                 onSubmit={async (event) => {
@@ -1178,7 +1186,7 @@ export default function ProcesoDetallePage() {
             <div>
               <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-[var(--foreground-muted)]">Enviadas recientemente</h3>
               {process.notificaciones.length ? <div className="space-y-2">{process.notificaciones.map((notification) => <article key={notification.id} className="rounded-lg border border-[var(--border)] p-3">
-                <div className="flex items-start justify-between gap-3"><div><p className="text-sm font-medium text-[var(--foreground)]">{notification.asunto}</p><p className="mt-1 text-xs text-[var(--foreground-muted)]">Para {notification.cliente} · {new Date(notification.created_at).toLocaleString("es-CO")}</p></div><CheckCircle2 className="size-4 shrink-0 text-emerald-600" /></div>
+                <div className="flex items-start justify-between gap-3"><div><p className="text-sm font-medium text-[var(--foreground)]">{notification.asunto}</p><p className="mt-1 text-xs text-[var(--foreground-muted)]">Para {notification.cliente} · {new Date(notification.created_at).toLocaleString("es-CO", { timeZone: "America/Bogota" })}</p></div><CheckCircle2 className="size-4 shrink-0 text-emerald-600" /></div>
                 <p className="mt-2 whitespace-pre-line text-xs leading-5 text-[var(--foreground-secondary)]">{notification.cuerpo}</p>
               </article>)}</div> : <p className="rounded-lg border border-dashed border-[var(--border)] px-3 py-5 text-center text-xs text-[var(--foreground-muted)]">Aún no se han enviado notificaciones.</p>}
             </div>
@@ -1190,12 +1198,13 @@ export default function ProcesoDetallePage() {
 
       {showDocumentRequestModal && (
         <div role="dialog" aria-modal="true" aria-labelledby="document-request-title" className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm">
-          <form onSubmit={async (event) => { event.preventDefault(); const ok = await action(`/api/expedientes/procesos/${id}/solicitudes-documento`, "POST", { cliente_id: Number(documentClientId), titulo: documentTitle.trim(), instrucciones: documentInstructions.trim() || null }); if (ok) setShowDocumentRequestModal(false); }} className="w-full max-w-lg space-y-4 rounded-xl border border-[var(--border)] bg-[var(--surface)] p-5 shadow-2xl">
+          <form onSubmit={async (event) => { event.preventDefault(); const ok = await action(`/api/expedientes/procesos/${id}/solicitudes-documento`, "POST", { cliente_id: Number(documentClientId), titulo: documentTitle.trim(), documentos: documentItems.split(/\r?\n/).map((value) => value.trim()).filter(Boolean), instrucciones: documentInstructions.trim() || null }); if (ok) setShowDocumentRequestModal(false); }} className="w-full max-w-lg space-y-4 rounded-xl border border-[var(--border)] bg-[var(--surface)] p-5 shadow-2xl">
             <div className="flex items-start justify-between gap-3"><div><h2 id="document-request-title" className="text-base font-semibold text-[var(--foreground)]">Solicitar documento</h2><p className="mt-1 text-sm text-[var(--foreground-muted)]">La solicitud se mostrará al cliente asignado a este proceso.</p></div><button type="button" aria-label="Cerrar" onClick={() => setShowDocumentRequestModal(false)} className="rounded-md p-1 text-[var(--foreground-muted)] hover:bg-[var(--surface-secondary)]"><X className="size-5" /></button></div>
             <label className="block text-sm font-medium text-[var(--foreground)]">Cliente<select required value={documentClientId} onChange={(event) => setDocumentClientId(event.target.value)} className="mt-1.5 w-full rounded-lg border border-[var(--border)] bg-[var(--surface-secondary)] px-3 py-2.5"><option value="">Selecciona un cliente</option>{process.clientes.map((client) => <option key={client.id} value={client.id}>{client.nombre_completo}</option>)}</select></label>
-            <label className="block text-sm font-medium text-[var(--foreground)]">Documento solicitado<input required maxLength={255} value={documentTitle} onChange={(event) => setDocumentTitle(event.target.value)} className="mt-1.5 w-full rounded-lg border border-[var(--border)] bg-[var(--surface-secondary)] px-3 py-2.5" /></label>
+            <label className="block text-sm font-medium text-[var(--foreground)]">Nombre de la solicitud<input required maxLength={255} value={documentTitle} onChange={(event) => setDocumentTitle(event.target.value)} placeholder="Documentos para la demanda" className="mt-1.5 w-full rounded-lg border border-[var(--border)] bg-[var(--surface-secondary)] px-3 py-2.5" /></label>
+            <label className="block text-sm font-medium text-[var(--foreground)]">Documentos requeridos <span className="font-normal text-[var(--foreground-muted)]">(uno por línea)</span><textarea required rows={5} value={documentItems} onChange={(event) => setDocumentItems(event.target.value)} placeholder={"Copia de la cédula\nRegistro civil\nCertificado de residencia"} className="mt-1.5 w-full rounded-lg border border-[var(--border)] bg-[var(--surface-secondary)] px-3 py-2.5" /></label>
             <label className="block text-sm font-medium text-[var(--foreground)]">Instrucciones<textarea rows={3} value={documentInstructions} onChange={(event) => setDocumentInstructions(event.target.value)} className="mt-1.5 w-full resize-y rounded-lg border border-[var(--border)] bg-[var(--surface-secondary)] px-3 py-2.5" /></label>
-            <footer className="flex justify-end gap-2 border-t border-[var(--border)] pt-4"><button type="button" disabled={working} onClick={() => setShowDocumentRequestModal(false)} className="rounded-lg border border-[var(--border)] px-4 py-2 text-sm text-[var(--foreground)]">Cancelar</button><button type="submit" disabled={working || !documentClientId || !documentTitle.trim()} className="inline-flex items-center gap-2 rounded-lg bg-[var(--primary)] px-4 py-2 text-sm font-medium text-white disabled:opacity-50">{working && <Loader2 className="size-4 animate-spin" />}Enviar solicitud</button></footer>
+            <footer className="flex justify-end gap-2 border-t border-[var(--border)] pt-4"><button type="button" disabled={working} onClick={() => setShowDocumentRequestModal(false)} className="rounded-lg border border-[var(--border)] px-4 py-2 text-sm text-[var(--foreground)]">Cancelar</button><button type="submit" disabled={working || !documentClientId || !documentTitle.trim() || !documentItems.trim()} className="inline-flex items-center gap-2 rounded-lg bg-[var(--primary)] px-4 py-2 text-sm font-medium text-white disabled:opacity-50">{working && <Loader2 className="size-4 animate-spin" />}Enviar solicitud</button></footer>
           </form>
         </div>
       )}

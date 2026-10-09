@@ -3,7 +3,7 @@
 import { FormEvent, useEffect, useState } from "react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
-import { ArrowLeft, Clock3, FileText, FolderOpen, KeyRound, Pencil, Save, Trash2 } from "lucide-react";
+import { ArrowLeft, Clock3, FileText, FolderOpen, KeyRound, Mail, Pencil, Save, Trash2 } from "lucide-react";
 import { fetchApi } from "@/lib/api";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
@@ -39,7 +39,7 @@ const roleLabels: Record<string, string> = {
 };
 const stateTone = (state: string) => state === "ACTIVO" ? "completed" : state === "RECHAZADO" ? "rejected" : "pending";
 const stateLabel = (state: string) => ({ ACTIVO: "Activo", SUSPENDIDO: "Suspendido", RECHAZADO: "Rechazado", PENDIENTE_APROBACION: "Pendiente de aprobación" })[state] || state;
-const formatDate = (value: string | null) => value ? new Date(value).toLocaleString("es-CO") : "Sin registro";
+const formatDate = (value: string | null) => value ? new Date(value).toLocaleString("es-CO", { timeZone: "America/Bogota" }) : "Sin registro";
 
 export default function AdminUserDetailPage() {
   const params = useParams<{ id: string }>();
@@ -153,6 +153,20 @@ export default function AdminUserDetailPage() {
     }
   }
 
+  async function sendPasswordReset() {
+    if (!user || !window.confirm(`¿Enviar a ${user.email} un enlace para restablecer su contraseña?`)) return;
+    setWorking(true);
+    setError("");
+    try {
+      const result = await fetchApi(`/api/admin/usuarios/${user.id}/enviar-restablecimiento`, { method: "POST", token });
+      setNotice(result.mensaje || `Se solicitó el envío a ${user.email}.`);
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "No fue posible enviar el restablecimiento.");
+    } finally {
+      setWorking(false);
+    }
+  }
+
   if (loading) return <div className="p-6"><LoadingState label="Cargando ficha de usuario" rows={5} /></div>;
   if (!user) return <div className="space-y-4 p-6"><Link href="/gestion-procesos/admin/usuarios" className="text-sm text-primary">Volver a usuarios</Link>{error && <p role="alert" className="rounded-lg bg-danger-light p-3 text-danger">{error}</p>}<EmptyState title="No se encontró el usuario" description="La cuenta pudo ser eliminada o no está disponible." /></div>;
 
@@ -165,6 +179,7 @@ export default function AdminUserDetailPage() {
       <header className="flex flex-wrap items-start justify-between gap-4">
         <div><p className="text-xs font-semibold uppercase tracking-wide text-primary">Ficha de cuenta · {roleLabels[user.rol] || user.rol}</p><h1 className="mt-1 text-2xl font-semibold">{user.nombre_completo}</h1><p className="mt-1 text-sm text-foreground-muted">{user.email}</p></div>
         <div className="flex flex-wrap gap-2">
+          <Button variant="secondary" onClick={() => void sendPasswordReset()} disabled={working}><Mail className="size-4" /> Enviar restablecimiento</Button>
           {!adminReadOnly && <Button variant="secondary" onClick={() => setEditing((value) => !value)}><Pencil className="size-4" /> Editar</Button>}
           {!adminReadOnly && <Button variant="secondary" onClick={() => void forcePasswordChange()} disabled={working || user.debe_cambiar_password}><KeyRound className="size-4" /> Restablecer acceso</Button>}
           {!adminReadOnly && user.estado !== "PENDIENTE_APROBACION" && <Button variant={user.estado === "ACTIVO" ? "danger" : "primary"} onClick={() => void changeStatus()} disabled={working}>{user.estado === "ACTIVO" ? "Suspender" : "Activar"}</Button>}

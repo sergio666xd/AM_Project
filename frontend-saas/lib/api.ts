@@ -1,6 +1,12 @@
+const configuredApiUrl = process.env.NEXT_PUBLIC_API_URL?.replace(
+  /^http:\/\/localhost(?=:|$)/i,
+  "http://127.0.0.1",
+);
+
 export const API_URL =
-  process.env.NEXT_PUBLIC_API_URL ||
-  (process.env.NODE_ENV === "development" ? "http://localhost:8000" : "");
+  configuredApiUrl ||
+  // Local Uvicorn commonly binds IPv4 only; avoid localhost resolving to ::1.
+  (process.env.NODE_ENV === "development" ? "http://127.0.0.1:8000" : "");
 
 export interface FetchOptions extends RequestInit {
   token?: string;
@@ -22,11 +28,21 @@ export async function apiRequest(
   const url = /^https?:\/\//i.test(endpoint)
     ? endpoint
     : `${API_URL}${endpoint.startsWith("/") ? endpoint : `/${endpoint}`}`;
+  const method = String(rest.method || "GET").toUpperCase();
+  const retryDelays = method === "GET" || method === "HEAD" ? [250, 700] : [];
+  const fetchWithTransientRetries = async () => {
+    for (let attempt = 0; ; attempt += 1) {
+      try {
+        return await fetch(url, { ...rest, headers: requestHeaders });
+      } catch (cause) {
+        if (!(cause instanceof TypeError) || attempt >= retryDelays.length) throw cause;
+        await new Promise((resolve) => window.setTimeout(resolve, retryDelays[attempt]));
+      }
+    }
+  };
+
   try {
-    const response = await fetch(url, {
-      ...rest,
-      headers: requestHeaders,
-    });
+    const response = await fetchWithTransientRetries();
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({}));
       throw new Error(

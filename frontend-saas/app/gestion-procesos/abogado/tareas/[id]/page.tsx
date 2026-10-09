@@ -98,7 +98,7 @@ type ScopeLevel = "HEREDAR" | "GENERAL" | "PROCESO" | "RADICADO" | "ACTUACION";
 function formatDateTime(value?: string | null) {
   if (!value) return "Sin fecha";
 
-  return new Date(value).toLocaleString("es-CO", {
+  return new Date(value).toLocaleString("es-CO", { timeZone: "America/Bogota",
     day: "2-digit",
     month: "2-digit",
     year: "numeric",

@@ -121,7 +121,13 @@ def emitir_notificacion_workflow(
                 db, plantilla_clave, variables or {}, canal="EMAIL",
                 link_label=enlace_texto, link_url=enlace_url,
             )
-            canal = usuario.canal_notificacion_cliente or "SIN_CANAL"
+            requested_channels = [
+                name for name, enabled in (
+                    ("EMAIL", usuario.notificaciones_email),
+                    ("WHATSAPP", usuario.notificaciones_whatsapp),
+                ) if enabled
+            ]
+            canal = "+".join(requested_channels) or "SIN_CANAL"
             clave = _delivery_key(tipo, origen, usuario.id, f"BLOQUEADA:{canal}")
             existente = db.query(models.EntregaNotificacion).filter_by(
                 clave_idempotencia=clave

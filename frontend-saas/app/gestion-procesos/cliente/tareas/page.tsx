@@ -346,6 +346,7 @@ export default function TareasClientePage() {
                           ? new Intl.DateTimeFormat("es-CO", {
                               dateStyle: "medium",
                               timeStyle: "short",
+                              timeZone: "America/Bogota",
                             }).format(new Date(task.fecha_limite))
                           : "Sin fecha límite"}{" "}
                         · {task.prioridad}

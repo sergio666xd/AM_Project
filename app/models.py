@@ -462,6 +462,7 @@ class SolicitudDocumento(Base):
     cliente_id = Column(Integer, ForeignKey("usuarios.id"), nullable=False, index=True)
     titulo = Column(String(255), nullable=False)
     instrucciones = Column(Text, nullable=True)
+    documentos_requeridos = Column(JSON, nullable=False, default=list)
     fecha_limite = Column(DateTime, nullable=True)
     atendida_en = Column(DateTime, nullable=True)
     created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
@@ -476,6 +477,7 @@ class DocumentoProceso(Base):
     proceso_id = Column(Integer, ForeignKey("procesos.id"), nullable=True, index=True)
     cliente_id = Column(Integer, ForeignKey("usuarios.id"), nullable=True, index=True)
     solicitud_id = Column(Integer, ForeignKey("solicitudes_documento.id"), nullable=True, index=True)
+    solicitud_item_id = Column(String(36), nullable=True, index=True)
     contrato_id = Column(Integer, ForeignKey("contratos_servicios.id", ondelete="SET NULL"), nullable=True, index=True)
     nombre_archivo = Column(String(255), nullable=False)
     ruta_archivo = Column(String(500), nullable=False)
@@ -522,6 +524,53 @@ class ComunicacionProceso(Base):
     proceso = relationship("Proceso")
     actor = relationship("Usuario", foreign_keys=[actor_id])
     cliente = relationship("Usuario", foreign_keys=[cliente_id])
+
+
+class ChatConversacion(Base):
+    __tablename__ = "chat_conversaciones"
+
+    id = Column(Integer, primary_key=True, index=True)
+    clave = Column(String(140), nullable=False, unique=True)
+    tipo = Column(String(32), nullable=False, index=True)
+    proceso_id = Column(Integer, ForeignKey("procesos.id", ondelete="CASCADE"), nullable=True, index=True)
+    cliente_id = Column(Integer, ForeignKey("usuarios.id", ondelete="SET NULL"), nullable=True, index=True)
+    creado_por_id = Column(Integer, ForeignKey("usuarios.id", ondelete="SET NULL"), nullable=True)
+    created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
+    updated_at = Column(DateTime, nullable=False, default=datetime.utcnow, index=True)
+    proceso = relationship("Proceso")
+    cliente = relationship("Usuario", foreign_keys=[cliente_id])
+    participantes = relationship("ChatParticipante", back_populates="conversacion", cascade="all, delete-orphan")
+    mensajes = relationship("ChatMensaje", back_populates="conversacion", cascade="all, delete-orphan", order_by="ChatMensaje.id")
+
+
+class ChatParticipante(Base):
+    __tablename__ = "chat_participantes"
+    __table_args__ = (UniqueConstraint("conversacion_id", "usuario_id", name="uq_chat_participante"),)
+
+    id = Column(Integer, primary_key=True)
+    conversacion_id = Column(Integer, ForeignKey("chat_conversaciones.id", ondelete="CASCADE"), nullable=False, index=True)
+    usuario_id = Column(Integer, ForeignKey("usuarios.id", ondelete="CASCADE"), nullable=False, index=True)
+    ultimo_leido_en = Column(DateTime, nullable=True)
+    ultimo_entregado_mensaje_id = Column(Integer, nullable=False, default=0)
+    ultimo_leido_mensaje_id = Column(Integer, nullable=False, default=0)
+    conversacion = relationship("ChatConversacion", back_populates="participantes")
+    usuario = relationship("Usuario")
+
+
+class ChatMensaje(Base):
+    __tablename__ = "chat_mensajes"
+
+    id = Column(Integer, primary_key=True, index=True)
+    conversacion_id = Column(Integer, ForeignKey("chat_conversaciones.id", ondelete="CASCADE"), nullable=False, index=True)
+    remitente_id = Column(Integer, ForeignKey("usuarios.id", ondelete="SET NULL"), nullable=True, index=True)
+    contenido = Column(Text, nullable=False)
+    referencia_tipo = Column(String(24), nullable=True)
+    referencia_id = Column(Integer, nullable=True)
+    referencia_titulo = Column(String(255), nullable=True)
+    referencia_url = Column(String(500), nullable=True)
+    created_at = Column(DateTime, nullable=False, default=datetime.utcnow, index=True)
+    conversacion = relationship("ChatConversacion", back_populates="mensajes")
+    remitente = relationship("Usuario")
 
 
 class LecturaNotificacionAbogado(Base):

@@ -188,7 +188,7 @@ export default function AdminAlertsPage() {
                 <td className="max-w-md px-3 py-3"><p className="font-semibold">{item.descripcion}</p><p className="mt-1 text-xs text-foreground-muted">{item.accion_recomendada}</p></td>
                 <td className="px-3 py-3"><Badge tone={priorityTone[item.prioridad]}>{item.prioridad}</Badge></td>
                 <td className="px-3 py-3"><Badge tone={item.estado === "ACTIVA" ? "pending" : item.estado === "ATENDIDA" ? "completed" : "archived"}>{item.estado === "ACTIVA" ? item.tipo : item.estado === "ATENDIDA" ? "Atendida" : item.estado === "DESCARTADA" ? "Descartada" : "Eliminada"}</Badge></td>
-                <td className="whitespace-nowrap px-3 py-3 text-xs text-foreground-muted">{item.fecha ? <time dateTime={item.fecha}>{new Date(item.fecha).toLocaleString("es-CO")}</time> : "—"}</td>
+                <td className="whitespace-nowrap px-3 py-3 text-xs text-foreground-muted">{item.fecha ? <time dateTime={item.fecha}>{new Date(item.fecha).toLocaleString("es-CO", { timeZone: "America/Bogota" })}</time> : "—"}</td>
                 <td className="px-3 py-3">{item.recurso}</td>
                 <td className="px-3 py-3"><div className="flex flex-wrap gap-1">
                   <Link className="inline-flex min-h-8 items-center gap-1 rounded-md bg-surface-hover px-2 text-xs font-semibold" href={item.href}><ExternalLink className="size-3.5" /> Abrir</Link>

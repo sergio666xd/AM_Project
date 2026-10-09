@@ -124,7 +124,7 @@ export default function AdminNotificationDeliveriesPage() {
             <tbody className="divide-y divide-border">
               {visible.map((item) => <tr key={item.id} className="align-top">
                 <td className="px-4 py-3"><input type="checkbox" checked={selectedIds.includes(item.id)} onChange={() => setSelectedIds((current) => current.includes(item.id) ? current.filter((id) => id !== item.id) : [...current, item.id])} aria-label={`Seleccionar entrega ${item.id}`} /></td>
-                <td className="whitespace-nowrap px-4 py-3 text-xs text-foreground-muted">{new Date(item.creada_en).toLocaleString("es-CO")}<br />{item.enviada_en ? `Enviada: ${new Date(item.enviada_en).toLocaleString("es-CO")}` : `Intentos: ${item.intentos}`}</td>
+                <td className="whitespace-nowrap px-4 py-3 text-xs text-foreground-muted">{new Date(item.creada_en).toLocaleString("es-CO", { timeZone: "America/Bogota" })}<br />{item.enviada_en ? `Enviada: ${new Date(item.enviada_en).toLocaleString("es-CO", { timeZone: "America/Bogota" })}` : `Intentos: ${item.intentos}`}</td>
                 <td className="px-4 py-3"><span className="font-semibold">{item.canal === "EMAIL" ? "Correo" : "WhatsApp"}</span><br /><span className="text-xs text-foreground-muted">{item.estado}</span>{item.error && <p className="mt-1 max-w-52 text-xs text-danger">{item.error}</p>}</td>
                 <td className="px-4 py-3"><p className="font-medium">{item.destinatario}</p><p className="text-xs text-foreground-muted">{item.canal === "EMAIL" ? item.email : item.whatsapp}</p></td>
                 <td className="px-4 py-3"><p className="text-xs font-semibold uppercase text-primary">{item.tipo}</p><p className="mt-1 max-w-64">{item.asunto}</p></td>

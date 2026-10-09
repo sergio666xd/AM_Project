@@ -37,7 +37,7 @@ type AuditFilters = { usuario: string; accion: string; modulo: string; fecha_des
 const emptyFilters: AuditFilters = { usuario: "", accion: "", modulo: "", fecha_desde: "", fecha_hasta: "", resultado: "" };
 
 function formatDate(value: string) {
-  return new Date(value).toLocaleString("es-CO", { dateStyle: "medium", timeStyle: "short" });
+  return new Date(value).toLocaleString("es-CO", { dateStyle: "medium", timeStyle: "short", timeZone: "America/Bogota" });
 }
 function DetailValue({ label, value }: { label: string; value: string | null }) {
   return <div><dt className="text-xs text-foreground-muted">{label}</dt><dd className="mt-1 break-words text-sm">{value || "No registrado"}</dd></div>;

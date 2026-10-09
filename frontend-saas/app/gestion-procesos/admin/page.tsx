@@ -102,7 +102,7 @@ function formatDate(value: string | null, includeTime = false) {
   return date.toLocaleString("es-CO", {
     timeZone: "America/Bogota",
     ...(includeTime
-      ? { dateStyle: "medium", timeStyle: "short" }
+      ? { dateStyle: "medium", timeStyle: "short", timeZone: "America/Bogota" }
       : { dateStyle: "medium" }),
   });
 }

@@ -1,25 +1,22 @@
 "use client";
 
 import { FormEvent, useState } from "react";
-import { KeyRound, Save, ShieldCheck } from "lucide-react";
+import { Save, ShieldCheck } from "lucide-react";
 import { useSession } from "@/context/SessionContext";
 import { fetchApi } from "@/lib/api";
-import { SecurityChangePanel } from "@/app/gestion-procesos/abogado/configuracion/page";
+import { SecurityChangeButton } from "@/components/security/SecurityChangeButton";
 
 export default function AdminAccountPage() {
   const { user, token, refreshUser } = useSession();
-  const [email, setEmail] = useState<string | null>(null);
   const [name, setName] = useState<string | null>(null);
-  const [whatsapp, setWhatsapp] = useState<string | null>(null);
-  const [currentPassword, setCurrentPassword] = useState("");
-  const [newPassword, setNewPassword] = useState("");
-  const [confirmPassword, setConfirmPassword] = useState("");
+  const [gender, setGender] = useState<string | null>(null);
+  const [documentNumber, setDocumentNumber] = useState<string | null>(null);
+  const [domicile, setDomicile] = useState<string | null>(null);
+  const [address, setAddress] = useState<string | null>(null);
+  const [professionalCard, setProfessionalCard] = useState<string | null>(null);
   const [savingProfile, setSavingProfile] = useState(false);
-  const [savingPassword, setSavingPassword] = useState(false);
   const [profileError, setProfileError] = useState("");
   const [profileNotice, setProfileNotice] = useState("");
-  const [passwordError, setPasswordError] = useState("");
-  const [passwordNotice, setPasswordNotice] = useState("");
 
   async function saveProfile(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -33,13 +30,16 @@ export default function AdminAccountPage() {
         token,
         body: JSON.stringify({
           nombre_completo: (name ?? user?.nombre_completo ?? "").trim(),
+          genero: gender ?? user?.genero ?? "",
+          numero_documento: documentNumber ?? user?.numero_documento ?? "",
+          domicilio: domicile ?? user?.domicilio ?? "",
+          direccion: address ?? user?.direccion ?? "",
+          tarjeta_profesional: professionalCard ?? user?.tarjeta_profesional ?? "",
         }),
       });
       await refreshUser();
-      setEmail(result.email);
       setName(result.nombre_completo);
-      setWhatsapp(result.whatsapp_numero);
-      setProfileNotice("Datos de acceso actualizados.");
+      setProfileNotice("Datos personales actualizados.");
     } catch (cause) {
       setProfileError(
         cause instanceof Error
@@ -48,42 +48,6 @@ export default function AdminAccountPage() {
       );
     } finally {
       setSavingProfile(false);
-    }
-  }
-
-  async function changePassword(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    setPasswordError("");
-    setPasswordNotice("");
-    if (!token) return setPasswordError("La sesión no está disponible.");
-    if (newPassword.length < 8)
-      return setPasswordError("Usa al menos 8 caracteres.");
-    if (newPassword !== confirmPassword)
-      return setPasswordError("La confirmación no coincide.");
-    if (newPassword === currentPassword)
-      return setPasswordError("La nueva contraseña debe ser distinta.");
-    setSavingPassword(true);
-    try {
-      const result = await fetchApi("/api/auth/cambiar-password", {
-        method: "POST",
-        token,
-        body: JSON.stringify({
-          password_actual: currentPassword,
-          password_nueva: newPassword,
-        }),
-      });
-      setCurrentPassword("");
-      setNewPassword("");
-      setConfirmPassword("");
-      setPasswordNotice(result.mensaje || "Contraseña actualizada.");
-    } catch (cause) {
-      setPasswordError(
-        cause instanceof Error
-          ? cause.message
-          : "No fue posible cambiar la contraseña.",
-      );
-    } finally {
-      setSavingPassword(false);
     }
   }
 
@@ -101,15 +65,15 @@ export default function AdminAccountPage() {
         </p>
       </header>
       <section className="grid gap-4 md:grid-cols-3">
-        <SecurityChangePanel action="email" title="Cambiar correo" token={token} whatsappAvailable={Boolean(user?.whatsapp_numero)} onComplete={refreshUser} />
-        <SecurityChangePanel action="whatsapp" title="Cambiar WhatsApp" token={token} whatsappAvailable={Boolean(user?.whatsapp_numero)} onComplete={refreshUser} />
-        <SecurityChangePanel action="password" title="Cambiar contraseña" token={token} whatsappAvailable={Boolean(user?.whatsapp_numero)} onComplete={refreshUser} />
+        <SecurityChangeButton action="email" title="Cambiar correo" token={token} whatsappAvailable={Boolean(user?.whatsapp_numero)} onComplete={refreshUser} />
+        <SecurityChangeButton action="whatsapp" title="Cambiar WhatsApp" token={token} whatsappAvailable={Boolean(user?.whatsapp_numero)} onComplete={refreshUser} />
+        <SecurityChangeButton action="password" title="Cambiar contraseña" token={token} whatsappAvailable={Boolean(user?.whatsapp_numero)} onComplete={refreshUser} />
       </section>
       <section className="space-y-4 border-t border-border pt-5">
         <div className="flex items-center gap-3">
           <ShieldCheck className="size-5 text-primary" />
           <div>
-            <h2 className="font-semibold">Datos de acceso</h2>
+            <h2 className="font-semibold">Datos personales</h2>
             <p className="text-sm text-foreground-muted">
               El correo se utiliza para iniciar sesión.
             </p>
@@ -142,24 +106,41 @@ export default function AdminAccountPage() {
               className="mt-1 w-full rounded-md border border-border bg-surface px-3 py-2.5"
             />
           </label>
+          <div className="text-sm">
+            <span className="font-medium">Correo de acceso</span>
+            <p className="mt-1 rounded-md border border-border bg-surface-secondary px-3 py-2.5">{user?.email || "No configurado"}</p>
+          </div>
+          <div className="text-sm">
+            <span className="font-medium">WhatsApp</span>
+            <p className="mt-1 rounded-md border border-border bg-surface-secondary px-3 py-2.5">{user?.whatsapp_numero || "No configurado"}</p>
+          </div>
           <label className="text-sm font-medium">
-            Correo de acceso
-            <input
-              required
-              type="email"
-              autoComplete="email"
-              value={email ?? user?.email ?? ""}
-              disabled
+            Género para documentos
+            <select
+              value={gender ?? user?.genero ?? ""}
+              onChange={(event) => setGender(event.target.value)}
               className="mt-1 w-full rounded-md border border-border bg-surface px-3 py-2.5"
-            />
+            >
+              <option value="">Sin especificar</option>
+              <option value="MASCULINO">Masculino</option>
+              <option value="FEMENINO">Femenino</option>
+            </select>
           </label>
           <label className="text-sm font-medium">
-            WhatsApp
-            <input
-              value={whatsapp ?? user?.whatsapp_numero ?? ""}
-              disabled
-              className="mt-1 w-full rounded-md border border-border bg-surface px-3 py-2.5"
-            />
+            Número de identificación
+            <input maxLength={40} value={documentNumber ?? user?.numero_documento ?? ""} onChange={(event) => setDocumentNumber(event.target.value)} className="mt-1 w-full rounded-md border border-border bg-surface px-3 py-2.5" />
+          </label>
+          <label className="text-sm font-medium">
+            Municipio / domicilio
+            <input maxLength={120} value={domicile ?? user?.domicilio ?? ""} onChange={(event) => setDomicile(event.target.value)} className="mt-1 w-full rounded-md border border-border bg-surface px-3 py-2.5" />
+          </label>
+          <label className="text-sm font-medium">
+            Dirección de notificación
+            <input maxLength={300} value={address ?? user?.direccion ?? ""} onChange={(event) => setAddress(event.target.value)} className="mt-1 w-full rounded-md border border-border bg-surface px-3 py-2.5" />
+          </label>
+          <label className="text-sm font-medium">
+            Tarjeta profesional
+            <input maxLength={40} value={professionalCard ?? user?.tarjeta_profesional ?? ""} onChange={(event) => setProfessionalCard(event.target.value)} className="mt-1 w-full rounded-md border border-border bg-surface px-3 py-2.5" />
           </label>
           <div className="flex items-end">
             <button
@@ -169,80 +150,6 @@ export default function AdminAccountPage() {
             >
               <Save className="size-4" />
               Guardar datos
-            </button>
-          </div>
-        </form>
-      </section>
-      <section className="hidden space-y-4 border-t border-border pt-5">
-        <div className="flex items-center gap-3">
-          <KeyRound className="size-5 text-primary" />
-          <div>
-            <h2 className="font-semibold">Contraseña</h2>
-            <p className="text-sm text-foreground-muted">
-              Confirma tu contraseña actual para cambiarla.
-            </p>
-          </div>
-        </div>
-        {passwordError && (
-          <p
-            role="alert"
-            className="rounded-lg border border-danger/30 bg-danger-light p-3 text-sm text-danger"
-          >
-            {passwordError}
-          </p>
-        )}
-        {passwordNotice && (
-          <p
-            role="status"
-            className="rounded-lg border border-success/30 bg-success-light p-3 text-sm text-success"
-          >
-            {passwordNotice}
-          </p>
-        )}
-        <form onSubmit={changePassword} className="grid gap-4 sm:grid-cols-2">
-          <label className="text-sm font-medium sm:col-span-2">
-            Contraseña actual
-            <input
-              required
-              type="password"
-              autoComplete="current-password"
-              value={currentPassword}
-              onChange={(event) => setCurrentPassword(event.target.value)}
-              className="mt-1 w-full rounded-md border border-border bg-surface px-3 py-2.5"
-            />
-          </label>
-          <label className="text-sm font-medium">
-            Nueva contraseña
-            <input
-              required
-              minLength={8}
-              type="password"
-              autoComplete="new-password"
-              value={newPassword}
-              onChange={(event) => setNewPassword(event.target.value)}
-              className="mt-1 w-full rounded-md border border-border bg-surface px-3 py-2.5"
-            />
-          </label>
-          <label className="text-sm font-medium">
-            Confirmar contraseña
-            <input
-              required
-              minLength={8}
-              type="password"
-              autoComplete="new-password"
-              value={confirmPassword}
-              onChange={(event) => setConfirmPassword(event.target.value)}
-              className="mt-1 w-full rounded-md border border-border bg-surface px-3 py-2.5"
-            />
-          </label>
-          <div>
-            <button
-              type="submit"
-              disabled={savingPassword}
-              className="inline-flex items-center gap-2 rounded-md border border-border px-4 py-2.5 text-sm font-semibold hover:bg-surface-hover disabled:opacity-50"
-            >
-              <KeyRound className="size-4" />
-              Cambiar contraseña
             </button>
           </div>
         </form>

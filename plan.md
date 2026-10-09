@@ -251,19 +251,19 @@ Al crear este plan, todas las fases iniciaron como **Pendientes**. No se asume t
 
 Completar durante Fase 0. Hasta entonces se asumen solo estos límites seguros: acreedor = abogado/despacho responsable; pagador = cliente vinculado; ADMIN = supervisor global; COP como moneda inicial; cuenta de cobro/recibo interno no se presentan como factura DIAN; ePayco desactivado hasta las Fases 8–9.
 
-| Decisión | Responsable | Estado |
-|---|---|---|
-| Identidad legal y datos que identifican al acreedor en los PDF | Despacho | Pendiente |
-| Confirmar responsable de recaudo y si se usa una única cuenta ePayco de la firma | Despacho | Pendiente |
-| Tratamiento de honorarios, IVA, retenciones y obligación de factura electrónica | Contador/asesor del despacho | Pendiente |
-| Política de vencimientos, pagos parciales, anticipos, descuentos y aplicación de un pago a varias cuentas | Despacho | Pendiente |
-| Política de anulación, devolución, reversión, disputa y soportes | Despacho | Pendiente |
-| Retención y acceso a documentos financieros después de cerrar/archivar un proceso | Despacho | Pendiente |
-| Campos del remitente financiero y correo de respuesta | Despacho | Pendiente |
-| `CPS.pdf` como referencia visual y `CPS.docx` como contenido auxiliar; fidelidad visual/editorial requerida | Despacho | Archivos presentes; método de edición por definir en Fase 0 |
-| Datos y cláusulas editables del contrato; flujo para generar nuevas versiones/adendas | Despacho/asesor jurídico | Pendiente |
-| Información de evento de firma (lugar, participantes, instrucciones y notificaciones) | Despacho | Pendiente |
-| Retención del escaneado firmado y política de reenvío al correo del cliente | Despacho | Pendiente |
+| Decisión                                                                                                       | Responsable                  | Estado                                                        |
+| --------------------------------------------------------------------------------------------------------------- | ---------------------------- | ------------------------------------------------------------- |
+| Identidad legal y datos que identifican al acreedor en los PDF                                                  | Despacho                     | Pendiente                                                     |
+| Confirmar responsable de recaudo y si se usa una única cuenta ePayco de la firma                               | Despacho                     | Pendiente                                                     |
+| Tratamiento de honorarios, IVA, retenciones y obligación de factura electrónica                               | Contador/asesor del despacho | Pendiente                                                     |
+| Política de vencimientos, pagos parciales, anticipos, descuentos y aplicación de un pago a varias cuentas     | Despacho                     | Pendiente                                                     |
+| Política de anulación, devolución, reversión, disputa y soportes                                            | Despacho                     | Pendiente                                                     |
+| Retención y acceso a documentos financieros después de cerrar/archivar un proceso                             | Despacho                     | Pendiente                                                     |
+| Campos del remitente financiero y correo de respuesta                                                           | Despacho                     | Pendiente                                                     |
+| `CPS.pdf` como referencia visual y `CPS.docx` como contenido auxiliar; fidelidad visual/editorial requerida | Despacho                     | Archivos presentes; método de edición por definir en Fase 0 |
+| Datos y cláusulas editables del contrato; flujo para generar nuevas versiones/adendas                          | Despacho/asesor jurídico    | Pendiente                                                     |
+| Información de evento de firma (lugar, participantes, instrucciones y notificaciones)                          | Despacho                     | Pendiente                                                     |
+| Retención del escaneado firmado y política de reenvío al correo del cliente                                  | Despacho                     | Pendiente                                                     |
 
 ## Criterios de ejecución para cada fase
 

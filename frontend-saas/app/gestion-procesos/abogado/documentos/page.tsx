@@ -26,6 +26,8 @@ type Request = {
   cliente: string;
   titulo: string;
   instrucciones?: string;
+  estado: string;
+  documentos_requeridos: { id: string; nombre: string; estado: string; documento?: { id: number; nombre_archivo: string; estado_revision: string; comentario_revision?: string | null } | null }[];
   atendida_en?: string;
 };
 
@@ -270,8 +272,8 @@ export default function DocumentosPage() {
 
       const matchesStatus =
         filtroEstado === "TODAS" ||
-        (filtroEstado === "PENDIENTES" && !item.atendida_en) ||
-        (filtroEstado === "ENTREGADAS" && !!item.atendida_en);
+        (filtroEstado === "PENDIENTES" && ["FALTAN_DOCUMENTOS", "RECHAZADO"].includes(item.estado)) ||
+        (filtroEstado === "ENTREGADAS" && !["FALTAN_DOCUMENTOS", "RECHAZADO"].includes(item.estado));
 
       return matchesSearch && matchesStatus;
     });
@@ -569,7 +571,7 @@ export default function DocumentosPage() {
                   color: "var(--foreground-muted)",
                 }}
               >
-                <th className="p-4">Documento</th>
+        <th className="p-4">Solicitud y documentos</th>
                 <th className="p-4">Proceso</th>
                 <th className="p-4">Cliente</th>
                 <th className="p-4">Estado</th>
@@ -630,6 +632,16 @@ export default function DocumentosPage() {
                             {item.instrucciones ||
                               "Sin instrucciones adicionales."}
                           </p>
+                          <ul className="mt-2 space-y-1 text-xs">
+                            {item.documentos_requeridos.map((requested) => (
+                              <li key={requested.id}>
+                                <span className="font-medium">{requested.nombre}</span>
+                                <span className="text-foreground-muted"> · {requested.estado.replaceAll("_", " ")}</span>
+                                {requested.documento && <span className="text-foreground-muted"> ({requested.documento.nombre_archivo})</span>}
+                                {requested.documento?.comentario_revision && <span className="block text-amber-700">Observación: {requested.documento.comentario_revision}</span>}
+                              </li>
+                            ))}
+                          </ul>
                         </div>
                       </div>
                     </td>
@@ -652,7 +664,7 @@ export default function DocumentosPage() {
                     </td>
 
                     <td className="p-4">
-                      {item.atendida_en ? (
+                      {item.estado === "APROBADO" ? (
                         <span
                           className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold"
                           style={{
@@ -661,8 +673,12 @@ export default function DocumentosPage() {
                           }}
                         >
                           <CheckCircle2 size={13} />
-                          Entregada
+                          Aprobada
                         </span>
+                      ) : item.estado === "EN_REVISION" || item.estado === "DOCUMENTOS_SUMINISTRADOS" ? (
+                        <span className="inline-flex rounded-full px-2.5 py-1 text-xs font-semibold" style={{ background: "var(--primary-light)", color: "var(--primary)" }}>{item.estado === "EN_REVISION" ? "En revisión" : "Documentos suministrados"}</span>
+                      ) : item.estado === "RECHAZADO" ? (
+                        <span className="inline-flex rounded-full px-2.5 py-1 text-xs font-semibold" style={{ background: "var(--danger-light)", color: "var(--danger)" }}>Requiere corrección</span>
                       ) : (
                         <span
                           className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold"
@@ -672,7 +688,7 @@ export default function DocumentosPage() {
                           }}
                         >
                           <Upload size={13} />
-                          Pendiente
+                          Faltan documentos
                         </span>
                       )}
                     </td>
@@ -988,11 +1004,26 @@ function SolicitudDocumentoModal({
     const titulo = String(
       form.get("titulo") || "",
     ).trim();
+    const documentos = String(form.get("documentos") || "")
+      .split(/\r?\n/).map((value) => value.trim()).filter(Boolean);
 
     const instrucciones = String(
       form.get("instrucciones") || "",
     ).trim();
     const fechaLimiteLocal = String(form.get("fecha_limite") || "");
+
+    if (!documentos.length) {
+      onError("Escribe al menos un documento solicitado, uno por línea.");
+      return;
+    }
+    if (documentos.length > 30) {
+      onError("Puedes incluir hasta 30 documentos en una solicitud.");
+      return;
+    }
+    if (new Set(documentos.map((value) => value.toLocaleLowerCase())).size !== documentos.length) {
+      onError("Cada documento solicitado debe tener un nombre distinto.");
+      return;
+    }
 
     if (!selectedProcessId) {
       onError("Debes seleccionar un proceso.");
@@ -1023,6 +1054,7 @@ function SolicitudDocumentoModal({
           body: JSON.stringify({
             cliente_id: Number(clienteId),
             titulo,
+            documentos,
             instrucciones: instrucciones || null,
             fecha_limite: fechaLimiteLocal ? new Date(fechaLimiteLocal).toISOString() : null,
           }),
@@ -1197,20 +1229,32 @@ function SolicitudDocumentoModal({
 
           <div>
             <label className="mb-1.5 block text-sm font-medium">
-              Documento solicitado
+              Nombre de la solicitud
             </label>
 
             <input
               name="titulo"
               required
-              autoFocus
-              placeholder="Ej. Copia de la cédula de ciudadanía"
+              placeholder="Ej. Documentos para preparar la demanda"
               className="w-full rounded-lg border px-3 py-2.5 text-sm outline-none"
               style={{
                 background: "var(--surface-muted)",
                 borderColor: "var(--border)",
                 color: "var(--foreground)",
               }}
+            />
+          </div>
+
+          <div>
+            <label className="mb-1.5 block text-sm font-medium">Documentos requeridos <span className="font-normal text-foreground-muted">(uno por línea, hasta 30)</span></label>
+            <textarea
+              name="documentos"
+              required
+              autoFocus
+              rows={5}
+              placeholder={"Copia de la cédula de ciudadanía\nRegistro civil de nacimiento\nCertificado de residencia"}
+              className="w-full resize-y rounded-lg border px-3 py-2.5 text-sm outline-none"
+              style={{ background: "var(--surface-muted)", borderColor: "var(--border)", color: "var(--foreground)" }}
             />
           </div>
 
@@ -1325,7 +1369,7 @@ function formatearFecha(fecha?: string) {
     return "—";
   }
 
-  return date.toLocaleDateString("es-CO", {
+  return date.toLocaleDateString("es-CO", { timeZone: "America/Bogota",
     day: "2-digit",
     month: "short",
     year: "numeric",

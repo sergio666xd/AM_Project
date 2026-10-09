@@ -135,7 +135,7 @@ def _serialize(contract: models.ContratoServicio, db: Session, *, include_conten
 
 
 def _extract_docx_text() -> str:
-    path = Path(__file__).resolve().parents[2] / "CPS.docx"
+    path = Path(__file__).resolve().parents[2] / "plantillas" / "cps" / "CPS.docx"
     if not path.is_file():
         raise HTTPException(status_code=503, detail="La plantilla CPS.docx no está disponible en el servidor.")
     try:
@@ -181,7 +181,8 @@ def obtener_plantilla(proceso_id: int | None = None, db: Session = Depends(get_d
         if isinstance(value, str) and value.strip():
             lawyer_profile[key] = value.strip().upper() if key != "correo" else value.strip()
     return {
-        "nombre": "CPS.pdf",
+        "nombre": "Contrato de Prestación de Servicios",
+        "archivo_referencia": "CPS.pdf",
         "campos": FIELD_LABELS,
         "campos_iniciales": default_contract_fields(attorney_profile=lawyer_profile),
         "datos_abogado": lawyer_profile,
@@ -239,7 +240,7 @@ def vista_previa_contrato(proceso_id: int, datos: schemas.ContratoVistaPrevia, d
 @router.get("/plantilla/referencia")
 def descargar_referencia_visual(actor: models.Usuario = Depends(security.obtener_usuario_actual)):
     _require_contract_staff(actor)
-    path = Path(__file__).resolve().parents[2] / "CPS.pdf"
+    path = Path(__file__).resolve().parents[2] / "plantillas" / "cps" / "CPS.pdf"
     if not path.is_file():
         raise HTTPException(status_code=503, detail="La referencia visual CPS.pdf no está disponible.")
     return FileResponse(path, media_type="application/pdf", filename="CPS.pdf", headers={"Cache-Control": "private, no-store"})

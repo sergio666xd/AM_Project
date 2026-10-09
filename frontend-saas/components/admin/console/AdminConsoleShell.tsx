@@ -17,6 +17,7 @@ import {
   ListChecks,
   LogOut,
   Menu,
+  MessageCircle,
   ScrollText,
   Settings,
   ServerCog,
@@ -29,6 +30,7 @@ import { useSession } from "@/context/SessionContext";
 import Breadcrumbs from "@/components/layout/Breadcrumbs";
 import { AdminAlertBell } from "@/components/admin/console/AdminAlertBell";
 import GlobalSearch from "@/components/layout/GlobalSearch";
+import ChatFloatingButton from "@/components/chat/ChatFloatingButton";
 
 type Item = { label: string; href: string; icon: typeof LayoutDashboard };
 type Section = { title: string; scope: string; links: Item[] };
@@ -92,6 +94,11 @@ const sections: Section[] = [
         icon: UserRound,
       },
       {
+        label: "Chat",
+        href: "/gestion-procesos/admin/chat",
+        icon: MessageCircle,
+      },
+      {
         label: "Auditoría",
         href: "/gestion-procesos/admin/auditoria",
         icon: ScrollText,
@@ -133,7 +140,7 @@ const sections: Section[] = [
         icon: BookOpenText,
       },
       {
-        label: "Contratos",
+        label: "Contratos y Documentos Legales",
         href: "/gestion-procesos/admin/contratos",
         icon: FileText,
       },
@@ -202,7 +209,7 @@ function activeScope(pathname: string) {
     return "Global · todas las modalidades";
   if (/\/admin\/(planes|solicitudes)(\/|$)/.test(pathname))
     return "SaaS · abogados externos";
-  if (/\/admin\/(notificaciones|alertas|actividad|auditoria|operacion)(\/|$)/.test(pathname))
+  if (/\/admin\/(notificaciones|alertas|actividad|auditoria|operacion|chat)(\/|$)/.test(pathname))
     return "Global · todas las modalidades";
   if (/\/admin\/(procesos|radicados|tareas|documentos|agenda|firma)(\/|$)/.test(pathname))
     return "Firma · Alejandra Muñoz Abogada y Asociados";
@@ -217,6 +224,7 @@ export default function AdminConsoleShell({
   const pathname = usePathname();
   const { user, logout, token } = useSession();
   const [mobileOpen, setMobileOpen] = useState(false);
+  const isChatRoute = pathname.split("/").includes("chat");
   const scope = activeScope(pathname);
 
   function renderNav() {
@@ -380,8 +388,8 @@ export default function AdminConsoleShell({
           </div>
         </div>
       </aside>
-      <main className="min-h-screen pt-16 md:ml-70 md:pt-0">
-        <header className="sticky top-0 z-30 border-b border-border bg-surface/95 px-5 py-3 backdrop-blur md:px-8">
+      <main className={isChatRoute ? "h-dvh overflow-hidden pt-16 md:ml-70 md:pt-0" : "min-h-screen pt-16 md:ml-70 md:pt-0"}>
+        {!isChatRoute && <header className="sticky top-0 z-30 border-b border-border bg-surface/95 px-5 py-3 backdrop-blur md:px-8">
           <div className="flex items-center justify-between gap-4">
             <div className="min-w-0">
               <Breadcrumbs />
@@ -389,9 +397,10 @@ export default function AdminConsoleShell({
             </div>
             <div className="flex items-center gap-2"><GlobalSearch /><AdminAlertBell token={token} /></div>
           </div>
-        </header>
-        <div className="p-5 md:p-8">{children}</div>
+        </header>}
+        <div className={isChatRoute ? "h-[calc(100dvh-4rem)] min-h-0 md:h-dvh" : "p-5 md:p-8"}>{children}</div>
       </main>
+      {!isChatRoute && <ChatFloatingButton />}
     </div>
   );
 }

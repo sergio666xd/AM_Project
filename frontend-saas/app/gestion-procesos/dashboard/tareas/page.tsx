@@ -115,7 +115,7 @@ function prioridadLabel(prioridad: PrioridadTarea) {
 function formatearFecha(fecha: string | null) {
   if (!fecha) return "Sin fecha";
 
-  return new Date(fecha).toLocaleDateString("es-CO", {
+  return new Date(fecha).toLocaleDateString("es-CO", { timeZone: "America/Bogota",
     day: "2-digit",
     month: "short",
     year: "numeric",

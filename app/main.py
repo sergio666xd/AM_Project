@@ -1,4 +1,3 @@
-import ipaddress
 import os
 import time
 import hashlib
@@ -16,15 +15,14 @@ from sqlalchemy.orm import Session
 from fastapi.middleware.cors import CORSMiddleware
 from datetime import datetime, timedelta
 from pathlib import Path
-from urllib.parse import quote, urlsplit
 from botocore.exceptions import BotoCoreError, ClientError
-from app.database import engine, Base, get_db, SessionLocal
+from app.database import engine, Base, get_db
 from app import models, schemas, security, storage
 from app.email_service import enviar_correo
 from app.site_content import PUBLIC_CONTENT_PAGES, PUBLIC_PAGE_ROUTES
 from app.routers import admin
 from app.security import obtener_usuario_actual
-from app.routers import admin, tareas, expedientes, workflows, contratos
+from app.routers import admin, tareas, expedientes, workflows, contratos, chat
 from app.radicados import (
     iniciar_consulta_nuevo_radicado,
     obtener_o_vincular_radicado,
@@ -39,7 +37,9 @@ from app.audit import (
 )
 from app.firm_access import has_firm_wide_access, lawyer_process_ids, lawyer_scope_id
 from app.workflow_service import public_site_url
-from app.message_templates import render_direct_message, render_message
+from app.message_templates import render_message
+from app.password_reset import password_reset_url, send_password_reset_email
+from app.security_notifications import send_security_change_confirmation
 
 # Crear las tablas en la BD
 models.Base.metadata.create_all(bind=engine)
@@ -157,6 +157,7 @@ app.include_router(tareas.router)
 app.include_router(expedientes.router)
 app.include_router(workflows.router)
 app.include_router(contratos.router)
+app.include_router(chat.router)
 
 
 def get_cors_origins() -> list[str]:
@@ -216,46 +217,6 @@ def _allow_password_reset_request(client_ip: str, email: str) -> bool:
                     break
     return True
 
-
-def _send_password_reset_email(email: str, reset_url: str) -> None:
-    db = SessionLocal()
-    try:
-        subject, body = render_direct_message(
-            db, "RECUPERAR_PASSWORD", {}, link_label="Restablecer contraseña", link_url=reset_url,
-        )
-        sent = enviar_correo(email, subject, body)
-        if not sent:
-            logging.getLogger(__name__).warning("Password reset email skipped because SMTP is not configured.")
-    except Exception:
-        logging.getLogger(__name__).exception("Password reset email delivery failed.")
-    finally:
-        db.close()
-
-
-def _password_reset_frontend_url() -> str:
-    """Use a configured public frontend origin; ignore localhost in production."""
-    configured = os.getenv("FRONTEND_URL", "").strip()
-    candidate = configured if "://" in configured else f"https://{configured}" if configured else ""
-    parsed = urlsplit(candidate) if candidate else None
-    hostname = (parsed.hostname or "").lower() if parsed else ""
-    is_local = hostname in {"localhost", "localhost.localdomain"} or hostname.endswith(".localhost")
-    if hostname:
-        try:
-            address = ipaddress.ip_address(hostname)
-            is_local = is_local or address.is_loopback or address.is_unspecified
-        except ValueError:
-            pass
-    if parsed and parsed.scheme in {"http", "https"} and parsed.netloc and hostname and not is_local:
-        return candidate.rstrip("/")
-
-    canonical = public_site_url()
-    canonical_host = (urlsplit(canonical).hostname or "").lower()
-    if os.getenv("NODE_ENV") != "development" and (
-        canonical_host in {"localhost", "localhost.localdomain"}
-        or canonical_host.endswith(".localhost")
-    ):
-        return "https://www.alejandramunozabogada.com"
-    return canonical
 
 @app.on_event("startup")
 def crear_datos_iniciales():
@@ -514,9 +475,7 @@ def solicitar_recuperacion_password(
     usuario = db.query(models.Usuario).filter(models.Usuario.email == email).first()
     if usuario and usuario.estado == models.EstadoUsuario.ACTIVO:
         token = security.create_password_reset_token(usuario.id, usuario.password_hash)
-        frontend_url = _password_reset_frontend_url()
-        reset_url = f"{frontend_url}/gestion-procesos/auth/restablecer-password?token={quote(token, safe='')}"
-        background_tasks.add_task(_send_password_reset_email, email, reset_url)
+        background_tasks.add_task(send_password_reset_email, email, password_reset_url(token))
     return {"mensaje": PASSWORD_RESET_MESSAGE}
 
 
@@ -533,7 +492,6 @@ def restablecer_password(
     usuario = db.query(models.Usuario).filter(models.Usuario.id == usuario_id).first()
     if (
         not usuario
-        or usuario.estado != models.EstadoUsuario.ACTIVO
         or security.verify_password_reset_token(datos.token, usuario.password_hash) != usuario.id
     ):
         raise HTTPException(status_code=400, detail="El enlace de recuperación no es válido o ha expirado.")
@@ -548,15 +506,25 @@ def restablecer_password(
 @app.patch("/api/auth/preferencias-notificaciones")
 def actualizar_preferencias_notificaciones(datos: schemas.PreferenciasNotificacionUpdate, usuario_actual: models.Usuario = Depends(obtener_usuario_actual), db: Session = Depends(get_db)):
     if usuario_actual.rol == models.RolUsuario.CLIENTE:
-        if datos.preferencias is not None or datos.notificaciones_email is not None or datos.notificaciones_whatsapp is not None:
-            raise HTTPException(status_code=400, detail="Los clientes solo pueden seleccionar un canal obligatorio.")
-        if datos.canal_cliente is None:
-            raise HTTPException(status_code=400, detail="Selecciona un canal obligatorio.")
-        if datos.canal_cliente == "WHATSAPP" and not usuario_actual.whatsapp_numero.strip():
-            raise HTTPException(status_code=400, detail="Configura un número de WhatsApp antes de seleccionar ese canal.")
-        usuario_actual.canal_notificacion_cliente = datos.canal_cliente
-        usuario_actual.notificaciones_email = datos.canal_cliente == "EMAIL"
-        usuario_actual.notificaciones_whatsapp = datos.canal_cliente == "WHATSAPP"
+        if datos.preferencias is not None:
+            raise HTTPException(status_code=400, detail="Los clientes configuran los canales de notificación directamente.")
+        if datos.canal_cliente is not None:
+            email_enabled = datos.canal_cliente == "EMAIL"
+            whatsapp_enabled = datos.canal_cliente == "WHATSAPP"
+        else:
+            email_enabled = datos.notificaciones_email if datos.notificaciones_email is not None else usuario_actual.notificaciones_email
+            whatsapp_enabled = datos.notificaciones_whatsapp if datos.notificaciones_whatsapp is not None else usuario_actual.notificaciones_whatsapp
+        if not email_enabled and not whatsapp_enabled:
+            raise HTTPException(status_code=400, detail="Selecciona al menos un canal de notificación.")
+        if whatsapp_enabled and not (usuario_actual.whatsapp_numero or "").strip():
+            raise HTTPException(status_code=400, detail="Configura un número de WhatsApp antes de habilitar ese canal.")
+        usuario_actual.notificaciones_email = email_enabled
+        usuario_actual.notificaciones_whatsapp = whatsapp_enabled
+        usuario_actual.canal_notificacion_cliente = (
+            "EMAIL" if email_enabled and not whatsapp_enabled
+            else "WHATSAPP" if whatsapp_enabled and not email_enabled
+            else None
+        )
     else:
         if datos.canal_cliente is not None:
             raise HTTPException(status_code=400, detail="El canal obligatorio solo aplica a CLIENTE.")
@@ -624,6 +592,7 @@ def _datos_codigo(challenge: models.CodigoSeguridadUsuario) -> dict:
         "canal": challenge.canal,
         "expira_en": challenge.expira_en.isoformat() + "Z",
         "reenviar_desde": challenge.reenviar_desde.isoformat() + "Z",
+        "verificado": challenge.valor_pendiente == "__OTP_VERIFICADO__",
     }
 
 
@@ -633,40 +602,15 @@ def solicitar_codigo_seguridad(
     usuario: models.Usuario = Depends(obtener_usuario_actual),
     db: Session = Depends(get_db),
 ):
-    if datos.canal == "WHATSAPP" and not usuario.whatsapp_numero.strip():
+    if datos.canal == "EMAIL" and not usuario.email:
+        raise HTTPException(status_code=400, detail="Tu cuenta no tiene un correo configurado.")
+    if datos.canal == "WHATSAPP" and not (usuario.whatsapp_numero or "").strip():
         raise HTTPException(status_code=400, detail="Tu cuenta no tiene un número de WhatsApp configurado.")
-    valor_pendiente = None
-    if datos.accion == "email":
-        if usuario.rol == models.RolUsuario.CLIENTE:
-            raise HTTPException(status_code=403, detail="Los clientes deben solicitar la edición de sus datos para aprobación.")
-        if not datos.valor:
-            raise HTTPException(status_code=400, detail="Ingresa el nuevo correo.")
-        from pydantic import TypeAdapter, ValidationError
-        try:
-            nuevo_email = str(TypeAdapter(schemas.EmailStr).validate_python(datos.valor)).strip().lower()
-        except ValidationError as exc:
-            raise HTTPException(status_code=422, detail="Ingresa un correo válido.") from exc
-        if db.query(models.Usuario).filter(models.Usuario.email == nuevo_email, models.Usuario.id != usuario.id).first():
-            raise HTTPException(status_code=409, detail="Este correo ya está asociado a otra cuenta.")
-        valor_pendiente = nuevo_email
-    elif datos.accion == "whatsapp":
-        if usuario.rol == models.RolUsuario.CLIENTE:
-            raise HTTPException(status_code=403, detail="Los clientes deben solicitar la edición de sus datos para aprobación.")
-        numero = "".join(char for char in (datos.valor or "") if char.isdigit())
-        if len(numero) < 10 or len(numero) > 15:
-            raise HTTPException(status_code=400, detail="Ingresa un número válido con indicativo de país.")
-        valor_pendiente = numero
-    else:
-        if not datos.password_actual or not security.verify_password(datos.password_actual, usuario.password_hash):
-            raise HTTPException(status_code=400, detail="La contraseña actual no es correcta.")
-        if not datos.password_nueva or len(datos.password_nueva) < 8 or len(datos.password_nueva.encode("utf-8")) > 72:
-            raise HTTPException(status_code=400, detail="La nueva contraseña debe tener entre 8 y 72 bytes UTF-8.")
-        valor_pendiente = security.hash_password(datos.password_nueva)
 
     ahora = datetime.utcnow()
     anterior = db.query(models.CodigoSeguridadUsuario).filter_by(
         usuario_id=usuario.id, accion=datos.accion, consumido_en=None
-    ).first()
+    ).order_by(models.CodigoSeguridadUsuario.creado_en.desc()).first()
     if anterior and anterior.expira_en > ahora and anterior.reenviar_desde > ahora:
         raise HTTPException(status_code=429, detail="Ya hay un código vigente. Espera el tiempo indicado para solicitar otro.")
 
@@ -680,7 +624,7 @@ def solicitar_codigo_seguridad(
     challenge = models.CodigoSeguridadUsuario(
         id=challenge_id, usuario_id=usuario.id, accion=datos.accion, canal=datos.canal,
         codigo_hash=_hash_codigo_seguridad(challenge_id, usuario.id, datos.accion, codigo),
-        valor_pendiente=valor_pendiente, expira_en=ahora + timedelta(minutes=3),
+        valor_pendiente=None, expira_en=ahora + timedelta(minutes=3),
         reenviar_desde=ahora + timedelta(seconds=60),
     )
     db.add(challenge)
@@ -705,8 +649,11 @@ def obtener_codigo_seguridad_activo(
     db.query(models.CodigoSeguridadUsuario).filter(
         models.CodigoSeguridadUsuario.usuario_id == usuario.id,
         models.CodigoSeguridadUsuario.expira_en <= datetime.utcnow(),
-        models.CodigoSeguridadUsuario.valor_pendiente.is_not(None),
-    ).update({models.CodigoSeguridadUsuario.valor_pendiente: None}, synchronize_session=False)
+        models.CodigoSeguridadUsuario.consumido_en.is_(None),
+    ).update({
+        models.CodigoSeguridadUsuario.valor_pendiente: None,
+        models.CodigoSeguridadUsuario.consumido_en: datetime.utcnow(),
+    }, synchronize_session=False)
     db.commit()
     return _datos_codigo(challenge) if challenge else None
 
@@ -718,13 +665,17 @@ def reenviar_codigo_seguridad(
     usuario: models.Usuario = Depends(obtener_usuario_actual),
     db: Session = Depends(get_db),
 ):
-    challenge = db.query(models.CodigoSeguridadUsuario).filter_by(id=challenge_id, usuario_id=usuario.id, consumido_en=None).with_for_update().first()
+    challenge = db.query(models.CodigoSeguridadUsuario).filter_by(
+        id=challenge_id, usuario_id=usuario.id, consumido_en=None
+    ).with_for_update().first()
     ahora = datetime.utcnow()
     if not challenge or challenge.expira_en <= ahora:
         raise HTTPException(status_code=410, detail="El código venció. Solicita uno nuevo.")
     if challenge.reenviar_desde > ahora:
         raise HTTPException(status_code=429, detail="Espera antes de reenviar o cambiar el canal.")
-    if datos.canal == "WHATSAPP" and not usuario.whatsapp_numero.strip():
+    if datos.canal == "EMAIL" and not usuario.email:
+        raise HTTPException(status_code=400, detail="Tu cuenta no tiene un correo configurado.")
+    if datos.canal == "WHATSAPP" and not (usuario.whatsapp_numero or "").strip():
         raise HTTPException(status_code=400, detail="Tu cuenta no tiene un número de WhatsApp configurado.")
     codigo = f"{secrets.randbelow(1_000_000):06d}"
     if not _enviar_codigo_seguridad(db, usuario, datos.canal, codigo):
@@ -734,6 +685,7 @@ def reenviar_codigo_seguridad(
     challenge.expira_en = ahora + timedelta(minutes=3)
     challenge.reenviar_desde = ahora + timedelta(seconds=60)
     challenge.intentos = 0
+    challenge.valor_pendiente = None
     db.commit()
     return _datos_codigo(challenge)
 
@@ -745,7 +697,9 @@ def verificar_codigo_seguridad(
     usuario: models.Usuario = Depends(obtener_usuario_actual),
     db: Session = Depends(get_db),
 ):
-    challenge = db.query(models.CodigoSeguridadUsuario).filter_by(id=challenge_id, usuario_id=usuario.id, consumido_en=None).with_for_update().first()
+    challenge = db.query(models.CodigoSeguridadUsuario).filter_by(
+        id=challenge_id, usuario_id=usuario.id, consumido_en=None
+    ).with_for_update().first()
     ahora = datetime.utcnow()
     if not challenge or challenge.expira_en <= ahora:
         raise HTTPException(status_code=410, detail="El código venció. Solicita uno nuevo.")
@@ -759,20 +713,115 @@ def verificar_codigo_seguridad(
         challenge.intentos += 1
         db.commit()
         raise HTTPException(status_code=400, detail="El código no es correcto.")
-    if challenge.accion == "email":
-        if db.query(models.Usuario).filter(models.Usuario.email == challenge.valor_pendiente, models.Usuario.id != usuario.id).first():
-            raise HTTPException(status_code=409, detail="Este correo ya está asociado a otra cuenta.")
-        usuario.email = challenge.valor_pendiente
-    elif challenge.accion == "whatsapp":
-        usuario.whatsapp_numero = challenge.valor_pendiente
-    else:
-        usuario.password_hash = challenge.valor_pendiente
-        usuario.debe_cambiar_password = False
-    challenge.consumido_en = ahora
-    registrar_evento_auditoria(db, usuario, f"auth.seguridad.{challenge.accion}", "usuario", usuario.id)
-    challenge.valor_pendiente = None
+    challenge.valor_pendiente = "__OTP_VERIFICADO__"
     db.commit()
-    return {"mensaje": "Cambio de seguridad aplicado.", "email": usuario.email, "whatsapp_numero": usuario.whatsapp_numero}
+    return {"mensaje": "Código verificado. Ingresa el nuevo dato.", "verificado": True}
+
+
+@app.post("/api/auth/seguridad/codigos/{challenge_id}/aplicar")
+def aplicar_cambio_seguridad(
+    challenge_id: str,
+    datos: schemas.AplicarCambioSeguridad,
+    background_tasks: BackgroundTasks,
+    usuario: models.Usuario = Depends(obtener_usuario_actual),
+    db: Session = Depends(get_db),
+):
+    challenge = db.query(models.CodigoSeguridadUsuario).filter_by(
+        id=challenge_id, usuario_id=usuario.id, consumido_en=None
+    ).with_for_update().first()
+    ahora = datetime.utcnow()
+    if not challenge or challenge.expira_en <= ahora:
+        raise HTTPException(status_code=410, detail="El código venció. Solicita uno nuevo.")
+    if challenge.valor_pendiente != "__OTP_VERIFICADO__":
+        raise HTTPException(status_code=403, detail="Primero debes validar el código enviado.")
+
+    old_email = usuario.email
+    old_whatsapp = usuario.whatsapp_numero or ""
+    if challenge.accion == "email":
+        from pydantic import TypeAdapter, ValidationError
+        if not datos.valor:
+            raise HTTPException(status_code=400, detail="Ingresa el nuevo correo.")
+        try:
+            new_email = str(TypeAdapter(schemas.EmailStr).validate_python(datos.valor)).strip().lower()
+        except ValidationError as exc:
+            raise HTTPException(status_code=422, detail="Ingresa un correo válido.") from exc
+        if db.query(models.Usuario).filter(models.Usuario.email == new_email, models.Usuario.id != usuario.id).first():
+            raise HTTPException(status_code=409, detail="Este correo ya está asociado a otra cuenta.")
+        usuario.email = new_email
+        change_label = "correo de acceso"
+    elif challenge.accion == "whatsapp":
+        number = "".join(char for char in (datos.valor or "") if char.isdigit())
+        if len(number) < 10 or len(number) > 15:
+            raise HTTPException(status_code=400, detail="Ingresa un número válido con indicativo de país.")
+        usuario.whatsapp_numero = number
+        change_label = "número de WhatsApp"
+    else:
+        if not datos.password_actual or not security.verify_password(datos.password_actual, usuario.password_hash):
+            raise HTTPException(status_code=400, detail="La contraseña actual no es correcta.")
+        if not datos.password_nueva or len(datos.password_nueva) < 8 or len(datos.password_nueva.encode("utf-8")) > 72:
+            raise HTTPException(status_code=400, detail="La nueva contraseña debe tener entre 8 y 72 bytes UTF-8.")
+        usuario.password_hash = security.hash_password(datos.password_nueva)
+        usuario.debe_cambiar_password = False
+        change_label = "contraseña"
+
+    if usuario.rol == models.RolUsuario.CLIENTE and challenge.accion in {"email", "whatsapp"}:
+        pending_profile_requests = db.query(models.SolicitudEdicionPerfilCliente).filter_by(
+            cliente_id=usuario.id, estado="PENDIENTE",
+        ).all()
+        for pending_request in pending_profile_requests:
+            pending_request.email_solicitado = usuario.email
+            pending_request.whatsapp_numero_solicitado = usuario.whatsapp_numero or ""
+
+    challenge.consumido_en = ahora
+    challenge.valor_pendiente = None
+    registrar_evento_auditoria(db, usuario, f"auth.seguridad.{challenge.accion}", "usuario", usuario.id)
+    db.commit()
+    db.refresh(usuario)
+    emails = [old_email, usuario.email]
+    whatsapp_numbers = [old_whatsapp, usuario.whatsapp_numero or ""]
+    background_tasks.add_task(
+        send_security_change_confirmation,
+        usuario.nombre_completo,
+        change_label,
+        emails,
+        whatsapp_numbers,
+    )
+    return {"mensaje": "Cambio aplicado. Enviamos una confirmación a tus canales registrados.", "email": usuario.email, "whatsapp_numero": usuario.whatsapp_numero}
+
+
+@app.delete("/api/auth/seguridad/codigos/{challenge_id}", status_code=status.HTTP_204_NO_CONTENT)
+def cancelar_codigo_seguridad(
+    challenge_id: str,
+    usuario: models.Usuario = Depends(obtener_usuario_actual),
+    db: Session = Depends(get_db),
+):
+    challenge = db.query(models.CodigoSeguridadUsuario).filter_by(
+        id=challenge_id, usuario_id=usuario.id, consumido_en=None
+    ).with_for_update().first()
+    if challenge:
+        challenge.consumido_en = datetime.utcnow()
+        challenge.valor_pendiente = None
+        db.commit()
+    return None
+
+@app.delete("/api/auth/seguridad/codigos", status_code=status.HTTP_204_NO_CONTENT)
+def cancelar_codigos_seguridad_activos(
+    accion: str,
+    usuario: models.Usuario = Depends(obtener_usuario_actual),
+    db: Session = Depends(get_db),
+):
+    if accion not in {"email", "whatsapp", "password"}:
+        raise HTTPException(status_code=400, detail="Acción no válida.")
+    db.query(models.CodigoSeguridadUsuario).filter(
+        models.CodigoSeguridadUsuario.usuario_id == usuario.id,
+        models.CodigoSeguridadUsuario.accion == accion,
+        models.CodigoSeguridadUsuario.consumido_en.is_(None),
+    ).update({
+        models.CodigoSeguridadUsuario.valor_pendiente: None,
+        models.CodigoSeguridadUsuario.consumido_en: datetime.utcnow(),
+    }, synchronize_session=False)
+    db.commit()
+    return None
 
 
 @app.patch("/api/auth/perfil")
@@ -814,7 +863,10 @@ def actualizar_mi_perfil(datos: schemas.PerfilUpdate, usuario_actual: models.Usu
     for field in ("numero_documento", "domicilio", "direccion", "tarjeta_profesional"):
         value = getattr(datos, field)
         if value is not None:
-            setattr(usuario_actual, field, value.strip().upper() or None)
+            normalized = value.strip().upper()
+            if field in {"numero_documento", "tarjeta_profesional"}:
+                normalized = normalized.replace(".", "")
+            setattr(usuario_actual, field, normalized or None)
     registrar_evento_auditoria(db, usuario_actual, "auth.perfil.actualizar", "usuario", usuario_actual.id)
     db.commit()
     db.refresh(usuario_actual)

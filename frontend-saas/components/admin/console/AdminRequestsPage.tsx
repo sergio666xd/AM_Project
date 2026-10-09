@@ -326,6 +326,7 @@ export default function AdminRequestsPage() {
                   <td className="px-4 py-3 text-foreground-secondary">
                     {new Intl.DateTimeFormat("es-CO", {
                       dateStyle: "medium",
+                      timeZone: "America/Bogota",
                     }).format(new Date(request.fecha_solicitud))}
                   </td>
                   <td className="px-4 py-3">

@@ -356,8 +356,14 @@ class VerificarCodigoSeguridad(BaseModel):
     codigo: str = Field(min_length=6, max_length=6, pattern=r"^\d{6}$")
 
 
+class AplicarCambioSeguridad(BaseModel):
+    valor: str | None = Field(default=None, max_length=320)
+    password_actual: str | None = Field(default=None, max_length=128)
+    password_nueva: str | None = Field(default=None, min_length=8, max_length=72)
+
+
 class SolicitudEdicionPerfilClienteCreate(BaseModel):
-    email: EmailStr
+    email: EmailStr | None = None
     nombre_completo: str
     whatsapp_numero: str = ""
     genero: Optional[str] = Field(default=None, max_length=16)
@@ -413,6 +419,7 @@ class ProcesoColaboradorUpdate(BaseModel):
 class SolicitudDocumentoCreate(BaseModel):
     cliente_id: int
     titulo: str
+    documentos: list[str] = Field(default_factory=list, max_length=30)
     instrucciones: Optional[str] = None
     fecha_limite: Optional[datetime] = None
 
@@ -591,6 +598,16 @@ class ComunicacionProcesoCreate(BaseModel):
 class ComunicacionClienteCreate(BaseModel):
     asunto: str = Field(min_length=1, max_length=255)
     contenido: str = Field(min_length=1, max_length=12000)
+
+
+class ChatMensajeCreate(BaseModel):
+    contenido: str = Field(min_length=1, max_length=12000)
+    referencia_tipo: Literal["ACTUACION", "TAREA", "EVENTO", "DOCUMENTO"] | None = None
+    referencia_id: int | None = Field(default=None, gt=0)
+
+
+class ChatMensajeLeidoUpdate(BaseModel):
+    mensaje_id: int = Field(gt=0)
 
 
 class NotificacionesClienteLeidasUpdate(BaseModel):

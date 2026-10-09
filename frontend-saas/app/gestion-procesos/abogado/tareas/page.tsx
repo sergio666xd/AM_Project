@@ -165,7 +165,7 @@ function formatearFecha(fecha?: string | null) {
     return "Sin fecha";
   }
 
-  return date.toLocaleDateString("es-CO", {
+  return date.toLocaleDateString("es-CO", { timeZone: "America/Bogota",
     day: "2-digit",
     month: "short",
     year: "numeric",

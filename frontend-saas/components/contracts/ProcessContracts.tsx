@@ -46,17 +46,24 @@ const FIELD_GROUPS: { title: string; fields: FieldDefinition[] }[] = [
 
 const EMPTY_FIELDS: ContractFields = Object.fromEntries(FIELD_GROUPS.flatMap((group) => group.fields.map(([key]) => [key, ""])));
 const PRESERVE_CASE_FIELD_KEYS = new Set(["correo", "abogado_correo", "objeto", "honorarios"]);
+const IDENTIFIER_FIELD_KEYS = new Set(["documento", "abogado_documento", "abogado_tarjeta"]);
+
+function normalizeIdentifier(value: string) {
+  return value.replace(/\./g, "");
+}
 
 function normalizeContractFields(value: ContractFields): ContractFields {
   return Object.fromEntries(Object.entries(value).map(([key, fieldValue]) => [
     key,
-    PRESERVE_CASE_FIELD_KEYS.has(key) ? fieldValue : fieldValue.toLocaleUpperCase("es-CO"),
+    IDENTIFIER_FIELD_KEYS.has(key)
+      ? normalizeIdentifier(fieldValue)
+      : PRESERVE_CASE_FIELD_KEYS.has(key) ? fieldValue : fieldValue.toLocaleUpperCase("es-CO"),
   ]));
 }
 
 function localDate(value?: string | null) {
   if (!value) return "—";
-  return new Intl.DateTimeFormat("es-CO", { dateStyle: "medium", timeStyle: "short" }).format(new Date(value));
+  return new Intl.DateTimeFormat("es-CO", { dateStyle: "medium", timeStyle: "short", timeZone: "America/Bogota" }).format(new Date(value));
 }
 
 export default function ProcessContracts({ processId, clients, onChange, initialContractId = null }: {
@@ -179,7 +186,9 @@ export default function ProcessContracts({ processId, clients, onChange, initial
   }
 
   function setContractField(key: string, value: string) {
-    const normalizedValue = PRESERVE_CASE_FIELD_KEYS.has(key) ? value : value.toLocaleUpperCase("es-CO");
+    const normalizedValue = IDENTIFIER_FIELD_KEYS.has(key)
+      ? normalizeIdentifier(value)
+      : PRESERVE_CASE_FIELD_KEYS.has(key) ? value : value.toLocaleUpperCase("es-CO");
     setFields((current) => ({ ...current, [key]: normalizedValue }));
   }
 
@@ -350,8 +359,8 @@ export default function ProcessContracts({ processId, clients, onChange, initial
       `}</style>
       <div className="contract-editing space-y-4">
         <div className="flex flex-wrap items-start justify-between gap-3">
-          <div><h2 className="text-base font-semibold">Contratos de prestación de servicios</h2><p className="mt-1 text-sm text-[var(--foreground-muted)]">Completa las variables de CPS.pdf. El texto legal, colores, encabezado, pie, gráficos y páginas se conservan del modelo original. El PDF se genera en memoria.</p></div>
-          <button type="button" onClick={() => void openTemplateReference()} disabled={busy} className="inline-flex items-center gap-1.5 rounded-md border border-[var(--border)] px-3 py-2 text-sm disabled:opacity-50">{documentAction === "template" ? <><Loader2 className="size-4 animate-spin" />Abriendo…</> : "Consultar referencia CPS.pdf"}</button>
+          <div><h2 className="text-base font-semibold">Contrato de Prestación de Servicios</h2><p className="mt-1 text-sm text-[var(--foreground-muted)]">Plantilla legal CPS. El texto, colores, encabezado, pie, gráficos y páginas se conservan del modelo original. El PDF se genera en memoria.</p></div>
+          <button type="button" onClick={() => void openTemplateReference()} disabled={busy} className="inline-flex items-center gap-1.5 rounded-md border border-[var(--border)] px-3 py-2 text-sm disabled:opacity-50">{documentAction === "template" ? <><Loader2 className="size-4 animate-spin" />Abriendo…</> : "Consultar plantilla de referencia"}</button>
         </div>
         {error && <p role="alert" className="rounded-lg border border-red-500/30 bg-red-500/5 p-3 text-sm text-red-700">{error}</p>}
         {message && <p role="status" className="rounded-lg border border-emerald-500/30 bg-emerald-500/5 p-3 text-sm text-emerald-700">{message}</p>}

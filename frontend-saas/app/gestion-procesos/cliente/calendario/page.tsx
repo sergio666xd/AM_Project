@@ -6,7 +6,7 @@ import { useSession } from "@/context/SessionContext";
 import { fetchApi } from "@/lib/api";
 import TaskMonthCalendar, { type CalendarTask } from "@/components/calendar/TaskMonthCalendar";
 type AgendaData = { eventos:{id:number;titulo:string;descripcion?:string|null;tipo:string;fecha_inicio:string;proceso_id:number;proceso:string}[]; tareas:{id:number;titulo:string;fecha_limite:string;proceso_id:number;proceso:string}[] };
-const dateText=(value:string)=>new Intl.DateTimeFormat("es-CO",{dateStyle:"full",timeStyle:"short"}).format(new Date(value));
+const dateText=(value:string)=>new Intl.DateTimeFormat("es-CO",{dateStyle:"full",timeStyle:"short",timeZone:"America/Bogota"}).format(new Date(value));
 export default function CalendarioClientePage(){const{token,loading:sessionLoading}=useSession();const[data,setData]=useState<AgendaData>({eventos:[],tareas:[]});const[loading,setLoading]=useState(true);const[error,setError]=useState("");
 useEffect(()=>{if(!token||sessionLoading)return;fetchApi("/api/expedientes/cliente/agenda?dias=180",{token}).then(setData).catch((cause)=>setError(cause instanceof Error?cause.message:"No fue posible cargar el calendario.")).finally(()=>setLoading(false));},[token,sessionLoading]);
 const tasks:CalendarTask[]=data.tareas.map((task)=>({id:task.id,titulo:task.titulo,estado:"PENDIENTE",fecha_limite:task.fecha_limite,href:`/gestion-procesos/cliente/tareas?tarea=${task.id}#tarea-${task.id}`}));

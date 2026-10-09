@@ -80,7 +80,7 @@ function formatDate(value?: string | null) {
     return value;
   }
 
-  return date.toLocaleDateString("es-CO", {
+  return date.toLocaleDateString("es-CO", { timeZone: "America/Bogota",
     day: "2-digit",
     month: "2-digit",
     year: "numeric",

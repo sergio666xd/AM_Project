@@ -26,6 +26,7 @@ import {
   Bell,
   ScrollText,
   CalendarDays,
+  MessageCircle,
   type LucideIcon,
 } from "lucide-react";
 
@@ -81,6 +82,7 @@ const platformAdminSections: { label: string; items: MenuItem[] }[] = [
       { label: "Usuarios · firma y SaaS", href: "/gestion-procesos/admin/usuarios", icon: Users },
       { label: "Auditoría", href: "/gestion-procesos/admin/auditoria", icon: ScrollText },
       { label: "Operación", href: "/gestion-procesos/admin/operacion", icon: Settings },
+      { label: "Chat del equipo", href: "/gestion-procesos/abogado/chat", icon: MessageCircle },
     ],
   },
   {
@@ -119,8 +121,9 @@ const lawyerMenuItems = (isSaas: boolean, isFirmAdmin: boolean) => [
   { label: "Clientes", href: "/gestion-procesos/abogado/clientes", icon: Users },
   { label: "Tareas", href: isSaas ? "/gestion-procesos/dashboard/tareas" : "/gestion-procesos/abogado/tareas", icon: ListChecks },
   { label: "Agenda", href: "/gestion-procesos/abogado/agenda", icon: CalendarDays },
+  { label: "Chat", href: "/gestion-procesos/abogado/chat", icon: MessageCircle },
   { label: "Documentos", href: "/gestion-procesos/abogado/documentos", icon: FileText },
-  ...(isFirmAdmin ? [{ label: "Contratos", href: "/gestion-procesos/abogado/contratos", icon: FileText }] : []),
+  ...(isFirmAdmin ? [{ label: "Contratos y Documentos Legales", href: "/gestion-procesos/abogado/contratos", icon: FileText }] : []),
   { label: "Notificaciones", href: "/gestion-procesos/abogado/notificaciones", icon: Bell },
   ...(isFirmAdmin ? [{ label: "Métricas y carga", href: "/gestion-procesos/abogado/metricas", icon: LayoutDashboard }] : []),
 ];
@@ -132,7 +135,7 @@ const lawyerMenuItems = (isSaas: boolean, isFirmAdmin: boolean) => [
     { label: "Documentos y solicitudes", href: "/gestion-procesos/cliente/documentos", icon: FileText },
     { label: "Calendario", href: "/gestion-procesos/cliente/calendario", icon: CalendarDays },
     { label: "Notificaciones", href: "/gestion-procesos/cliente/notificaciones", icon: Bell },
-    { label: "Mensajes", href: "/gestion-procesos/cliente/mensajes", icon: UserCheck },
+    { label: "Chat", href: "/gestion-procesos/cliente/chat", icon: MessageCircle },
     { label: "Ayuda", href: "/gestion-procesos/cliente/ayuda", icon: ScrollText },
     { label: "Mi perfil", href: "/gestion-procesos/cliente/perfil", icon: User },
     { label: "Configuración", href: "/gestion-procesos/cliente/configuracion", icon: Settings },

@@ -20,6 +20,7 @@ from app.notification_policy import (
 )
 from app.notification_service import emitir_notificacion_workflow
 from app.message_templates import render_message
+from app.timezone import format_colombia_datetime
 from app.rama_judicial_api import ejecutar_consulta_api_radicado
 from app.reminder_workflow import (
     momento_programado,
@@ -636,7 +637,7 @@ def preparar_recordatorio_workflow(
         fecha_limite = normalizar_utc_naive(tarea.fecha_limite)
         anticipacion = recordatorio.anticipacion_minutos
         programado_por = f"{anticipacion // 60} horas antes" if anticipacion else "en el momento programado"
-        mensaje += f"\nVencimiento: {fecha_limite.strftime('%d/%m/%Y %H:%M UTC')}\nAviso: {programado_por}"
+        mensaje += f"\nVencimiento: {format_colombia_datetime(fecha_limite)}\nAviso: {programado_por}"
     mensaje += f"\n\nAbrir enlace: Ver tarea | {public_site_url()}{tarea_path}"
     entrega_ids = emitir_notificacion_workflow(
         db,
@@ -656,7 +657,7 @@ def preparar_recordatorio_workflow(
                    "radicado": tarea.radicado.numero if tarea.radicado else "No asociado",
                    "actuacion": tarea.actuacion_rel.actuacion if tarea.actuacion_rel else "No asociada",
                    "detalle": tarea.descripcion or "Sin detalles adicionales",
-                   "fecha_limite": fecha_limite.strftime('%d/%m/%Y %H:%M UTC') if tarea.fecha_limite else "Sin fecha límite",
+                   "fecha_limite": format_colombia_datetime(fecha_limite) if tarea.fecha_limite else "Sin fecha límite",
                    "anticipacion": programado_por},
         enlace_texto="Ver tarea", enlace_url=f"{public_site_url()}{tarea_path}",
     )

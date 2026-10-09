@@ -23,7 +23,7 @@ from reportlab.platypus import Paragraph, SimpleDocTemplate, Spacer
 from xml.sax.saxutils import escape
 
 
-TEMPLATE_PATH = Path(__file__).resolve().parents[1] / "CPS.pdf"
+TEMPLATE_PATH = Path(__file__).resolve().parents[1] / "plantillas" / "cps" / "CPS.pdf"
 TEXT_TEMPLATE_PATH = TEMPLATE_PATH.with_name("CPS.docx")
 PAGE_COUNT = 3
 MAX_GENERATED_PAGES = 10
@@ -171,6 +171,14 @@ def validate_contract_fields(raw: dict[str, str], *, require_complete: bool = Tr
             if not fields[required]:
                 raise ValueError(f"Completa el campo {FIELD_LABELS[required].lower()}.")
     return fields
+
+
+def _format_colombian_identifier(value: str) -> str:
+    """Add Colombian thousands separators to numeric identifiers for the PDF only."""
+    digits = value.replace(".", "")
+    if digits.isdigit():
+        return re.sub(r"\B(?=(\d{3})+(?!\d))", ".", digits)
+    return value
 
 
 def _template_paragraph_runs() -> list[list[tuple[str, frozenset[str]]]]:
@@ -476,6 +484,8 @@ class SignatureFlowable(Spacer):
 def render_contract_pdf(raw_fields: dict[str, str]) -> bytes:
     """Return a filled, naturally reflowed CPS PDF without persisting it."""
     fields = validate_contract_fields(raw_fields)
+    for key in ("documento", "abogado_documento", "abogado_tarjeta"):
+        fields[key] = _format_colombian_identifier(fields[key])
     if not TEMPLATE_PATH.is_file():
         raise FileNotFoundError("No está disponible la plantilla visual CPS.pdf.")
     source = PdfReader(str(TEMPLATE_PATH))
