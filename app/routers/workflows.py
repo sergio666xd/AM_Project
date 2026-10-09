@@ -19,6 +19,7 @@ from app.notification_policy import (
     clientes_notificables_para_radicado,
 )
 from app.notification_service import emitir_notificacion_workflow
+from app.message_templates import render_message
 from app.rama_judicial_api import ejecutar_consulta_api_radicado
 from app.reminder_workflow import (
     momento_programado,
@@ -290,7 +291,7 @@ def _cuerpo_novedades(secciones: list[dict]) -> str:
         if seccion.get("detalle_url"):
             bloque += f"\nAbrir radicado: {seccion['detalle_url']}"
         bloques.append(bloque)
-    return "Novedades judiciales\n\n" + "\n\n".join(bloques)
+    return "\n\n".join(bloques)
 
 
 def _url_radicado(usuario: models.Usuario, radicado_id: int) -> str:
@@ -379,6 +380,8 @@ def preparar_notificaciones_actuaciones(
                     emisor=proceso.abogado,
                     iniciar_workflow=False,
                     actuacion_ids=[actuacion["id"] for actuacion in nuevas],
+                    plantilla_clave="ACTUACIONES_DIGEST",
+                    variables={"nombre": cliente.nombre_completo, "novedades": omitida},
                 )
             else:
                 _agregar_actuaciones_a_grupo(
@@ -434,6 +437,11 @@ def preparar_notificaciones_actuaciones(
         secciones_pendientes = [seccion for seccion in secciones_pendientes if seccion["actuaciones"]]
 
         actuacion_ids = sorted(pending_ids)
+        subject, body = render_message(
+            db, "ACTUACIONES_DIGEST", {"nombre": usuario.nombre_completo,
+                                       "novedades": _cuerpo_novedades(secciones_pendientes)},
+            canal=canal,
+        )
         event_digest = hashlib.sha256(
             ",".join(map(str, actuacion_ids)).encode("ascii")
         ).hexdigest()
@@ -445,8 +453,8 @@ def preparar_notificaciones_actuaciones(
                 usuario_id=usuario.id,
                 tipo="ACTUACIONES",
                 canal=canal,
-                asunto="Novedades judiciales",
-                cuerpo=_cuerpo_novedades(secciones_pendientes),
+                asunto=subject,
+                cuerpo=body,
                 estado="PENDIENTE",
             )
             db.add(entrega)
@@ -454,8 +462,8 @@ def preparar_notificaciones_actuaciones(
         else:
             if entrega.intentos >= MAX_INTENTOS_NOTIFICACION:
                 continue
-            entrega.asunto = "Novedades judiciales"
-            entrega.cuerpo = _cuerpo_novedades(secciones_pendientes)
+            entrega.asunto = subject
+            entrega.cuerpo = body
             if entrega.estado != "ENVIADA":
                 entrega.estado = "PENDIENTE"
                 entrega.error = None
@@ -641,6 +649,16 @@ def preparar_recordatorio_workflow(
         iniciar_workflow=False,
         recordatorio_id=recordatorio.id,
         recordatorio_version=recordatorio.version,
+        plantilla_clave="RECORDATORIO_TAREA",
+        variables={"nombre": usuario.nombre_completo, "tarea": tarea.titulo,
+                   "estado": tarea.estado.value, "prioridad": tarea.prioridad.value,
+                   "proceso": tarea.proceso.nombre if tarea.proceso else "Tarea general",
+                   "radicado": tarea.radicado.numero if tarea.radicado else "No asociado",
+                   "actuacion": tarea.actuacion_rel.actuacion if tarea.actuacion_rel else "No asociada",
+                   "detalle": tarea.descripcion or "Sin detalles adicionales",
+                   "fecha_limite": fecha_limite.strftime('%d/%m/%Y %H:%M UTC') if tarea.fecha_limite else "Sin fecha límite",
+                   "anticipacion": programado_por},
+        enlace_texto="Ver tarea", enlace_url=f"{public_site_url()}{tarea_path}",
     )
     if not entrega_ids:
         recordatorio.enviado_en = ahora

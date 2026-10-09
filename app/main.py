@@ -15,9 +15,10 @@ from sqlalchemy import or_, text
 from sqlalchemy.orm import Session
 from fastapi.middleware.cors import CORSMiddleware
 from datetime import datetime, timedelta
+from pathlib import Path
 from urllib.parse import quote, urlsplit
 from botocore.exceptions import BotoCoreError, ClientError
-from app.database import engine, Base, get_db
+from app.database import engine, Base, get_db, SessionLocal
 from app import models, schemas, security, storage
 from app.email_service import enviar_correo
 from app.site_content import PUBLIC_CONTENT_PAGES, PUBLIC_PAGE_ROUTES
@@ -38,6 +39,7 @@ from app.audit import (
 )
 from app.firm_access import has_firm_wide_access, lawyer_process_ids, lawyer_scope_id
 from app.workflow_service import public_site_url
+from app.message_templates import render_direct_message, render_message
 
 # Crear las tablas en la BD
 models.Base.metadata.create_all(bind=engine)
@@ -216,16 +218,18 @@ def _allow_password_reset_request(client_ip: str, email: str) -> bool:
 
 
 def _send_password_reset_email(email: str, reset_url: str) -> None:
+    db = SessionLocal()
     try:
-        sent = enviar_correo(
-            email,
-            "Restablece tu contraseña",
-            f"Usa este enlace para elegir una nueva contraseña. El enlace vence en 20 minutos:\n\n{reset_url}\n\nSi no solicitaste el cambio, ignora este mensaje.",
+        subject, body = render_direct_message(
+            db, "RECUPERAR_PASSWORD", {}, link_label="Restablecer contraseña", link_url=reset_url,
         )
+        sent = enviar_correo(email, subject, body)
         if not sent:
             logging.getLogger(__name__).warning("Password reset email skipped because SMTP is not configured.")
     except Exception:
         logging.getLogger(__name__).exception("Password reset email delivery failed.")
+    finally:
+        db.close()
 
 
 def _password_reset_frontend_url() -> str:
@@ -257,6 +261,13 @@ def _password_reset_frontend_url() -> str:
 def crear_datos_iniciales():
     """Aplica compatibilidad y siembra planes SaaS solo si aún no existen."""
     actualizar_esquema_planes()
+    ruta_plantillas = Path(__file__).resolve().parents[1] / "migrations" / "2026_10_10_mensajes_configurables.sql"
+    if not ruta_plantillas.is_file():
+        raise RuntimeError("No se encontró la migración de plantillas de mensajes.")
+    with engine.begin() as conexion:
+        ddl, datos_plantillas = ruta_plantillas.read_text(encoding="utf-8").split("\n\n", maxsplit=1)
+        conexion.exec_driver_sql(ddl)
+        conexion.exec_driver_sql(datos_plantillas)
     db = next(get_db())
     try:
         if not db.query(models.Plan).first():
@@ -591,10 +602,10 @@ def _hash_codigo_seguridad(challenge_id: str, usuario_id: int, accion: str, codi
     return hmac.new(secreto, mensaje, hashlib.sha256).hexdigest()
 
 
-def _enviar_codigo_seguridad(usuario: models.Usuario, canal: str, codigo: str) -> bool:
-    mensaje = f"Tu código de seguridad es {codigo}. Vence en 3 minutos. Si no solicitaste este cambio, ignora este mensaje."
+def _enviar_codigo_seguridad(db: Session, usuario: models.Usuario, canal: str, codigo: str) -> bool:
+    asunto, mensaje = render_message(db, "CODIGO_SEGURIDAD", {"nombre": usuario.nombre_completo, "codigo": codigo}, canal=canal)
     if canal == "EMAIL":
-        return enviar_correo(usuario.email, "Código de seguridad de tu cuenta", mensaje)
+        return enviar_correo(usuario.email, asunto, mensaje)
     from app.whatsapp import enviar_mensaje_whatsapp
     return bool(usuario.whatsapp_numero and enviar_mensaje_whatsapp(usuario.whatsapp_numero, mensaje))
 
@@ -654,7 +665,7 @@ def solicitar_codigo_seguridad(
 
     challenge_id = str(uuid4())
     codigo = f"{secrets.randbelow(1_000_000):06d}"
-    if not _enviar_codigo_seguridad(usuario, datos.canal, codigo):
+    if not _enviar_codigo_seguridad(db, usuario, datos.canal, codigo):
         raise HTTPException(status_code=503, detail="No fue posible enviar el código por ese canal.")
     if anterior:
         anterior.consumido_en = ahora
@@ -709,7 +720,7 @@ def reenviar_codigo_seguridad(
     if datos.canal == "WHATSAPP" and not usuario.whatsapp_numero.strip():
         raise HTTPException(status_code=400, detail="Tu cuenta no tiene un número de WhatsApp configurado.")
     codigo = f"{secrets.randbelow(1_000_000):06d}"
-    if not _enviar_codigo_seguridad(usuario, datos.canal, codigo):
+    if not _enviar_codigo_seguridad(db, usuario, datos.canal, codigo):
         raise HTTPException(status_code=503, detail="No fue posible enviar el código por ese canal.")
     challenge.canal = datos.canal
     challenge.codigo_hash = _hash_codigo_seguridad(challenge.id, usuario.id, challenge.accion, codigo)

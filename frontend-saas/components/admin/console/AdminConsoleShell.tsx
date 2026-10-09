@@ -38,6 +38,7 @@ const operationsLinks: Item[] = [
   { label: "Consultas judiciales", href: "/gestion-procesos/admin/operacion/consultas", icon: CalendarDays },
   { label: "Integraciones", href: "/gestion-procesos/admin/operacion/integraciones", icon: ServerCog },
   { label: "Notificaciones", href: "/gestion-procesos/admin/operacion/notificaciones", icon: Bell },
+  { label: "Mensajes del sistema", href: "/gestion-procesos/admin/operacion/mensajes", icon: FileText },
 ];
 const documentLinks: Item[] = [
   { label: "Archivos recibidos", href: "/gestion-procesos/admin/documentos", icon: BookOpenText },

@@ -31,6 +31,7 @@ from app.contract_pdf import (
 )
 from app.firm_access import lawyer_process_ids, require_process_manager, require_roles
 from app.workflow_service import public_site_url
+from app.message_templates import render_direct_message
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/contratos", tags=["Contratos"])
@@ -377,10 +378,15 @@ def _enviar_copia_firmada(db: Session, contract: models.ContratoServicio, docume
         content = stored["Body"].read(MAX_DOCUMENT_BYTES + 1)
         if len(content) > MAX_DOCUMENT_BYTES:
             raise ValueError("El archivo supera el límite permitido para adjuntar al correo.")
+        subject, body = render_direct_message(db, "CONTRATO_FIRMADO", {
+            "nombre": contract.parte_cliente_snapshot.get("nombre", "cliente"),
+            "proceso": contract.proceso.nombre,
+        }, link_label="Ver expediente",
+           link_url=f"{public_site_url()}/gestion-procesos/cliente/procesos/{contract.proceso_id}")
         sent = enviar_correo(
             recipient,
-            f"Copia de contrato firmado — {contract.proceso.nombre}",
-            f"Hola {contract.parte_cliente_snapshot.get('nombre', 'cliente')},\n\nAdjuntamos una copia del contrato firmado asociado a tu expediente {contract.proceso.nombre}. También puedes consultarlo en el portal:\n\nAbrir enlace: Ver expediente | {public_site_url()}/gestion-procesos/cliente/procesos/{contract.proceso_id}\n\nEl documento queda disponible en la sección Documentos del expediente.",
+            subject,
+            body,
             adjunto=(document.nombre_archivo, content, document.mime_type),
         )
         if not sent:

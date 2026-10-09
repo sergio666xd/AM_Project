@@ -79,6 +79,8 @@ def enviar_resumen_mensual():
                 f"Resumen mensual de procesos ({mes_actual})",
                 mensaje,
                 emisor=usuario,
+                plantilla_clave="RESUMEN_MENSUAL",
+                variables={"nombre": usuario.nombre_completo, "mes": mes_actual, "resumen": mensaje},
             )
             if entrega_ids:
                 usuarios_notificados += 1

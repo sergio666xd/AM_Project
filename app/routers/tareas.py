@@ -149,6 +149,13 @@ def _notificar_cambio_tarea(
         emitir_notificacion_workflow(
             db, destinatario, "TAREAS", f"TAREA_ACCION:{tarea.id}:{datetime.utcnow().timestamp()}",
             f"{accion.capitalize()}: {tarea.titulo}", cuerpo, emisor=actor, incluir_email=True,
+            plantilla_clave="TAREA_ACCION",
+            variables={"nombre": destinatario.nombre_completo, "actor": actor.nombre_completo,
+                       "accion": accion, "tarea": tarea.titulo, "detalle": detalle,
+                       "estado": tarea.estado.value, "prioridad": tarea.prioridad.value,
+                       "fecha_limite": due, "proceso": process, "radicado": radicado,
+                       "actuacion": actuacion},
+            enlace_texto="Ver tareas", enlace_url=url_tarea,
         )
 
 
@@ -455,6 +462,10 @@ def notificar_subtarea_asignada(
         "Nueva subtarea asignada",
         mensaje,
         emisor=usuario,
+        plantilla_clave="SUBTAREA_ASIGNADA",
+        variables={"nombre": cliente.nombre_completo, "actor": usuario.nombre_completo,
+                   "subtarea": subtarea.titulo, "tarea": tarea.titulo if tarea else ""},
+        enlace_texto="Ver tarea", enlace_url=_url_tarea_notificacion(cliente, tarea_id),
     )
 
 

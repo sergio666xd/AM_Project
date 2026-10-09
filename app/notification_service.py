@@ -9,6 +9,7 @@ from sqlalchemy.orm import Session
 
 from app import models
 from app.notification_policy import canales_habilitados, canales_recordatorio_seleccionados
+from app.message_templates import render_message
 from app.workflow_service import workflow_frontend_url, workflow_service_headers
 
 logger = logging.getLogger(__name__)
@@ -95,7 +96,13 @@ def emitir_notificacion_workflow(
     recordatorio_version: int | None = None,
     actuacion_ids: list[int] | None = None,
     incluir_email: bool = False,
+    plantilla_clave: str | None = None,
+    variables: dict | None = None,
+    enlace_texto: str | None = None,
+    enlace_url: str | None = None,
 ) -> list[int]:
+    if not plantilla_clave:
+        raise ValueError("Toda notificación debe usar una plantilla persistida en la base de datos.")
     recordatorio = (
         db.query(models.RecordatorioTarea).filter_by(id=recordatorio_id).first()
         if tipo == "RECORDATORIOS" and recordatorio_id is not None
@@ -110,6 +117,10 @@ def emitir_notificacion_workflow(
         canales = tuple(dict.fromkeys((*canales, "EMAIL")))
     if not canales:
         if usuario.rol == models.RolUsuario.CLIENTE:
+            asunto_guardado, cuerpo_guardado = render_message(
+                db, plantilla_clave, variables or {}, canal="EMAIL",
+                link_label=enlace_texto, link_url=enlace_url,
+            )
             canal = usuario.canal_notificacion_cliente or "SIN_CANAL"
             clave = _delivery_key(tipo, origen, usuario.id, f"BLOQUEADA:{canal}")
             existente = db.query(models.EntregaNotificacion).filter_by(
@@ -123,8 +134,8 @@ def emitir_notificacion_workflow(
                     canal=canal,
                     recordatorio_id=recordatorio_id,
                     recordatorio_version=recordatorio_version,
-                    asunto=asunto,
-                    cuerpo=cuerpo,
+                    asunto=asunto_guardado,
+                    cuerpo=cuerpo_guardado,
                     estado="OMITIDA",
                     error="El canal obligatorio no está disponible para este contacto o plan.",
                 )
@@ -147,20 +158,23 @@ def emitir_notificacion_workflow(
             return [existente.id]
         return []
 
-    entrega_ids = [
-        crear_entrega_canal(
+    entrega_ids = []
+    for canal in canales:
+        asunto_canal, cuerpo_canal = render_message(
+                db, plantilla_clave, variables or {}, canal=canal,
+                link_label=enlace_texto, link_url=enlace_url,
+        )
+        entrega_ids.append(crear_entrega_canal(
             db,
             usuario,
             tipo,
             origen,
             canal,
-            asunto,
-            cuerpo,
+            asunto_canal,
+            cuerpo_canal,
             recordatorio_id=recordatorio_id,
             recordatorio_version=recordatorio_version,
-        )
-        for canal in canales
-    ]
+        ))
     for entrega_id, canal in zip(entrega_ids, canales):
         for actuacion_id in actuacion_ids or []:
             mapping = db.query(models.EntregaNotificacionActuacion).filter_by(

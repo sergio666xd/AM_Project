@@ -1,5 +1,6 @@
 import os
 import re
+import logging
 import smtplib
 import hashlib
 from uuid import uuid4
@@ -48,6 +49,8 @@ from app.workflow_service import (
 )
 from app.notification_service import emitir_notificacion_workflow
 from app.workflow_service import public_site_url
+from app.message_templates import render_message
+from app.reminder_workflow import iniciar_workflow_recordatorio
 import json
 
 
@@ -55,6 +58,7 @@ router = APIRouter(
     prefix="/api/admin",
     tags=["Administración"],
 )
+logger = logging.getLogger(__name__)
 
 
 def _validar_capacidad_actuaciones(limite: int | None) -> None:
@@ -965,6 +969,69 @@ def listar_entregas_notificacion_admin(
         "limite": limite,
         "offset": offset,
     }
+
+
+@router.get("/notificaciones/plantillas")
+def listar_plantillas_mensaje_admin(
+    db: Session = Depends(get_db),
+    _: models.Usuario = Depends(verificar_admin),
+):
+    plantillas = db.query(models.PlantillaMensaje).filter_by(activo=True).order_by(models.PlantillaMensaje.nombre.asc()).all()
+    etiquetas_enlace = {
+        "ABOGADO_CREDENCIALES": "Ingresar al portal", "CLIENTE_CREDENCIALES": "Ingresar al portal",
+        "TAREA_ACCION": "Ver tareas", "SUBTAREA_ASIGNADA": "Ver tarea", "RECORDATORIO_TAREA": "Ver tarea",
+        "REACTIVACION_TAREA": "Ver tarea", "REACTIVACION_EVENTO": "Ver agenda",
+        "REACTIVACION_COMUNICACION": "Ver conversación", "COMUNICACION_CLIENTE_ABOGADO": "Ver conversación",
+        "DOCUMENTO_RECIBIDO": "Revisar documentos", "CONTRATO_FIRMADO": "Ver expediente",
+        "RECUPERAR_PASSWORD": "Restablecer contraseña", "ACTUACIONES_DIGEST": "Abrir radicado",
+    }
+    resultado = []
+    for plantilla in plantillas:
+        ejemplos = plantilla.variables_ejemplo or {}
+        resultado.append({
+            "clave": plantilla.clave,
+            "nombre": plantilla.nombre,
+            "asunto_email": plantilla.asunto_email,
+            "cuerpo_email": plantilla.cuerpo_email.replace("\\n", "\n"),
+            "cuerpo_whatsapp": plantilla.cuerpo_whatsapp.replace("\\n", "\n"),
+            "variables_ejemplo": ejemplos,
+            "enlace_ejemplo": plantilla.enlace_ejemplo,
+            "texto_enlace_ejemplo": etiquetas_enlace.get(plantilla.clave, "Ver proceso") if plantilla.enlace_ejemplo else None,
+            "activo": plantilla.activo,
+            "actualizado_en": plantilla.updated_at,
+            "vista_previa_email": render_message(db, plantilla.clave, ejemplos, canal="EMAIL", link_label=etiquetas_enlace.get(plantilla.clave, "Ver proceso"), link_url=plantilla.enlace_ejemplo)[1],
+            "vista_previa_whatsapp": render_message(db, plantilla.clave, ejemplos, canal="WHATSAPP", link_label=etiquetas_enlace.get(plantilla.clave, "Ver proceso"), link_url=plantilla.enlace_ejemplo)[1],
+        })
+    return resultado
+
+
+@router.put("/notificaciones/plantillas/{clave}")
+def actualizar_plantilla_mensaje_admin(
+    clave: str,
+    datos: dict = Body(...),
+    db: Session = Depends(get_db),
+    admin: models.Usuario = Depends(verificar_admin),
+):
+    plantilla = db.query(models.PlantillaMensaje).filter_by(clave=clave).first()
+    if not plantilla:
+        raise HTTPException(status_code=404, detail="La plantilla no existe.")
+    asunto = datos.get("asunto_email")
+    cuerpo_email = datos.get("cuerpo_email")
+    cuerpo_whatsapp = datos.get("cuerpo_whatsapp")
+    if not isinstance(asunto, str) or not asunto.strip() or len(asunto) > 1000:
+        raise HTTPException(status_code=400, detail="El asunto debe tener contenido y máximo 1000 caracteres.")
+    if not isinstance(cuerpo_email, str) or not cuerpo_email.strip() or len(cuerpo_email) > 30000:
+        raise HTTPException(status_code=400, detail="El mensaje de correo debe tener contenido y máximo 30000 caracteres.")
+    if not isinstance(cuerpo_whatsapp, str) or not cuerpo_whatsapp.strip() or len(cuerpo_whatsapp) > 10000:
+        raise HTTPException(status_code=400, detail="El mensaje de WhatsApp debe tener contenido y máximo 10000 caracteres.")
+    plantilla.asunto_email = asunto
+    plantilla.cuerpo_email = cuerpo_email
+    plantilla.cuerpo_whatsapp = cuerpo_whatsapp
+    plantilla.actualizado_por_id = admin.id
+    registrar_evento_auditoria(db, admin, "admin.mensaje.plantilla.actualizar", "plantilla_mensaje", clave)
+    db.commit()
+    db.refresh(plantilla)
+    return {"clave": plantilla.clave, "mensaje": "Plantilla actualizada.", "actualizado_en": plantilla.updated_at}
 
 
 @router.post("/notificaciones/leer")
@@ -1948,20 +2015,151 @@ def _notificar_evento_agenda_admin(db: Session, evento: models.EventoAgenda, adm
     for cliente in destinatarios:
         if not cliente or cliente.estado != models.EstadoUsuario.ACTIVO:
             continue
-        cuerpo = (
-            f"Hola {cliente.nombre_completo},\n\n"
-            f"{admin.nombre_completo} {accion} una actividad relacionada con tu proceso.\n\n"
-            f"Proceso: {proceso.nombre}\nActividad: {evento.titulo}\nTipo: {evento.tipo}\n"
-            f"Estado: {evento.estado}\nInicio: {evento.fecha_inicio.strftime('%d/%m/%Y %H:%M UTC')}\n"
-            f"Fin: {evento.fecha_fin.strftime('%d/%m/%Y %H:%M UTC') if evento.fecha_fin else 'No indicada'}\n"
-            f"Responsable: {evento.responsable.nombre_completo if evento.responsable else 'No asignado'}\n"
-            f"Detalle: {evento.descripcion or 'Sin detalles adicionales'}\n\n"
-            f"Abrir enlace: Ver proceso | {public_site_url()}/gestion-procesos/cliente/procesos/{proceso.id}#agenda"
-        )
+        link_url = f"{public_site_url()}/gestion-procesos/cliente/procesos/{proceso.id}#agenda"
         emitir_notificacion_workflow(
             db, cliente, "RESUMENES", f"EVENTO_AGENDA:{evento.id}:{accion.upper()}:{evento.fecha_inicio.isoformat()}",
-            f"{accion.capitalize()} actividad: {evento.titulo}", cuerpo, emisor=admin, incluir_email=True,
+            f"{accion.capitalize()} actividad: {evento.titulo}", "", emisor=admin, incluir_email=True,
+            plantilla_clave="EVENTO_AGENDA",
+            variables={"nombre": cliente.nombre_completo, "actor": admin.nombre_completo, "accion": accion,
+                       "proceso": proceso.nombre, "actividad": evento.titulo, "tipo": evento.tipo,
+                       "estado": evento.estado, "inicio": evento.fecha_inicio.strftime('%d/%m/%Y %H:%M UTC'),
+                       "fin": evento.fecha_fin.strftime('%d/%m/%Y %H:%M UTC') if evento.fecha_fin else 'No indicada',
+                       "responsable": evento.responsable.nombre_completo if evento.responsable else 'No asignado',
+                       "detalle": evento.descripcion or 'Sin detalles adicionales'},
+            enlace_texto="Ver proceso", enlace_url=link_url,
         )
+
+
+def _notificar_agenda_tras_reactivacion(db: Session, usuario: models.Usuario, actor: models.Usuario) -> None:
+    """Deliver catch-up notices for pending and unread agenda items after reactivation."""
+    ahora = datetime.utcnow()
+    marca_reactivacion = ahora.isoformat()
+    if usuario.rol == models.RolUsuario.CLIENTE:
+        process_ids = [row[0] for row in db.query(models.ProcesoCliente.proceso_id).filter_by(cliente_id=usuario.id).all()]
+        task_query = db.query(models.Tarea).filter(
+            models.Tarea.cliente_id == usuario.id,
+            models.Tarea.estado.notin_((models.EstadoTarea.COMPLETADA, models.EstadoTarea.CANCELADA)),
+        )
+        event_query = db.query(models.EventoAgenda).filter(
+            models.EventoAgenda.proceso_id.in_(process_ids or [-1]),
+            models.EventoAgenda.estado == "PROGRAMADO",
+            models.EventoAgenda.fecha_inicio >= ahora,
+            or_(models.EventoAgenda.cliente_id == usuario.id, models.EventoAgenda.cliente_id.is_(None)),
+        )
+        communication_query = db.query(models.ComunicacionProceso).filter(
+            models.ComunicacionProceso.cliente_id == usuario.id,
+            models.ComunicacionProceso.visibilidad == "CLIENTE",
+            models.ComunicacionProceso.actor_id != usuario.id,
+            models.ComunicacionProceso.leido_en.is_(None),
+        )
+    else:
+        owned_ids = [row[0] for row in db.query(models.Proceso.id).filter_by(abogado_id=usuario.id).all()]
+        collaborating_ids = [row[0] for row in db.query(models.ProcesoColaborador.proceso_id).filter_by(abogado_id=usuario.id).all()]
+        process_ids = list(set(owned_ids + collaborating_ids))
+        task_query = db.query(models.Tarea).filter(
+            models.Tarea.usuario_id == usuario.id,
+            models.Tarea.estado.notin_((models.EstadoTarea.COMPLETADA, models.EstadoTarea.CANCELADA)),
+        )
+        event_query = db.query(models.EventoAgenda).filter(
+            models.EventoAgenda.responsable_id == usuario.id,
+            models.EventoAgenda.estado == "PROGRAMADO",
+            models.EventoAgenda.fecha_inicio >= ahora,
+        )
+        communication_query = db.query(models.ComunicacionProceso).filter(
+            models.ComunicacionProceso.proceso_id.in_(process_ids or [-1]),
+            models.ComunicacionProceso.visibilidad == "CLIENTE",
+            models.ComunicacionProceso.actor_id != usuario.id,
+            models.ComunicacionProceso.leido_en.is_(None),
+        )
+
+    recordatorio_ids = []
+    for task in task_query.order_by(models.Tarea.fecha_limite.asc().nullslast()).limit(30).all():
+        process = task.proceso.nombre if task.proceso else "Tarea general"
+        destinatario_recordatorio = task.cliente_asignado if task.cliente_id else task.usuario
+        active_system_reminders = [item for item in task.recordatorios if item.interno_sistema and item.activo and item.enviado_en is None]
+        if task.fecha_limite and destinatario_recordatorio and destinatario_recordatorio.estado == models.EstadoUsuario.ACTIVO and not active_system_reminders:
+            if destinatario_recordatorio.rol == models.RolUsuario.CLIENTE:
+                email_enabled = destinatario_recordatorio.canal_notificacion_cliente == "EMAIL" and bool(destinatario_recordatorio.email)
+                whatsapp_enabled = destinatario_recordatorio.canal_notificacion_cliente == "WHATSAPP" and bool(destinatario_recordatorio.whatsapp_numero.strip())
+            else:
+                reminder_preferences = (destinatario_recordatorio.preferencias_notificacion or {}).get("RECORDATORIOS", {})
+                email_enabled = bool(reminder_preferences.get("email", destinatario_recordatorio.notificaciones_email)) and bool(destinatario_recordatorio.email)
+                whatsapp_enabled = bool(reminder_preferences.get("whatsapp", destinatario_recordatorio.notificaciones_whatsapp)) and bool(destinatario_recordatorio.whatsapp_numero.strip())
+            for anticipation in (1440, 720):
+                if task.fecha_limite - timedelta(minutes=anticipation) <= ahora:
+                    continue
+                reminder = models.RecordatorioTarea(
+                    tarea_id=task.id, canal=models.CanalRecordatorio.WHATSAPP,
+                    notificar_email=email_enabled, notificar_whatsapp=whatsapp_enabled,
+                    activo=True, version=1, workflow_version_lanzada=0,
+                    anticipacion_minutos=anticipation, interno_sistema=True,
+                )
+                db.add(reminder)
+                db.flush()
+                recordatorio_ids.append(reminder.id)
+        recipient_url = (
+            f"{public_site_url()}/gestion-procesos/cliente/tareas?tarea={task.id}#tarea-{task.id}"
+            if usuario.rol == models.RolUsuario.CLIENTE
+            else f"{public_site_url()}/gestion-procesos/dashboard/tareas/{task.id}"
+            if usuario.rol == models.RolUsuario.ABOGADO
+            else f"{public_site_url()}/gestion-procesos/abogado/tareas/{task.id}"
+        )
+        try:
+            emitir_notificacion_workflow(
+                db, usuario, "TAREAS", f"REACTIVACION:{usuario.id}:TAREA:{task.id}:{marca_reactivacion}",
+                "Tarea pendiente tras reactivar tu cuenta", "", emisor=actor, incluir_email=True,
+                plantilla_clave="REACTIVACION_TAREA",
+                variables={"nombre": usuario.nombre_completo, "tarea": task.titulo, "proceso": process,
+                           "estado": task.estado.value, "fecha_limite": task.fecha_limite.strftime("%d/%m/%Y %H:%M UTC") if task.fecha_limite else "Sin fecha límite"},
+                enlace_texto="Ver tarea", enlace_url=recipient_url,
+            )
+        except Exception:
+            logger.exception("No se pudo preparar aviso de tarea pendiente al reactivar usuario %s", usuario.id)
+
+    for event in event_query.order_by(models.EventoAgenda.fecha_inicio.asc()).limit(30).all():
+        process = event.proceso
+        if not process:
+            continue
+        role_path = "cliente" if usuario.rol == models.RolUsuario.CLIENTE else "dashboard" if usuario.rol == models.RolUsuario.ABOGADO else "abogado"
+        recipient_url = f"{public_site_url()}/gestion-procesos/{role_path}/procesos/{process.id}#agenda"
+        try:
+            emitir_notificacion_workflow(
+                db, usuario, "RESUMENES", f"REACTIVACION:{usuario.id}:EVENTO:{event.id}:{marca_reactivacion}",
+                "Actividad próxima tras reactivar tu cuenta", "", emisor=actor, incluir_email=True,
+                plantilla_clave="REACTIVACION_EVENTO",
+                variables={"nombre": usuario.nombre_completo, "actividad": event.titulo, "proceso": process.nombre,
+                           "tipo": event.tipo, "fecha": event.fecha_inicio.strftime("%d/%m/%Y %H:%M UTC"),
+                           "descripcion": event.descripcion or "Sin detalles adicionales"},
+                enlace_texto="Ver agenda", enlace_url=recipient_url,
+            )
+        except Exception:
+            logger.exception("No se pudo preparar aviso de evento al reactivar usuario %s", usuario.id)
+
+    for communication in communication_query.order_by(models.ComunicacionProceso.created_at.desc()).limit(30).all():
+        process = communication.proceso
+        if not process:
+            continue
+        role_path = "cliente" if usuario.rol == models.RolUsuario.CLIENTE else "dashboard" if usuario.rol == models.RolUsuario.ABOGADO else "abogado"
+        recipient_url = f"{public_site_url()}/gestion-procesos/{role_path}/procesos/{process.id}#comunicaciones"
+        try:
+            emitir_notificacion_workflow(
+                db, usuario, "RESUMENES", f"REACTIVACION:{usuario.id}:COMUNICACION:{communication.id}:{marca_reactivacion}",
+                f"Comunicación pendiente: {communication.asunto}", "", emisor=actor, incluir_email=True,
+                plantilla_clave="REACTIVACION_COMUNICACION",
+                variables={"nombre": usuario.nombre_completo, "proceso": process.nombre,
+                           "asunto": communication.asunto, "fecha": communication.created_at.strftime("%d/%m/%Y %H:%M UTC"),
+                           "mensaje": communication.contenido},
+                enlace_texto="Ver conversación", enlace_url=recipient_url,
+            )
+        except Exception:
+            logger.exception("No se pudo preparar aviso de comunicación al reactivar usuario %s", usuario.id)
+
+    db.commit()
+    for recordatorio_id in recordatorio_ids:
+        try:
+            iniciar_workflow_recordatorio(db, recordatorio_id)
+        except Exception:
+            logger.exception("No se pudo iniciar un recordatorio al reactivar usuario %s", usuario.id)
 
 
 @router.get("/agenda/eventos")
@@ -2348,15 +2546,8 @@ def enviar_mensaje_prueba_integracion(
     )
     db.commit()
     try:
-        enviado = (
-            enviar_correo(destinatario, "Prueba de integración", "Mensaje de prueba solicitado por un administrador.")
-            if datos.canal == "EMAIL"
-            else enviar_mensaje_whatsapp(
-                destinatario,
-                "👋 ¡Hola! Esta es una prueba de integración de WhatsApp solicitada por el administrador.\n\n"
-                "Si recibiste este mensaje, la conexión está funcionando correctamente.",
-            )
-        )
+        subject, body = render_message(db, "PRUEBA_INTEGRACION", {}, canal=datos.canal)
+        enviado = enviar_correo(destinatario, subject, body) if datos.canal == "EMAIL" else enviar_mensaje_whatsapp(destinatario, body)
     except Exception as exc:
         raise HTTPException(status_code=502, detail="El proveedor no pudo completar el envío de prueba.") from exc
     if not enviado:
@@ -3151,11 +3342,14 @@ def cambiar_estado_usuario(
     if estado not in (models.EstadoUsuario.ACTIVO, models.EstadoUsuario.SUSPENDIDO, models.EstadoUsuario.RECHAZADO):
         raise HTTPException(status_code=400, detail="Estado de cuenta no permitido.")
 
+    reactivado = usuario.estado == models.EstadoUsuario.SUSPENDIDO and estado == models.EstadoUsuario.ACTIVO
     usuario.estado = estado
 
     registrar_evento_auditoria(db, usuario_actual, f"admin.usuario.estado.{estado.value}", "usuario", usuario.id)
     db.commit()
     db.refresh(usuario)
+    if reactivado:
+        _notificar_agenda_tras_reactivacion(db, usuario, usuario_actual)
 
     return {
         "mensaje": "Estado del usuario actualizado correctamente.",

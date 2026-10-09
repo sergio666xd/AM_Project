@@ -120,6 +120,23 @@ class ConfiguracionConsultas(Base):
     lease_hasta = Column(DateTime, nullable=True)
 
 
+class PlantillaMensaje(Base):
+    """Editable templates for system email and WhatsApp messages."""
+    __tablename__ = "plantillas_mensaje"
+
+    id = Column(Integer, primary_key=True)
+    clave = Column(String(80), nullable=False, unique=True, index=True)
+    nombre = Column(String(180), nullable=False)
+    asunto_email = Column(Text, nullable=True)
+    cuerpo_email = Column(Text, nullable=False)
+    cuerpo_whatsapp = Column(Text, nullable=False)
+    variables_ejemplo = Column(JSON, nullable=False, default=dict)
+    enlace_ejemplo = Column(String(1000), nullable=True)
+    activo = Column(Boolean, nullable=False, default=True)
+    actualizado_por_id = Column(Integer, ForeignKey("usuarios.id", ondelete="SET NULL"), nullable=True)
+    updated_at = Column(DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+
 class EventoAgenda(Base):
     __tablename__ = "eventos_agenda"
 

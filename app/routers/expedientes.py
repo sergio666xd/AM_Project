@@ -305,6 +305,10 @@ def _notificar(
     origen: str,
     emisor: models.Usuario | None = None,
     incluir_email: bool = True,
+    plantilla_clave: str | None = None,
+    variables: dict | None = None,
+    enlace_texto: str | None = None,
+    enlace_url: str | None = None,
 ) -> None:
     emitir_notificacion_workflow(
         db,
@@ -315,6 +319,10 @@ def _notificar(
         cuerpo,
         emisor=emisor,
         incluir_email=incluir_email,
+        plantilla_clave=plantilla_clave,
+        variables=variables,
+        enlace_texto=enlace_texto,
+        enlace_url=enlace_url,
     )
 
 
@@ -335,17 +343,15 @@ def _notificar_clientes_proceso(
         and link.cliente.estado == models.EstadoUsuario.ACTIVO
     ]
     for destinatario in destinatarios:
-        cuerpo = (
-            f"Hola {destinatario.nombre_completo},\n\n"
-            f"{actor.nombre_completo} {accion} en el proceso {proceso.nombre}.\n\n"
-            f"Proceso: {proceso.nombre}\n"
-            f"Fecha y hora: {datetime.utcnow().strftime('%d/%m/%Y %H:%M UTC')}\n"
-            f"Detalle: {detalle}\n\n"
-            f"Este mensaje resume un cambio relacionado con tu expediente.\n\n"
-            f"Abrir enlace: Ver proceso | {public_site_url()}/gestion-procesos/cliente#proceso-{proceso.id}"
-        )
+        cuerpo = ""
         _notificar(db, destinatario, asunto, cuerpo, tipo,
-                   f"ACCION_PROCESO:{proceso.id}:{uuid4().hex}", emisor=actor)
+                   f"ACCION_PROCESO:{proceso.id}:{uuid4().hex}", emisor=actor,
+                   plantilla_clave="PROCESO_ACTUALIZACION",
+                   variables={"nombre": destinatario.nombre_completo, "actor": actor.nombre_completo,
+                              "accion": accion, "proceso": proceso.nombre,
+                              "fecha": datetime.utcnow().strftime('%d/%m/%Y %H:%M UTC'), "detalle": detalle},
+                   enlace_texto="Ver proceso",
+                   enlace_url=f"{public_site_url()}/gestion-procesos/cliente#proceso-{proceso.id}")
 
 
 def _notificar_evento_agenda(
@@ -369,23 +375,19 @@ def _notificar_evento_agenda(
     for destinatario in destinatarios:
         if destinatario.estado != models.EstadoUsuario.ACTIVO:
             continue
-        cuerpo = (
-            f"Hola {destinatario.nombre_completo},\n\n"
-            f"{actor.nombre_completo} {accion} una actividad relacionada con tu proceso.\n\n"
-            f"Proceso: {proceso.nombre}\n"
-            f"Actividad: {evento.titulo}\n"
-            f"Tipo: {evento.tipo}\n"
-            f"Estado: {evento.estado}\n"
-            f"Inicio: {fecha_inicio}\n"
-            f"Fin: {fecha_fin}\n"
-            f"Responsable: {responsable}\n"
-            f"Detalle: {evento.descripcion or 'Sin detalles adicionales'}\n\n"
-            f"Abrir enlace: Ver proceso | {public_site_url()}/gestion-procesos/cliente/procesos/{proceso.id}#agenda"
-        )
+        cuerpo = ""
         _notificar(
             db, destinatario, f"{accion.capitalize()} actividad: {evento.titulo}", cuerpo,
             "RESUMENES", f"EVENTO_AGENDA:{evento.id}:{accion.upper()}:{evento.fecha_inicio.isoformat()}",
             emisor=actor,
+            plantilla_clave="EVENTO_AGENDA",
+            variables={"nombre": destinatario.nombre_completo, "actor": actor.nombre_completo,
+                       "accion": accion, "proceso": proceso.nombre, "actividad": evento.titulo,
+                       "tipo": evento.tipo, "estado": evento.estado, "inicio": fecha_inicio,
+                       "fin": fecha_fin, "responsable": responsable,
+                       "detalle": evento.descripcion or "Sin detalles adicionales"},
+            enlace_texto="Ver proceso",
+            enlace_url=f"{public_site_url()}/gestion-procesos/cliente/procesos/{proceso.id}#agenda",
         )
 
 
@@ -454,6 +456,9 @@ def crear_abogado_admin(datos: schemas.AbogadoAdminCreate, db: Session = Depends
         "ACCESO",
         f"USUARIO:{abogado.id}:ACCESO",
         emisor=usuario,
+        plantilla_clave="ABOGADO_CREDENCIALES",
+        variables={"nombre": abogado.nombre_completo, "correo": abogado.email},
+        enlace_texto="Ingresar al portal", enlace_url=f"{public_site_url()}/gestion-procesos/auth/login",
     )
     return {"id": abogado.id, "email": abogado.email, "debe_cambiar_password": True}
 
@@ -480,6 +485,11 @@ def crear_cliente(datos: schemas.ClienteCreate, db: Session = Depends(get_db), u
         f"USUARIO:{cliente.id}:ACCESO",
         emisor=usuario,
         incluir_email=False,
+        plantilla_clave="CLIENTE_CREDENCIALES",
+        variables={"nombre": cliente.nombre_completo, "actor": usuario.nombre_completo,
+                   "correo": cliente.email, "password": datos.password_temporal,
+                   "canal": datos.canal_envio},
+        enlace_texto="Ingresar al portal", enlace_url=f"{public_site_url()}/gestion-procesos/auth/login",
     )
     return {"id": cliente.id, "email": cliente.email, "debe_cambiar_password": True, "canal_envio": datos.canal_envio, "mensaje": "Cliente creado y credenciales programadas para envío."}
 
@@ -949,6 +959,13 @@ def revisar_documento(documento_id: int, datos: schemas.DocumentoRevisionUpdate,
                 db, cliente, f"Documento revisado: {documento.nombre_archivo}",
                 f"Hola {cliente.nombre_completo},\n\n{usuario.nombre_completo} revisó el documento {documento.nombre_archivo} del proceso {documento.proceso.nombre}.\n\nEstado: {documento.estado_revision.replace('_', ' ')}\nComentario: {documento.comentario_revision or 'Sin comentarios adicionales'}\nFecha de revisión: {documento.revisado_en.strftime('%d/%m/%Y %H:%M UTC')}\n\nAbrir enlace: Ver proceso | {public_site_url()}/gestion-procesos/cliente#proceso-{documento.proceso_id}",
                 "DOCUMENTOS", f"REVISION_DOCUMENTO:{documento.id}:{documento.estado_revision}", emisor=usuario,
+                plantilla_clave="DOCUMENTO_REVISION",
+                variables={"nombre": cliente.nombre_completo, "actor": usuario.nombre_completo,
+                           "documento": documento.nombre_archivo, "proceso": documento.proceso.nombre,
+                           "estado": documento.estado_revision.replace("_", " "),
+                           "comentario": documento.comentario_revision or "Sin comentarios adicionales",
+                           "fecha": documento.revisado_en.strftime("%d/%m/%Y %H:%M UTC")},
+                enlace_texto="Ver proceso", enlace_url=f"{public_site_url()}/gestion-procesos/cliente#proceso-{documento.proceso_id}",
             )
         except Exception:
             db.rollback()
@@ -1802,6 +1819,12 @@ def enviar_mensaje_cliente(proceso_id: int, datos: schemas.ComunicacionClienteCr
         db, proceso.abogado, f"Mensaje de {usuario.nombre_completo}: {asunto}",
         f"Hola {proceso.abogado.nombre_completo},\n\n{usuario.nombre_completo} te envió un mensaje sobre el proceso {proceso.nombre}.\n\nAsunto: {asunto}\nFecha: {mensaje.created_at.strftime('%d/%m/%Y %H:%M UTC')}\nMensaje:\n{contenido}\n\nAbrir enlace: Ver conversación | {public_site_url()}/gestion-procesos/abogado/procesos/{proceso.id}#comunicaciones",
         "RESUMENES", f"COMUNICACION_CLIENTE:{mensaje.id}", emisor=usuario,
+        plantilla_clave="COMUNICACION_CLIENTE_ABOGADO",
+        variables={"nombre": proceso.abogado.nombre_completo, "actor": usuario.nombre_completo,
+                   "proceso": proceso.nombre, "asunto": asunto,
+                   "fecha": mensaje.created_at.strftime("%d/%m/%Y %H:%M UTC"), "mensaje": contenido},
+        enlace_texto="Ver conversación",
+        enlace_url=f"{public_site_url()}/gestion-procesos/abogado/procesos/{proceso.id}#comunicaciones",
     )
     return {"id": mensaje.id, "mensaje": "Tu mensaje fue enviado al despacho."}
 
@@ -1845,7 +1868,13 @@ def crear_comunicacion_proceso(proceso_id: int, datos: schemas.ComunicacionProce
     if cliente:
         cuerpo = f"Hola {cliente.nombre_completo},\n\n{usuario.nombre_completo} registro una comunicacion para el proceso {proceso.nombre}.\n\nAsunto: {item.asunto}\nFecha: {item.created_at.strftime('%d/%m/%Y %H:%M UTC')}\nDetalle: {item.contenido}\n\nAbrir enlace: Ver proceso | {public_site_url()}/gestion-procesos/cliente#proceso-{proceso.id}"
         _notificar(db, cliente, f"Nueva comunicacion: {item.asunto}", cuerpo,
-                   "RESUMENES", f"COMUNICACION_PROCESO:{item.id}", emisor=usuario)
+                   "RESUMENES", f"COMUNICACION_PROCESO:{item.id}", emisor=usuario,
+                   plantilla_clave="COMUNICACION_ABOGADO_CLIENTE",
+                   variables={"nombre": cliente.nombre_completo, "actor": usuario.nombre_completo,
+                              "proceso": proceso.nombre, "asunto": item.asunto,
+                              "fecha": item.created_at.strftime("%d/%m/%Y %H:%M UTC"), "mensaje": item.contenido},
+                   enlace_texto="Ver proceso",
+                   enlace_url=f"{public_site_url()}/gestion-procesos/cliente/procesos/{proceso.id}#comunicaciones")
     return {"id": item.id, "mensaje": "Comunicación registrada en el expediente."}
 
 
@@ -1895,6 +1924,12 @@ def asignar_colaborador_proceso(
         db, abogado, f"Te agregaron al proceso {proceso.nombre}", cuerpo,
         "RESUMENES", f"COLABORACION_PROCESO:{proceso.id}:{abogado.id}:{uuid4().hex}",
         emisor=usuario, incluir_email=True,
+        plantilla_clave="COLABORADOR_AGREGADO",
+        variables={"nombre": abogado.nombre_completo, "actor": usuario.nombre_completo,
+                   "permiso": permiso, "proceso": proceso.nombre,
+                   "responsable": proceso.abogado.nombre_completo},
+        enlace_texto="Ver proceso",
+        enlace_url=f"{public_site_url()}/gestion-procesos/abogado/procesos/{proceso.id}",
     )
     return {"mensaje": f"{abogado.nombre_completo} fue agregado como {permiso}."}
 
@@ -2139,6 +2174,13 @@ def notificar_actuacion(proceso_id: int, actuacion_id: int, datos: schemas.Notif
         "ACTUACIONES",
         f"NOTIFICACION_ACTUACION:{actuacion.id}:{cliente.id}",
         emisor=usuario,
+        plantilla_clave="ACTUACION_NOTIFICADA",
+        variables={"nombre": cliente.nombre_completo, "actor": usuario.nombre_completo,
+                   "proceso": proceso.nombre, "radicado": actuacion.radicado_rel.numero,
+                   "fecha": actuacion.fecha_actuacion or "No informada",
+                   "actuacion": actuacion.actuacion, "anotacion": actuacion.anotacion or "Sin anotación",
+                   "comentarios": datos.comentarios},
+        enlace_texto="Ver proceso", enlace_url=f"{public_site_url()}/gestion-procesos/cliente/procesos/{proceso.id}#actividad",
     )
     db.add(models.NotificacionProceso(
         abogado_id=usuario.id, proceso_id=proceso.id, cliente_id=cliente.id,
@@ -2166,6 +2208,13 @@ def solicitar_documento(proceso_id: int, datos: schemas.SolicitudDocumentoCreate
         "DOCUMENTOS",
         f"SOLICITUD_DOCUMENTO:{solicitud.id}",
         usuario,
+        plantilla_clave="SOLICITUD_DOCUMENTO",
+        variables={"nombre": cliente.nombre_completo, "actor": usuario.nombre_completo,
+                   "proceso": proceso.nombre, "solicitud": solicitud.titulo,
+                   "instrucciones": solicitud.instrucciones or "Sin instrucciones adicionales",
+                   "fecha_limite": solicitud.fecha_limite.strftime("%d/%m/%Y %H:%M UTC") if solicitud.fecha_limite else "Sin fecha límite",
+                   "fecha": solicitud.created_at.strftime("%d/%m/%Y %H:%M UTC")},
+        enlace_texto="Ver proceso", enlace_url=f"{public_site_url()}/gestion-procesos/cliente/procesos/{proceso.id}#documentos",
     )
     return {"id": solicitud.id, "mensaje": "Solicitud enviada al cliente."}
 
@@ -2221,6 +2270,13 @@ def cargar_documento_cliente(solicitud_id: int, archivo: UploadFile = File(...),
         db, proceso.abogado, f"Documento recibido: {documento.nombre_archivo}",
         f"Hola {proceso.abogado.nombre_completo},\n\n{usuario.nombre_completo} cargó un documento para el proceso {proceso.nombre}.\n\nDocumento: {documento.nombre_archivo}\nSolicitud: {solicitud.titulo}\nTipo: {documento.mime_type}\nFecha de carga: {documento.created_at.strftime('%d/%m/%Y %H:%M UTC')}\n\nAbrir enlace: Revisar documentos | {public_site_url()}/gestion-procesos/abogado/procesos/{proceso.id}#documentos",
         "DOCUMENTOS", f"DOCUMENTO_RECIBIDO:{documento.id}", emisor=usuario,
+        plantilla_clave="DOCUMENTO_RECIBIDO",
+        variables={"nombre": proceso.abogado.nombre_completo, "actor": usuario.nombre_completo,
+                   "proceso": proceso.nombre, "documento": documento.nombre_archivo,
+                   "solicitud": solicitud.titulo, "tipo": documento.mime_type,
+                   "fecha": documento.created_at.strftime("%d/%m/%Y %H:%M UTC")},
+        enlace_texto="Revisar documentos",
+        enlace_url=f"{public_site_url()}/gestion-procesos/abogado/procesos/{proceso.id}#documentos",
     )
     return {"id": documento.id, "nombre_archivo": documento.nombre_archivo}
 
