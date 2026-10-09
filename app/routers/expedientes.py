@@ -348,6 +348,47 @@ def _notificar_clientes_proceso(
                    f"ACCION_PROCESO:{proceso.id}:{uuid4().hex}", emisor=actor)
 
 
+def _notificar_evento_agenda(
+    db: Session,
+    proceso: models.Proceso,
+    evento: models.EventoAgenda,
+    actor: models.Usuario,
+    accion: str,
+    cliente: models.Usuario | None = None,
+) -> None:
+    """Notify the selected client, or every active client attached to the process."""
+    destinatarios = [cliente] if cliente else [
+        enlace.cliente for enlace in proceso.clientes
+        if enlace.cliente
+        and enlace.cliente.rol == models.RolUsuario.CLIENTE
+        and enlace.cliente.estado == models.EstadoUsuario.ACTIVO
+    ]
+    fecha_inicio = evento.fecha_inicio.strftime("%d/%m/%Y %H:%M UTC")
+    fecha_fin = evento.fecha_fin.strftime("%d/%m/%Y %H:%M UTC") if evento.fecha_fin else "No indicada"
+    responsable = evento.responsable.nombre_completo if evento.responsable else "No asignado"
+    for destinatario in destinatarios:
+        if destinatario.estado != models.EstadoUsuario.ACTIVO:
+            continue
+        cuerpo = (
+            f"Hola {destinatario.nombre_completo},\n\n"
+            f"{actor.nombre_completo} {accion} una actividad relacionada con tu proceso.\n\n"
+            f"Proceso: {proceso.nombre}\n"
+            f"Actividad: {evento.titulo}\n"
+            f"Tipo: {evento.tipo}\n"
+            f"Estado: {evento.estado}\n"
+            f"Inicio: {fecha_inicio}\n"
+            f"Fin: {fecha_fin}\n"
+            f"Responsable: {responsable}\n"
+            f"Detalle: {evento.descripcion or 'Sin detalles adicionales'}\n\n"
+            f"Abrir enlace: Ver proceso | {public_site_url()}/gestion-procesos/cliente/procesos/{proceso.id}#agenda"
+        )
+        _notificar(
+            db, destinatario, f"{accion.capitalize()} actividad: {evento.titulo}", cuerpo,
+            "RESUMENES", f"EVENTO_AGENDA:{evento.id}:{accion.upper()}:{evento.fecha_inicio.isoformat()}",
+            emisor=actor,
+        )
+
+
 def _estado_proceso_cliente(proceso: models.Proceso) -> tuple[str, str]:
     estados = [(link.radicado.estado_consulta or "").casefold() for link in proceso.radicados if link.radicado]
     if not estados:
@@ -1220,10 +1261,7 @@ def crear_evento_agenda_abogado(datos: schemas.EventoAgendaCreate, db: Session =
     db.add(evento); db.flush()
     registrar_evento_auditoria(db, usuario, "proceso.evento_agenda.crear", "proceso", proceso.id)
     db.commit(); db.refresh(evento)
-    if cliente:
-        _notificar(db, cliente, f"Evento programado: {evento.titulo}",
-                   f"Hola {cliente.nombre_completo},\n\n{usuario.nombre_completo} program? un evento relacionado con el proceso {proceso.nombre}.\n\nEvento: {evento.titulo}\nTipo: {evento.tipo}\nEstado: {evento.estado}\nInicio: {evento.fecha_inicio.strftime('%d/%m/%Y %H:%M UTC')}\nFin: {evento.fecha_fin.strftime('%d/%m/%Y %H:%M UTC') if evento.fecha_fin else 'No indicado'}\nResponsable: {responsable.nombre_completo}\nDetalle: {evento.descripcion or 'Sin detalles adicionales'}\n\nAbrir enlace: Ver proceso | {public_site_url()}/gestion-procesos/cliente#proceso-{proceso.id}",
-                   "RESUMENES", f"EVENTO_AGENDA:{evento.id}:CREADO", emisor=usuario)
+    _notificar_evento_agenda(db, proceso, evento, usuario, "programó", cliente)
     return _serializar_evento_firma(evento)
 
 
@@ -1260,10 +1298,7 @@ def actualizar_evento_agenda_abogado(evento_id: int, datos: schemas.EventoAgenda
     registrar_evento_auditoria(db, usuario, "proceso.evento_agenda.actualizar", "proceso", proceso.id)
     db.commit(); db.refresh(evento)
     destinatario = cliente or cliente_anterior
-    if destinatario:
-        _notificar(db, destinatario, f"Evento actualizado: {evento.titulo}",
-                   f"Hola {destinatario.nombre_completo},\n\n{usuario.nombre_completo} actualiz? el evento relacionado con el proceso {proceso.nombre}.\n\nEvento: {evento.titulo}\nTipo: {evento.tipo}\nEstado: {evento.estado}\nInicio: {evento.fecha_inicio.strftime('%d/%m/%Y %H:%M UTC')}\nFin: {evento.fecha_fin.strftime('%d/%m/%Y %H:%M UTC') if evento.fecha_fin else 'No indicado'}\nResponsable: {evento.responsable.nombre_completo if evento.responsable else 'No asignado'}\nDetalle: {evento.descripcion or 'Sin detalles adicionales'}\n\nAbrir enlace: Ver proceso | {public_site_url()}/gestion-procesos/cliente#proceso-{proceso.id}",
-                   "RESUMENES", f"EVENTO_AGENDA:{evento.id}:ACTUALIZADO:{evento.fecha_inicio.isoformat()}", emisor=usuario)
+    _notificar_evento_agenda(db, proceso, evento, usuario, "actualizó", destinatario)
     return _serializar_evento_firma(evento)
 
 
@@ -1275,10 +1310,7 @@ def eliminar_evento_agenda_abogado(evento_id: int, db: Session = Depends(get_db)
         raise HTTPException(status_code=404, detail="Evento no encontrado.")
     proceso = _proceso_abogado(evento.proceso_id, usuario, db)
     cliente = evento.cliente
-    if cliente and cliente.estado == models.EstadoUsuario.ACTIVO:
-        _notificar(db, cliente, f"Evento cancelado: {evento.titulo}",
-                   f"Hola {cliente.nombre_completo},\n\n{usuario.nombre_completo} cancel? el evento relacionado con el proceso {proceso.nombre}.\n\nEvento: {evento.titulo}\nFecha prevista: {evento.fecha_inicio.strftime('%d/%m/%Y %H:%M UTC')}\nResponsable: {evento.responsable.nombre_completo if evento.responsable else 'No asignado'}\n\nAbrir enlace: Ver proceso | {public_site_url()}/gestion-procesos/cliente#proceso-{proceso.id}",
-                   "RESUMENES", f"EVENTO_AGENDA:{evento.id}:ELIMINADO", emisor=usuario)
+    _notificar_evento_agenda(db, proceso, evento, usuario, "canceló", cliente)
     registrar_evento_auditoria(db, usuario, "proceso.evento_agenda.eliminar", "proceso", proceso.id)
     db.delete(evento); db.commit()
     return {"mensaje": "Evento eliminado de la agenda."}

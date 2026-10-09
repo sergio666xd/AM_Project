@@ -46,6 +46,8 @@ from app.workflow_service import (
     workflow_frontend_url,
     workflow_service_headers,
 )
+from app.notification_service import emitir_notificacion_workflow
+from app.workflow_service import public_site_url
 import json
 
 
@@ -1931,6 +1933,37 @@ def _validar_vinculos_evento_agenda(db: Session, responsable_id: int | None, pro
         raise HTTPException(status_code=400, detail="Solo los eventos de firma pueden asociarse a un contrato.")
 
 
+def _notificar_evento_agenda_admin(db: Session, evento: models.EventoAgenda, admin: models.Usuario, accion: str) -> None:
+    if not evento.proceso_id:
+        return
+    proceso = db.query(models.Proceso).filter_by(id=evento.proceso_id).first()
+    if not proceso:
+        return
+    destinatarios = [evento.cliente] if evento.cliente else [
+        link.cliente for link in proceso.clientes
+        if link.cliente
+        and link.cliente.rol == models.RolUsuario.CLIENTE
+        and link.cliente.estado == models.EstadoUsuario.ACTIVO
+    ]
+    for cliente in destinatarios:
+        if not cliente or cliente.estado != models.EstadoUsuario.ACTIVO:
+            continue
+        cuerpo = (
+            f"Hola {cliente.nombre_completo},\n\n"
+            f"{admin.nombre_completo} {accion} una actividad relacionada con tu proceso.\n\n"
+            f"Proceso: {proceso.nombre}\nActividad: {evento.titulo}\nTipo: {evento.tipo}\n"
+            f"Estado: {evento.estado}\nInicio: {evento.fecha_inicio.strftime('%d/%m/%Y %H:%M UTC')}\n"
+            f"Fin: {evento.fecha_fin.strftime('%d/%m/%Y %H:%M UTC') if evento.fecha_fin else 'No indicada'}\n"
+            f"Responsable: {evento.responsable.nombre_completo if evento.responsable else 'No asignado'}\n"
+            f"Detalle: {evento.descripcion or 'Sin detalles adicionales'}\n\n"
+            f"Abrir enlace: Ver proceso | {public_site_url()}/gestion-procesos/cliente/procesos/{proceso.id}#agenda"
+        )
+        emitir_notificacion_workflow(
+            db, cliente, "RESUMENES", f"EVENTO_AGENDA:{evento.id}:{accion.upper()}:{evento.fecha_inicio.isoformat()}",
+            f"{accion.capitalize()} actividad: {evento.titulo}", cuerpo, emisor=admin, incluir_email=True,
+        )
+
+
 @router.get("/agenda/eventos")
 def listar_eventos_agenda_admin(
     fecha_desde: str,
@@ -1987,6 +2020,8 @@ def crear_evento_agenda_admin(datos: schemas.EventoAgendaCreate, db: Session = D
     db.flush()
     registrar_evento_auditoria(db, admin, "admin.agenda.evento.crear", "evento_agenda", evento.id)
     db.commit()
+    db.refresh(evento)
+    _notificar_evento_agenda_admin(db, evento, admin, "programó")
     return {"id": evento.id, "mensaje": "Evento agregado a la agenda."}
 
 
