@@ -62,7 +62,7 @@ function sumarDias(value: string, amount: number) {
 }
 
 function formatoFecha(value: string) {
-  return new Date(value).toLocaleString("es-CO", { timeZone: "America/Bogota",
+  return new Date(value).toLocaleString("es-CO", {
     timeZone: "America/Bogota",
     weekday: "long",
     day: "2-digit",
