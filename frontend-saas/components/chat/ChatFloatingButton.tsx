@@ -36,6 +36,21 @@ function sameMessage(left: Message, right: Message) {
     && sameDeliveryStatus(left, right);
 }
 
+function sameChat(left: Chat, right: Chat) {
+  return left.id === right.id
+    && left.route_key === right.route_key
+    && left.tipo === right.tipo
+    && left.titulo === right.titulo
+    && left.subtitulo === right.subtitulo
+    && left.href === right.href
+    && left.no_leidos === right.no_leidos
+    && left.updated_at === right.updated_at
+    && left.ultimo_mensaje === right.ultimo_mensaje
+    && left.ultimo_remitente === right.ultimo_remitente
+    && left.en_linea === right.en_linea
+    && left.participantes_en_linea === right.participantes_en_linea;
+}
+
 function processId(chat: Chat) {
   const id = Number(chat.proceso_id);
   if (Number.isInteger(id) && id > 0) return id;
@@ -109,9 +124,12 @@ export default function ChatFloatingButton() {
   const lastMessageId = useRef(0);
   const lastReadAckId = useRef(0);
   const activeChatId = useRef<number | null>(null);
+  const selectedChatRef = useRef<Chat | null>(selected);
   const messagesContainerRef = useRef<HTMLDivElement>(null);
   const composerRef = useRef<HTMLTextAreaElement>(null);
   const refocusComposerAfterSendRef = useRef(false);
+  const selectedChatId = selected?.id ?? null;
+  selectedChatRef.current = selected;
 
   const unreadChats = chats.filter((chat) => chat.no_leidos > 0).length;
   const processGroups = useMemo(() => {
@@ -137,7 +155,11 @@ export default function ChatFloatingButton() {
       const response = await apiRequest("/api/chat/conversaciones", { token });
       const incoming = await response.json() as Chat[];
       setChats((current) => preserveChatList(current, incoming));
-      setSelected((current) => current ? incoming.find((chat) => chat.id === current.id) ?? current : current);
+      setSelected((current) => {
+        if (!current) return current;
+        const updated = incoming.find((chat) => chat.id === current.id);
+        return updated && !sameChat(current, updated) ? updated : current;
+      });
       setError("");
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "No se pudieron cargar los chats.");
@@ -187,22 +209,27 @@ export default function ChatFloatingButton() {
     const refresh = () => {
       if (document.visibilityState !== "visible") return;
       void loadChats();
-      if (open && selected) void loadMessages(selected);
+      const active = selectedChatRef.current;
+      if (open && active) void loadMessages(active);
     };
     const timer = window.setInterval(refresh, 5000);
     document.addEventListener("visibilitychange", refresh);
     return () => { window.clearTimeout(initialLoad); window.clearInterval(timer); document.removeEventListener("visibilitychange", refresh); };
-  }, [token, open, selected, loadChats, loadMessages]);
+  }, [token, open, selectedChatId, loadChats, loadMessages]);
 
   useEffect(() => {
-    if (!open || !selected) return;
-    const initialLoad = window.setTimeout(() => { void loadMessages(selected, true); }, 0);
+    if (!open || !selectedChatId) return;
+    const activeId = selectedChatId;
+    const initialLoad = window.setTimeout(() => {
+      const active = selectedChatRef.current;
+      if (active?.id === activeId) void loadMessages(active, true);
+    }, 0);
     return () => window.clearTimeout(initialLoad);
-  }, [open, selected, loadMessages]);
+  }, [open, selectedChatId, loadMessages]);
   useLayoutEffect(() => {
     const container = messagesContainerRef.current;
     if (selected && container) container.scrollTop = container.scrollHeight;
-  }, [selected, messages.length, loading]);
+  }, [selectedChatId, messages.length, loading]);
 
   useEffect(() => {
     if (sending || !refocusComposerAfterSendRef.current) return;

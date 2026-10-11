@@ -19,6 +19,7 @@ dependencies = [
     "celery",
     "redis",
     "requests",
+    "pywebpush>=2.0,<3",
     "boto3",
     "qstash",
     "pypdf>=6.0,<7",

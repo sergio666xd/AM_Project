@@ -139,8 +139,8 @@ def _send_chat_push(
         return False
     try:
         from pywebpush import WebPushException, webpush
-    except ImportError:
-        logger.error("pywebpush no está instalado; no se pudo enviar el aviso del chat.")
+    except ImportError as exc:
+        logger.exception("No se pudo importar pywebpush o una dependencia necesaria: %s", exc)
         return False
 
     delivered = False
