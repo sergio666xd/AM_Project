@@ -681,6 +681,12 @@ class ChatPushSubscriptionDelete(BaseModel):
     endpoint: str = Field(min_length=1, max_length=2048)
 
 
+class ChatPushDiagnosticCreate(BaseModel):
+    etapa: Literal["clave_publica", "registrar_service_worker", "esperar_service_worker", "buscar_suscripcion", "eliminar_suscripcion_anterior", "crear_suscripcion", "guardar_suscripcion"]
+    nombre_error: str = Field(default="Error", max_length=120)
+    mensaje_error: str = Field(default="", max_length=500)
+
+
 class NotificacionesClienteLeidasUpdate(BaseModel):
     ids: list[str] = Field(min_length=1, max_length=500)
 

@@ -121,6 +121,18 @@ def eliminar_suscripcion_push(
     return {"registrada": False}
 
 
+@router.post("/push/diagnosticos", status_code=204)
+def registrar_error_configuracion_push(
+    data: schemas.ChatPushDiagnosticCreate,
+    user: models.Usuario = Depends(security.obtener_usuario_actual),
+):
+    logger.warning(
+        "No se pudo configurar Push en navegador para usuario %s: etapa=%s error=%s mensaje=%s",
+        user.id, data.etapa, data.nombre_error, data.mensaje_error,
+    )
+    return None
+
+
 def _send_chat_push(
     db: Session,
     recipient: models.Usuario,

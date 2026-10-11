@@ -12,21 +12,51 @@ function decodeApplicationServerKey(value: string) {
   return Uint8Array.from(raw, (character) => character.charCodeAt(0));
 }
 
-async function getOrCreateSubscription(registration: ServiceWorkerRegistration, publicKey: string) {
+async function getOrCreateSubscription(registration: ServiceWorkerRegistration, publicKey: string, setStage: (stage: string) => void) {
   const expectedKey = decodeApplicationServerKey(publicKey);
+  setStage("buscar_suscripcion");
   let subscription = await registration.pushManager.getSubscription();
   const currentKey = subscription?.options.applicationServerKey;
   const currentBytes = currentKey ? new Uint8Array(currentKey) : null;
   const sameKey = !!currentBytes && currentBytes.length === expectedKey.length
     && currentBytes.every((byte, index) => byte === expectedKey[index]);
-  if (subscription && !sameKey) {
+  if (subscription && currentBytes && !sameKey) {
+    setStage("eliminar_suscripcion_anterior");
     await subscription.unsubscribe();
     subscription = null;
   }
-  return subscription ?? registration.pushManager.subscribe({
-    userVisibleOnly: true,
-    applicationServerKey: expectedKey as BufferSource,
-  });
+  if (subscription) return subscription;
+
+  setStage("crear_suscripcion");
+  for (let attempt = 0; ; attempt += 1) {
+    try {
+      return await registration.pushManager.subscribe({
+        userVisibleOnly: true,
+        applicationServerKey: expectedKey as BufferSource,
+      });
+    } catch (cause) {
+      const message = cause instanceof Error ? cause.message : String(cause);
+      const transientPushFailure = cause instanceof DOMException
+        && (cause.name === "AbortError" || /push service error/i.test(message));
+      if (!transientPushFailure || attempt >= 2) throw cause;
+      await new Promise((resolve) => window.setTimeout(resolve, 500 * (attempt + 1)));
+    }
+  }
+}
+
+async function reportPushFailure(token: string, stage: string, cause: unknown) {
+  const name = cause instanceof Error ? cause.name : "Error";
+  const message = cause instanceof Error ? cause.message : String(cause);
+  console.error("Error al configurar las notificaciones Push", { stage, name, message });
+  try {
+    await apiRequest("/api/chat/push/diagnosticos", {
+      method: "POST",
+      token,
+      body: JSON.stringify({ etapa: stage, nombre_error: name.slice(0, 120), mensaje_error: message.slice(0, 500) }),
+    });
+  } catch (diagnosticError) {
+    console.warn("No se pudo enviar el diagnóstico Push a la API", diagnosticError);
+  }
 }
 
 export default function PushNotificationPrompt() {
@@ -66,6 +96,7 @@ export default function PushNotificationPrompt() {
 
     const dismissed = window.sessionStorage.getItem(`push-prompt-dismissed:${user.id}`) === "1";
     let cancelled = false;
+    let stage = "clave_publica";
     if (currentPermission !== "granted") setOpen(!dismissed);
 
     void (async () => {
@@ -73,12 +104,16 @@ export default function PushNotificationPrompt() {
         if (currentPermission === "granted") {
           const keyResponse = await apiRequest("/api/chat/push/clave-publica", { token });
           const { public_key: publicKey } = await keyResponse.json() as { public_key: string };
+          stage = "registrar_service_worker";
           await navigator.serviceWorker.register("/chat-sw.js");
+          stage = "esperar_service_worker";
           const registration = await navigator.serviceWorker.ready;
-          const subscription = await getOrCreateSubscription(registration, publicKey);
+          const subscription = await getOrCreateSubscription(registration, publicKey, (value) => { stage = value; });
+          stage = "guardar_suscripcion";
           if (!cancelled) await persistSubscription(subscription);
         }
       } catch (cause) {
+        await reportPushFailure(token, stage, cause);
         if (!cancelled) {
           setError(cause instanceof Error ? cause.message : "No se pudo configurar Push en este dispositivo.");
           if (!dismissed) setOpen(true);
@@ -94,6 +129,7 @@ export default function PushNotificationPrompt() {
     if (!token || busy || permission === "unsupported" || permission === "denied") return;
     setBusy(true);
     setError("");
+    let stage = "clave_publica";
     try {
       const granted = Notification.permission === "granted" ? "granted" : await Notification.requestPermission();
       setPermission(granted);
@@ -105,11 +141,15 @@ export default function PushNotificationPrompt() {
       }
       const keyResponse = await apiRequest("/api/chat/push/clave-publica", { token });
       const { public_key: publicKey } = await keyResponse.json() as { public_key: string };
+      stage = "registrar_service_worker";
       await navigator.serviceWorker.register("/chat-sw.js");
+      stage = "esperar_service_worker";
       const registration = await navigator.serviceWorker.ready;
-      const subscription = await getOrCreateSubscription(registration, publicKey);
+      const subscription = await getOrCreateSubscription(registration, publicKey, (value) => { stage = value; });
+      stage = "guardar_suscripcion";
       await persistSubscription(subscription);
     } catch (cause) {
+      await reportPushFailure(token, stage, cause);
       setError(cause instanceof Error ? cause.message : "No se pudieron activar las notificaciones del navegador.");
     } finally {
       setBusy(false);
