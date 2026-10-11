@@ -1102,6 +1102,8 @@ def listar_plantillas_mensaje_admin(
             "asunto_email": plantilla.asunto_email,
             "cuerpo_email": plantilla.cuerpo_email.replace("\\n", "\n"),
             "cuerpo_whatsapp": plantilla.cuerpo_whatsapp.replace("\\n", "\n"),
+            "titulo_push": plantilla.titulo_push,
+            "cuerpo_push": plantilla.cuerpo_push,
             "variables_ejemplo": ejemplos,
             "enlace_ejemplo": plantilla.enlace_ejemplo,
             "texto_enlace_ejemplo": etiquetas_enlace.get(plantilla.clave, "Ver proceso") if plantilla.enlace_ejemplo else None,
@@ -1126,15 +1128,28 @@ def actualizar_plantilla_mensaje_admin(
     asunto = datos.get("asunto_email")
     cuerpo_email = datos.get("cuerpo_email")
     cuerpo_whatsapp = datos.get("cuerpo_whatsapp")
+    titulo_push = datos.get("titulo_push", plantilla.titulo_push)
+    cuerpo_push = datos.get("cuerpo_push", plantilla.cuerpo_push)
     if not isinstance(asunto, str) or not asunto.strip() or len(asunto) > 1000:
         raise HTTPException(status_code=400, detail="El asunto debe tener contenido y máximo 1000 caracteres.")
     if not isinstance(cuerpo_email, str) or not cuerpo_email.strip() or len(cuerpo_email) > 30000:
         raise HTTPException(status_code=400, detail="El mensaje de correo debe tener contenido y máximo 30000 caracteres.")
     if not isinstance(cuerpo_whatsapp, str) or not cuerpo_whatsapp.strip() or len(cuerpo_whatsapp) > 10000:
         raise HTTPException(status_code=400, detail="El mensaje de WhatsApp debe tener contenido y máximo 10000 caracteres.")
+    if clave == "ACTUACIONES_DIGEST" and (
+        not isinstance(titulo_push, str) or not titulo_push.strip()
+        or not isinstance(cuerpo_push, str) or not cuerpo_push.strip()
+    ):
+        raise HTTPException(status_code=400, detail="El título y la descripción Push de novedades judiciales son obligatorios.")
     plantilla.asunto_email = asunto
     plantilla.cuerpo_email = cuerpo_email
     plantilla.cuerpo_whatsapp = cuerpo_whatsapp
+    if titulo_push is not None and (not isinstance(titulo_push, str) or len(titulo_push) > 500):
+        raise HTTPException(status_code=400, detail="El título Push debe tener máximo 500 caracteres.")
+    if cuerpo_push is not None and (not isinstance(cuerpo_push, str) or len(cuerpo_push) > 5000):
+        raise HTTPException(status_code=400, detail="El cuerpo Push debe tener máximo 5000 caracteres.")
+    plantilla.titulo_push = titulo_push
+    plantilla.cuerpo_push = cuerpo_push
     plantilla.actualizado_por_id = admin.id
     registrar_evento_auditoria(db, admin, "admin.mensaje.plantilla.actualizar", "plantilla_mensaje", clave)
     db.commit()

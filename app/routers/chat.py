@@ -795,8 +795,12 @@ def enviar_mensaje(conversation_id: int, data: schemas.ChatMensajeCreate, db: Se
                 "Push no enviada para el mensaje %s al usuario %s: no tiene suscripciones registradas.",
                 message.id, recipient.id,
             )
+        sender_type = "Cliente" if _role(user) == "CLIENTE" else "Abogado"
         push_delivered = _send_chat_push(
-            db, recipient, user, link, tag=f"chat-message-{message.id}",
+            db, recipient, user, link,
+            title=f"Nuevo mensaje de tu {sender_type} - {user.nombre_completo}.",
+            body=content,
+            tag=f"chat-message-{message.id}",
         ) if push_enabled else False
         if not (_supports_firm_panel_presence(user) and _supports_firm_panel_presence(recipient)):
             staff_sender = _role(user) != "CLIENTE"

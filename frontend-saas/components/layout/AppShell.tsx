@@ -7,6 +7,7 @@ import Breadcrumbs from "./Breadcrumbs";
 import GlobalSearch from "./GlobalSearch";
 import ChatFloatingButton from "@/components/chat/ChatFloatingButton";
 import ChatPresenceHeartbeat from "@/components/chat/ChatPresenceHeartbeat";
+import PushNotificationPrompt from "@/components/chat/PushNotificationPrompt";
 import { useChatViewport } from "@/components/chat/useChatViewport";
 
 interface AppShellProps {
@@ -29,6 +30,7 @@ export default function AppShell({
       data-area={variant}
     >
       <ChatPresenceHeartbeat />
+      {variant !== "saas" && <PushNotificationPrompt />}
       <Sidebar variant={variant} />
 
       <main className={`${isChatPage ? "flex h-full min-h-0 flex-col overflow-hidden" : "min-h-screen"} pt-[var(--header-height)] md:ml-[260px] md:pt-0`}>

@@ -7,7 +7,8 @@ import { useSession } from "@/context/SessionContext";
 
 type Template = {
   clave: string; nombre: string; asunto_email: string | null; cuerpo_email: string;
-  cuerpo_whatsapp: string; variables_ejemplo: Record<string, unknown>; enlace_ejemplo: string | null;
+  cuerpo_whatsapp: string; titulo_push: string | null; cuerpo_push: string | null;
+  variables_ejemplo: Record<string, unknown>; enlace_ejemplo: string | null;
   texto_enlace_ejemplo: string | null; vista_previa_email: string; vista_previa_whatsapp: string; actualizado_en: string;
 };
 
@@ -43,7 +44,7 @@ export default function AdminMessageTemplatesPage() {
   useEffect(() => { void load(); }, [token]);
   const template = items.find((item) => item.clave === selected);
   const visibleItems = items.filter((item) => `${item.nombre} ${item.clave}`.toLowerCase().includes(query.trim().toLowerCase()));
-  function update(key: "asunto_email" | "cuerpo_email" | "cuerpo_whatsapp", value: string) {
+  function update(key: "asunto_email" | "cuerpo_email" | "cuerpo_whatsapp" | "titulo_push" | "cuerpo_push", value: string) {
     setItems((current) => current.map((item) => item.clave === selected ? { ...item, [key]: value } : item));
   }
 
@@ -53,7 +54,7 @@ export default function AdminMessageTemplatesPage() {
     try {
       await fetchApi(`/api/admin/notificaciones/plantillas/${template.clave}`, {
         method: "PUT", token,
-        body: JSON.stringify({ asunto_email: template.asunto_email, cuerpo_email: template.cuerpo_email, cuerpo_whatsapp: template.cuerpo_whatsapp }),
+        body: JSON.stringify({ asunto_email: template.asunto_email, cuerpo_email: template.cuerpo_email, cuerpo_whatsapp: template.cuerpo_whatsapp, titulo_push: template.titulo_push, cuerpo_push: template.cuerpo_push }),
       });
       setNotice("Plantilla guardada.");
       await load();
@@ -82,6 +83,7 @@ export default function AdminMessageTemplatesPage() {
         <label className="block rounded-lg border border-border bg-surface p-4 text-sm font-medium">Asunto del correo<input value={template.asunto_email || ""} onChange={(event) => update("asunto_email", event.target.value)} className="mt-2 h-10 w-full rounded-md border border-border bg-background px-3 font-normal" placeholder="(sin asunto)" /></label>
         <label className="block rounded-lg border border-border bg-surface p-4 text-sm font-medium">Texto del correo<textarea rows={9} value={template.cuerpo_email} onChange={(event) => update("cuerpo_email", event.target.value)} className="mt-2 w-full rounded-md border border-border bg-background p-3 font-normal" /></label>
         <label className="block rounded-lg border border-border bg-surface p-4 text-sm font-medium">Texto de WhatsApp<textarea rows={7} value={template.cuerpo_whatsapp} onChange={(event) => update("cuerpo_whatsapp", event.target.value)} className="mt-2 w-full rounded-md border border-border bg-background p-3 font-normal" /></label>
+        {(template.titulo_push !== null || template.cuerpo_push !== null || template.clave === "ACTUACIONES_DIGEST") && <section className="space-y-4 rounded-lg border border-border bg-surface p-4"><div><h3 className="font-semibold">Notificación del navegador</h3><p className="mt-1 text-xs text-foreground-muted">Se envía a los usuarios que activaron las notificaciones Push. El clic abre el radicado correspondiente.</p></div><label className="block text-sm font-medium">Título Push<input value={template.titulo_push || ""} onChange={(event) => update("titulo_push", event.target.value)} maxLength={500} className="mt-2 h-10 w-full rounded-md border border-border bg-background px-3 font-normal" placeholder="Nueva actuación judicial en {{radicado}}" /></label><label className="block text-sm font-medium">Descripción Push<textarea rows={3} value={template.cuerpo_push || ""} onChange={(event) => update("cuerpo_push", event.target.value)} maxLength={5000} className="mt-2 w-full rounded-md border border-border bg-background p-3 font-normal" placeholder="{{actuacion}}" /></label><article className="rounded-md border border-border bg-background p-3"><h4 className="text-sm font-semibold">Vista previa Push</h4><p className="mt-2 text-sm font-semibold">{preview(template.titulo_push || "", template.variables_ejemplo || {}, null, null)}</p><p className="mt-1 whitespace-pre-wrap text-sm text-foreground-muted">{preview(template.cuerpo_push || "", template.variables_ejemplo || {}, null, null)}</p></article></section>}
         <div className="grid gap-4 lg:grid-cols-2"><article className="rounded-lg border border-border bg-surface p-4"><h3 className="text-sm font-semibold">Vista previa de correo</h3><pre className="mt-3 whitespace-pre-wrap font-sans text-sm">{preview(template.cuerpo_email, template.variables_ejemplo || {}, template.enlace_ejemplo, template.texto_enlace_ejemplo)}</pre></article><article className="rounded-lg border border-border bg-surface p-4"><h3 className="text-sm font-semibold">Vista previa de WhatsApp</h3><pre className="mt-3 whitespace-pre-wrap font-sans text-sm">{preview(template.cuerpo_whatsapp, template.variables_ejemplo || {}, template.enlace_ejemplo, template.texto_enlace_ejemplo)}</pre></article></div>
         <button type="button" onClick={() => void save()} disabled={saving} className="inline-flex h-10 items-center gap-2 rounded-md bg-primary px-4 text-sm font-semibold !text-white disabled:opacity-50"><Save className="size-4" />{saving ? "Guardando…" : "Guardar mensaje"}</button>
       </div> : <div className="rounded-lg border border-dashed border-border bg-surface p-10 text-center text-sm text-foreground-muted">No hay tipos de mensaje configurados. Aplica la migración de plantillas.</div>}

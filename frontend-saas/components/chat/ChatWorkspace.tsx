@@ -7,7 +7,6 @@ import { ArrowLeft, CalendarDays, Check, CheckCheck, ClipboardList, FileText, Fo
 import { useSession } from "@/context/SessionContext";
 import { apiRequest } from "@/lib/api";
 import { preserveChatList, upsertChat } from "@/components/chat/chatListState";
-import ChatPushNotifications from "@/components/chat/ChatPushNotifications";
 
 type Chat = { id: number; clave: string; route_key: string; tipo: string; titulo: string; subtitulo: string; href: string; no_leidos: number; updated_at: string; proceso_id?: number | null; ultimo_mensaje?: string | null; ultimo_remitente?: string | null; en_linea?: boolean; participantes_en_linea?: number };
 type Message = { id: number; contenido: string; remitente_id: number | null; remitente: string; es_mio: boolean; created_at: string; estado_entrega?: "ENVIADO" | "ENTREGADO" | "ENTREGADO_PARCIAL" | "LEIDO"; entregados?: number; leidos?: number; destinatarios?: number; referencia: { tipo: string; id: number; titulo: string; url: string } | null };
@@ -444,7 +443,6 @@ export default function ChatWorkspace() {
   const list = <aside className={`${activeKey ? "hidden md:flex" : "flex"} w-full shrink-0 flex-col border-r border-border bg-surface md:w-[330px] lg:w-[370px]`}>
     <div className="border-b border-border bg-surface-muted px-4 py-4">
       {visibleProcessGroup ? <div className="flex items-center gap-2"><button type="button" onClick={() => { setSelectedProcessId(null); router.push(root); }} className="rounded-full p-1.5 hover:bg-surface-hover" aria-label="Volver a todos los chats"><ArrowLeft className="size-4" /></button><div className="min-w-0"><h1 className="truncate text-lg font-semibold">{visibleProcessGroup.titulo}</h1><p className="mt-1 text-xs text-(--foreground-muted)">{visibleProcessGroup.chats.length} chats asociados al proceso</p></div></div> : <><h1 className="text-xl font-semibold">Chats</h1><p className="mt-1 text-xs text-(--foreground-muted)">Se actualizan automáticamente cada 5 segundos.</p></>}
-      <div className="mt-2 flex justify-end"><ChatPushNotifications showTestButton /></div>
     </div>
     {listError && <p role="alert" className="border-b border-border px-4 py-3 text-xs text-danger">{listError}</p>}
     <div className="min-h-0 flex-1 overflow-y-auto">

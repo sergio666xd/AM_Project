@@ -8,7 +8,6 @@ import { useSession } from "@/context/SessionContext";
 import { apiRequest } from "@/lib/api";
 import { renderMessageMarkdown } from "@/components/chat/ChatWorkspace";
 import { preserveChatList } from "@/components/chat/chatListState";
-import ChatPushNotifications from "@/components/chat/ChatPushNotifications";
 import { useChatViewport } from "@/components/chat/useChatViewport";
 
 type Chat = { id: number; clave: string; route_key: string; tipo: string; titulo: string; subtitulo: string; href: string; no_leidos: number; updated_at: string; proceso_id?: number | null; ultimo_mensaje?: string | null; ultimo_remitente?: string | null; en_linea?: boolean; participantes_en_linea?: number };
@@ -279,7 +278,6 @@ export default function ChatFloatingButton() {
       <header className="flex items-center gap-2 border-b border-border bg-surface-muted px-3 py-3">
         {selected && <button type="button" onClick={() => { activeChatId.current = null; setSelected(null); setMessages([]); lastMessageId.current = 0; lastReadAckId.current = 0; setError(""); }} aria-label="Volver a la lista de chats" className={`grid ${isFirmChat ? "size-11" : "size-8"} place-items-center rounded-full hover:bg-surface-hover`}><ArrowLeft className="size-4" /></button>}
         <div className="min-w-0 flex-1"><h2 className="truncate text-sm font-semibold">{selected?.titulo ?? (selectedProcessId ? processGroups.find((group) => group.id === selectedProcessId)?.titulo : null) ?? "Chats"}</h2><p className="text-[10px] text-foreground-muted">{selected ? selected.tipo === "PROCESO_COLABORADORES" ? selected.participantes_en_linea ? `${selected.participantes_en_linea} en línea` : "Nadie en línea" : selected.en_linea ? "En línea" : "Desconectado" : "Conversaciones recientes"}</p></div>
-        {!selected && <ChatPushNotifications />}
         {selected && <Link href={selected.href} title="Abrir pantalla completa" className="rounded-md px-2 py-1 text-xs font-medium text-primary hover:bg-primary/10">Pantalla completa</Link>}
         <button type="button" onClick={() => setOpen(false)} aria-label="Cerrar chat flotante" className={`grid ${isFirmChat ? "size-11" : "size-8"} place-items-center rounded-full hover:bg-surface-hover`}><X className="size-4" /></button>
       </header>

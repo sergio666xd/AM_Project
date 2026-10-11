@@ -74,6 +74,13 @@ class ConfiguracionFirmaUpdate(BaseModel):
     preferencias_notificacion: dict[str, bool] = Field(default_factory=lambda: {"email": True, "whatsapp": True})
     parametros_generales: dict[str, Any] = Field(default_factory=dict)
 
+    @field_validator("correo_contacto", "correo_pqr", mode="before")
+    @classmethod
+    def normalizar_correo_opcional(cls, value: Any) -> Any:
+        # Los inputs type=email del panel envían "" cuando el correo opcional
+        # queda vacío; EmailStr espera null en ese caso.
+        return None if isinstance(value, str) and not value.strip() else value
+
 
 class ConfiguracionIntegracionesUpdate(BaseModel):
     smtp_host: str | None = Field(default=None, max_length=255)

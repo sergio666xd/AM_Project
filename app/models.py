@@ -121,7 +121,7 @@ class ConfiguracionConsultas(Base):
 
 
 class PlantillaMensaje(Base):
-    """Editable templates for system email and WhatsApp messages."""
+    """Editable templates for system email, WhatsApp, and browser push messages."""
     __tablename__ = "plantillas_mensaje"
 
     id = Column(Integer, primary_key=True)
@@ -130,6 +130,8 @@ class PlantillaMensaje(Base):
     asunto_email = Column(Text, nullable=True)
     cuerpo_email = Column(Text, nullable=False)
     cuerpo_whatsapp = Column(Text, nullable=False)
+    titulo_push = Column(Text, nullable=True)
+    cuerpo_push = Column(Text, nullable=True)
     variables_ejemplo = Column(JSON, nullable=False, default=dict)
     enlace_ejemplo = Column(String(1000), nullable=True)
     activo = Column(Boolean, nullable=False, default=True)

@@ -54,8 +54,22 @@ export default function AdminFirmSettingsPage() {
     if (!token) return;
     setSaving(true); setError(""); setNotice("");
     try {
-      const result = await fetchApi("/api/admin/configuracion/firma", { method: "PUT", token, body: JSON.stringify(settings) });
-      setSettings(result);
+      const payload = {
+        ...settings,
+        correo_contacto: settings.correo_contacto?.trim() || null,
+        correo_pqr: settings.correo_pqr?.trim() || null,
+      };
+      const result = await fetchApi("/api/admin/configuracion/firma", { method: "PUT", token, body: JSON.stringify(payload) });
+      setSettings({
+        ...EMPTY,
+        ...result,
+        preferencias_notificacion: { ...EMPTY.preferencias_notificacion, ...result.preferencias_notificacion },
+        parametros_generales: {
+          ...EMPTY.parametros_generales,
+          ...result.parametros_generales,
+          contrato_abogado: { ...DEFAULT_CONTRACT_ATTORNEY, ...result.parametros_generales?.contrato_abogado },
+        },
+      });
       setNotice("Configuración de la firma guardada.");
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "No se pudo guardar la configuración.");

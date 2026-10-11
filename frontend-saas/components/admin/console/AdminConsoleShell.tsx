@@ -34,6 +34,7 @@ import { AdminAlertBell } from "@/components/admin/console/AdminAlertBell";
 import GlobalSearch from "@/components/layout/GlobalSearch";
 import ChatFloatingButton from "@/components/chat/ChatFloatingButton";
 import ChatPresenceHeartbeat from "@/components/chat/ChatPresenceHeartbeat";
+import PushNotificationPrompt from "@/components/chat/PushNotificationPrompt";
 
 type Item = { label: string; href: string; icon: typeof LayoutDashboard };
 type Section = { title: string; scope: string; links: Item[] };
@@ -314,6 +315,7 @@ export default function AdminConsoleShell({
   return (
     <div className="min-h-screen bg-background text-foreground">
       <ChatPresenceHeartbeat />
+      <PushNotificationPrompt />
       <header className="fixed inset-x-0 top-0 z-40 flex h-16 items-center justify-between border-b border-border bg-surface px-4 md:hidden">
         <button
           type="button"
