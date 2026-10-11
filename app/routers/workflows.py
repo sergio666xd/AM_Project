@@ -1,6 +1,7 @@
 import hmac
 import hashlib
 import os
+import smtplib
 from datetime import date, datetime, timedelta
 from uuid import uuid4
 
@@ -40,6 +41,24 @@ router = APIRouter(
 RECONCILIACION_INTERVALO_DIAS = 30
 DETALLE_RECONCILIACION_COMPLETA = "ok|RECONCILIACION_COMPLETA_V1"
 MAX_INTENTOS_NOTIFICACION = 3
+
+
+def _diagnostico_entrega(canal: str, error: Exception) -> str:
+    """Describe fallos del proveedor sin exponer credenciales ni respuestas privadas."""
+    if canal == "EMAIL":
+        if isinstance(error, smtplib.SMTPAuthenticationError):
+            return "SMTP rechazó la autenticación; verifica usuario y contraseña en Operación > Integraciones."
+        if isinstance(error, smtplib.SMTPRecipientsRefused):
+            return "El servidor SMTP rechazó el correo del destinatario."
+        if isinstance(error, (smtplib.SMTPConnectError, OSError)):
+            return "No fue posible conectar con el servidor SMTP; verifica host, puerto y TLS."
+        if isinstance(error, smtplib.SMTPResponseException):
+            return f"El servidor SMTP rechazó el envío (código {error.smtp_code})."
+        return f"Falló el envío SMTP ({type(error).__name__}); revisa la configuración de correo."
+    message = str(error)
+    if message.startswith(("WhatsApp no está configurado", "WhatsApp API respondió", "No fue posible conectar con la API de WhatsApp")):
+        return message
+    return f"Falló el proveedor de WhatsApp ({type(error).__name__}); revisa Operación > Integraciones."
 
 
 def _aplicar_delta_contadores_barrido(
@@ -759,16 +778,16 @@ def enviar_entrega_notificacion_workflow(
         if entrega.canal == "EMAIL":
             enviado = enviar_correo(usuario.email, entrega.asunto, entrega.cuerpo)
         else:
-            enviado = enviar_mensaje_whatsapp(usuario.whatsapp_numero, entrega.cuerpo)
+            enviado = enviar_mensaje_whatsapp(usuario.whatsapp_numero, entrega.cuerpo, raise_on_error=True)
         if not enviado:
             raise RuntimeError("El proveedor no confirmó la entrega.")
     except Exception as exc:
         entrega.estado = "ERROR"
-        entrega.error = str(exc)
+        entrega.error = _diagnostico_entrega(entrega.canal, exc)
         entrega.lease_hasta = None
         _marcar_recordatorio_completo_si_aplica(db, entrega)
         db.commit()
-        raise HTTPException(status_code=503, detail="No fue posible entregar la notificación; Workflow reintentará.") from exc
+        raise HTTPException(status_code=503, detail=entrega.error) from exc
 
     entrega.estado = "ENVIADA"
     entrega.error = None

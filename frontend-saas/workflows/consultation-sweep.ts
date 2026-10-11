@@ -74,7 +74,14 @@ async function workflowBackendFetch(path: string, init?: RequestInit): Promise<R
   headers.set("Content-Type", "application/json");
   const response = await fetch(workflowBackendUrl(path), { ...init, headers, cache: "no-store" });
   if (!response.ok) {
-    throw new Error(`Workflow backend returned ${response.status}`);
+    let detail = "";
+    try {
+      const body = await response.clone().json() as { detail?: unknown };
+      if (typeof body.detail === "string") detail = body.detail;
+    } catch {
+      // Keep the status when an intermediary returns a non-JSON error page.
+    }
+    throw new Error(`Workflow backend returned ${response.status}${detail ? `: ${detail}` : ""}`);
   }
   return response;
 }
@@ -159,7 +166,7 @@ async function sendNotification(deliveryId: number): Promise<void> {
   } catch (error) {
     const { attempt } = getStepMetadata();
     throw new RetryableError(
-      error instanceof Error ? error.message : `No fue posible enviar la entrega ${deliveryId}`,
+      `Entrega ${deliveryId}: ${error instanceof Error ? error.message : "no fue posible enviar la notificación"}`,
       { retryAfter: Math.min(attempt ** 2 * 5_000, 30_000) },
     );
   }
