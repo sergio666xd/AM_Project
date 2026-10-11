@@ -13,6 +13,31 @@ type Chat = { id: number; clave: string; route_key: string; tipo: string; titulo
 type Message = { id: number; contenido: string; remitente_id: number | null; remitente: string; es_mio: boolean; created_at: string; estado_entrega?: "ENVIADO" | "ENTREGADO" | "ENTREGADO_PARCIAL" | "LEIDO"; entregados?: number; leidos?: number; destinatarios?: number; referencia: { tipo: string; id: number; titulo: string; url: string } | null };
 type DeliveryStatus = Required<Pick<Message, "estado_entrega" | "entregados" | "leidos" | "destinatarios">>;
 type Reference = { tipo: "ACTUACION" | "RADICADO" | "TAREA" | "SUBTAREA" | "EVENTO" | "DOCUMENTO"; id: number; titulo: string; href: string; grupo?: string; radicado_numero?: string; parent_id?: number; request_id?: number | null };
+
+function sameDeliveryStatus(left: Message, right: DeliveryStatus) {
+  return left.estado_entrega === right.estado_entrega
+    && left.entregados === right.entregados
+    && left.leidos === right.leidos
+    && left.destinatarios === right.destinatarios;
+}
+
+function sameMessage(left: Message, right: Message) {
+  return left.id === right.id
+    && left.contenido === right.contenido
+    && left.remitente_id === right.remitente_id
+    && left.remitente === right.remitente
+    && left.es_mio === right.es_mio
+    && left.created_at === right.created_at
+    && left.referencia?.tipo === right.referencia?.tipo
+    && left.referencia?.id === right.referencia?.id
+    && left.referencia?.titulo === right.referencia?.titulo
+    && left.referencia?.url === right.referencia?.url
+    && left.estado_entrega === right.estado_entrega
+    && left.entregados === right.entregados
+    && left.leidos === right.leidos
+    && left.destinatarios === right.destinatarios;
+}
+
 const referenceTypes = [
   { tipo: "ACTUACION", label: "Radicados y actuaciones", Icon: Gavel },
   { tipo: "TAREA", label: "Tareas y subtareas", Icon: ClipboardList },
@@ -160,6 +185,7 @@ export default function ChatWorkspace() {
   const followLatestRef = useRef(true);
   const [showLatestMessage, setShowLatestMessage] = useState(false);
   const composerRef = useRef<HTMLTextAreaElement>(null);
+  const refocusComposerAfterSendRef = useRef(false);
   const messageIdRef = useRef(0);
   const readAckRef = useRef({ key: "", messageId: 0 });
   const activeKeyRef = useRef("");
@@ -246,12 +272,17 @@ export default function ChatWorkspace() {
         }
         setMessages((current) => {
           const byId = new Map(current.map((item) => [item.id, item]));
-          for (const item of incoming) byId.set(item.id, { ...item, ...statuses.get(item.id) });
+          for (const item of incoming) {
+            const next = { ...item, ...statuses.get(item.id) };
+            const existing = byId.get(item.id);
+            if (!existing || !sameMessage(existing, next)) byId.set(item.id, next);
+          }
           for (const [id, status] of statuses) {
             const existing = byId.get(id);
-            if (existing) byId.set(id, { ...existing, ...status });
+            if (existing && !sameDeliveryStatus(existing, status)) byId.set(id, { ...existing, ...status });
           }
-          return [...byId.values()].sort((a, b) => a.id - b.id);
+          const next = [...byId.values()].sort((a, b) => a.id - b.id);
+          return next.length === current.length && next.every((item, index) => item === current[index]) ? current : next;
         });
         messageIdRef.current = Math.max(previousMessageId, result.mensajes.at(-1)?.id ?? 0);
       }
@@ -336,6 +367,13 @@ export default function ChatWorkspace() {
   }, [draft]);
 
   useEffect(() => {
+    if (sending || !refocusComposerAfterSendRef.current) return;
+    refocusComposerAfterSendRef.current = false;
+    const frame = window.requestAnimationFrame(() => composerRef.current?.focus({ preventScroll: true }));
+    return () => window.cancelAnimationFrame(frame);
+  }, [sending]);
+
+  useEffect(() => {
     const message = messages.at(-1);
     if (!token || !activeChat || !resolvedConversationId || !message || document.visibilityState !== "visible") return;
     if (readAckRef.current.key !== activeKey) readAckRef.current = { key: activeKey, messageId: 0 };
@@ -374,7 +412,13 @@ export default function ChatWorkspace() {
   }
 
   function onComposerKeyDown(event: KeyboardEvent<HTMLTextAreaElement>) {
-    if (event.key === "Enter" && !event.shiftKey) { event.preventDefault(); void send(); }
+    if (event.key === "Enter" && !event.shiftKey && !event.nativeEvent.isComposing) {
+      event.preventDefault();
+      if (draft.trim() && activeChat && !sending) {
+        refocusComposerAfterSendRef.current = true;
+        void send();
+      }
+    }
   }
 
   function openReferenceCategory(tipo: Reference["tipo"]) {
@@ -400,7 +444,7 @@ export default function ChatWorkspace() {
   const list = <aside className={`${activeKey ? "hidden md:flex" : "flex"} w-full shrink-0 flex-col border-r border-border bg-surface md:w-[330px] lg:w-[370px]`}>
     <div className="border-b border-border bg-surface-muted px-4 py-4">
       {visibleProcessGroup ? <div className="flex items-center gap-2"><button type="button" onClick={() => { setSelectedProcessId(null); router.push(root); }} className="rounded-full p-1.5 hover:bg-surface-hover" aria-label="Volver a todos los chats"><ArrowLeft className="size-4" /></button><div className="min-w-0"><h1 className="truncate text-lg font-semibold">{visibleProcessGroup.titulo}</h1><p className="mt-1 text-xs text-(--foreground-muted)">{visibleProcessGroup.chats.length} chats asociados al proceso</p></div></div> : <><h1 className="text-xl font-semibold">Chats</h1><p className="mt-1 text-xs text-(--foreground-muted)">Se actualizan automáticamente cada 5 segundos.</p></>}
-      <div className="mt-2 flex justify-end"><ChatPushNotifications /></div>
+      <div className="mt-2 flex justify-end"><ChatPushNotifications showTestButton /></div>
     </div>
     {listError && <p role="alert" className="border-b border-border px-4 py-3 text-xs text-danger">{listError}</p>}
     <div className="min-h-0 flex-1 overflow-y-auto">

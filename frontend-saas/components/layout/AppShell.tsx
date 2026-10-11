@@ -7,6 +7,7 @@ import Breadcrumbs from "./Breadcrumbs";
 import GlobalSearch from "./GlobalSearch";
 import ChatFloatingButton from "@/components/chat/ChatFloatingButton";
 import ChatPresenceHeartbeat from "@/components/chat/ChatPresenceHeartbeat";
+import { useChatViewport } from "@/components/chat/useChatViewport";
 
 interface AppShellProps {
   children: ReactNode;
@@ -19,10 +20,12 @@ export default function AppShell({
 }: AppShellProps) {
   const pathname = usePathname();
   const isChatPage = pathname.split("/").includes("chat");
+  const chatViewport = useChatViewport();
 
   return (
     <div
       className={`${isChatPage ? "h-dvh overflow-hidden" : "min-h-screen"} bg-background text-foreground`}
+      style={isChatPage && chatViewport.height ? { height: `${chatViewport.height}px` } : undefined}
       data-area={variant}
     >
       <ChatPresenceHeartbeat />
