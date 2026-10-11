@@ -16,6 +16,7 @@ from app.firm_access import lawyer_process_ids, require_process_access, role_nam
 from app.notification_service import emitir_notificacion_workflow
 from app.notification_policy import canales_habilitados
 from app.workflow_service import compact_portal_path, user_portal_url
+from app.web_push import firm_push_icon
 
 router = APIRouter(prefix="/api/chat", tags=["Chat"])
 logger = logging.getLogger(__name__)
@@ -154,11 +155,14 @@ def _send_chat_push(
         return False
 
     delivered = False
+    icon = firm_push_icon(db)
     payload_data = {
         "title": title or f"Nuevo mensaje de {sender.nombre_completo}",
         "body": f"{sender.nombre_completo} te está escribiendo.",
         "url": link,
         "tag": tag or f"chat-user-{sender.id}",
+        "icon": icon,
+        "badge": icon,
     }
     if body is not None:
         payload_data["body"] = body
@@ -330,14 +334,17 @@ def _display_conversation(db: Session, conversation: models.ChatConversacion, us
     last = db.query(models.ChatMensaje).filter_by(conversacion_id=conversation.id).order_by(models.ChatMensaje.id.desc()).first()
     own_participant = next((item for item in conversation.participantes if item.usuario_id == user.id), None)
     last_read_id = own_participant.ultimo_leido_mensaje_id if own_participant else 0
-    unread = db.query(models.ChatMensaje).filter(
+    unread_query = db.query(models.ChatMensaje.id).filter(
         models.ChatMensaje.conversacion_id == conversation.id,
         models.ChatMensaje.remitente_id != user.id,
         models.ChatMensaje.id > last_read_id,
-    ).count()
+    ).order_by(models.ChatMensaje.id.asc())
+    first_unread = unread_query.first()
+    unread = unread_query.count()
     return {
         "id": conversation.id, "clave": conversation.clave, "route_key": route_key, "tipo": conversation.tipo,
         "titulo": title, "subtitulo": subtitle, "href": base, "no_leidos": unread,
+        "primer_no_leido_id": first_unread[0] if first_unread else None,
         "proceso_id": conversation.proceso_id,
         "en_linea": bool(other and other.id in online_ids),
         "participantes_en_linea": len(online_ids),

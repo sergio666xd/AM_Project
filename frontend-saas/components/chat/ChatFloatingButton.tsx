@@ -10,7 +10,7 @@ import { renderMessageMarkdown } from "@/components/chat/ChatWorkspace";
 import { preserveChatList } from "@/components/chat/chatListState";
 import { useChatViewport } from "@/components/chat/useChatViewport";
 
-type Chat = { id: number; clave: string; route_key: string; tipo: string; titulo: string; subtitulo: string; href: string; no_leidos: number; updated_at: string; proceso_id?: number | null; ultimo_mensaje?: string | null; ultimo_remitente?: string | null; en_linea?: boolean; participantes_en_linea?: number };
+type Chat = { id: number; clave: string; route_key: string; tipo: string; titulo: string; subtitulo: string; href: string; no_leidos: number; primer_no_leido_id?: number | null; updated_at: string; proceso_id?: number | null; ultimo_mensaje?: string | null; ultimo_remitente?: string | null; en_linea?: boolean; participantes_en_linea?: number };
 type Message = { id: number; contenido: string; remitente_id: number | null; remitente: string; es_mio: boolean; created_at: string; estado_entrega?: "ENVIADO" | "ENTREGADO" | "ENTREGADO_PARCIAL" | "LEIDO"; entregados?: number; leidos?: number; destinatarios?: number; referencia: { tipo: string; id: number; titulo: string; url: string } | null };
 type DeliveryStatus = Pick<Message, "estado_entrega" | "entregados" | "leidos" | "destinatarios">;
 
@@ -75,7 +75,7 @@ function dayLabel(value: string) {
   return new Intl.DateTimeFormat("es-CO", { weekday: "long", day: "numeric", month: "long", year: "numeric", timeZone: "America/Bogota" }).format(new Date(value));
 }
 
-function FloatingMessageTimeline({ messages }: { messages: Message[] }) {
+function FloatingMessageTimeline({ messages, newMessagesStartId }: { messages: Message[]; newMessagesStartId: number | null }) {
   return <div className="mx-auto flex max-w-3xl flex-col gap-0">
     {messages.map((message, index) => {
       const previous = messages[index - 1];
@@ -96,6 +96,7 @@ function FloatingMessageTimeline({ messages }: { messages: Message[] }) {
         : (sameGroupAsPrevious ? "rounded-tl-md" : "rounded-tl-sm") + " " + (sameGroupAsNext ? "rounded-bl-md" : "rounded-bl-sm");
       return <Fragment key={message.id}>
         {(!previous || !sameDayAsPrevious) && <div className="my-3 flex justify-center"><span className="rounded-full border border-border bg-surface/90 px-3 py-1 text-[10px] font-medium text-foreground-muted shadow-sm">{dayLabel(message.created_at)}</span></div>}
+        {message.id === newMessagesStartId && <div className="my-3 flex items-center gap-2 text-[10px] font-medium text-primary"><span className="h-px flex-1 bg-primary/25" /><span className="rounded-full bg-primary/5 px-2.5 py-1">Mensajes nuevos</span><span className="h-px flex-1 bg-primary/25" /></div>}
         <article className={`max-w-[88%] rounded-xl px-3 py-2 text-sm shadow-sm ${message.es_mio ? "ml-auto bg-primary-light text-foreground" : "mr-auto bg-surface text-foreground"} ${bubbleCorners} ${sameGroupAsPrevious ? "mt-0" : "mt-2"}`}>
           {!message.es_mio && !sameGroupAsPrevious && <p className="mb-1 text-[10px] font-semibold text-primary">{message.remitente}</p>}
           <div className="break-words leading-5">{renderMessageMarkdown(message.contenido)}</div>
@@ -116,6 +117,7 @@ export default function ChatFloatingButton() {
   const [selected, setSelected] = useState<Chat | null>(null);
   const [selectedProcessId, setSelectedProcessId] = useState<number | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
+  const [newMessagesStartId, setNewMessagesStartId] = useState<number | null>(null);
   const [draft, setDraft] = useState("");
   const [loading, setLoading] = useState(false);
   const [sending, setSending] = useState(false);
@@ -171,9 +173,14 @@ export default function ChatFloatingButton() {
     try {
       const after = reset ? 0 : lastMessageId.current;
       const response = await apiRequest(`/api/chat/resolver?clave=${encodeURIComponent(chat.route_key)}&after_id=${after}`, { token });
-      const result = await response.json() as { mensajes: Message[]; estados_mensajes?: ({ id: number } & DeliveryStatus)[] };
+      const result = await response.json() as { conversacion: Chat; mensajes: Message[]; estados_mensajes?: ({ id: number } & DeliveryStatus)[] };
       if (activeChatId.current !== chat.id) return;
       const statuses = new Map((result.estados_mensajes ?? []).map(({ id, ...status }) => [id, status]));
+      if (reset) setNewMessagesStartId(result.conversacion.primer_no_leido_id ?? null);
+      else {
+        const firstIncomingMessage = result.mensajes.find((message) => !message.es_mio && message.id > lastMessageId.current);
+        if (firstIncomingMessage) setNewMessagesStartId((current) => current ?? result.conversacion.primer_no_leido_id ?? firstIncomingMessage.id);
+      }
       setMessages((current) => {
         const byId = new Map((reset ? [] : current).map((message) => [message.id, message]));
         result.mensajes.forEach((message) => {
@@ -245,6 +252,7 @@ export default function ChatFloatingButton() {
     setDraft(""); setSending(true); setError("");
     try {
       await apiRequest(`/api/chat/conversaciones/${selected.id}/mensajes`, { method: "POST", token, body: JSON.stringify({ contenido: content }) });
+      setNewMessagesStartId(null);
       await loadMessages(selected); await loadChats();
     } catch (cause) {
       setDraft(previousDraft);
@@ -266,6 +274,7 @@ export default function ChatFloatingButton() {
     activeChatId.current = chat.id;
     lastMessageId.current = 0;
     lastReadAckId.current = 0;
+    setNewMessagesStartId(null);
     setSelected(chat);
     setMessages([]);
     setError("");
@@ -276,10 +285,10 @@ export default function ChatFloatingButton() {
   return <>
     {open && <section aria-label="Chat flotante" style={floatingStyle} className={isFirmChat ? firmFloatingClass : standardFloatingClass}>
       <header className="flex items-center gap-2 border-b border-border bg-surface-muted px-3 py-3">
-        {selected && <button type="button" onClick={() => { activeChatId.current = null; setSelected(null); setMessages([]); lastMessageId.current = 0; lastReadAckId.current = 0; setError(""); }} aria-label="Volver a la lista de chats" className={`grid ${isFirmChat ? "size-11" : "size-8"} place-items-center rounded-full hover:bg-surface-hover`}><ArrowLeft className="size-4" /></button>}
+        {selected && <button type="button" onClick={() => { activeChatId.current = null; setSelected(null); setMessages([]); setNewMessagesStartId(null); lastMessageId.current = 0; lastReadAckId.current = 0; setError(""); }} aria-label="Volver a la lista de chats" className={`grid ${isFirmChat ? "size-11" : "size-8"} place-items-center rounded-full hover:bg-surface-hover`}><ArrowLeft className="size-4" /></button>}
         <div className="min-w-0 flex-1"><h2 className="truncate text-sm font-semibold">{selected?.titulo ?? (selectedProcessId ? processGroups.find((group) => group.id === selectedProcessId)?.titulo : null) ?? "Chats"}</h2><p className="text-[10px] text-foreground-muted">{selected ? selected.tipo === "PROCESO_COLABORADORES" ? selected.participantes_en_linea ? `${selected.participantes_en_linea} en línea` : "Nadie en línea" : selected.en_linea ? "En línea" : "Desconectado" : "Conversaciones recientes"}</p></div>
-        {selected && <Link href={selected.href} title="Abrir pantalla completa" className="rounded-md px-2 py-1 text-xs font-medium text-primary hover:bg-primary/10">Pantalla completa</Link>}
-        <button type="button" onClick={() => setOpen(false)} aria-label="Cerrar chat flotante" className={`grid ${isFirmChat ? "size-11" : "size-8"} place-items-center rounded-full hover:bg-surface-hover`}><X className="size-4" /></button>
+        {selected && <Link href={selected.href} title="Abrir pantalla completa" onClick={() => setNewMessagesStartId(null)} className="rounded-md px-2 py-1 text-xs font-medium text-primary hover:bg-primary/10">Pantalla completa</Link>}
+        <button type="button" onClick={() => { setOpen(false); setNewMessagesStartId(null); }} aria-label="Cerrar chat flotante" className={`grid ${isFirmChat ? "size-11" : "size-8"} place-items-center rounded-full hover:bg-surface-hover`}><X className="size-4" /></button>
       </header>
       {error && <p role="alert" className="border-b border-border bg-danger/5 px-3 py-2 text-xs text-danger">{error}</p>}
       {!selected ? <div className="min-h-0 flex-1 overflow-y-auto">
@@ -297,7 +306,7 @@ export default function ChatFloatingButton() {
           {!chats.length && <p className="px-4 py-12 text-center text-sm text-foreground-muted">No hay conversaciones disponibles.</p>}
         </>}
       </div> : <>
-        <div ref={messagesContainerRef} className="min-h-0 flex-1 overflow-y-auto bg-background px-3 py-3">{loading ? <p className="py-8 text-center text-xs text-foreground-muted">Cargando mensajes...</p> : messages.length ? <FloatingMessageTimeline messages={messages} /> : <p className="py-8 text-center text-xs text-foreground-muted">Aun no hay mensajes en esta conversacion.</p>}</div>
+        <div ref={messagesContainerRef} className="min-h-0 flex-1 overflow-y-auto bg-background px-3 py-3">{loading ? <p className="py-8 text-center text-xs text-foreground-muted">Cargando mensajes...</p> : messages.length ? <FloatingMessageTimeline messages={messages} newMessagesStartId={newMessagesStartId} /> : <p className="py-8 text-center text-xs text-foreground-muted">Aun no hay mensajes en esta conversacion.</p>}</div>
         <form onSubmit={(event) => void send(event)} className="flex items-end gap-2 border-t border-border p-2"><textarea ref={composerRef} value={draft} onChange={(event) => setDraft(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter" && !event.shiftKey && !event.nativeEvent.isComposing) { event.preventDefault(); if (draft.trim() && !sending) { refocusComposerAfterSendRef.current = true; event.currentTarget.form?.requestSubmit(); } } }} disabled={sending} rows={2} maxLength={12000} placeholder="Escribe un mensaje..." className="max-h-24 min-h-10 min-w-0 flex-1 resize-none overflow-y-auto rounded-xl border border-border bg-surface-muted px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30" /><button type="submit" disabled={!draft.trim() || sending} aria-label="Enviar mensaje" className={`grid ${isFirmChat ? "size-11" : "size-9"} shrink-0 place-items-center rounded-full bg-primary !text-white disabled:opacity-50`}><Send className="size-4" /></button></form>
       </>}
     </section>}

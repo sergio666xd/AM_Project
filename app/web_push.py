@@ -9,6 +9,18 @@ from sqlalchemy.orm import Session
 from app import models
 
 logger = logging.getLogger(__name__)
+DEFAULT_PUSH_ICON = "/AM_logo_Recurso%202_Landscape_web.png"
+
+
+def firm_push_icon(db: Session) -> str:
+    """Return the configured firm logo for browser push notifications."""
+    try:
+        config = db.query(models.ConfiguracionFirma).filter_by(id=1).first()
+        logo_url = (config.logo_url or "").strip() if config else ""
+        return logo_url or DEFAULT_PUSH_ICON
+    except Exception:
+        logger.exception("No se pudo leer el logo de la firma para la notificación Push.")
+        return DEFAULT_PUSH_ICON
 
 
 def send_web_push(
@@ -45,7 +57,8 @@ def send_web_push(
         logger.exception("No se pudo importar pywebpush o una dependencia necesaria: %s", exc)
         return False
 
-    payload = json.dumps({"title": title, "body": body, "url": link, "tag": tag}, ensure_ascii=False)
+    icon = firm_push_icon(db)
+    payload = json.dumps({"title": title, "body": body, "url": link, "tag": tag, "icon": icon, "badge": icon}, ensure_ascii=False)
     delivered = False
     failed = 0
     for subscription in subscriptions:

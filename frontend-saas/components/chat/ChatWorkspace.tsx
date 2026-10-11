@@ -8,7 +8,7 @@ import { useSession } from "@/context/SessionContext";
 import { apiRequest } from "@/lib/api";
 import { preserveChatList, upsertChat } from "@/components/chat/chatListState";
 
-type Chat = { id: number; clave: string; route_key: string; tipo: string; titulo: string; subtitulo: string; href: string; no_leidos: number; updated_at: string; proceso_id?: number | null; ultimo_mensaje?: string | null; ultimo_remitente?: string | null; en_linea?: boolean; participantes_en_linea?: number };
+type Chat = { id: number; clave: string; route_key: string; tipo: string; titulo: string; subtitulo: string; href: string; no_leidos: number; primer_no_leido_id?: number | null; updated_at: string; proceso_id?: number | null; ultimo_mensaje?: string | null; ultimo_remitente?: string | null; en_linea?: boolean; participantes_en_linea?: number };
 type Message = { id: number; contenido: string; remitente_id: number | null; remitente: string; es_mio: boolean; created_at: string; estado_entrega?: "ENVIADO" | "ENTREGADO" | "ENTREGADO_PARCIAL" | "LEIDO"; entregados?: number; leidos?: number; destinatarios?: number; referencia: { tipo: string; id: number; titulo: string; url: string } | null };
 type DeliveryStatus = Required<Pick<Message, "estado_entrega" | "entregados" | "leidos" | "destinatarios">>;
 type Reference = { tipo: "ACTUACION" | "RADICADO" | "TAREA" | "SUBTAREA" | "EVENTO" | "DOCUMENTO"; id: number; titulo: string; href: string; grupo?: string; radicado_numero?: string; parent_id?: number; request_id?: number | null };
@@ -179,6 +179,7 @@ export default function ChatWorkspace() {
   const [error, setError] = useState("");
   const [listError, setListError] = useState("");
   const [incomingAnnouncement, setIncomingAnnouncement] = useState("");
+  const [newMessagesStartId, setNewMessagesStartId] = useState<number | null>(null);
   const [resolvedConversationId, setResolvedConversationId] = useState<number | null>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
   const followLatestRef = useRef(true);
@@ -261,6 +262,7 @@ export default function ChatWorkspace() {
       const statuses = new Map((result.estados_mensajes ?? []).map(({ id, ...status }) => [id, status]));
       if (reset) {
         setMessages(result.mensajes.map((item) => ({ ...item, ...statuses.get(item.id) })));
+        setNewMessagesStartId(result.conversacion.primer_no_leido_id ?? null);
         messageIdRef.current = result.mensajes.at(-1)?.id ?? 0;
       } else if (result.mensajes.length || statuses.size) {
         const previousMessageId = messageIdRef.current;
@@ -269,6 +271,8 @@ export default function ChatWorkspace() {
         if (isFirmChat && latestIncomingMessage) {
           setIncomingAnnouncement(`Nuevo mensaje de ${latestIncomingMessage.remitente}: ${latestIncomingMessage.contenido}`);
         }
+        const firstIncomingMessage = incoming.find((item) => !item.es_mio);
+        if (firstIncomingMessage) setNewMessagesStartId((current) => current ?? result.conversacion.primer_no_leido_id ?? firstIncomingMessage.id);
         setMessages((current) => {
           const byId = new Map(current.map((item) => [item.id, item]));
           for (const item of incoming) {
@@ -303,7 +307,7 @@ export default function ChatWorkspace() {
   }, [token, loadChats, loadMessages]);
 
   useEffect(() => {
-    setMessages([]); messageIdRef.current = 0; setResolvedConversationId(null); setLoading(!!activeKey); setError(""); setReferenceId(""); setIncomingAnnouncement("");
+    setMessages([]); messageIdRef.current = 0; setResolvedConversationId(null); setLoading(!!activeKey); setError(""); setReferenceId(""); setIncomingAnnouncement(""); setNewMessagesStartId(null);
     followLatestRef.current = true; setShowLatestMessage(false);
     readAckRef.current = { key: activeKey, messageId: 0 };
     if (activeKey) void loadMessages(true);
@@ -403,6 +407,7 @@ export default function ChatWorkspace() {
         method: "POST", token,
         body: JSON.stringify({ contenido: content, ...(selected ? { referencia_tipo: selected.tipo, referencia_id: selected.id } : {}) }),
       });
+      setNewMessagesStartId(null);
       await loadMessages(); await loadChats();
     } catch (cause) {
       setDraft(draftToRestore); setReferenceId(referenceToRestore);
@@ -482,6 +487,7 @@ export default function ChatWorkspace() {
           const statusTone = message.estado_entrega === "LEIDO" ? "text-primary" : "text-foreground-muted";
           return <Fragment key={message.id}>
             {(!previous || !sameDayAsPrevious) && <div className="my-3 flex justify-center"><span className="rounded-full border border-border bg-surface/90 px-3 py-1 text-[10px] font-medium text-foreground-muted shadow-sm">{dayLabel(message.created_at)}</span></div>}
+            {message.id === newMessagesStartId && <div className="my-4 flex items-center gap-3 text-[11px] font-medium text-primary"><span className="h-px flex-1 bg-primary/25" /><span className="rounded-full bg-primary/5 px-3 py-1">Mensajes nuevos</span><span className="h-px flex-1 bg-primary/25" /></div>}
             <article className={"max-w-[88%] rounded-xl px-3 py-2 shadow-sm sm:max-w-[75%] " + alignment + " " + bubbleCorners + (sameGroupAsPrevious ? " mt-0" : " mt-2") + (message.es_mio ? " bg-primary-light text-foreground" : " bg-surface text-foreground")}>
               {!sameGroupAsPrevious && <p className="mb-1 text-[10px] font-semibold text-primary">{message.es_mio ? "Tú" : message.remitente}</p>}
               {message.referencia && <Link href={message.referencia.url} className="mb-2 flex items-start gap-2 rounded-md border-l-4 border-primary bg-primary/5 p-2 text-xs hover:bg-primary/10"><Link2 className="mt-0.5 size-3.5 shrink-0" /><span><strong className="block">Referencia · {message.referencia.tipo.toLowerCase()}</strong>{message.referencia.titulo}</span></Link>}

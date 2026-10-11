@@ -8,8 +8,8 @@ self.addEventListener("push", (event) => {
 
   event.waitUntil(self.registration.showNotification(payload.title || "Nuevo mensaje", {
     body: payload.body || "Tienes un mensaje nuevo en el panel.",
-    icon: "/AM_logo_Recurso%202_Landscape_web.png",
-    badge: "/AM_logo_Recurso%202_Landscape_web.png",
+    icon: payload.icon || "/AM_logo_Recurso%202_Landscape_web.png",
+    badge: payload.badge || payload.icon || "/AM_logo_Recurso%202_Landscape_web.png",
     tag: payload.tag || "chat-message",
     data: { url: payload.url || "/" },
   }));
