@@ -23,6 +23,11 @@ self.addEventListener("notificationclick", (event) => {
     for (const client of windows) {
       if (client.url === target && "focus" in client) return client.focus();
     }
+    for (const client of windows) {
+      if (new URL(client.url).origin !== self.location.origin || !("navigate" in client)) continue;
+      const navigatedClient = await client.navigate(target);
+      if (navigatedClient && "focus" in navigatedClient) return navigatedClient.focus();
+    }
     return self.clients.openWindow(target);
   })());
 });

@@ -128,14 +128,24 @@ def _send_chat_push(
     *,
     title: str | None = None,
     body: str | None = None,
+    tag: str | None = None,
 ) -> bool:
     public_key = os.getenv("WEB_PUSH_VAPID_PUBLIC_KEY", "").strip()
     private_key = os.getenv("WEB_PUSH_VAPID_PRIVATE_KEY", "").strip()
     subject = os.getenv("WEB_PUSH_VAPID_SUBJECT", "mailto:contacto@alejandramunozabogada.com").strip()
     if not public_key or not private_key:
+        missing = [name for name, value in (
+            ("WEB_PUSH_VAPID_PUBLIC_KEY", public_key),
+            ("WEB_PUSH_VAPID_PRIVATE_KEY", private_key),
+        ) if not value]
+        logger.warning(
+            "Push no enviada al usuario %s: faltan variables de configuración %s.",
+            recipient.id, ", ".join(missing),
+        )
         return False
     subscriptions = db.query(models.ChatPushSubscription).filter_by(usuario_id=recipient.id).all()
     if not subscriptions:
+        logger.info("Push no enviada al usuario %s: no tiene suscripciones registradas.", recipient.id)
         return False
     try:
         from pywebpush import WebPushException, webpush
@@ -148,11 +158,12 @@ def _send_chat_push(
         "title": title or f"Nuevo mensaje de {sender.nombre_completo}",
         "body": f"{sender.nombre_completo} te está escribiendo.",
         "url": link,
-        "tag": f"chat-user-{sender.id}",
+        "tag": tag or f"chat-user-{sender.id}",
     }
     if body is not None:
         payload_data["body"] = body
     payload = json.dumps(payload_data, ensure_ascii=False)
+    failed = 0
     for subscription in subscriptions:
         try:
             webpush(
@@ -168,13 +179,32 @@ def _send_chat_push(
             )
             delivered = True
         except WebPushException as exc:
+            failed += 1
             status_code = getattr(exc, "status_code", None) or getattr(getattr(exc, "response", None), "status_code", None)
             if status_code in {404, 410}:
                 db.delete(subscription)
+                logger.info(
+                    "Suscripción Push vencida eliminada para usuario %s (HTTP %s).",
+                    recipient.id, status_code,
+                )
             else:
-                logger.warning("No se pudo entregar Web Push al usuario %s (HTTP %s).", recipient.id, status_code or "desconocido")
-        except Exception:
-            logger.exception("No se pudo enviar Web Push al usuario %s.", recipient.id)
+                logger.warning(
+                    "No se pudo entregar Web Push al usuario %s (HTTP %s).",
+                    recipient.id, status_code or "desconocido",
+                )
+        except Exception as exc:
+            failed += 1
+            logger.exception("Error al enviar Web Push al usuario %s: %s", recipient.id, exc)
+    if not delivered:
+        logger.warning(
+            "Push no enviada al usuario %s: fallaron sus %s suscripciones registradas.",
+            recipient.id, failed,
+        )
+    elif failed:
+        logger.warning(
+            "Push entregada al usuario %s, pero fallaron %s de %s suscripciones.",
+            recipient.id, failed, len(subscriptions),
+        )
     return delivered
 
 
@@ -199,6 +229,7 @@ def probar_notificacion_push(
         user_portal_url(user, chat_path),
         title="Prueba de notificaciones",
         body="Las notificaciones Push de este navegador estan funcionando.",
+        tag=f"chat-test-{user.id}",
     )
     if not delivered:
         raise HTTPException(status_code=502, detail="El servicio Push rechazo el envio. Revisa los logs del backend y confirma que las claves VAPID correspondan a las usadas al crear la suscripcion.")
@@ -759,10 +790,15 @@ def enviar_mensaje(conversation_id: int, data: schemas.ChatMensajeCreate, db: Se
         link = user_portal_url(recipient, display["href"])
         process_name = process.nombre if process else "Conversacion del despacho"
         push_enabled = db.query(models.ChatPushSubscription.id).filter_by(usuario_id=recipient.id).first() is not None
+        if not push_enabled:
+            logger.info(
+                "Push no enviada para el mensaje %s al usuario %s: no tiene suscripciones registradas.",
+                message.id, recipient.id,
+            )
+        push_delivered = _send_chat_push(
+            db, recipient, user, link, tag=f"chat-message-{message.id}",
+        ) if push_enabled else False
         if not (_supports_firm_panel_presence(user) and _supports_firm_panel_presence(recipient)):
-            push_delivered = False
-            if push_enabled:
-                push_delivered = _send_chat_push(db, recipient, user, link)
             staff_sender = _role(user) != "CLIENTE"
             template = "COMUNICACION_ABOGADO_CLIENTE" if staff_sender else "COMUNICACION_CLIENTE_ABOGADO"
             whatsapp_enabled = "WHATSAPP" in canales_habilitados(recipient, "RESUMENES", emisor=user)
@@ -782,7 +818,14 @@ def enviar_mensaje(conversation_id: int, data: schemas.ChatMensajeCreate, db: Se
             models.ChatPresenciaPanel.usuario_id == recipient.id,
             models.ChatPresenciaPanel.last_seen_at >= now - PANEL_PRESENCE_TTL,
         ).first() is not None
+        # Push is sent for every message, whether the recipient is online or offline.
+        # Presence only suppresses the grouped email/WhatsApp workflow notices.
         if is_panel_active:
+            continue
+
+        whatsapp_enabled = "WHATSAPP" in canales_habilitados(recipient, "RESUMENES", emisor=user)
+        should_send_workflow = not push_delivered or whatsapp_enabled
+        if not should_send_workflow:
             continue
 
         db.query(models.Usuario.id).filter_by(id=recipient.id).with_for_update().first()
@@ -794,18 +837,8 @@ def enviar_mensaje(conversation_id: int, data: schemas.ChatMensajeCreate, db: Se
             db.rollback()
             continue
 
-        push_delivered = _send_chat_push(db, recipient, user, link) if push_enabled else False
-        whatsapp_enabled = "WHATSAPP" in canales_habilitados(recipient, "RESUMENES", emisor=user)
-        should_send_workflow = not push_delivered or whatsapp_enabled
         template_exists = db.query(models.PlantillaMensaje.id).filter_by(clave="CHAT_MENSAJE", activo=True).first()
         if should_send_workflow and not template_exists:
-            if push_delivered:
-                if notice is None:
-                    db.add(models.ChatAvisoDestinatario(remitente_id=user.id, destinatario_id=recipient.id, ultima_notificacion_en=now))
-                else:
-                    notice.ultima_notificacion_en = now
-                db.commit()
-                continue
             db.rollback()
             logger.warning("Falta configurar la plantilla CHAT_MENSAJE; se omite el aviso externo del chat.")
             continue
