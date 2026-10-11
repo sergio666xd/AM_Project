@@ -81,6 +81,13 @@ class ConfiguracionFirmaUpdate(BaseModel):
         # queda vacío; EmailStr espera null en ese caso.
         return None if isinstance(value, str) and not value.strip() else value
 
+    @field_validator("telefono", "whatsapp", "direccion", "ciudad", "pais", "logo_url", "sitio_web", mode="before")
+    @classmethod
+    def normalizar_texto_opcional(cls, value: Any) -> Any:
+        # Estos campos son nullable en la tabla y pueden llegar como null desde
+        # registros antiguos; el formulario y el esquema los manejan como texto.
+        return "" if value is None else value
+
 
 class ConfiguracionIntegracionesUpdate(BaseModel):
     smtp_host: str | None = Field(default=None, max_length=255)

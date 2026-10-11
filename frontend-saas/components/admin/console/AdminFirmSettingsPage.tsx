@@ -31,6 +31,26 @@ const EMPTY: FirmSettings = {
   preferencias_notificacion: { email: true, whatsapp: true }, parametros_generales: { contrato_abogado: DEFAULT_CONTRACT_ATTORNEY },
 };
 
+function normalizeFirmSettings(data: Partial<FirmSettings>): FirmSettings {
+  return {
+    ...EMPTY,
+    ...data,
+    telefono: data.telefono ?? "",
+    whatsapp: data.whatsapp ?? "",
+    direccion: data.direccion ?? "",
+    ciudad: data.ciudad ?? "",
+    pais: data.pais ?? "Colombia",
+    logo_url: data.logo_url ?? "",
+    sitio_web: data.sitio_web ?? "",
+    preferencias_notificacion: { ...EMPTY.preferencias_notificacion, ...data.preferencias_notificacion },
+    parametros_generales: {
+      ...EMPTY.parametros_generales,
+      ...data.parametros_generales,
+      contrato_abogado: { ...DEFAULT_CONTRACT_ATTORNEY, ...data.parametros_generales?.contrato_abogado },
+    },
+  };
+}
+
 export default function AdminFirmSettingsPage() {
   const { token } = useSession();
   const [settings, setSettings] = useState<FirmSettings>(EMPTY);
@@ -43,7 +63,7 @@ export default function AdminFirmSettingsPage() {
     if (!token) return;
     let active = true;
     fetchApi("/api/admin/configuracion/firma", { method: "GET", token })
-      .then((data: FirmSettings) => { if (active) setSettings({ ...data, parametros_generales: { ...data.parametros_generales, contrato_abogado: { ...DEFAULT_CONTRACT_ATTORNEY, ...data.parametros_generales?.contrato_abogado } } }); })
+      .then((data: FirmSettings) => { if (active) setSettings(normalizeFirmSettings(data)); })
       .catch((cause: unknown) => { if (active) setError(cause instanceof Error ? cause.message : "No se pudo cargar la configuración de la firma."); })
       .finally(() => { if (active) setLoading(false); });
     return () => { active = false; };
@@ -60,16 +80,7 @@ export default function AdminFirmSettingsPage() {
         correo_pqr: settings.correo_pqr?.trim() || null,
       };
       const result = await fetchApi("/api/admin/configuracion/firma", { method: "PUT", token, body: JSON.stringify(payload) });
-      setSettings({
-        ...EMPTY,
-        ...result,
-        preferencias_notificacion: { ...EMPTY.preferencias_notificacion, ...result.preferencias_notificacion },
-        parametros_generales: {
-          ...EMPTY.parametros_generales,
-          ...result.parametros_generales,
-          contrato_abogado: { ...DEFAULT_CONTRACT_ATTORNEY, ...result.parametros_generales?.contrato_abogado },
-        },
-      });
+      setSettings(normalizeFirmSettings(result));
       setNotice("Configuración de la firma guardada.");
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "No se pudo guardar la configuración.");
