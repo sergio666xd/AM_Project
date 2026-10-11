@@ -7,5 +7,5 @@ export default function AdminLayout({
 }: {
   children: ReactNode;
 }) {
-  return <RoleGate roles={["ADMIN"]}><AdminConsoleShell>{children}</AdminConsoleShell></RoleGate>;
+  return <RoleGate roles={["ADMIN"]} restrictedBehavior="page"><AdminConsoleShell>{children}</AdminConsoleShell></RoleGate>;
 }

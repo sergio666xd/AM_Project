@@ -122,6 +122,7 @@ def actualizar_esquema_planes() -> None:
         conexion.execute(text("ALTER TABLE documentos_proceso ALTER COLUMN solicitud_id DROP NOT NULL"))
         conexion.execute(text("ALTER TABLE solicitudes_documento ADD COLUMN IF NOT EXISTS fecha_limite TIMESTAMP"))
         conexion.execute(text("ALTER TABLE comunicaciones_proceso ADD COLUMN IF NOT EXISTS leido_en TIMESTAMP"))
+        conexion.execute(text("ALTER TABLE eventos_agenda ADD COLUMN IF NOT EXISTS cliente_id INTEGER REFERENCES usuarios(id) ON DELETE SET NULL"))
         conexion.execute(text("ALTER TABLE eventos_agenda ADD COLUMN IF NOT EXISTS contrato_id INTEGER REFERENCES contratos_servicios(id) ON DELETE SET NULL"))
         conexion.execute(text("ALTER TABLE documentos_proceso ADD COLUMN IF NOT EXISTS contrato_id INTEGER REFERENCES contratos_servicios(id) ON DELETE SET NULL"))
         conexion.execute(text("ALTER TABLE contratos_servicios ADD COLUMN IF NOT EXISTS campos_actual JSON NOT NULL DEFAULT '{}'::json"))
@@ -162,18 +163,23 @@ app.include_router(chat.router)
 
 def get_cors_origins() -> list[str]:
     configured = os.getenv("CORS_ORIGINS", "")
-    if configured.strip():
-        return [origin.strip().rstrip("/") for origin in configured.split(",") if origin.strip()]
-    return ["http://localhost:3000", "http://127.0.0.1:3000"]
+    # Keep the known application origins available even when a deployment
+    # provides additional CORS_ORIGINS entries. Replacing this list outright
+    # made the admin/panel subdomains fail in the browser while the API still
+    # returned HTTP 200 to the request itself.
+    defaults = [
+        "http://localhost:3000",
+        "http://admin.localhost:3000",
+        "http://panel.localhost:3000",
+        "http://127.0.0.1:3000",
+        "https://alejandramunozabogada.com",
+        "https://www.alejandramunozabogada.com",
+        "https://admin.alejandramunozabogada.com",
+        "https://panel.alejandramunozabogada.com",
+    ]
+    extra = [origin.strip().rstrip("/") for origin in configured.split(",") if origin.strip()]
+    return list(dict.fromkeys([*defaults, *extra]))
 
-
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=get_cors_origins(),
-    allow_credentials=False,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
 
 
 # Protección ligera para el único endpoint público de captación. Para una
@@ -367,7 +373,7 @@ def registrar_abogado(
     try:
         storage.get_r2_client().upload_fileobj(
             tarjeta_profesional.file,
-            storage.get_r2_bucket(),
+            storage.get_r2_tp_registros_bucket(),
             object_key,
             ExtraArgs={"ContentType": content_type},
         )
@@ -406,7 +412,7 @@ def registrar_abogado(
         db.rollback()
         # Evita dejar un documento huérfano si falla el registro en la base de datos.
         try:
-            storage.get_r2_client().delete_object(Bucket=storage.get_r2_bucket(), Key=object_key)
+            storage.get_r2_client().delete_object(Bucket=storage.get_r2_tp_registros_bucket(), Key=object_key)
         except (BotoCoreError, ClientError):
             pass
         raise HTTPException(status_code=500, detail="No fue posible completar el registro.") from exc
@@ -475,7 +481,7 @@ def solicitar_recuperacion_password(
     usuario = db.query(models.Usuario).filter(models.Usuario.email == email).first()
     if usuario and usuario.estado == models.EstadoUsuario.ACTIVO:
         token = security.create_password_reset_token(usuario.id, usuario.password_hash)
-        background_tasks.add_task(send_password_reset_email, email, password_reset_url(token))
+        background_tasks.add_task(send_password_reset_email, email, password_reset_url(token, usuario.rol))
     return {"mensaje": PASSWORD_RESET_MESSAGE}
 
 
@@ -1147,10 +1153,12 @@ def descargar_tarjeta_profesional(
     solicitud = db.query(models.SolicitudRegistro).filter(models.SolicitudRegistro.id == solicitud_id).first()
     if not solicitud:
         raise HTTPException(status_code=404, detail="Solicitud no encontrada.")
+    if not solicitud.ruta_tarjeta_profesional:
+        raise HTTPException(status_code=404, detail="La tarjeta profesional fue retirada del almacenamiento.")
 
     try:
         response = storage.get_r2_client().get_object(
-            Bucket=storage.get_r2_bucket(), Key=solicitud.ruta_tarjeta_profesional
+            Bucket=storage.get_r2_tp_registros_bucket(), Key=solicitud.ruta_tarjeta_profesional
         )
     except ClientError as exc:
         error_code = exc.response.get("Error", {}).get("Code")
@@ -1397,3 +1405,16 @@ def consultar_radicado_manual(
         status_code=410,
         detail="Este endpoint legacy fue deshabilitado. Inicia la consulta desde la interfaz ADMIN mediante Workflow.",
     )
+
+
+# Keep CORS outside Starlette's ServerErrorMiddleware so unhandled 500
+# responses still carry the allowed origin header. Browser clients can then
+# report the API error instead of a misleading CORS/network failure.
+_fastapi_app = app
+app = CORSMiddleware(
+    app=_fastapi_app,
+    allow_origins=get_cors_origins(),
+    allow_credentials=False,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)

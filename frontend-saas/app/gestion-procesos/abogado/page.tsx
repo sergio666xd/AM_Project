@@ -172,7 +172,24 @@ export default function AbogadoPage() {
     }
   }
 
-  const cards = [
+  const cards = isSaasLawyer ? [
+    {
+      title: "Radicados",
+      value: saasData?.resumen.total_radicados ?? data.processes,
+      description: "Consulta tus procesos y actuaciones judiciales",
+      href: "/gestion-procesos/dashboard/radicados",
+      icon: FolderOpen,
+      iconClass: "bg-blue-50 text-blue-600 dark:bg-blue-950 dark:text-blue-400",
+    },
+    {
+      title: "Tareas",
+      value: data.tasks,
+      description: "Revisa tu trabajo pendiente",
+      href: "/gestion-procesos/dashboard/tareas",
+      icon: ListChecks,
+      iconClass: "bg-amber-50 text-amber-600 dark:bg-amber-950 dark:text-amber-400",
+    },
+  ] : [
     {
       title: "Procesos",
       value: data.processes,
@@ -251,8 +268,17 @@ export default function AbogadoPage() {
         </div>
       )}
 
+      {!isSaasLawyer && data.processes === 0 && data.clients === 0 && data.tasks === 0 && (
+        <section className="rounded-xl border border-[var(--primary)]/20 bg-[var(--primary)]/5 p-5 sm:p-6" aria-labelledby="firm-welcome-title">
+          <p className="text-sm font-medium text-[var(--primary)]">Configuración inicial</p>
+          <h2 id="firm-welcome-title" className="mt-1 text-lg font-semibold text-[var(--foreground)]">Tu espacio de trabajo está listo</h2>
+          <p className="mt-1 max-w-2xl text-sm text-[var(--foreground-muted)]">Empieza creando un expediente. Desde su ficha podrás vincular al cliente, registrar radicados y organizar tareas, documentos y actividades.</p>
+          <Link href="/gestion-procesos/abogado/procesos" className="mt-4 inline-flex min-h-11 items-center gap-2 rounded-lg bg-[var(--primary)] px-4 py-2 text-sm font-semibold !text-white hover:opacity-90">Ir a procesos <ArrowRight aria-hidden="true" className="size-4" /></Link>
+        </section>
+      )}
+
       {/* Tarjetas principales */}
-      <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+      <div className={`grid grid-cols-1 gap-4 ${isSaasLawyer ? "md:grid-cols-2" : "md:grid-cols-3"}`}>
         {cards.map(
           ({
             title,
@@ -299,7 +325,9 @@ export default function AbogadoPage() {
       </div>
 
       {!isSaasLawyer && firmDashboard && <section className="space-y-5" aria-label="Centro de trabajo de la firma">
-        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">{[
+        <details className="rounded-xl border border-[var(--border)] bg-[var(--surface)] p-4">
+          <summary className="flex min-h-11 cursor-pointer items-center justify-between gap-3 font-medium text-[var(--foreground)]">Indicadores del despacho <span className="text-xs font-normal text-[var(--foreground-muted)]">8 métricas</span></summary>
+          <div className="mt-3 grid gap-3 border-t border-[var(--border)] pt-3 sm:grid-cols-2 xl:grid-cols-4">{[
           ["Procesos activos", firmDashboard.resumen.procesos_activos, "/gestion-procesos/abogado/procesos"],
           ["Tareas pendientes", firmDashboard.resumen.tareas_pendientes, "/gestion-procesos/abogado/tareas"],
           ["Tareas vencidas", firmDashboard.resumen.tareas_vencidas, "/gestion-procesos/abogado/tareas"],
@@ -308,7 +336,8 @@ export default function AbogadoPage() {
           ["Consultas judiciales con error", firmDashboard.resumen.consultas_con_error, "/gestion-procesos/abogado/radicados"],
           ["Próximos vencimientos", firmDashboard.resumen.proximos_eventos, "/gestion-procesos/abogado/agenda"],
           ["Procesos sin actividad", firmDashboard.resumen.procesos_sin_actividad, "/gestion-procesos/abogado/procesos?filtro=ATENCION"],
-        ].map(([label, value, href]) => <Link key={String(label)} href={String(href)} className="rounded-xl border border-[var(--border)] bg-[var(--surface)] p-4 transition hover:border-[var(--primary)]/40"><p className="text-sm text-[var(--foreground-muted)]">{label}</p><p className="mt-2 text-2xl font-semibold text-[var(--foreground)]">{value}</p></Link>)}</div>
+          ].map(([label, value, href]) => <Link key={String(label)} href={String(href)} className="rounded-xl border border-[var(--border)] bg-[var(--surface)] p-4 transition hover:border-[var(--primary)]/40"><p className="text-sm text-[var(--foreground-muted)]">{label}</p><p className="mt-2 text-2xl font-semibold text-[var(--foreground)]">{value}</p></Link>)}</div>
+        </details>
         <div className="grid gap-5 xl:grid-cols-[1fr_1.2fr]">
           <section className="overflow-hidden rounded-xl border border-[var(--border)] bg-[var(--surface)]"><header className="flex items-center justify-between border-b border-[var(--border)] px-5 py-4"><div><h2 className="font-semibold">Requiere tu atención</h2><p className="mt-1 text-xs text-[var(--foreground-muted)]">Tareas, documentos, consultas y procesos sin actividad reciente</p></div><Link href="/gestion-procesos/abogado/notificaciones" className="text-xs font-medium text-[var(--primary)] hover:underline">Ver avisos</Link></header>{firmDashboard.atencion.length ? <div className="divide-y divide-[var(--border)]">{firmDashboard.atencion.slice(0, 8).map((item, index) => <Link key={`${item.tipo}-${item.titulo}-${index}`} href={item.href} className="flex items-center justify-between gap-3 px-5 py-3 hover:bg-[var(--surface-hover)]"><span className="min-w-0"><span className="block truncate text-sm font-medium">{item.titulo}</span><span className="mt-1 block text-xs text-[var(--foreground-muted)]">{item.descripcion}</span></span><ArrowRight className="size-4 shrink-0 text-[var(--primary)]" /></Link>)}</div> : <p className="px-5 py-8 text-center text-sm text-[var(--foreground-muted)]">No hay elementos que requieran atención ahora.</p>}</section>
           <section className="overflow-hidden rounded-xl border border-[var(--border)] bg-[var(--surface)]"><header className="border-b border-[var(--border)] px-5 py-4"><h2 className="font-semibold">Actividad reciente</h2><p className="mt-1 text-xs text-[var(--foreground-muted)]">Movimientos recientes de procesos, documentos y tareas.</p></header>{firmDashboard.actividad_reciente.length ? <div className="max-h-[28rem] divide-y divide-[var(--border)] overflow-y-auto">{firmDashboard.actividad_reciente.slice(0, 12).map((item) => <Link key={item.id} href={item.href} className="block px-5 py-3 hover:bg-[var(--surface-hover)]"><div className="flex items-center justify-between gap-3"><p className="truncate text-sm font-medium">{item.titulo}</p><span className="shrink-0 text-[10px] text-[var(--foreground-muted)]">{new Date(item.fecha).toLocaleString("es-CO", { timeZone: "America/Bogota" })}</span></div><p className="mt-1 truncate text-xs text-[var(--foreground-muted)]">{item.proceso} · {item.tipo} · {item.descripcion}</p></Link>)}</div> : <p className="px-5 py-8 text-center text-sm text-[var(--foreground-muted)]">No hay actividad reciente.</p>}</section>
@@ -386,6 +415,7 @@ export default function AbogadoPage() {
       )}
 
       {/* Flujo del despacho */}
+      {!isSaasLawyer && <>
       <div className="rounded-xl border border-[var(--border)] bg-[var(--surface)] shadow-sm">
         <div className="border-b border-[var(--border)] px-5 py-4">
           <h2 className="font-semibold text-[var(--foreground)]">
@@ -481,8 +511,10 @@ export default function AbogadoPage() {
           </Link>
         </div>
       </div>
+      </>}
 
       {/* Nota operativa */}
+      {!isSaasLawyer && <>
       <div className="rounded-xl border border-[var(--border)] bg-[var(--surface)] p-5 shadow-sm">
         <div className="flex gap-3">
           <div className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-[var(--primary)]/10 text-[var(--primary)]">
@@ -503,6 +535,7 @@ export default function AbogadoPage() {
           </div>
         </div>
       </div>
+      </>}
     </div>
   );
 }

@@ -20,6 +20,8 @@ import {
   Trash2,
   X,
   ChevronRight,
+  Users,
+  Gavel,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useSession } from "@/context/SessionContext";
@@ -50,11 +52,20 @@ type Task = {
 type Process = {
   id: number;
   nombre: string;
+  radicados?: { id: number; numero: string }[];
+  clientes?: { id: number; nombre_completo: string }[];
 };
 
 type Client = {
   id: number;
   nombre_completo: string;
+};
+
+type Radicado = {
+  id: number;
+  numero?: string;
+  numero_radicado?: string;
+  titulo?: string;
 };
 
 function estadoLabel(estado: string) {
@@ -192,6 +203,7 @@ export default function TareasPage() {
   const [tasks, setTasks] = useState<Task[]>([]);
   const [processes, setProcesses] = useState<Process[]>([]);
   const [clients, setClients] = useState<Client[]>([]);
+  const [radicados, setRadicados] = useState<Radicado[]>([]);
   const [loading, setLoading] = useState(true);
   const [actualizando, setActualizando] = useState(false);
 
@@ -227,7 +239,7 @@ export default function TareasPage() {
       setActualizando(true);
       setError("");
 
-      const [tasksResponse, processesResponse, clientsResponse] =
+      const [tasksResponse, processesResponse, clientsResponse, radicadosResponse] =
         await Promise.all([
           apiRequest(`/api/tareas`, {
             headers: headers(),
@@ -238,13 +250,15 @@ export default function TareasPage() {
           apiRequest(`/api/expedientes/clientes`, {
             headers: headers(),
           }),
+          apiRequest(`/api/radicados`, { headers: headers() }),
         ]);
 
-      const [tasksData, processesData, clientsData] =
+      const [tasksData, processesData, clientsData, radicadosData] =
         await Promise.all([
           tasksResponse.json(),
           processesResponse.json(),
           clientsResponse.json(),
+          radicadosResponse.json(),
         ]);
 
       if (!tasksResponse.ok) {
@@ -266,10 +280,14 @@ export default function TareasPage() {
             "No fue posible cargar los clientes.",
         );
       }
+      if (!radicadosResponse.ok) {
+        throw new Error(radicadosData.detail || "No fue posible cargar los radicados.");
+      }
 
       setTasks(Array.isArray(tasksData) ? tasksData : []);
       setProcesses(Array.isArray(processesData) ? processesData : []);
       setClients(Array.isArray(clientsData) ? clientsData : []);
+      setRadicados(Array.isArray(radicadosData) ? radicadosData : (radicadosData.items ?? []));
     } catch (cause) {
       setError(
         cause instanceof Error
@@ -439,7 +457,7 @@ export default function TareasPage() {
 
   return (
     <div
-      className="space-y-5"
+      className="space-y-5 pb-24"
       style={{ color: "var(--foreground)" }}
     >
       {/* ENCABEZADO */}
@@ -702,7 +720,7 @@ export default function TareasPage() {
         {([ ["LISTA", "Lista"], ["KANBAN", "Kanban"], ["CALENDARIO", "Calendario"] ] as const).map(([key, label]) => <button key={key} type="button" role="tab" aria-selected={vista === key} onClick={() => setVista(key)} className="rounded-lg border px-3 py-2 text-sm font-medium" style={{ borderColor: vista === key ? "var(--primary)" : "var(--border)", background: vista === key ? "var(--primary-light)" : "var(--surface)", color: vista === key ? "var(--primary)" : "var(--foreground-secondary)" }}>{label}</button>)}
       </div>
 
-      {vista === "CALENDARIO" ? <TaskMonthCalendar tasks={calendarTasks} /> : vista === "KANBAN" ? <div className="grid gap-4 lg:grid-cols-4">{["PENDIENTE", "EN_CURSO", "COMPLETADA", "CANCELADA"].map((status) => <section key={status} className="min-h-48 rounded-xl border p-3" style={{ borderColor: "var(--border)", background: "var(--surface-muted)" }}><h2 className="mb-3 flex items-center justify-between text-sm font-semibold">{estadoLabel(status)}<span className="rounded-full bg-[var(--surface)] px-2 py-0.5 text-xs">{filteredTasks.filter((task) => task.estado === status).length}</span></h2><div className="space-y-2">{filteredTasks.filter((task) => task.estado === status).map((task) => <TaskCard key={task.id} task={task} processes={processes} clients={clients} onOpen={() => openTask(task.id)} onComplete={() => void request(`/api/tareas/${task.id}/completar`, "PATCH")} onDelete={() => { if (confirm("¿Eliminar tarea?")) void request(`/api/tareas/${task.id}`, "DELETE"); }} onStatusChange={(estado) => void request(`/api/tareas/${task.id}`, "PUT", { estado })} />)}</div></section>)}</div> : <>
+      {vista === "CALENDARIO" ? <TaskMonthCalendar tasks={calendarTasks} /> : vista === "KANBAN" ? <div className="grid gap-4 lg:grid-cols-4">{["PENDIENTE", "EN_CURSO", "COMPLETADA", "CANCELADA"].map((status) => <section key={status} className="min-h-48 rounded-xl border p-3" style={{ borderColor: "var(--border)", background: "var(--surface-muted)" }}><h2 className="mb-3 flex items-center justify-between text-sm font-semibold">{estadoLabel(status)}<span className="rounded-full bg-[var(--surface)] px-2 py-0.5 text-xs">{filteredTasks.filter((task) => task.estado === status).length}</span></h2><div className="space-y-2">{filteredTasks.filter((task) => task.estado === status).map((task) => <TaskCard key={task.id} task={task} processes={processes} clients={clients} radicados={radicados} onOpen={() => openTask(task.id)} onComplete={() => void request(`/api/tareas/${task.id}/completar`, "PATCH")} onDelete={() => { if (confirm("¿Eliminar tarea?")) void request(`/api/tareas/${task.id}`, "DELETE"); }} onStatusChange={(estado) => void request(`/api/tareas/${task.id}`, "PUT", { estado })} />)}</div></section>)}</div> : <>
       {/* ESCRITORIO */}
       <div
         className="hidden overflow-hidden rounded-xl border md:block"
@@ -746,6 +764,7 @@ export default function TareasPage() {
                   task={task}
                   processes={processes}
                   clients={clients}
+                  radicados={radicados}
                   onOpen={() => openTask(task.id)}
                   onComplete={() =>
                     void request(
@@ -783,6 +802,7 @@ export default function TareasPage() {
               task={task}
               processes={processes}
               clients={clients}
+              radicados={radicados}
               onOpen={() => openTask(task.id)}
               onComplete={() =>
                 void request(
@@ -904,6 +924,7 @@ function TaskRow({
   task,
   processes,
   clients,
+  radicados,
   onOpen,
   onComplete,
   onDelete,
@@ -912,6 +933,7 @@ function TaskRow({
   task: Task;
   processes: Process[];
   clients: Client[];
+  radicados: Radicado[];
   onOpen: () => void;
   onComplete: () => void;
   onDelete: () => void;
@@ -923,6 +945,8 @@ function TaskRow({
   const client = clients.find(
     (item) => item.id === task.cliente_id,
   );
+  const hasClientAssociation = Boolean(task.cliente_id || process?.clientes?.length);
+  const radicado = radicados.find((item) => item.id === task.radicado_id);
 
   return (
     <tr
@@ -944,9 +968,10 @@ function TaskRow({
 
       <td className="px-4 py-4">
         <div className="min-w-0">
-          <p className="truncate font-medium text-foreground group-hover:text-primary">
-            {task.titulo}
-          </p>
+          <div className="flex items-center gap-2">
+            <p className="truncate font-medium text-foreground group-hover:text-primary">{task.titulo}</p>
+            {hasClientAssociation && <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-semibold text-primary"><Users size={12} />{task.cliente_id ? "Tarea asignada" : "Proceso con clientes"}</span>}
+          </div>
           {task.descripcion && (
             <p className="mt-1 max-w-md truncate text-xs text-foreground-muted">
               {task.descripcion}
@@ -958,14 +983,16 @@ function TaskRow({
       <td className="px-4 py-4">
         <div className="space-y-1">
           {process && (
-            <p className="text-sm text-foreground">{process.nombre}</p>
+            <p className="text-sm text-foreground"><span className="text-xs text-foreground-muted">Proceso: </span>{process.nombre}</p>
           )}
+          {radicado && <p className="text-xs text-foreground-muted"><Gavel size={12} className="mr-1 inline" />Radicado: {radicado.numero || radicado.numero_radicado || `#${radicado.id}`}</p>}
           {client && (
             <p className="text-xs text-foreground-muted">
-              {client.nombre_completo}
+              Cliente: {client.nombre_completo}
             </p>
           )}
-          {!process && !client && (
+          {!client && process?.clientes && process.clientes.length > 0 && <p className="text-xs text-foreground-muted">Clientes: {process.clientes.map((item) => item.nombre_completo).join(", ")}</p>}
+          {!process && !client && !radicado && (
             <span className="text-xs text-foreground-muted">
               {nivelLabel(nivelTarea(task))}
             </span>
@@ -1054,6 +1081,7 @@ function TaskCard({
   task,
   processes,
   clients,
+  radicados,
   onOpen,
   onComplete,
   onDelete,
@@ -1062,6 +1090,7 @@ function TaskCard({
   task: Task;
   processes: Process[];
   clients: Client[];
+  radicados: Radicado[];
   onOpen: () => void;
   onComplete: () => void;
   onDelete: () => void;
@@ -1073,6 +1102,8 @@ function TaskCard({
   const client = clients.find(
     (item) => item.id === task.cliente_id,
   );
+  const hasClientAssociation = Boolean(task.cliente_id || process?.clientes?.length);
+  const radicado = radicados.find((item) => item.id === task.radicado_id);
 
   return (
     <div
@@ -1103,9 +1134,7 @@ function TaskCard({
         <div className="min-w-0 flex-1">
           <div className="flex items-start justify-between gap-3">
             <div className="min-w-0">
-              <h3 className="truncate font-semibold text-foreground">
-                {task.titulo}
-              </h3>
+              <div className="flex items-center gap-2"><h3 className="truncate font-semibold text-foreground">{task.titulo}</h3>{hasClientAssociation && <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-semibold text-primary"><Users size={12} />{task.cliente_id ? "Tarea asignada" : "Proceso con clientes"}</span>}</div>
               {task.descripcion && (
                 <p className="mt-1 line-clamp-2 text-xs text-foreground-muted">
                   {task.descripcion}
@@ -1130,6 +1159,7 @@ function TaskCard({
                 </p>
               </div>
             )}
+            {radicado && <div><p className="text-xs text-foreground-muted">Radicado</p><p className="text-sm text-foreground">{radicado.numero || radicado.numero_radicado || `#${radicado.id}`}</p></div>}
 
             {client && (
               <div>
@@ -1139,8 +1169,9 @@ function TaskCard({
                 </p>
               </div>
             )}
+            {!client && process?.clientes && process.clientes.length > 0 && <div><p className="text-xs text-foreground-muted">Clientes del proceso</p><p className="text-sm text-foreground">{process.clientes.map((item) => item.nombre_completo).join(", ")}</p></div>}
 
-            {!process && !client && (
+            {!process && !client && !radicado && (
               <p className="text-xs text-foreground-muted">
                 {nivelLabel(nivelTarea(task))}
               </p>
@@ -1183,7 +1214,7 @@ function TaskCard({
                 event.stopPropagation();
                 onStatusChange(event.target.value);
               }}
-              className="rounded-full border-0 px-3 py-1.5 text-xs font-semibold outline-none"
+              className="min-h-11 rounded-full border-0 px-3 py-1.5 text-xs font-semibold outline-none"
               style={estadoClasses(task.estado)}
             >
               <option value="PENDIENTE">Pendiente</option>
@@ -1199,11 +1230,12 @@ function TaskCard({
                   event.stopPropagation();
                   onComplete();
                 }}
-                className="rounded-lg p-2 text-foreground-muted transition hover:bg-success-light hover:text-success"
+                className="inline-flex min-h-11 items-center gap-2 rounded-lg px-3 text-sm font-medium text-success transition hover:bg-success-light"
                 title="Completar tarea"
                 aria-label="Completar tarea"
               >
                 <Check size={16} />
+                <span>Completar</span>
               </button>
               <button
                 type="button"
@@ -1211,7 +1243,7 @@ function TaskCard({
                   event.stopPropagation();
                   onDelete();
                 }}
-                className="rounded-lg p-2 text-foreground-muted transition hover:bg-danger-light hover:text-danger"
+                className="inline-flex min-h-11 min-w-11 items-center justify-center rounded-lg text-foreground-muted transition hover:bg-danger-light hover:text-danger"
                 title="Eliminar tarea"
                 aria-label="Eliminar tarea"
               >

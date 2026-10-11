@@ -8,7 +8,7 @@ const variants: Record<ButtonVariant, string> = {
   secondary: "bg-surface-hover text-foreground hover:brightness-95",
   outline: "border border-border bg-surface text-foreground hover:bg-surface-hover",
   ghost: "text-foreground-secondary hover:bg-surface-hover hover:text-foreground",
-  danger: "bg-danger text-white hover:brightness-90",
+  danger: "bg-danger !text-white hover:brightness-90",
 };
 
 const sizes: Record<ButtonSize, string> = {

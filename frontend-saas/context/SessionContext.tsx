@@ -49,6 +49,16 @@ const SessionContext = createContext<SessionContextType | undefined>(
   undefined
 );
 
+function persistPortalRole(role?: string | null) {
+  if (typeof document === "undefined") return;
+  if (!role) {
+    document.cookie = "portal_role=; Path=/; Max-Age=0; SameSite=Lax";
+    return;
+  }
+  const secure = window.location.protocol === "https:" ? "; Secure" : "";
+  document.cookie = `portal_role=${encodeURIComponent(role)}; Path=/; SameSite=Lax${secure}`;
+}
+
 export function SessionProvider({
   children,
 }: {
@@ -64,6 +74,7 @@ export function SessionProvider({
     if (!storedToken) {
       setToken(null);
       setUser(null);
+      persistPortalRole(null);
       setLoading(false);
       return;
     }
@@ -74,6 +85,7 @@ export function SessionProvider({
       const currentUser = await getCurrentUser(storedToken);
 
       setUser(currentUser);
+      persistPortalRole(currentUser.rol);
     } catch (error) {
       console.error(
         "No fue posible recuperar la sesión:",
@@ -81,6 +93,7 @@ export function SessionProvider({
       );
 
       localStorage.removeItem("token");
+      persistPortalRole(null);
 
       setToken(null);
       setUser(null);
@@ -107,6 +120,7 @@ export function SessionProvider({
 
       setToken(storedToken);
       setUser(currentUser);
+      persistPortalRole(currentUser.rol);
     } catch (error) {
       console.error(
         "No fue posible actualizar el usuario:",
@@ -117,6 +131,7 @@ export function SessionProvider({
 
   function logout() {
     localStorage.removeItem("token");
+    persistPortalRole(null);
 
     setToken(null);
     setUser(null);

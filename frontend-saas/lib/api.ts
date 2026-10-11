@@ -46,9 +46,9 @@ export async function apiRequest(
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({}));
       throw new Error(
-        errorData.detail ||
+        `HTTP ${response.status}: ${errorData.detail ||
           errorData.message ||
-          `Error ${response.status}: ${response.statusText}`,
+          response.statusText || "Error de servidor."}`,
       );
     }
     return response;

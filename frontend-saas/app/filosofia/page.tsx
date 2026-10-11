@@ -1,4 +1,5 @@
 import { renderRichText } from "@/components/marketing/RichText";
+import { MarketingContactCta } from "@/components/marketing/MarketingContactCta";
 import { Compass, FileCheck2, Search, UserCheck, type LucideIcon } from "lucide-react";
 import { MarketingLayout } from "@/components/marketing/MarketingLayout";
 import { loadPublicPageContent } from "@/lib/publicPageContent";
@@ -26,6 +27,7 @@ export default async function Filosofia() {
           <div className="mx-auto max-w-2xl text-center"><p className="text-sm font-bold uppercase tracking-[.2em] text-[#92792e]">{renderRichText(content.methodologyEyebrow)}</p><h2 className="mt-3 text-3xl font-semibold">{renderRichText(content.methodologyTitle)}</h2><p className="mt-3 text-[#002060]/75">{renderRichText(content.methodologyDescription)}</p></div>
           <div className="mt-10 grid gap-5 sm:grid-cols-2 lg:grid-cols-4">{content.steps.map((step, index) => { const Icon = stepIcons[index % stepIcons.length]; return <article key={step.step} className="rounded-xl border border-[#ccb56b]/40 bg-white p-6"><span className="rounded-full bg-[#fff7df] px-3 py-1 text-xs font-bold text-[#92792e]">{renderRichText(step.step)}</span><Icon className="mt-5 text-[#002060]"/><h3 className="mt-4 text-lg font-bold">{renderRichText(step.title)}</h3><p className="mt-3 text-sm leading-6 text-[#002060]/75">{renderRichText(step.description)}</p></article>; })}</div>
         </section>
+        <div className="mx-auto max-w-7xl px-5 pb-16 lg:px-8"><MarketingContactCta /></div>
       </main>
     </MarketingLayout>
   );

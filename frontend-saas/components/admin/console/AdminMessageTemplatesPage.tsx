@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Save } from "lucide-react";
+import { Save, Search } from "lucide-react";
 import { fetchApi } from "@/lib/api";
 import { useSession } from "@/context/SessionContext";
 
@@ -23,6 +23,7 @@ export default function AdminMessageTemplatesPage() {
   const { token } = useSession();
   const [items, setItems] = useState<Template[]>([]);
   const [selected, setSelected] = useState("");
+  const [query, setQuery] = useState("");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
@@ -41,6 +42,7 @@ export default function AdminMessageTemplatesPage() {
 
   useEffect(() => { void load(); }, [token]);
   const template = items.find((item) => item.clave === selected);
+  const visibleItems = items.filter((item) => `${item.nombre} ${item.clave}`.toLowerCase().includes(query.trim().toLowerCase()));
   function update(key: "asunto_email" | "cuerpo_email" | "cuerpo_whatsapp", value: string) {
     setItems((current) => current.map((item) => item.clave === selected ? { ...item, [key]: value } : item));
   }
@@ -64,14 +66,24 @@ export default function AdminMessageTemplatesPage() {
     {error && <p role="alert" className="rounded-md border border-danger/30 bg-danger/5 p-3 text-sm text-danger">{error}</p>}
     {notice && <p role="status" className="rounded-md border border-success/30 bg-success/5 p-3 text-sm">{notice}</p>}
     {loading ? <p className="py-10 text-center text-sm text-foreground-muted">Cargando mensajes…</p> : <div className="grid gap-5 xl:grid-cols-[260px_minmax(0,1fr)]">
-      <nav aria-label="Tipos de mensaje" className="space-y-1 rounded-lg border border-border bg-surface p-2">{items.map((item) => <button key={item.clave} type="button" onClick={() => setSelected(item.clave)} className={`w-full rounded-md px-3 py-2 text-left text-sm ${selected === item.clave ? "bg-primary text-white" : "hover:bg-surface-hover"}`}>{item.nombre}</button>)}</nav>
+      <nav aria-label="Tipos de mensaje" className="space-y-2 rounded-lg border border-border bg-surface p-2">
+        <label className="relative block">
+          <span className="sr-only">Buscar plantilla por nombre o clave</span>
+          <Search aria-hidden="true" className="absolute left-3 top-3 size-4 text-foreground-muted" />
+          <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Buscar tipo de mensaje" className="h-10 w-full rounded-md border border-border bg-background pl-9 pr-3 text-sm" />
+        </label>
+        <div className="max-h-[65vh] space-y-1 overflow-y-auto">
+          {visibleItems.map((item) => <button key={item.clave} type="button" aria-pressed={selected === item.clave} onClick={() => setSelected(item.clave)} className={`min-h-11 w-full rounded-md px-3 py-2 text-left text-sm ${selected === item.clave ? "bg-primary !text-white" : "hover:bg-surface-hover"}`}>{item.nombre}</button>)}
+          {visibleItems.length === 0 && <p className="p-3 text-sm text-foreground-muted">No hay plantillas que coincidan con la búsqueda.</p>}
+        </div>
+      </nav>
       {template ? <div className="space-y-4">
         <div className="rounded-lg border border-border bg-surface p-4"><h2 className="font-semibold">{template.nombre}</h2><p className="mt-1 text-xs text-foreground-muted">Variables disponibles: {Object.keys(template.variables_ejemplo || {}).map((key) => `{{${key}}}`).join(", ") || "ninguna"}</p>{template.enlace_ejemplo && <p className="mt-2 break-all text-xs text-foreground-muted">Ejemplo del enlace generado: {template.enlace_ejemplo}</p>}</div>
         <label className="block rounded-lg border border-border bg-surface p-4 text-sm font-medium">Asunto del correo<input value={template.asunto_email || ""} onChange={(event) => update("asunto_email", event.target.value)} className="mt-2 h-10 w-full rounded-md border border-border bg-background px-3 font-normal" placeholder="(sin asunto)" /></label>
         <label className="block rounded-lg border border-border bg-surface p-4 text-sm font-medium">Texto del correo<textarea rows={9} value={template.cuerpo_email} onChange={(event) => update("cuerpo_email", event.target.value)} className="mt-2 w-full rounded-md border border-border bg-background p-3 font-normal" /></label>
         <label className="block rounded-lg border border-border bg-surface p-4 text-sm font-medium">Texto de WhatsApp<textarea rows={7} value={template.cuerpo_whatsapp} onChange={(event) => update("cuerpo_whatsapp", event.target.value)} className="mt-2 w-full rounded-md border border-border bg-background p-3 font-normal" /></label>
         <div className="grid gap-4 lg:grid-cols-2"><article className="rounded-lg border border-border bg-surface p-4"><h3 className="text-sm font-semibold">Vista previa de correo</h3><pre className="mt-3 whitespace-pre-wrap font-sans text-sm">{preview(template.cuerpo_email, template.variables_ejemplo || {}, template.enlace_ejemplo, template.texto_enlace_ejemplo)}</pre></article><article className="rounded-lg border border-border bg-surface p-4"><h3 className="text-sm font-semibold">Vista previa de WhatsApp</h3><pre className="mt-3 whitespace-pre-wrap font-sans text-sm">{preview(template.cuerpo_whatsapp, template.variables_ejemplo || {}, template.enlace_ejemplo, template.texto_enlace_ejemplo)}</pre></article></div>
-        <button type="button" onClick={() => void save()} disabled={saving} className="inline-flex h-10 items-center gap-2 rounded-md bg-primary px-4 text-sm font-semibold text-white disabled:opacity-50"><Save className="size-4" />{saving ? "Guardando…" : "Guardar mensaje"}</button>
+        <button type="button" onClick={() => void save()} disabled={saving} className="inline-flex h-10 items-center gap-2 rounded-md bg-primary px-4 text-sm font-semibold !text-white disabled:opacity-50"><Save className="size-4" />{saving ? "Guardando…" : "Guardar mensaje"}</button>
       </div> : <div className="rounded-lg border border-dashed border-border bg-surface p-10 text-center text-sm text-foreground-muted">No hay tipos de mensaje configurados. Aplica la migración de plantillas.</div>}
     </div>}
   </section>;

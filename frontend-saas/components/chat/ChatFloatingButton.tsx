@@ -72,6 +72,7 @@ function FloatingMessageTimeline({ messages }: { messages: Message[] }) {
 export default function ChatFloatingButton() {
   const { user, token } = useSession();
   const pathname = usePathname();
+  const isFirmChat = user?.rol === "CLIENTE" || user?.rol === "ABOGADO_ADMIN" || user?.rol === "ADMIN";
   const [open, setOpen] = useState(false);
   const [chats, setChats] = useState<Chat[]>([]);
   const [selected, setSelected] = useState<Chat | null>(null);
@@ -198,12 +199,12 @@ export default function ChatFloatingButton() {
   if (!user || !token || pathname.split("/").includes("chat")) return null;
 
   return <>
-    {open && <section aria-label="Chat flotante" className="fixed bottom-20 right-4 z-[80] flex h-[min(620px,calc(100dvh-6rem))] w-[min(380px,calc(100vw-2rem))] flex-col overflow-hidden rounded-2xl border border-border bg-surface shadow-2xl sm:bottom-24 sm:right-6">
+    {open && <section aria-label="Chat flotante" className={isFirmChat ? "fixed inset-0 z-[80] flex h-dvh w-screen flex-col overflow-hidden border-0 bg-surface shadow-2xl sm:inset-auto sm:bottom-24 sm:right-6 sm:h-[min(620px,calc(100dvh-6rem))] sm:w-[min(380px,calc(100vw-2rem))] sm:rounded-2xl sm:border" : "fixed bottom-20 right-4 z-[80] flex h-[min(620px,calc(100dvh-6rem))] w-[min(380px,calc(100vw-2rem))] flex-col overflow-hidden rounded-2xl border border-border bg-surface shadow-2xl sm:bottom-24 sm:right-6"}>
       <header className="flex items-center gap-2 border-b border-border bg-surface-muted px-3 py-3">
-        {selected && <button type="button" onClick={() => { activeChatId.current = null; setSelected(null); setMessages([]); lastMessageId.current = 0; lastReadAckId.current = 0; setError(""); }} aria-label="Volver a la lista de chats" className="grid size-8 place-items-center rounded-full hover:bg-surface-hover"><ArrowLeft className="size-4" /></button>}
+        {selected && <button type="button" onClick={() => { activeChatId.current = null; setSelected(null); setMessages([]); lastMessageId.current = 0; lastReadAckId.current = 0; setError(""); }} aria-label="Volver a la lista de chats" className={`grid ${isFirmChat ? "size-11" : "size-8"} place-items-center rounded-full hover:bg-surface-hover`}><ArrowLeft className="size-4" /></button>}
         <div className="min-w-0 flex-1"><h2 className="truncate text-sm font-semibold">{selected?.titulo ?? (selectedProcessId ? processGroups.find((group) => group.id === selectedProcessId)?.titulo : null) ?? "Chats"}</h2><p className="text-[10px] text-foreground-muted">{selected ? selected.subtitulo : "Conversaciones recientes"}</p></div>
         {selected && <Link href={selected.href} title="Abrir pantalla completa" className="rounded-md px-2 py-1 text-xs font-medium text-primary hover:bg-primary/10">Pantalla completa</Link>}
-        <button type="button" onClick={() => setOpen(false)} aria-label="Cerrar chat flotante" className="grid size-8 place-items-center rounded-full hover:bg-surface-hover"><X className="size-4" /></button>
+        <button type="button" onClick={() => setOpen(false)} aria-label="Cerrar chat flotante" className={`grid ${isFirmChat ? "size-11" : "size-8"} place-items-center rounded-full hover:bg-surface-hover`}><X className="size-4" /></button>
       </header>
       {error && <p role="alert" className="border-b border-border bg-danger/5 px-3 py-2 text-xs text-danger">{error}</p>}
       {!selected ? <div className="min-h-0 flex-1 overflow-y-auto">
@@ -222,9 +223,9 @@ export default function ChatFloatingButton() {
         </>}
       </div> : <>
         <div ref={messagesContainerRef} className="min-h-0 flex-1 overflow-y-auto bg-background px-3 py-3">{loading ? <p className="py-8 text-center text-xs text-foreground-muted">Cargando mensajes...</p> : messages.length ? <FloatingMessageTimeline messages={messages} /> : <p className="py-8 text-center text-xs text-foreground-muted">Aun no hay mensajes en esta conversacion.</p>}</div>
-        <form onSubmit={(event) => void send(event)} className="flex items-end gap-2 border-t border-border p-2"><textarea value={draft} onChange={(event) => setDraft(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter" && !event.shiftKey && !event.nativeEvent.isComposing) { event.preventDefault(); event.currentTarget.form?.requestSubmit(); } }} disabled={sending} rows={2} maxLength={12000} placeholder="Escribe un mensaje..." className="max-h-24 min-h-10 min-w-0 flex-1 resize-none overflow-y-auto rounded-xl border border-border bg-surface-muted px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30" /><button type="submit" disabled={!draft.trim() || sending} aria-label="Enviar mensaje" className="grid size-9 shrink-0 place-items-center rounded-full bg-primary text-white disabled:opacity-50"><Send className="size-4" /></button></form>
+        <form onSubmit={(event) => void send(event)} className="flex items-end gap-2 border-t border-border p-2"><textarea value={draft} onChange={(event) => setDraft(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter" && !event.shiftKey && !event.nativeEvent.isComposing) { event.preventDefault(); event.currentTarget.form?.requestSubmit(); } }} disabled={sending} rows={2} maxLength={12000} placeholder="Escribe un mensaje..." className="max-h-24 min-h-10 min-w-0 flex-1 resize-none overflow-y-auto rounded-xl border border-border bg-surface-muted px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30" /><button type="submit" disabled={!draft.trim() || sending} aria-label="Enviar mensaje" className={`grid ${isFirmChat ? "size-11" : "size-9"} shrink-0 place-items-center rounded-full bg-primary !text-white disabled:opacity-50`}><Send className="size-4" /></button></form>
       </>}
     </section>}
-    <button type="button" onClick={() => { setOpen((value) => !value); setSelectedProcessId(null); }} aria-label={`Abrir chats${unreadChats ? `, ${unreadChats} conversaciones sin leer` : ""}`} className="fixed bottom-4 right-4 z-[80] grid size-14 place-items-center rounded-full bg-primary text-white shadow-xl transition hover:scale-105 sm:bottom-6 sm:right-6"><MessageCircle className="size-6" />{unreadChats > 0 && <span className="absolute -right-1 -top-1 grid min-w-6 place-items-center rounded-full bg-danger px-1.5 py-0.5 text-[10px] font-bold text-white">{unreadChats > 99 ? "99+" : unreadChats}</span>}</button>
+    {!(open && isFirmChat) && <button type="button" onClick={() => { setOpen((value) => !value); setSelectedProcessId(null); }} aria-label={`Abrir chats${unreadChats ? `, ${unreadChats} conversaciones sin leer` : ""}`} className="fixed bottom-4 right-4 z-[80] grid size-14 place-items-center rounded-full bg-primary !text-white shadow-xl transition hover:scale-105 sm:bottom-6 sm:right-6"><MessageCircle className="size-6" />{unreadChats > 0 && <span className="absolute -right-1 -top-1 grid min-w-6 place-items-center rounded-full bg-danger px-1.5 py-0.5 text-[10px] font-bold text-white">{unreadChats > 99 ? "99+" : unreadChats}</span>}</button>}
   </>;
 }

@@ -128,6 +128,12 @@ const lawyerMenuItems = (isSaas: boolean, isFirmAdmin: boolean) => [
   ...(isFirmAdmin ? [{ label: "Métricas y carga", href: "/gestion-procesos/abogado/metricas", icon: LayoutDashboard }] : []),
 ];
 
+const saasMenuItems: MenuItem[] = [
+  { label: "Resumen", href: "/gestion-procesos/dashboard", icon: LayoutDashboard },
+  { label: "Radicados", href: "/gestion-procesos/dashboard/radicados", icon: RefreshCw },
+  { label: "Tareas", href: "/gestion-procesos/dashboard/tareas", icon: ListChecks },
+];
+
   const clientMenuItems: MenuItem[] = [
     { label: "Inicio", href: "/gestion-procesos/cliente", icon: LayoutDashboard },
     { label: "Mis procesos", href: "/gestion-procesos/cliente/procesos", icon: FolderOpen },
@@ -160,8 +166,8 @@ export default function Sidebar({ variant }: SidebarProps) {
 
   const menuRef = useRef<HTMLDivElement>(null);
 
-  const menuItems: MenuItem[] = variant === "client" ? clientMenuItems : lawyerMenuItems(user?.rol === "ABOGADO", user?.rol === "ABOGADO_ADMIN");
-  const homeHref = variant === "platform-admin" ? "/gestion-procesos/admin" : variant === "lawyer" || variant === "saas" ? "/gestion-procesos/abogado" : "/gestion-procesos/cliente";
+  const menuItems: MenuItem[] = variant === "client" ? clientMenuItems : user?.rol === "ABOGADO" ? saasMenuItems : lawyerMenuItems(false, user?.rol === "ABOGADO_ADMIN");
+  const homeHref = variant === "platform-admin" ? "/gestion-procesos/admin" : user?.rol === "ABOGADO" ? "/gestion-procesos/dashboard" : variant === "lawyer" || variant === "saas" ? "/gestion-procesos/abogado" : "/gestion-procesos/cliente";
   const accountBaseHref = variant === "platform-admin" ? "/gestion-procesos/admin" : variant === "lawyer" || variant === "saas" ? "/gestion-procesos/abogado" : "/gestion-procesos/cliente";
   const roleLabel = user?.rol === "ADMIN" ? "Administrador de plataforma" : user?.rol === "ABOGADO_ADMIN" ? "Abogado de la firma" : user?.rol === "ABOGADO" ? "Abogado SaaS" : "Cliente";
   const adminArea = pathname.startsWith("/gestion-procesos/admin/contenido")

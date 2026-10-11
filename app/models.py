@@ -282,7 +282,7 @@ class SolicitudRegistro(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     usuario_id = Column(Integer, ForeignKey("usuarios.id"), unique=True, nullable=False)
-    ruta_tarjeta_profesional = Column(String(255), nullable=False)
+    ruta_tarjeta_profesional = Column(String(255), nullable=True)
     notas_admin = Column(Text, nullable=True)
     fecha_solicitud = Column(DateTime, default=datetime.utcnow)
 
@@ -571,6 +571,35 @@ class ChatMensaje(Base):
     created_at = Column(DateTime, nullable=False, default=datetime.utcnow, index=True)
     conversacion = relationship("ChatConversacion", back_populates="mensajes")
     remitente = relationship("Usuario")
+
+
+class ChatPresenciaPanel(Base):
+    __tablename__ = "chat_presencias_panel"
+    __table_args__ = (
+        UniqueConstraint("usuario_id", "session_id", name="uq_chat_presencia_usuario_sesion"),
+        Index("ix_chat_presencia_last_seen", "last_seen_at"),
+    )
+
+    id = Column(Integer, primary_key=True)
+    usuario_id = Column(Integer, ForeignKey("usuarios.id", ondelete="CASCADE"), nullable=False, index=True)
+    session_id = Column(String(80), nullable=False)
+    last_seen_at = Column(DateTime, nullable=False, default=datetime.utcnow)
+    usuario = relationship("Usuario")
+
+
+class ChatAvisoDestinatario(Base):
+    __tablename__ = "chat_avisos_destinatario"
+    __table_args__ = (
+        UniqueConstraint("remitente_id", "destinatario_id", name="uq_chat_aviso_remitente_destinatario"),
+        Index("ix_chat_aviso_ultima_notificacion", "ultima_notificacion_en"),
+    )
+
+    id = Column(Integer, primary_key=True)
+    remitente_id = Column(Integer, ForeignKey("usuarios.id", ondelete="CASCADE"), nullable=False)
+    destinatario_id = Column(Integer, ForeignKey("usuarios.id", ondelete="CASCADE"), nullable=False)
+    ultima_notificacion_en = Column(DateTime, nullable=False)
+    remitente = relationship("Usuario", foreign_keys=[remitente_id])
+    destinatario = relationship("Usuario", foreign_keys=[destinatario_id])
 
 
 class LecturaNotificacionAbogado(Base):

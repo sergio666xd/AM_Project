@@ -125,6 +125,12 @@ export default function DetalleRadicadoPage() {
   const params = useParams();
   const router = useRouter();
 
+  function volverAListado() {
+    const returnTo = new URLSearchParams(window.location.search).get("returnTo");
+    const listPath = "/gestion-procesos/dashboard/radicados";
+    router.push(returnTo?.startsWith(`${listPath}?`) || returnTo === listPath ? returnTo : listPath);
+  }
+
   const { user, token, loading: sessionLoading } = useSession();
 
   const id = Array.isArray(params?.id)
@@ -446,7 +452,7 @@ export default function DetalleRadicadoPage() {
 
       <button
         type="button"
-        onClick={() => router.push("/gestion-procesos/dashboard/radicados")}
+        onClick={volverAListado}
         className="inline-flex items-center gap-2 rounded-lg px-1 py-1 text-sm text-[var(--foreground-muted)] transition hover:text-[var(--foreground)]"
       >
         <ArrowLeft className="h-4 w-4" />
@@ -500,10 +506,8 @@ export default function DetalleRadicadoPage() {
 
           <button
             type="button"
-            onClick={() =>
-              router.push("/gestion-procesos/dashboard/radicados")
-            }
-            className="mt-5 rounded-lg bg-[var(--primary)] px-4 py-2.5 text-sm font-medium text-white transition hover:opacity-90"
+            onClick={volverAListado}
+            className="mt-5 rounded-lg bg-[var(--primary)] px-4 py-2.5 text-sm font-medium !text-white transition hover:opacity-90"
           >
             Volver a Radicados
           </button>
@@ -541,7 +545,7 @@ export default function DetalleRadicadoPage() {
                   type="button"
                   onClick={handleConsultar}
                   disabled={consultando}
-                  className="inline-flex w-full shrink-0 items-center justify-center gap-2 rounded-lg bg-[var(--primary)] px-4 py-2.5 text-sm font-medium text-white transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto"
+                  className="inline-flex w-full shrink-0 items-center justify-center gap-2 rounded-lg bg-[var(--primary)] px-4 py-2.5 text-sm font-medium !text-white transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto"
                 >
                   {consultando ? (
                     <Loader2 className="h-4 w-4 animate-spin" />

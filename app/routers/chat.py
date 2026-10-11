@@ -1,8 +1,10 @@
 from __future__ import annotations
 
-from datetime import datetime
+import logging
+from datetime import datetime, timedelta
 
 from fastapi import APIRouter, Depends, HTTPException
+from sqlalchemy import or_
 from sqlalchemy.orm import Session
 
 from app import models, schemas, security
@@ -10,11 +12,13 @@ from app.audit import registrar_evento_auditoria
 from app.database import get_db
 from app.firm_access import lawyer_process_ids, require_process_access, role_name
 from app.notification_service import emitir_notificacion_workflow
-from app.timezone import format_colombia_datetime
-from app.workflow_service import public_site_url
+from app.workflow_service import compact_portal_path, user_portal_url
 
 router = APIRouter(prefix="/api/chat", tags=["Chat"])
+logger = logging.getLogger(__name__)
 STAFF_ROLES = {"ADMIN", "ABOGADO", "ABOGADO_ADMIN"}
+PANEL_PRESENCE_TTL = timedelta(seconds=90)
+CHAT_NOTIFICATION_COOLDOWN = timedelta(hours=1)
 
 
 def _role(user: models.Usuario) -> str:
@@ -23,6 +27,49 @@ def _role(user: models.Usuario) -> str:
 
 def _chat_area(user: models.Usuario) -> str:
     return {"CLIENTE": "cliente", "ADMIN": "admin"}.get(_role(user), "abogado")
+
+
+def _supports_firm_panel_presence(user: models.Usuario) -> bool:
+    return _role(user) in {"CLIENTE", "ABOGADO_ADMIN", "ADMIN"}
+
+
+@router.post("/presencia")
+def actualizar_presencia_panel(
+    data: schemas.ChatPresenciaUpdate,
+    db: Session = Depends(get_db),
+    user: models.Usuario = Depends(security.obtener_usuario_actual),
+):
+    if not _supports_firm_panel_presence(user):
+        return {"activo": False}
+    now = datetime.utcnow()
+    db.query(models.ChatPresenciaPanel).filter(
+        models.ChatPresenciaPanel.last_seen_at < now - PANEL_PRESENCE_TTL
+    ).delete(synchronize_session=False)
+    presence = db.query(models.ChatPresenciaPanel).filter_by(
+        usuario_id=user.id, session_id=data.session_id,
+    ).with_for_update().first()
+    if presence is None:
+        presence = models.ChatPresenciaPanel(
+            usuario_id=user.id, session_id=data.session_id, last_seen_at=now,
+        )
+        db.add(presence)
+    else:
+        presence.last_seen_at = now
+    db.commit()
+    return {"activo": True, "expira_en_segundos": int(PANEL_PRESENCE_TTL.total_seconds())}
+
+
+@router.delete("/presencia")
+def cerrar_presencia_panel(
+    data: schemas.ChatPresenciaUpdate,
+    db: Session = Depends(get_db),
+    user: models.Usuario = Depends(security.obtener_usuario_actual),
+):
+    db.query(models.ChatPresenciaPanel).filter_by(
+        usuario_id=user.id, session_id=data.session_id,
+    ).delete(synchronize_session=False)
+    db.commit()
+    return {"activo": False}
 
 
 def _path_id(value: str) -> int:
@@ -108,6 +155,7 @@ def _display_conversation(db: Session, conversation: models.ChatConversacion, us
         target_path = "administrador" if other and _role(other) == "ADMIN" else f"directo/{other.id if other else 0}"
         base = f"/gestion-procesos/{_chat_area(user)}/chat/{target_path}"
         route_key = f"direct:{'administrador' if other and _role(other) == 'ADMIN' else (other.id if other else 0)}"
+    base = compact_portal_path(user, base)
     last = db.query(models.ChatMensaje).filter_by(conversacion_id=conversation.id).order_by(models.ChatMensaje.id.desc()).first()
     own_participant = next((item for item in conversation.participantes if item.usuario_id == user.id), None)
     last_read_id = own_participant.ultimo_leido_mensaje_id if own_participant else 0
@@ -126,14 +174,53 @@ def _display_conversation(db: Session, conversation: models.ChatConversacion, us
     }
 
 
-def _message_reference_url(message: models.ChatMensaje, conversation: models.ChatConversacion, user: models.Usuario) -> str | None:
-    if message.referencia_tipo != "DOCUMENTO" or conversation.proceso_id is None:
+def _message_reference_url(message: models.ChatMensaje, conversation: models.ChatConversacion, user: models.Usuario, db: Session) -> str | None:
+    if conversation.proceso_id is None:
         return message.referencia_url
     if _role(user) == "CLIENTE":
-        return f"/gestion-procesos/cliente/procesos/{conversation.proceso_id}#documentos"
+        process_url = f"/gestion-procesos/cliente/procesos/{conversation.proceso_id}"
+        if message.referencia_tipo == "DOCUMENTO":
+            document = db.query(models.DocumentoProceso).filter_by(id=message.referencia_id, proceso_id=conversation.proceso_id).first()
+            return f"/gestion-procesos/cliente/documentos#solicitud-{document.solicitud_id}" if document and document.solicitud_id else f"{process_url}#documentos"
+        if message.referencia_tipo == "TAREA":
+            return f"/gestion-procesos/cliente/tareas?tarea={message.referencia_id}#tarea-{message.referencia_id}"
+        if message.referencia_tipo == "SUBTAREA":
+            subtask = db.query(models.Subtarea).filter_by(id=message.referencia_id).first()
+            task_id = subtask.tarea_id if subtask else message.referencia_id
+            return f"/gestion-procesos/cliente/tareas?tarea={task_id}#tarea-{task_id}"
+        if message.referencia_tipo == "EVENTO":
+            return f"{process_url}#evento-{message.referencia_id}"
+        if message.referencia_tipo == "RADICADO":
+            return f"{process_url}#radicado-{message.referencia_id}"
+        if message.referencia_tipo == "ACTUACION":
+            actuation = db.query(models.Actuacion).filter_by(id=message.referencia_id).first()
+            return f"{process_url}#radicado-{actuation.radicado_id}" if actuation else f"{process_url}#radicados"
+    process_base = f"/gestion-procesos/abogado/procesos/{conversation.proceso_id}"
     if _role(user) == "ADMIN":
-        return "/gestion-procesos/admin/documentos"
-    return f"/gestion-procesos/abogado/documentos?proceso={conversation.proceso_id}#documento-{message.referencia_id}"
+        if message.referencia_tipo == "DOCUMENTO":
+            return f"/gestion-procesos/admin/documentos?proceso={conversation.proceso_id}#documento-{message.referencia_id}"
+        if message.referencia_tipo in {"TAREA", "SUBTAREA"}:
+            return f"/gestion-procesos/admin/tareas?tarea={message.referencia_id}"
+        if message.referencia_tipo == "EVENTO":
+            return f"/gestion-procesos/admin/agenda?evento={message.referencia_id}"
+        if message.referencia_tipo in {"RADICADO", "ACTUACION"}:
+            return f"/gestion-procesos/admin/radicados?proceso={conversation.proceso_id}"
+        return f"/gestion-procesos/admin/procesos?proceso={conversation.proceso_id}"
+    if message.referencia_tipo == "DOCUMENTO":
+        return f"/gestion-procesos/abogado/documentos?proceso={conversation.proceso_id}#documento-{message.referencia_id}"
+    if message.referencia_tipo == "TAREA":
+        return f"{process_base}/tareas#tarea-{message.referencia_id}"
+    if message.referencia_tipo == "SUBTAREA":
+        subtask = db.query(models.Subtarea).filter_by(id=message.referencia_id).first()
+        task_id = subtask.tarea_id if subtask else message.referencia_id
+        return f"{process_base}/tareas#tarea-{task_id}"
+    if message.referencia_tipo == "EVENTO":
+        return f"{process_base}/agenda#evento-{message.referencia_id}"
+    if message.referencia_tipo == "RADICADO":
+        return f"{process_base}/radicados#radicado-{message.referencia_id}"
+    if message.referencia_tipo == "ACTUACION":
+        return f"{process_base}/radicados#actuacion-{message.referencia_id}"
+    return message.referencia_url
 
 
 def _message_delivery(message: models.ChatMensaje, participants: list[models.ChatParticipante]) -> dict:
@@ -321,7 +408,7 @@ def resolver_conversacion(clave: str, after_id: int = 0, db: Session = Depends(g
             "remitente": item.remitente.nombre_completo if item.remitente else "Usuario eliminado",
             "es_mio": item.remitente_id == user.id, "created_at": item.created_at,
             **_message_delivery(item, conversation.participantes),
-            "referencia": ({"tipo": item.referencia_tipo, "id": item.referencia_id, "titulo": item.referencia_titulo, "url": _message_reference_url(item, conversation, user)} if item.referencia_tipo else None),
+            "referencia": ({"tipo": item.referencia_tipo, "id": item.referencia_id, "titulo": item.referencia_titulo, "url": _message_reference_url(item, conversation, user, db)} if item.referencia_tipo else None),
         } for item in messages],
     }
 
@@ -353,7 +440,7 @@ def _document_visible_to_user(db: Session, document: models.DocumentoProceso, pr
     if role == "ADMIN":
         return True
     if role == "CLIENTE":
-        linked = db.query(models.ProcesoCliente.id).filter_by(proceso_id=process.id, cliente_id=viewer.id).first()
+        linked = db.query(models.ProcesoCliente.proceso_id).filter_by(proceso_id=process.id, cliente_id=viewer.id).first()
         if not linked or document.cliente_id != viewer.id:
             return False
         if document.contrato_id is not None:
@@ -371,24 +458,107 @@ def _document_visible_to_user(db: Session, document: models.DocumentoProceso, pr
 def _listar_referencias(process: models.Proceso, conversation: models.ChatConversacion, db: Session, user: models.Usuario):
     if _role(user) == "CLIENTE":
         raise HTTPException(status_code=403, detail="Solo el equipo puede adjuntar referencias.")
+    client_id = conversation.cliente_id
+    if client_id is None:
+        client_id = next((
+            participant.usuario_id for participant in conversation.participantes
+            if participant.usuario and _role(participant.usuario) == "CLIENTE"
+        ), None)
+    if client_id is not None and not db.query(models.ProcesoCliente.proceso_id).filter_by(
+        proceso_id=process.id, cliente_id=client_id,
+    ).first():
+        client_id = None
+
     result = []
-    for item in db.query(models.Actuacion).join(models.ProcesoRadicado, models.ProcesoRadicado.radicado_id == models.Actuacion.radicado_id).filter(models.ProcesoRadicado.proceso_id == process.id).order_by(models.Actuacion.fecha_actuacion.desc()).limit(100).all():
-        description = item.actuacion or item.anotacion or "Actuacion judicial"
-        result.append({"tipo": "ACTUACION", "id": item.id, "titulo": f"Actuacion - {description[:180]}", "href": f"/gestion-procesos/abogado/procesos/{process.id}/radicados"})
-    for item in db.query(models.Tarea).filter_by(proceso_id=process.id).order_by(models.Tarea.created_at.desc()).limit(100).all():
-        result.append({"tipo": "TAREA", "id": item.id, "titulo": f"Tarea - {item.titulo}", "href": f"/gestion-procesos/abogado/procesos/{process.id}/tareas"})
-    for item in db.query(models.EventoAgenda).filter_by(proceso_id=process.id).order_by(models.EventoAgenda.fecha_inicio.desc()).limit(100).all():
-        result.append({"tipo": "EVENTO", "id": item.id, "titulo": f"Evento - {item.titulo}", "href": f"/gestion-procesos/abogado/procesos/{process.id}/agenda"})
+    process_radications = db.query(models.Radicado).join(
+        models.ProcesoRadicado, models.ProcesoRadicado.radicado_id == models.Radicado.id,
+    ).filter(models.ProcesoRadicado.proceso_id == process.id).order_by(models.Radicado.numero.asc()).all()
+    radication_ids = [item.id for item in process_radications]
+    for item in process_radications:
+        result.append({"tipo": "RADICADO", "id": item.id, "titulo": item.numero,
+                       "href": f"/gestion-procesos/abogado/procesos/{process.id}/radicados#radicado-{item.id}"})
+    actuation_query = db.query(models.Actuacion).filter(models.Actuacion.radicado_id.in_(radication_ids or [-1]))
+    for item in actuation_query.order_by(models.Actuacion.fecha_actuacion.desc(), models.Actuacion.id.desc()).all():
+        radication = next((row for row in process_radications if row.id == item.radicado_id), None)
+        description = item.actuacion or item.anotacion or "Actuación judicial"
+        result.append({"tipo": "ACTUACION", "id": item.id,
+                       "titulo": description[:180], "grupo": str(item.radicado_id),
+                       "radicado_numero": radication.numero if radication else "",
+                       "href": f"/gestion-procesos/abogado/procesos/{process.id}/radicados#actuacion-{item.id}"})
+
+    task_scope = [models.Tarea.proceso_id == process.id]
+    if radication_ids:
+        task_scope.append(models.Tarea.radicado_id.in_(radication_ids))
+        process_actuation_ids = db.query(models.Actuacion.id).filter(models.Actuacion.radicado_id.in_(radication_ids))
+        task_scope.append(models.Tarea.actuacion_id.in_(process_actuation_ids))
+    if client_id is not None:
+        task_scope.append(models.Tarea.id.in_(db.query(models.Subtarea.tarea_id).filter(
+            models.Subtarea.proceso_id == process.id,
+            models.Subtarea.asignada_cliente.is_(True),
+            models.Subtarea.cliente_id == client_id,
+        )))
+    task_query = db.query(models.Tarea).filter(or_(*task_scope))
+    if client_id is not None:
+        assigned_parent_ids = db.query(models.Subtarea.tarea_id).filter(
+            models.Subtarea.asignada_cliente.is_(True), models.Subtarea.cliente_id == client_id,
+        ).distinct()
+        task_query = task_query.filter(or_(
+            models.Tarea.cliente_id == client_id,
+            models.Tarea.id.in_(assigned_parent_ids),
+        ))
+    visible_tasks = task_query.order_by(models.Tarea.created_at.desc()).all()
+    visible_task_ids = {item.id for item in visible_tasks}
+    for item in visible_tasks:
+        result.append({"tipo": "TAREA", "id": item.id, "titulo": f"Tarea - {item.titulo}", "href": f"/gestion-procesos/abogado/procesos/{process.id}/tareas#tarea-{item.id}"})
+    subtask_query = db.query(models.Subtarea).join(
+        models.Tarea, models.Tarea.id == models.Subtarea.tarea_id,
+    ).filter(models.Tarea.id.in_(visible_task_ids or [-1]))
+    if client_id is not None:
+        subtask_query = subtask_query.filter(
+            models.Subtarea.asignada_cliente.is_(True), models.Subtarea.cliente_id == client_id,
+        )
+    for item in subtask_query.order_by(models.Subtarea.orden.asc(), models.Subtarea.id.asc()).all():
+        result.append({"tipo": "SUBTAREA", "id": item.id, "titulo": f"Subtarea - {item.titulo}",
+                       "grupo": item.tarea.titulo if item.tarea else "Tarea",
+                       "parent_id": item.tarea_id,
+                       "href": f"/gestion-procesos/abogado/procesos/{process.id}/tareas#tarea-{item.tarea_id}"})
+
+    event_query = db.query(models.EventoAgenda).filter_by(proceso_id=process.id)
+    if client_id is not None:
+        event_query = event_query.filter(or_(
+            models.EventoAgenda.cliente_id == client_id,
+            (models.EventoAgenda.proceso_id == process.id) & models.EventoAgenda.cliente_id.is_(None),
+        ))
+    for item in event_query.order_by(models.EventoAgenda.fecha_inicio.desc()).all():
+        result.append({"tipo": "EVENTO", "id": item.id, "titulo": f"Evento - {item.titulo}", "href": f"/gestion-procesos/abogado/procesos/{process.id}/agenda#evento-{item.id}"})
     participants = [item.usuario for item in conversation.participantes if item.usuario]
     documents = db.query(models.DocumentoProceso).filter_by(proceso_id=process.id).order_by(
         models.DocumentoProceso.created_at.desc(), models.DocumentoProceso.id.desc(),
-    ).limit(300).all()
+    ).all()
     for document in documents:
         if not participants or not all(_document_visible_to_user(db, document, process, participant) for participant in participants):
             continue
-        title = document.solicitud.titulo if document.solicitud else document.nombre_archivo
-        display_title = f"Documento - {title} - {document.nombre_archivo}" if document.solicitud else f"Documento - {title}"
-        result.append({"tipo": "DOCUMENTO", "id": document.id, "titulo": display_title,
+        request = document.solicitud
+        requested_name = None
+        if request:
+            requested_items = request.documentos_requeridos or []
+            requested_name = next((
+                str(item.get("nombre")) for item in requested_items
+                if str(item.get("id") or "legacy") == str(document.solicitud_item_id)
+            ), None)
+            if not requested_name and len(requested_items) == 1:
+                requested_name = str(requested_items[0].get("nombre") or request.titulo)
+            requested_name = requested_name or request.titulo
+        if requested_name:
+            title = requested_name
+        elif document.contrato_id is not None:
+            title = "Contrato firmado"
+        else:
+            title = "Documento del proceso"
+        result.append({"tipo": "DOCUMENTO", "id": document.id,
+                       "titulo": title,
+                       "grupo": request.titulo if request else ("Contratos" if document.contrato_id is not None else "Otros documentos del proceso"),
+                       "request_id": request.id if request else None,
                        "href": f"/gestion-procesos/abogado/documentos?proceso={process.id}#documento-{document.id}"})
     return result
 
@@ -439,17 +609,78 @@ def enviar_mensaje(conversation_id: int, data: schemas.ChatMensajeCreate, db: Se
     db.commit()
     db.refresh(message)
     process = conversation.proceso
-    link = f"{public_site_url()}{_display_conversation(db, conversation, next(item.usuario for item in conversation.participantes if item.usuario_id != user.id))[ 'href' ]}"
-    for recipient in [item.usuario for item in conversation.participantes if item.usuario and item.usuario_id != user.id and item.usuario.estado == models.EstadoUsuario.ACTIVO]:
-        staff_sender = _role(user) != "CLIENTE"
-        template = "COMUNICACION_ABOGADO_CLIENTE" if staff_sender else "COMUNICACION_CLIENTE_ABOGADO"
-        process_name = process.nombre if process else "Conversación del despacho"
-        emitir_notificacion_workflow(
-            db, recipient, "RESUMENES", f"CHAT:{message.id}:{recipient.id}",
-            f"Nuevo mensaje de {user.nombre_completo}",
-            f"{user.nombre_completo}: {content}", emisor=user, plantilla_clave=template,
-            variables={"nombre": recipient.nombre_completo, "actor": user.nombre_completo,
-                       "proceso": process_name, "asunto": "Nuevo mensaje", "fecha": format_colombia_datetime(message.created_at),
-                       "mensaje": content}, enlace_texto="Abrir conversación", enlace_url=link,
-        )
+    recipients = [item.usuario for item in conversation.participantes if item.usuario and item.usuario_id != user.id and item.usuario.estado == models.EstadoUsuario.ACTIVO]
+    now = datetime.utcnow()
+    db.query(models.ChatPresenciaPanel).filter(models.ChatPresenciaPanel.last_seen_at < now - PANEL_PRESENCE_TTL).delete(synchronize_session=False)
+    for recipient in recipients:
+        display = _display_conversation(db, conversation, recipient)
+        link = user_portal_url(recipient, display["href"])
+        process_name = process.nombre if process else "Conversacion del despacho"
+        if not (_supports_firm_panel_presence(user) and _supports_firm_panel_presence(recipient)):
+            staff_sender = _role(user) != "CLIENTE"
+            template = "COMUNICACION_ABOGADO_CLIENTE" if staff_sender else "COMUNICACION_CLIENTE_ABOGADO"
+            emitir_notificacion_workflow(
+                db, recipient, "RESUMENES", f"CHAT:{message.id}:{recipient.id}",
+                f"Nuevo mensaje de {user.nombre_completo}", f"{user.nombre_completo}: {content}",
+                emisor=user, plantilla_clave=template,
+                variables={"nombre": recipient.nombre_completo, "actor": user.nombre_completo,
+                           "proceso": process_name, "asunto": "Nuevo mensaje", "mensaje": content},
+                enlace_texto="Abrir conversacion", enlace_url=link,
+            )
+            continue
+
+        is_panel_active = db.query(models.ChatPresenciaPanel.id).filter(
+            models.ChatPresenciaPanel.usuario_id == recipient.id,
+            models.ChatPresenciaPanel.last_seen_at >= now - PANEL_PRESENCE_TTL,
+        ).first() is not None
+        if is_panel_active:
+            continue
+
+        db.query(models.Usuario.id).filter_by(id=recipient.id).with_for_update().first()
+        notice = db.query(models.ChatAvisoDestinatario).filter_by(
+            remitente_id=user.id, destinatario_id=recipient.id,
+        ).with_for_update().first()
+        previous_notice_at = notice.ultima_notificacion_en if notice else None
+        if previous_notice_at and now - previous_notice_at < CHAT_NOTIFICATION_COOLDOWN:
+            db.rollback()
+            continue
+
+        template_exists = db.query(models.PlantillaMensaje.id).filter_by(clave="CHAT_MENSAJE", activo=True).first()
+        if not template_exists:
+            db.rollback()
+            logger.warning("Falta configurar la plantilla CHAT_MENSAJE; se omite el aviso externo del chat.")
+            continue
+
+        if notice is None:
+            notice = models.ChatAvisoDestinatario(remitente_id=user.id, destinatario_id=recipient.id, ultima_notificacion_en=now)
+            db.add(notice)
+        else:
+            notice.ultima_notificacion_en = now
+        db.commit()
+
+        try:
+            delivery_ids = emitir_notificacion_workflow(
+                db, recipient, "RESUMENES", f"CHAT_AVISO:{user.id}:{recipient.id}:{int(now.timestamp())}",
+                f"Nuevos mensajes de {user.nombre_completo}",
+                f"{user.nombre_completo} te esta enviando mensajes.",
+                emisor=user, plantilla_clave="CHAT_MENSAJE",
+                variables={"nombre": recipient.nombre_completo, "actor": user.nombre_completo},
+                enlace_texto="Abrir chat", enlace_url=link,
+            )
+        except Exception:
+            db.rollback()
+            logger.exception("No se pudo preparar la notificacion agrupada del chat.")
+            delivery_ids = []
+
+        if not delivery_ids:
+            db.query(models.Usuario.id).filter_by(id=recipient.id).with_for_update().first()
+            current_notice = db.query(models.ChatAvisoDestinatario).filter_by(
+                remitente_id=user.id, destinatario_id=recipient.id,
+            ).with_for_update().first()
+            if current_notice:
+                if previous_notice_at is None:
+                    db.delete(current_notice)
+                else:
+                    current_notice.ultima_notificacion_en = previous_notice_at
+                db.commit()
     return {"id": message.id, "mensaje": "Mensaje enviado."}

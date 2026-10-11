@@ -3,7 +3,8 @@
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { KeyRound, Mail, Pencil, Plus, RefreshCw, Search, Trash2, X } from "lucide-react";
-import { fetchApi } from "@/lib/api";
+import { apiRequest, fetchApi } from "@/lib/api";
+import { ApiErrorState } from "@/components/ui/ApiErrorState";
 
 type Role = "ABOGADO_ADMIN" | "ABOGADO" | "CLIENTE" | "ADMIN";
 type Status = "ACTIVO" | "SUSPENDIDO" | "PENDIENTE_APROBACION" | "RECHAZADO";
@@ -52,10 +53,34 @@ const stateLabels: Record<Status, string> = {
 };
 
 async function loadOptions(token: string) {
+  const loadJson = async <T,>(endpoint: string, label: string): Promise<T> => {
+    let response: Response;
+    try {
+      response = await apiRequest(endpoint, { method: "GET", token });
+    } catch (cause) {
+      const detail = cause instanceof Error ? cause.message : "Error desconocido.";
+      throw new Error(`${label}: ${detail}`);
+    }
+
+    let data: unknown;
+    try {
+      data = await response.json();
+    } catch {
+      throw new Error(`${label}: el servidor devolvió una respuesta inválida.`);
+    }
+    return data as T;
+  };
+
   const [users, plans] = await Promise.all([
-    fetchApi("/api/admin/usuarios?incluir_administradores=true", { method: "GET", token }),
-    fetchApi("/api/admin/planes", { method: "GET", token }),
+    loadJson<unknown>("/api/admin/usuarios?incluir_administradores=true", "No fue posible cargar usuarios"),
+    loadJson<unknown>("/api/admin/planes", "No fue posible cargar planes"),
   ]);
+  if (!Array.isArray(users)) {
+    throw new Error("No fue posible cargar usuarios: la API devolvió un formato inesperado.");
+  }
+  if (!Array.isArray(plans)) {
+    throw new Error("No fue posible cargar planes: la API devolvió un formato inesperado.");
+  }
   return { users: users as User[], plans: plans as Plan[] };
 }
 
@@ -69,6 +94,7 @@ export default function AdminUsersPage() {
   const [loading, setLoading] = useState(true);
   const [working, setWorking] = useState(false);
   const [error, setError] = useState("");
+  const [loadError, setLoadError] = useState("");
   const [notice, setNotice] = useState("");
   const [formOpen, setFormOpen] = useState(false);
   const [editing, setEditing] = useState<User | null>(null);
@@ -85,11 +111,12 @@ export default function AdminUsersPage() {
         if (active) {
           setUsers(result.users);
           setPlans(result.plans.filter((plan) => plan.activo));
+          setLoadError("");
         }
       })
       .catch((cause: unknown) => {
         if (active)
-          setError(
+          setLoadError(
             cause instanceof Error
               ? cause.message
               : "No fue posible cargar usuarios.",
@@ -106,13 +133,14 @@ export default function AdminUsersPage() {
   async function reload() {
     if (!token) return;
     setLoading(true);
-    setError("");
+    setLoadError("");
     try {
       const result = await loadOptions(token);
       setUsers(result.users);
       setPlans(result.plans.filter((plan) => plan.activo));
+      setLoadError("");
     } catch (cause) {
-      setError(
+      setLoadError(
         cause instanceof Error
           ? cause.message
           : "No fue posible cargar usuarios.",
@@ -354,14 +382,8 @@ export default function AdminUsersPage() {
           </button>}
         </div>
       </header>
-      {error && (
-        <p
-          role="alert"
-          className="rounded-lg border border-danger/30 bg-danger-light p-3 text-sm text-danger"
-        >
-          {error}
-        </p>
-      )}
+      {loadError && <ApiErrorState error={loadError} onRetry={() => void reload()} retrying={loading} compact />}
+      {error && <p role="alert" className="rounded-lg border border-danger/30 bg-danger-light p-3 text-sm text-danger">{error}</p>}
       {notice && (
         <p
           role="status"
@@ -388,7 +410,7 @@ export default function AdminUsersPage() {
             type="button"
             aria-pressed={scope === item.id}
             onClick={() => setScope(item.id)}
-            className={`rounded-md px-3 py-1.5 text-sm ${scope === item.id ? "bg-primary text-white" : "text-foreground-muted hover:bg-surface-hover"}`}
+            className={`rounded-md px-3 py-1.5 text-sm ${scope === item.id ? "bg-primary !text-white" : "text-foreground-muted hover:bg-surface-hover"}`}
           >
             {item.label}
           </button>
@@ -434,7 +456,7 @@ export default function AdminUsersPage() {
       </div>
       <div className="overflow-x-auto rounded-lg border border-border bg-surface">
         <div className="flex flex-wrap items-center gap-2 border-b border-border p-3"><label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={visible.length > 0 && visible.every((user) => selectedIds.includes(user.id))} onChange={(event) => setSelectedIds((current) => event.target.checked ? [...new Set([...current, ...visible.map((user) => user.id)])] : current.filter((id) => !visible.some((user) => user.id === id)))} />Seleccionar resultados visibles</label><span className="text-sm text-foreground-muted">{selectedIds.length} seleccionadas</span><div className="ml-auto flex flex-wrap gap-2"><button type="button" disabled={working || !visible.some((user) => selectedIds.includes(user.id) && user.estado === "ACTIVO" && user.rol !== "ADMIN")} onClick={() => void bulkUserAction("SUSPEND")} className="rounded-md border border-border px-3 py-2 text-xs disabled:opacity-50">Suspender</button><button type="button" disabled={working || !visible.some((user) => selectedIds.includes(user.id) && ["SUSPENDIDO", "RECHAZADO"].includes(user.estado) && user.rol !== "ADMIN")} onClick={() => void bulkUserAction("ACTIVATE")} className="rounded-md border border-border px-3 py-2 text-xs disabled:opacity-50">Activar</button><button type="button" disabled={working || !selectedIds.some((id) => visible.some((user) => user.id === id && user.rol !== "ADMIN"))} onClick={() => void bulkUserAction("DELETE")} className="rounded-md border border-danger/30 px-3 py-2 text-xs text-danger disabled:opacity-50">Eliminar seleccionadas</button></div></div>
-        <table className="w-full min-w-230 text-left text-sm">
+        <table aria-busy={loading} className="w-full min-w-230 text-left text-sm">
           <thead className="border-b border-border bg-surface-secondary text-xs uppercase text-foreground-muted">
             <tr>
               <th className="px-4 py-3"><span className="sr-only">Selección</span></th>
@@ -454,6 +476,12 @@ export default function AdminUsersPage() {
                   className="px-4 py-10 text-center text-foreground-muted"
                 >
                   Cargando cuentas...
+                </td>
+              </tr>
+            ) : loadError && users.length === 0 ? (
+              <tr>
+                <td colSpan={7} className="px-4 py-8 text-center text-sm text-foreground-muted">
+                  La lista no está disponible todavía. Usa «Reintentar» para volver a consultar.
                 </td>
               </tr>
             ) : visible.length ? (
@@ -544,7 +572,7 @@ export default function AdminUsersPage() {
                   colSpan={7}
                   className="px-4 py-12 text-center text-sm text-foreground-muted"
                 >
-                  No hay cuentas para este filtro.
+                  {users.length === 0 ? "Aún no hay cuentas en este ámbito." : "No hay cuentas que coincidan con los filtros."}
                 </td>
               </tr>
             )}

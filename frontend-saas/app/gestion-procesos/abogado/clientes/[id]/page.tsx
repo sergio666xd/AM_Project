@@ -29,6 +29,11 @@ type Client = {
   nombre_completo: string;
   email: string;
   whatsapp_numero: string;
+  genero?: "MASCULINO" | "FEMENINO" | null;
+  numero_documento?: string | null;
+  domicilio?: string | null;
+  direccion?: string | null;
+  chat_href?: string | null;
   canal_notificacion_cliente?: "EMAIL" | "WHATSAPP" | null;
   notificaciones_email?: boolean;
   notificaciones_whatsapp?: boolean;
@@ -62,6 +67,10 @@ export default function ClienteDetalle() {
 
   const [name, setName] = useState("");
   const [whatsapp, setWhatsapp] = useState("");
+  const [gender, setGender] = useState<"" | "MASCULINO" | "FEMENINO">("");
+  const [documentNumber, setDocumentNumber] = useState("");
+  const [domicile, setDomicile] = useState("");
+  const [address, setAddress] = useState("");
 
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -99,6 +108,10 @@ export default function ClienteDetalle() {
       setClient(data);
       setName(data.nombre_completo || "");
       setWhatsapp(data.whatsapp_numero || "");
+      setGender(data.genero || "");
+      setDocumentNumber(data.numero_documento || "");
+      setDomicile(data.domicilio || "");
+      setAddress(data.direccion || "");
     } catch (err) {
       setError(
         err instanceof Error
@@ -169,6 +182,10 @@ export default function ClienteDetalle() {
           body: JSON.stringify({
             nombre_completo: name.trim(),
             whatsapp_numero: whatsapp.trim(),
+            genero: gender || null,
+            numero_documento: documentNumber.trim(),
+            domicilio: domicile.trim(),
+            direccion: address.trim(),
           }),
         }
       );
@@ -324,6 +341,14 @@ export default function ClienteDetalle() {
           </div>
 
           <div className="flex items-center gap-2 self-start">
+            {client.chat_href && <Link
+              href={client.chat_href}
+              className="inline-flex min-h-9 items-center gap-2 rounded-lg bg-[var(--primary)] px-3 text-sm font-medium !text-white transition hover:opacity-90"
+            >
+              <MessageCircle className="size-4" />
+              Chat
+            </Link>}
+
             <span className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-medium ${client.estado_relacion === "ACTIVO" ? "border-emerald-500/20 bg-emerald-500/10 text-emerald-700 dark:text-emerald-400" : "border-amber-500/20 bg-amber-500/10 text-amber-700 dark:text-amber-400"}`}>
               <ShieldCheck className="size-3.5" />
               {client.estado_relacion === "ACTIVO" ? "Con procesos activos" : "Sin procesos asociados"}
@@ -660,13 +685,63 @@ export default function ClienteDetalle() {
                   className="mt-1.5 h-10 w-full rounded-lg border border-[var(--border)] bg-[var(--background)] px-3 text-sm text-[var(--foreground)] outline-none transition focus:border-[var(--primary)]"
                 />
               </label>
+
+              <label className="block">
+                <span className="text-sm font-medium text-[var(--foreground)]">
+                  Género
+                </span>
+                <select
+                  value={gender}
+                  onChange={(event) => setGender(event.target.value as typeof gender)}
+                  className="mt-1.5 h-10 w-full rounded-lg border border-[var(--border)] bg-[var(--background)] px-3 text-sm text-[var(--foreground)] outline-none focus:border-[var(--primary)]"
+                >
+                  <option value="">Sin especificar</option>
+                  <option value="FEMENINO">Femenino</option>
+                  <option value="MASCULINO">Masculino</option>
+                </select>
+              </label>
+
+              <label className="block">
+                <span className="text-sm font-medium text-[var(--foreground)]">
+                  Número de documento
+                </span>
+                <input
+                  value={documentNumber}
+                  onChange={(event) => setDocumentNumber(event.target.value)}
+                  placeholder="Sin puntos"
+                  className="mt-1.5 h-10 w-full rounded-lg border border-[var(--border)] bg-[var(--background)] px-3 text-sm text-[var(--foreground)] outline-none focus:border-[var(--primary)]"
+                />
+              </label>
+
+              <label className="block">
+                <span className="text-sm font-medium text-[var(--foreground)]">
+                  Domicilio
+                </span>
+                <input
+                  value={domicile}
+                  onChange={(event) => setDomicile(event.target.value)}
+                  placeholder="Ciudad o municipio"
+                  className="mt-1.5 h-10 w-full rounded-lg border border-[var(--border)] bg-[var(--background)] px-3 text-sm text-[var(--foreground)] outline-none focus:border-[var(--primary)]"
+                />
+              </label>
+
+              <label className="block">
+                <span className="text-sm font-medium text-[var(--foreground)]">
+                  Dirección
+                </span>
+                <input
+                  value={address}
+                  onChange={(event) => setAddress(event.target.value)}
+                  className="mt-1.5 h-10 w-full rounded-lg border border-[var(--border)] bg-[var(--background)] px-3 text-sm text-[var(--foreground)] outline-none focus:border-[var(--primary)]"
+                />
+              </label>
             </div>
 
             <div className="border-t border-[var(--border)] px-5 py-4">
               <button
                 type="submit"
                 disabled={saving}
-                className="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-[var(--primary)] px-4 py-2.5 text-sm font-medium text-white transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
+                className="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-[var(--primary)] px-4 py-2.5 text-sm font-medium !text-white transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
               >
                 {saving ? (
                   <RefreshCw className="size-4 animate-spin" />

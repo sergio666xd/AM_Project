@@ -1,5 +1,5 @@
-import { redirect } from "next/navigation";
+import AbogadoPage from "../abogado/page";
 
 export default function DashboardCompatibilityPage() {
-  redirect("/gestion-procesos/abogado");
+  return <AbogadoPage />;
 }

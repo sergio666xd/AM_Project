@@ -1,7 +1,7 @@
 "use client";
 
 import { ChangeEvent, useCallback, useEffect, useRef, useState } from "react";
-import { Download, Eye, FileText, Loader2, Mail, Printer, Save, ShieldCheck, X } from "lucide-react";
+import { Download, Eye, FileText, Loader2, Mail, Printer, Save, ShieldCheck, Trash2, X } from "lucide-react";
 import { apiRequest } from "@/lib/api";
 import { useSession } from "@/context/SessionContext";
 
@@ -350,6 +350,28 @@ export default function ProcessContracts({ processId, clients, onChange, initial
     } finally { setBusy(false); }
   }
 
+  async function deleteAnnulledContract() {
+    if (!token || selectedId === null || selected?.estado !== "ANULADO") return;
+    const confirmed = window.confirm(`¿Eliminar permanentemente el contrato anulado #${selected.id}? Los documentos cargados se conservarán en el expediente y las actividades de firma activas se cancelarán.`);
+    if (!confirmed) return;
+    setBusy(true); setError(""); setMessage("");
+    try {
+      const response = await apiRequest(`/api/contratos/${selected.id}`, {
+        method: "DELETE", headers: { Authorization: `Bearer ${token}` },
+      });
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.detail || "No se pudo eliminar el contrato.");
+      setContracts((current) => current.filter((item) => item.id !== selected.id));
+      setSelectedId(null);
+      setFields(EMPTY_FIELDS);
+      setClientId("");
+      setMessage(result.mensaje || "Contrato anulado eliminado.");
+      await onChange();
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "No se pudo eliminar el contrato.");
+    } finally { setBusy(false); }
+  }
+
   const selected = contracts.find((item) => item.id === selectedId) ?? null;
   const canEdit = selected?.estado === "BORRADOR";
 
@@ -375,26 +397,27 @@ export default function ProcessContracts({ processId, clients, onChange, initial
             {isCreating && <div className="space-y-2 border-t border-[var(--border)] pt-3">
               <label className="block text-xs font-medium">Cliente del expediente<select value={clientId} onChange={(event) => changeDraftClient(event.target.value)} className="mt-1 w-full rounded-md border border-[var(--border)] bg-[var(--surface)] p-2">{clients.map((client) => <option key={client.id} value={client.id}>{client.nombre_completo}</option>)}</select></label>
             </div>}
-            {!isCreating && <button type="button" onClick={() => void startNewDraft()} disabled={!clients.length || busy} className="w-full rounded-md bg-[var(--primary)] px-3 py-2 text-sm font-semibold text-white disabled:opacity-50">Nuevo contrato</button>}
+            {!isCreating && <button type="button" onClick={() => void startNewDraft()} disabled={!clients.length || busy} className="w-full rounded-md bg-[var(--primary)] px-3 py-2 text-sm font-semibold !text-white disabled:opacity-50">Nuevo contrato</button>}
           </aside>
           <section className="min-w-0 space-y-3 rounded-xl border border-[var(--border)] p-4">
             {selected ? <>
               <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[var(--border)] pb-3"><div><h3 className="font-semibold">Contrato #{selected.id} · {selected.cliente}</h3><p className="text-xs text-[var(--foreground-muted)]">Estado: {STATUS_LABEL[selected.estado]} · Versión {selected.version_actual}</p></div>
                 <div className="flex flex-wrap gap-2">
                   {canEdit && <button type="button" onClick={() => void saveDraft()} disabled={busy} className="inline-flex items-center gap-1 rounded-md border border-[var(--border)] px-3 py-2 text-xs"><Save className="size-3.5"/>Guardar</button>}
-                  {!['FIRMADO', 'TERMINADO', 'ANULADO'].includes(selected.estado) && <button type="button" onClick={() => void previewPdf()} disabled={busy} className="inline-flex items-center gap-1 rounded-md bg-[var(--primary)] px-3 py-2 text-xs font-semibold text-white disabled:opacity-50">{documentAction === "preview" ? <><Loader2 className="size-3.5 animate-spin"/>Generando…</> : <><Printer className="size-3.5"/>Vista previa PDF</>}</button>}
+                  {!['FIRMADO', 'TERMINADO', 'ANULADO'].includes(selected.estado) && <button type="button" onClick={() => void previewPdf()} disabled={busy} className="inline-flex items-center gap-1 rounded-md bg-[var(--primary)] px-3 py-2 text-xs font-semibold !text-white disabled:opacity-50">{documentAction === "preview" ? <><Loader2 className="size-3.5 animate-spin"/>Generando…</> : <><Printer className="size-3.5"/>Vista previa PDF</>}</button>}
                   {canEdit && <button type="button" onClick={() => void changeStatus("LISTO_PARA_FIRMA")} disabled={busy} className="rounded-md border border-[var(--border)] px-3 py-2 text-xs">Listo para firma</button>}
                   {selected.estado === "FIRMADO" && selected.documento_firmado && <><button type="button" onClick={() => void openSignedDocument(false)} disabled={busy} className="inline-flex items-center gap-1 rounded-md border border-[var(--border)] px-3 py-2 text-xs disabled:opacity-50">{documentAction === "view" ? <><Loader2 className="size-3.5 animate-spin"/>Abriendo…</> : <><Eye className="size-3.5"/>Ver firmado</>}</button><button type="button" onClick={() => void openSignedDocument(true)} disabled={busy} className="inline-flex items-center gap-1 rounded-md border border-[var(--border)] px-3 py-2 text-xs disabled:opacity-50">{documentAction === "download" ? <><Loader2 className="size-3.5 animate-spin"/>Descargando…</> : <><Download className="size-3.5"/>Descargar</>}</button><button type="button" onClick={() => void retryEmail()} disabled={busy} className="inline-flex items-center gap-1 rounded-md border border-[var(--border)] px-3 py-2 text-xs"><Mail className="size-3.5"/>Reenviar copia</button></>}
                   {selected.estado === "FIRMADO" && <button type="button" onClick={() => { if (window.confirm("¿Reabrir la firma? La actividad volverá a Programado y podrás cargar otra versión del PDF.")) void changeStatus("EN_FIRMA"); }} disabled={busy} className="rounded-md border border-[var(--border)] px-3 py-2 text-xs">Reabrir firma</button>}
                   {selected.estado === "FIRMADO" && <button type="button" onClick={() => { const reason = window.prompt("Motivo/causal de terminación del contrato:"); if (reason?.trim()) void changeStatus("TERMINADO", reason.trim()); }} disabled={busy} className="rounded-md border border-[var(--border)] px-3 py-2 text-xs">Terminar</button>}
-                  {["EN_FIRMA", "FIRMADO"].includes(selected.estado) && <label className="inline-flex cursor-pointer items-center gap-1 rounded-md bg-[var(--primary)] px-3 py-2 text-xs font-semibold text-white"><ShieldCheck className="size-3.5"/>{selected.estado === "FIRMADO" ? "Reemplazar PDF firmado" : "Cargar firmado"}<input className="sr-only" type="file" accept=".pdf,application/pdf" onChange={(event) => void uploadSigned(event)} /></label>}
+                  {["EN_FIRMA", "FIRMADO"].includes(selected.estado) && <label className="inline-flex cursor-pointer items-center gap-1 rounded-md bg-[var(--primary)] px-3 py-2 text-xs font-semibold !text-white"><ShieldCheck className="size-3.5"/>{selected.estado === "FIRMADO" ? "Reemplazar PDF firmado" : "Cargar firmado"}<input className="sr-only" type="file" accept=".pdf,application/pdf" onChange={(event) => void uploadSigned(event)} /></label>}
                   {["BORRADOR", "LISTO_PARA_FIRMA", "EN_FIRMA"].includes(selected.estado) && <button type="button" onClick={() => { const reason = window.prompt("Motivo de anulación:"); if (reason?.trim()) void changeStatus("ANULADO", reason.trim()); }} disabled={busy} className="rounded-md border border-red-500/30 px-3 py-2 text-xs text-red-700">Anular</button>}
+                  {selected.estado === "ANULADO" && <button type="button" onClick={() => void deleteAnnulledContract()} disabled={busy} className="inline-flex items-center gap-1 rounded-md border border-red-500/30 px-3 py-2 text-xs text-red-700 disabled:opacity-50">{busy ? <Loader2 className="size-3.5 animate-spin" /> : <Trash2 className="size-3.5" />}{busy ? "Eliminando…" : "Eliminar contrato"}</button>}
                 </div>
               </div>
               <div className="space-y-5">{FIELD_GROUPS.map((group) => <fieldset key={group.title} className="grid gap-3 rounded-lg border border-[var(--border)] p-3 sm:grid-cols-2"><legend className="px-1 text-xs font-semibold">{group.title}</legend>{group.fields.map((field) => renderField(field, !canEdit))}</fieldset>)}</div>
               <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-[var(--foreground-muted)]"><span>Emitido: {localDate(selected.emitido_en)}</span><span>Firmado: {localDate(selected.firmado_en)}</span><span>Terminado: {localDate(selected.terminado_en)}</span></div>
               <details><summary className="cursor-pointer text-xs font-medium">Historial de versiones</summary><ol className="mt-2 space-y-1 text-xs text-[var(--foreground-muted)]">{selected.versiones.map((version) => <li key={version.version}>v{version.version} · {STATUS_LABEL[version.estado as Contract["estado"]] || version.estado} · {localDate(version.created_at)} · SHA-256 {version.hash_sha256.slice(0, 12)}</li>)}</ol></details>
-            </> : isCreating ? <div className="space-y-3"><div className="flex items-center justify-between"><h3 className="font-semibold">Nuevo contrato · Expediente #{processId}</h3><button type="button" onClick={() => setIsCreating(false)} aria-label="Cerrar" className="rounded p-1"><X className="size-4"/></button></div><div className="space-y-5">{FIELD_GROUPS.map((group) => <fieldset key={group.title} className="grid gap-3 rounded-lg border border-[var(--border)] p-3 sm:grid-cols-2"><legend className="px-1 text-xs font-semibold">{group.title}</legend>{group.fields.map((field) => renderField(field, false))}</fieldset>)}</div><div className="flex flex-wrap gap-2"><button type="button" onClick={() => void createDraft()} disabled={busy || !clientId} className="rounded-md bg-[var(--primary)] px-3 py-2 text-sm font-semibold text-white disabled:opacity-50">{busy ? "Guardando…" : "Guardar borrador"}</button><button type="button" onClick={() => void previewPdf()} disabled={busy || !clientId} className="inline-flex items-center gap-1 rounded-md border border-[var(--border)] px-3 py-2 text-sm">{documentAction === "preview" ? <><Loader2 className="size-4 animate-spin"/>Generando…</> : <><Eye className="size-4"/>Vista previa PDF</>}</button></div></div>
+            </> : isCreating ? <div className="space-y-3"><div className="flex items-center justify-between"><h3 className="font-semibold">Nuevo contrato · Expediente #{processId}</h3><button type="button" onClick={() => setIsCreating(false)} aria-label="Cerrar" className="rounded p-1"><X className="size-4"/></button></div><div className="space-y-5">{FIELD_GROUPS.map((group) => <fieldset key={group.title} className="grid gap-3 rounded-lg border border-[var(--border)] p-3 sm:grid-cols-2"><legend className="px-1 text-xs font-semibold">{group.title}</legend>{group.fields.map((field) => renderField(field, false))}</fieldset>)}</div><div className="flex flex-wrap gap-2"><button type="button" onClick={() => void createDraft()} disabled={busy || !clientId} className="rounded-md bg-[var(--primary)] px-3 py-2 text-sm font-semibold !text-white disabled:opacity-50">{busy ? "Guardando…" : "Guardar borrador"}</button><button type="button" onClick={() => void previewPdf()} disabled={busy || !clientId} className="inline-flex items-center gap-1 rounded-md border border-[var(--border)] px-3 py-2 text-sm">{documentAction === "preview" ? <><Loader2 className="size-4 animate-spin"/>Generando…</> : <><Eye className="size-4"/>Vista previa PDF</>}</button></div></div>
               : <div className="grid min-h-48 place-items-center text-center text-sm text-[var(--foreground-muted)]"><div><FileText className="mx-auto mb-2 size-8 opacity-50"/>Selecciona un contrato o crea un borrador.</div></div>}
           </section>
         </div>

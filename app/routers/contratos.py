@@ -30,7 +30,7 @@ from app.contract_pdf import (
     validate_contract_fields,
 )
 from app.firm_access import lawyer_process_ids, require_process_manager, require_roles
-from app.workflow_service import public_site_url
+from app.workflow_service import user_portal_url
 from app.message_templates import render_direct_message
 
 logger = logging.getLogger(__name__)
@@ -364,6 +364,42 @@ def cambiar_estado_contrato(contract_id: int, datos: schemas.ContratoServicioEst
     return _serialize(contract, db)
 
 
+@router.delete("/{contract_id}")
+def eliminar_contrato_anulado(contract_id: int, db: Session = Depends(get_db), actor: models.Usuario = Depends(security.obtener_usuario_actual)):
+    contract = _contract(db, contract_id, actor, editable=True)
+    if contract.estado != "ANULADO":
+        raise HTTPException(status_code=409, detail="Solo se pueden eliminar contratos anulados.")
+
+    process_id = contract.proceso_id
+    client_id = contract.cliente_id
+    # Keep uploaded files and agenda history in the expediente, detached from
+    # the deleted contract. An active signature appointment is cancelled.
+    documents = db.query(models.DocumentoProceso).filter_by(contrato_id=contract.id).all()
+    for document in documents:
+        document.contrato_id = None
+    events = db.query(models.EventoAgenda).filter_by(contrato_id=contract.id).all()
+    for event in events:
+        if event.tipo == "FIRMA_CONTRATO" and event.estado != "CANCELADO":
+            event.estado = "CANCELADO"
+        event.contrato_id = None
+
+    # Delivery records restrict contract deletion. Their count is retained in
+    # the audit event before removing the contract's dependent records.
+    deliveries = db.query(models.EntregaCorreoContrato).filter_by(contrato_id=contract.id).all()
+    delivery_count = len(deliveries)
+    for delivery in deliveries:
+        db.delete(delivery)
+
+    registrar_evento_auditoria(
+        db, actor, "contrato.eliminar", "contrato_servicio", contract.id,
+        {"estado": "ANULADO", "proceso_id": process_id, "cliente_id": client_id,
+         "documentos_conservados": len(documents), "entregas_correo_eliminadas": delivery_count},
+    )
+    db.delete(contract)
+    db.commit()
+    return {"mensaje": "Contrato anulado eliminado. Los archivos cargados se conservaron en el expediente."}
+
+
 def _enviar_copia_firmada(db: Session, contract: models.ContratoServicio, document: models.DocumentoProceso, actor: models.Usuario) -> dict:
     client = contract.cliente
     recipient = client.email if client else contract.parte_cliente_snapshot.get("email", "")
@@ -383,7 +419,7 @@ def _enviar_copia_firmada(db: Session, contract: models.ContratoServicio, docume
             "nombre": contract.parte_cliente_snapshot.get("nombre", "cliente"),
             "proceso": contract.proceso.nombre,
         }, link_label="Ver expediente",
-           link_url=f"{public_site_url()}/gestion-procesos/cliente/procesos/{contract.proceso_id}")
+           link_url=user_portal_url(client, f"/gestion-procesos/cliente/procesos/{contract.proceso_id}#documentos"))
         sent = enviar_correo(
             recipient,
             subject,

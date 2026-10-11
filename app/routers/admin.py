@@ -5,7 +5,7 @@ import smtplib
 import hashlib
 from uuid import uuid4
 from urllib.error import HTTPError, URLError
-from urllib.parse import urljoin, urlsplit
+from urllib.parse import quote, urljoin, urlsplit
 from urllib.request import Request, urlopen
 
 import requests
@@ -44,12 +44,13 @@ from app.rama_judicial_api import API_BASE_URL
 from app.whatsapp import enviar_mensaje_whatsapp
 from app.integration_settings import encrypt_secret, get_integration_settings
 from app.workflow_service import (
+    chat_conversation_url,
+    user_portal_url,
     workflow_401_reason,
     workflow_frontend_url,
     workflow_service_headers,
 )
 from app.notification_service import emitir_notificacion_workflow
-from app.workflow_service import public_site_url
 from app.timezone import format_colombia_datetime
 from app.message_templates import render_message
 from app.reminder_workflow import iniciar_workflow_recordatorio
@@ -417,6 +418,91 @@ def eliminar_evento_auditoria(
     registrar_evento_auditoria(db, admin, "admin.auditoria.eliminar", "evento_auditoria", evento_id)
     db.commit()
     return {"eliminado": evento_id}
+
+
+@router.get("/chat/limpieza")
+def listar_conversaciones_para_limpieza_admin(
+    limit: int = Query(100, ge=1, le=200),
+    offset: int = Query(0, ge=0),
+    db: Session = Depends(get_db),
+    admin: models.Usuario = Depends(verificar_admin),
+):
+    """List conversation metadata only; message bodies and references are never selected."""
+    message_stats = db.query(
+        models.ChatMensaje.conversacion_id.label("conversacion_id"),
+        func.count(models.ChatMensaje.id).label("cantidad_mensajes"),
+        func.max(models.ChatMensaje.created_at).label("ultimo_mensaje_en"),
+    ).group_by(models.ChatMensaje.conversacion_id).subquery()
+    total = db.query(func.count(models.ChatConversacion.id)).scalar() or 0
+    rows = (
+        db.query(
+            models.ChatConversacion,
+            func.coalesce(message_stats.c.cantidad_mensajes, 0),
+            message_stats.c.ultimo_mensaje_en,
+        )
+        .outerjoin(message_stats, message_stats.c.conversacion_id == models.ChatConversacion.id)
+        .order_by(message_stats.c.ultimo_mensaje_en.desc().nullslast(), models.ChatConversacion.updated_at.desc())
+        .offset(offset)
+        .limit(limit)
+        .all()
+    )
+    conversation_ids = [row[0].id for row in rows]
+    participant_names: dict[int, list[str]] = {}
+    if conversation_ids:
+        participants = (
+            db.query(models.ChatParticipante.conversacion_id, models.Usuario.nombre_completo)
+            .join(models.Usuario, models.Usuario.id == models.ChatParticipante.usuario_id)
+            .filter(models.ChatParticipante.conversacion_id.in_(conversation_ids))
+            .order_by(models.Usuario.nombre_completo)
+            .all()
+        )
+        for conversation_id, participant_name in participants:
+            participant_names.setdefault(conversation_id, []).append(participant_name)
+
+    return {
+        "total": total,
+        "limit": limit,
+        "offset": offset,
+        "conversaciones": [{
+            "id": conversation.id,
+            "tipo": conversation.tipo,
+            "proceso": conversation.proceso.nombre if conversation.proceso else None,
+            "cliente": conversation.cliente.nombre_completo if conversation.cliente else None,
+            "participantes": participant_names.get(conversation.id, []),
+            "cantidad_mensajes": int(message_count),
+            "ultimo_mensaje_en": last_message_at,
+        } for conversation, message_count, last_message_at in rows],
+    }
+
+
+@router.post("/chat/limpieza/{conversation_id}")
+def limpiar_conversacion_admin(
+    conversation_id: int,
+    datos: dict = Body(...),
+    db: Session = Depends(get_db),
+    admin: models.Usuario = Depends(verificar_admin),
+):
+    if datos.get("confirmacion") != "LIMPIAR CONVERSACION":
+        raise HTTPException(status_code=400, detail="Escribe LIMPIAR CONVERSACION para confirmar.")
+    conversation = db.query(models.ChatConversacion).filter_by(id=conversation_id).first()
+    if conversation is None:
+        raise HTTPException(status_code=404, detail="La conversación ya no existe.")
+
+    deleted = db.query(models.ChatMensaje).filter_by(conversacion_id=conversation_id).delete(synchronize_session=False)
+    for participant in db.query(models.ChatParticipante).filter_by(conversacion_id=conversation_id).all():
+        participant.ultimo_leido_en = None
+        participant.ultimo_entregado_mensaje_id = 0
+        participant.ultimo_leido_mensaje_id = 0
+    registrar_evento_auditoria(
+        db,
+        admin,
+        "admin.chat.limpiar_conversacion",
+        "chat_conversacion",
+        conversation_id,
+        {"mensajes_eliminados": deleted},
+    )
+    db.commit()
+    return {"conversacion_id": conversation_id, "mensajes_eliminados": deleted}
 
 
 # ============================================================
@@ -987,6 +1073,26 @@ def listar_plantillas_mensaje_admin(
         "DOCUMENTO_RECIBIDO": "Revisar documentos", "CONTRATO_FIRMADO": "Ver expediente",
         "RECUPERAR_PASSWORD": "Restablecer contraseña", "ACTUACIONES_DIGEST": "Abrir radicado",
     }
+    etiquetas_enlace.update({
+        "REACTIVACION_EVENTO": "Ver agenda",
+        "TAREA_ACCION": "Ver tarea",
+        "CHAT_MENSAJE": "Abrir chat",
+        "DOCUMENTO_RECIBIDO": "Revisar documentos",
+        "CONTRATO_FIRMADO": "Ver documentos",
+        "SUBTAREA_ASIGNADA": "Ver tarea",
+        "RECORDATORIO_TAREA": "Ver tarea",
+        "REACTIVACION_TAREA": "Ver tarea",
+        "EVENTO_AGENDA": "Ver agenda",
+        "PROCESO_ACTUALIZACION": "Ver proceso",
+        "DOCUMENTO_REVISION": "Ver documentos",
+        "COMUNICACION_ABOGADO_CLIENTE": "Abrir chat",
+        "COMUNICACION_CLIENTE_ABOGADO": "Abrir chat",
+        "COLABORADOR_AGREGADO": "Ver proceso",
+        "ACTUACION_NOTIFICADA": "Ver actuación",
+        "SOLICITUD_DOCUMENTO": "Ver documentos",
+        "REACTIVACION_COMUNICACION": "Abrir chat",
+        "ACTUACIONES_DIGEST": "",
+    })
     resultado = []
     for plantilla in plantillas:
         ejemplos = plantilla.variables_ejemplo or {}
@@ -1644,6 +1750,259 @@ def eliminar_recurso_admin(
     return {"mensaje": "Proceso archivado." if recurso == "procesos" else "Registro eliminado."}
 
 
+def _r2_bucket_admin(scope: str) -> str:
+    if scope == "system":
+        return storage.get_r2_system_bucket()
+    if scope == "tp-registros":
+        return storage.get_r2_tp_registros_bucket()
+    raise HTTPException(status_code=400, detail="Bucket no válido.")
+
+
+@router.get("/almacenamiento/archivos")
+def listar_archivos_r2_admin(
+    scope: str = Query("system", pattern="^(system|tp-registros)$"),
+    prefix: str = Query("", max_length=1024),
+    continuation_token: str | None = Query(None),
+    db: Session = Depends(get_db),
+    admin: models.Usuario = Depends(verificar_admin),
+):
+    prefix = prefix.strip("/")
+    if "\\" in prefix or any(part == ".." for part in prefix.split("/")):
+        raise HTTPException(status_code=400, detail="La carpeta seleccionada no es válida.")
+    if prefix:
+        prefix += "/"
+    bucket = _r2_bucket_admin(scope)
+    params = {"Bucket": bucket, "MaxKeys": 500, "Delimiter": "/", "Prefix": prefix}
+    if continuation_token:
+        params["ContinuationToken"] = continuation_token
+    try:
+        result = storage.get_r2_client().list_objects_v2(**params)
+    except ClientError as exc:
+        error_code = str(exc.response.get("Error", {}).get("Code") or "Unknown")
+        logger.exception("R2 rechazó el listado del bucket %s en el prefijo %s (código %s).", bucket, prefix, error_code)
+        if error_code in {"NoSuchBucket", "404"}:
+            raise HTTPException(status_code=404, detail=f"R2 no reconoce el bucket configurado '{bucket}'. Un bucket vacío debe responder sin error; revisa el nombre y la cuenta de R2.") from exc
+        if error_code in {"AccessDenied", "Unauthorized", "InvalidAccessKeyId", "SignatureDoesNotMatch"}:
+            raise HTTPException(status_code=403, detail="Las credenciales de R2 no tienen acceso de lectura a este bucket. Revisa el token y sus permisos.") from exc
+        if error_code in {"InvalidToken", "InvalidArgument"} and continuation_token:
+            raise HTTPException(status_code=400, detail="La página guardada ya no es válida. Vuelve a la raíz del bucket y carga de nuevo.") from exc
+        raise HTTPException(status_code=502, detail=f"R2 no pudo listar el bucket (código: {error_code}).") from exc
+    except BotoCoreError as exc:
+        logger.exception("Error de conexión con R2 al listar el bucket %s y el prefijo %s.", bucket, prefix)
+        raise HTTPException(status_code=502, detail="No fue posible conectar con R2 para listar el almacenamiento.") from exc
+
+    contents = [item for item in result.get("Contents", []) if item.get("Key") != prefix]
+    folders = [
+        {"prefix": item["Prefix"], "name": item["Prefix"][len(prefix):].strip("/")}
+        for item in result.get("CommonPrefixes", [])
+    ]
+    keys = [item["Key"] for item in contents]
+    associations: dict[str, list[dict]] = {}
+    matched_documents = db.query(models.DocumentoProceso).filter(models.DocumentoProceso.ruta_archivo.in_(keys)).all() if keys else []
+    for document in matched_documents:
+        associations.setdefault(document.ruta_archivo, []).append({
+            "tipo": "documento", "id": document.id, "nombre": document.nombre_archivo,
+            "proceso": document.proceso.nombre if document.proceso else None,
+            "cliente": document.cliente.nombre_completo if document.cliente else None,
+            "solicitud": document.solicitud.titulo if document.solicitud else None,
+            "contrato_id": document.contrato_id,
+        })
+    matched_registrations = db.query(models.SolicitudRegistro).filter(models.SolicitudRegistro.ruta_tarjeta_profesional.in_(keys)).all() if keys else []
+    for request in matched_registrations:
+        if request.ruta_tarjeta_profesional:
+            associations.setdefault(request.ruta_tarjeta_profesional, []).append({
+                "tipo": "tarjeta_profesional", "id": request.id, "nombre": "Tarjeta profesional",
+                "usuario": request.usuario.nombre_completo if request.usuario else "Usuario eliminado",
+            })
+    files = []
+    for item in contents:
+        key = item["Key"]
+        refs = associations.get(key, [])
+        files.append({
+            "key": key, "size": item.get("Size", 0),
+            "last_modified": item.get("LastModified").isoformat() if item.get("LastModified") else None,
+            "etag": (item.get("ETag") or "").strip('"'), "associations": refs, "orphan": not refs,
+        })
+    return {"scope": scope, "bucket": bucket, "prefix": prefix,
+            "folders": folders, "files": files,
+            "is_truncated": result.get("IsTruncated", False),
+            "next_token": result.get("NextContinuationToken")}
+
+
+@router.get("/almacenamiento/archivos/url-temporal")
+def url_temporal_archivo_r2_admin(
+    scope: str = Query("system", pattern="^(system|tp-registros)$"),
+    key: str = Query(..., min_length=1, max_length=1024),
+    download: bool = Query(False),
+    admin: models.Usuario = Depends(verificar_admin),
+):
+    if "\\" in key or any(part == ".." for part in key.split("/")):
+        raise HTTPException(status_code=400, detail="La clave del archivo no es válida.")
+    bucket = _r2_bucket_admin(scope)
+    client = storage.get_r2_client()
+    try:
+        metadata = client.head_object(Bucket=bucket, Key=key)
+        filename = key.rsplit("/", 1)[-1]
+        disposition = "attachment" if download else "inline"
+        url = client.generate_presigned_url("get_object", Params={
+            "Bucket": bucket,
+            "Key": key,
+            "ResponseContentDisposition": f"{disposition}; filename*=UTF-8''{quote(filename)}",
+        }, ExpiresIn=900)
+    except ClientError as exc:
+        if exc.response.get("Error", {}).get("Code") in {"NoSuchKey", "NotFound", "404"}:
+            raise HTTPException(status_code=404, detail="El archivo no existe en este bucket.") from exc
+        raise HTTPException(status_code=502, detail="No fue posible preparar el acceso al archivo.") from exc
+    except (BotoCoreError, RuntimeError) as exc:
+        raise HTTPException(status_code=502, detail="No fue posible preparar el acceso al archivo.") from exc
+    return {"url": url, "content_type": metadata.get("ContentType") or "application/octet-stream",
+            "expires_in": 900, "filename": key.rsplit("/", 1)[-1]}
+
+
+@router.post("/almacenamiento/carpetas/eliminar")
+def eliminar_carpeta_r2_admin(
+    datos: dict = Body(...), db: Session = Depends(get_db),
+    admin: models.Usuario = Depends(verificar_admin),
+):
+    scope = str(datos.get("scope") or "")
+    prefix = str(datos.get("prefix") or "").strip("/")
+    if not prefix or len(prefix) > 1024 or "\\" in prefix or any(part == ".." for part in prefix.split("/")):
+        raise HTTPException(status_code=400, detail="Selecciona una carpeta válida; no se permite eliminar la raíz del bucket.")
+    if datos.get("confirmacion") != "ELIMINAR CARPETA":
+        raise HTTPException(status_code=400, detail="Escribe ELIMINAR CARPETA para confirmar la operación.")
+
+    folder_prefix = f"{prefix}/"
+    bucket = _r2_bucket_admin(scope)
+    client = storage.get_r2_client()
+    keys: list[str] = []
+    continuation_token = None
+    try:
+        while True:
+            params = {"Bucket": bucket, "Prefix": folder_prefix, "MaxKeys": 1000}
+            if continuation_token:
+                params["ContinuationToken"] = continuation_token
+            result = client.list_objects_v2(**params)
+            keys.extend(item["Key"] for item in result.get("Contents", []))
+            if len(keys) > 10000:
+                raise HTTPException(status_code=413, detail="La carpeta contiene más de 10.000 objetos. Elimínala por subcarpetas para controlar la operación.")
+            if not result.get("IsTruncated"):
+                break
+            continuation_token = result.get("NextContinuationToken")
+            if not continuation_token:
+                raise RuntimeError("R2 no devolvió el token para continuar el listado.")
+    except HTTPException:
+        raise
+    except (BotoCoreError, ClientError, RuntimeError) as exc:
+        raise HTTPException(status_code=502, detail="No fue posible revisar el contenido de la carpeta en R2.") from exc
+
+    if not keys:
+        return {"mensaje": "La carpeta ya está vacía.", "archivos_eliminados": 0, "asociaciones_eliminadas": 0}
+
+    documents = db.query(models.DocumentoProceso).filter(models.DocumentoProceso.ruta_archivo.in_(keys)).all()
+    requests = db.query(models.SolicitudRegistro).filter(models.SolicitudRegistro.ruta_tarjeta_profesional.in_(keys)).all()
+    for document in documents:
+        db.delete(document)
+    for request in requests:
+        request.ruta_tarjeta_profesional = None
+    registrar_evento_auditoria(db, admin, "admin.r2.desvincular_carpeta", "carpeta_r2", folder_prefix,
+        {"bucket": bucket, "archivos": len(keys), "documentos": len(documents), "solicitudes_registro": len(requests)})
+    db.commit()
+
+    try:
+        for start in range(0, len(keys), 1000):
+            response = client.delete_objects(Bucket=bucket, Delete={
+                "Objects": [{"Key": key} for key in keys[start:start + 1000]],
+                "Quiet": False,
+            })
+            errors = response.get("Errors", [])
+            if errors:
+                raise RuntimeError(f"R2 rechazó {len(errors)} eliminaciones.")
+    except (BotoCoreError, ClientError, RuntimeError) as exc:
+        raise HTTPException(status_code=502, detail="Se retiraron las asociaciones, pero R2 no confirmó la eliminación completa. Actualiza el gestor y elimina los objetos restantes.") from exc
+
+    registrar_evento_auditoria(db, admin, "admin.r2.carpeta_eliminar", "carpeta_r2", folder_prefix,
+        {"bucket": bucket, "archivos": len(keys)})
+    db.commit()
+    return {"mensaje": f"Carpeta eliminada: {len(keys)} archivo(s) y sus asociaciones retiradas.",
+            "archivos_eliminados": len(keys), "asociaciones_eliminadas": len(documents) + len(requests)}
+
+
+@router.post("/almacenamiento/archivos/eliminar")
+def eliminar_archivo_r2_admin(
+    datos: dict = Body(...), db: Session = Depends(get_db),
+    admin: models.Usuario = Depends(verificar_admin),
+):
+    scope, key = str(datos.get("scope") or ""), str(datos.get("key") or "")
+    if not key or len(key) > 1024:
+        raise HTTPException(status_code=400, detail="Indica una clave de archivo válida.")
+    bucket = _r2_bucket_admin(scope)
+    client = storage.get_r2_client()
+    try:
+        client.head_object(Bucket=bucket, Key=key)
+    except ClientError as exc:
+        if exc.response.get("Error", {}).get("Code") in {"NoSuchKey", "NotFound", "404"}:
+            raise HTTPException(status_code=404, detail="El objeto ya no existe en R2.") from exc
+        raise HTTPException(status_code=502, detail="No fue posible comprobar el archivo en R2.") from exc
+    except (BotoCoreError, RuntimeError) as exc:
+        raise HTTPException(status_code=502, detail="No fue posible comprobar el archivo en R2.") from exc
+
+    documents = db.query(models.DocumentoProceso).filter_by(ruta_archivo=key).all()
+    requests = db.query(models.SolicitudRegistro).filter_by(ruta_tarjeta_profesional=key).all()
+    if (documents or requests) and datos.get("confirmar_asociaciones") is not True:
+        raise HTTPException(status_code=409, detail="El archivo tiene asociaciones; confirma explícitamente que también se retiren.")
+    for document in documents:
+        db.delete(document)
+    for request in requests:
+        request.ruta_tarjeta_profesional = None
+    registrar_evento_auditoria(db, admin, "admin.r2.desvincular", "archivo_r2", key,
+        {"bucket": bucket, "documentos": len(documents), "solicitudes_registro": len(requests)})
+    db.commit()
+    try:
+        client.delete_object(Bucket=bucket, Key=key)
+    except (BotoCoreError, ClientError, RuntimeError) as exc:
+        raise HTTPException(status_code=502, detail="Se retiraron las asociaciones, pero R2 no confirmó el borrado. El objeto quedó disponible para reintentar.") from exc
+    registrar_evento_auditoria(db, admin, "admin.r2.eliminar", "archivo_r2", key, {"bucket": bucket})
+    db.commit()
+    return {"mensaje": "Archivo eliminado de R2 y asociaciones retiradas.",
+            "asociaciones_eliminadas": len(documents) + len(requests)}
+
+
+@router.post("/almacenamiento/archivos/mover-a-sistema")
+def mover_archivo_r2_a_sistema_admin(
+    datos: dict = Body(...), db: Session = Depends(get_db),
+    admin: models.Usuario = Depends(verificar_admin),
+):
+    key = str(datos.get("key") or "")
+    if not key or len(key) > 1024:
+        raise HTTPException(status_code=400, detail="Indica una clave de archivo válida.")
+    source, target = storage.get_r2_tp_registros_bucket(), storage.get_r2_system_bucket()
+    if source == target:
+        raise HTTPException(status_code=409, detail="Configura buckets distintos antes de migrar archivos.")
+    if db.query(models.SolicitudRegistro.id).filter_by(ruta_tarjeta_profesional=key).first():
+        raise HTTPException(status_code=409, detail="Las tarjetas profesionales deben permanecer en el bucket tp-registros.")
+    client = storage.get_r2_client()
+    try:
+        client.head_object(Bucket=source, Key=key)
+        try:
+            client.head_object(Bucket=target, Key=key)
+        except ClientError as exc:
+            if exc.response.get("Error", {}).get("Code") not in {"NoSuchKey", "NotFound", "404"}:
+                raise
+        else:
+            raise HTTPException(status_code=409, detail="Ya existe esa clave en el bucket del sistema.")
+        client.copy_object(Bucket=target, Key=key, CopySource={"Bucket": source, "Key": key})
+        client.head_object(Bucket=target, Key=key)
+        client.delete_object(Bucket=source, Key=key)
+    except HTTPException:
+        raise
+    except (BotoCoreError, ClientError, RuntimeError) as exc:
+        raise HTTPException(status_code=502, detail="No se pudo mover el archivo al bucket del sistema.") from exc
+    registrar_evento_auditoria(db, admin, "admin.r2.mover_a_sistema", "archivo_r2", key,
+        {"desde": source, "hacia": target})
+    db.commit()
+    return {"mensaje": "Archivo movido al bucket del sistema.", "bucket": target, "key": key}
+
+
 @router.patch("/inventario/procesos/{item_id}/restaurar")
 def restaurar_proceso_admin(
     item_id: int,
@@ -2025,7 +2384,7 @@ def _notificar_evento_agenda_admin(db: Session, evento: models.EventoAgenda, adm
     for cliente in destinatarios:
         if not cliente or cliente.estado != models.EstadoUsuario.ACTIVO:
             continue
-        link_url = f"{public_site_url()}/gestion-procesos/cliente/procesos/{proceso.id}#agenda"
+        link_url = user_portal_url(cliente, f"/gestion-procesos/cliente/procesos/{proceso.id}#evento-{evento.id}")
         emitir_notificacion_workflow(
             db, cliente, "RESUMENES", f"EVENTO_AGENDA:{evento.id}:{accion.upper()}:{evento.fecha_inicio.isoformat()}",
             f"{accion.capitalize()} actividad: {evento.titulo}", "", emisor=admin, incluir_email=True,
@@ -2036,7 +2395,7 @@ def _notificar_evento_agenda_admin(db: Session, evento: models.EventoAgenda, adm
                        "fin": format_colombia_datetime(evento.fecha_fin) if evento.fecha_fin else 'No indicada',
                        "responsable": evento.responsable.nombre_completo if evento.responsable else 'No asignado',
                        "detalle": evento.descripcion or 'Sin detalles adicionales'},
-            enlace_texto="Ver proceso", enlace_url=link_url,
+            enlace_texto="Ver agenda", enlace_url=link_url,
         )
 
 
@@ -2108,11 +2467,13 @@ def _notificar_agenda_tras_reactivacion(db: Session, usuario: models.Usuario, ac
                 db.flush()
                 recordatorio_ids.append(reminder.id)
         recipient_url = (
-            f"{public_site_url()}/gestion-procesos/cliente/tareas?tarea={task.id}#tarea-{task.id}"
+            user_portal_url(usuario, f"/gestion-procesos/cliente/tareas?tarea={task.id}#tarea-{task.id}")
             if usuario.rol == models.RolUsuario.CLIENTE
-            else f"{public_site_url()}/gestion-procesos/dashboard/tareas/{task.id}"
+            else user_portal_url(usuario, f"/gestion-procesos/dashboard/tareas/{task.id}")
             if usuario.rol == models.RolUsuario.ABOGADO
-            else f"{public_site_url()}/gestion-procesos/abogado/tareas/{task.id}"
+            else user_portal_url(usuario, f"/gestion-procesos/admin/tareas?detalle={task.id}")
+            if usuario.rol == models.RolUsuario.ADMIN
+            else user_portal_url(usuario, f"/gestion-procesos/abogado/tareas/{task.id}")
         )
         try:
             emitir_notificacion_workflow(
@@ -2130,9 +2491,19 @@ def _notificar_agenda_tras_reactivacion(db: Session, usuario: models.Usuario, ac
         process = event.proceso
         if not process:
             continue
-        role_path = "cliente" if usuario.rol == models.RolUsuario.CLIENTE else "dashboard" if usuario.rol == models.RolUsuario.ABOGADO else "abogado"
-        section_path = "/agenda" if role_path == "abogado" else "#agenda"
-        recipient_url = f"{public_site_url()}/gestion-procesos/{role_path}/procesos/{process.id}{section_path}"
+        if usuario.rol == models.RolUsuario.CLIENTE:
+            recipient_url = user_portal_url(usuario, f"/gestion-procesos/cliente/procesos/{process.id}#evento-{event.id}")
+            recipient_label = "Ver agenda"
+        elif usuario.rol == models.RolUsuario.ABOGADO_ADMIN:
+            recipient_url = user_portal_url(usuario, f"/gestion-procesos/abogado/procesos/{process.id}/agenda")
+            recipient_label = "Ver agenda"
+        elif usuario.rol == models.RolUsuario.ADMIN:
+            recipient_url = user_portal_url(usuario, f"/gestion-procesos/admin/agenda")
+            recipient_label = "Ver agenda"
+        else:
+            # The SaaS dashboard has no process agenda detail route yet.
+            recipient_url = user_portal_url(usuario, "/gestion-procesos/dashboard")
+            recipient_label = "Abrir panel"
         try:
             emitir_notificacion_workflow(
                 db, usuario, "RESUMENES", f"REACTIVACION:{usuario.id}:EVENTO:{event.id}:{marca_reactivacion}",
@@ -2141,7 +2512,7 @@ def _notificar_agenda_tras_reactivacion(db: Session, usuario: models.Usuario, ac
                 variables={"nombre": usuario.nombre_completo, "actividad": event.titulo, "proceso": process.nombre,
                            "tipo": event.tipo, "fecha": format_colombia_datetime(event.fecha_inicio),
                            "descripcion": event.descripcion or "Sin detalles adicionales"},
-                enlace_texto="Ver agenda", enlace_url=recipient_url,
+                enlace_texto=recipient_label, enlace_url=recipient_url,
             )
         except Exception:
             logger.exception("No se pudo preparar aviso de evento al reactivar usuario %s", usuario.id)
@@ -2150,9 +2521,24 @@ def _notificar_agenda_tras_reactivacion(db: Session, usuario: models.Usuario, ac
         process = communication.proceso
         if not process:
             continue
-        role_path = "cliente" if usuario.rol == models.RolUsuario.CLIENTE else "dashboard" if usuario.rol == models.RolUsuario.ABOGADO else "abogado"
-        section_path = "/comunicaciones" if role_path == "abogado" else "#comunicaciones"
-        recipient_url = f"{public_site_url()}/gestion-procesos/{role_path}/procesos/{process.id}{section_path}"
+        other_user_id = communication.actor_id if usuario.rol == models.RolUsuario.CLIENTE else communication.cliente_id
+        if other_user_id:
+            recipient_url = chat_conversation_url(usuario, process.id, other_user_id)
+            recipient_label = "Abrir chat"
+        elif usuario.rol == models.RolUsuario.CLIENTE:
+            recipient_url = user_portal_url(usuario, f"/gestion-procesos/cliente/procesos/{process.id}")
+            recipient_label = "Ver proceso"
+        elif usuario.rol == models.RolUsuario.ADMIN:
+            recipient_url = user_portal_url(usuario, f"/gestion-procesos/admin/procesos?detalle={process.id}")
+            recipient_label = "Ver proceso"
+        elif usuario.rol == models.RolUsuario.ABOGADO_ADMIN:
+            recipient_url = user_portal_url(usuario, f"/gestion-procesos/abogado/procesos/{process.id}/resumen")
+            recipient_label = "Ver proceso"
+        else:
+            # Legacy communications are being replaced by chat; the SaaS view
+            # has no compatible process chat route, so use its existing home.
+            recipient_url = user_portal_url(usuario, "/gestion-procesos/dashboard")
+            recipient_label = "Abrir panel"
         try:
             emitir_notificacion_workflow(
                 db, usuario, "RESUMENES", f"REACTIVACION:{usuario.id}:COMUNICACION:{communication.id}:{marca_reactivacion}",
@@ -2161,7 +2547,7 @@ def _notificar_agenda_tras_reactivacion(db: Session, usuario: models.Usuario, ac
                 variables={"nombre": usuario.nombre_completo, "proceso": process.nombre,
                            "asunto": communication.asunto, "fecha": format_colombia_datetime(communication.created_at),
                            "mensaje": communication.contenido},
-                enlace_texto="Ver conversación", enlace_url=recipient_url,
+                enlace_texto=recipient_label, enlace_url=recipient_url,
             )
         except Exception:
             logger.exception("No se pudo preparar aviso de comunicación al reactivar usuario %s", usuario.id)
@@ -2775,7 +3161,7 @@ def enviar_restablecimiento_password_admin(
     background_tasks.add_task(
         send_password_reset_email,
         usuario.email,
-        password_reset_url(token),
+        password_reset_url(token, usuario.rol),
     )
     registrar_evento_auditoria(
         db, admin, "admin.usuario.password.restablecimiento_enviado", "usuario", usuario.id,

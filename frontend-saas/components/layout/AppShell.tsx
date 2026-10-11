@@ -6,6 +6,7 @@ import Sidebar from "./Sidebar";
 import Breadcrumbs from "./Breadcrumbs";
 import GlobalSearch from "./GlobalSearch";
 import ChatFloatingButton from "@/components/chat/ChatFloatingButton";
+import ChatPresenceHeartbeat from "@/components/chat/ChatPresenceHeartbeat";
 
 interface AppShellProps {
   children: ReactNode;
@@ -24,6 +25,7 @@ export default function AppShell({
       className={`${isChatPage ? "h-dvh overflow-hidden" : "min-h-screen"} bg-background text-foreground`}
       data-area={variant}
     >
+      <ChatPresenceHeartbeat />
       <Sidebar variant={variant} />
 
       <main className={`${isChatPage ? "flex h-full min-h-0 flex-col overflow-hidden" : "min-h-screen"} pt-[var(--header-height)] md:ml-[260px] md:pt-0`}>

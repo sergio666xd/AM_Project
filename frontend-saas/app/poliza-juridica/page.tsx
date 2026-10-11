@@ -8,6 +8,7 @@ import {
   UsersRound,
 } from "lucide-react";
 import { MarketingLayout } from "@/components/marketing/MarketingLayout";
+import { MarketingContactCta } from "@/components/marketing/MarketingContactCta";
 import { loadPublicPageContent } from "@/lib/publicPageContent";
 import { SITE_PAGE_DEFAULTS } from "@/lib/sitePageDefaults";
 import { generatePublicPageMetadata } from "@/lib/pageSeo";
@@ -41,7 +42,7 @@ export default async function PolizaJuridicaPage() {
                 href={whatsappUrl}
                 target="_blank"
                 rel="noreferrer"
-                className="mt-8 inline-flex items-center gap-2 rounded-lg bg-[#ccb56b] px-6 py-3.5 font-bold text-[#002060] transition hover:bg-[#dcc982]"
+                className="mt-8 inline-flex min-h-11 items-center gap-2 rounded-lg bg-[#ccb56b] px-6 py-3.5 font-bold text-[#002060] transition outline-none hover:bg-[#dcc982] focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-[#002060]"
               >
                 <MessageCircle size={20} /> Solicitar estudio de la póliza
               </a>
@@ -84,10 +85,11 @@ export default async function PolizaJuridicaPage() {
               <p className="text-sm font-bold uppercase tracking-[.2em] text-[#92792e]">{renderRichText(content.closingEyebrow)}</p>
               <h2 className="mt-3 text-3xl font-semibold">{renderRichText(content.closingTitle)}</h2>
               <p className="mt-4 leading-7 text-[#002060]/75">{renderRichText(content.closingDescription)}</p>
-              <a href={whatsappUrl} target="_blank" rel="noreferrer" className="mt-6 inline-flex items-center gap-2 font-bold underline decoration-[#ccb56b] decoration-2 underline-offset-4"><MessageCircle size={19} /> {renderRichText(content.closingCta)}</a>
+              <a href={whatsappUrl} target="_blank" rel="noreferrer" className="mt-6 inline-flex min-h-11 items-center gap-2 rounded px-1 font-bold underline decoration-[#92792e] decoration-2 underline-offset-4 outline-none focus-visible:ring-2 focus-visible:ring-[#002060]"><MessageCircle size={19} aria-hidden="true" /> {renderRichText(content.closingCta)}</a>
             </div>
           </div>
         </section>
+        <div className="mx-auto max-w-7xl px-5 py-12 lg:px-8"><MarketingContactCta /></div>
       </main>
     </MarketingLayout>
   );

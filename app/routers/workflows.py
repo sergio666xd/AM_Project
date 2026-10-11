@@ -29,7 +29,7 @@ from app.reminder_workflow import (
 )
 from app.monthly_summary import enviar_resumen_mensual
 from app.whatsapp import enviar_mensaje_whatsapp
-from app.workflow_service import public_site_url
+from app.workflow_service import user_portal_url
 
 
 router = APIRouter(
@@ -266,7 +266,7 @@ def _agregar_actuaciones_a_grupo(
             {
                 "proceso": proceso.nombre if proceso else None,
                 "radicado": radicado.numero,
-                "detalle_url": _url_radicado(usuario, radicado.id),
+                "detalle_url": _url_radicado(usuario, radicado.id, proceso.id if proceso else None),
                 "actuaciones": {},
             },
         )
@@ -295,14 +295,16 @@ def _cuerpo_novedades(secciones: list[dict]) -> str:
     return "\n\n".join(bloques)
 
 
-def _url_radicado(usuario: models.Usuario, radicado_id: int) -> str:
+def _url_radicado(usuario: models.Usuario, radicado_id: int, proceso_id: int | None = None) -> str:
     if usuario.rol == models.RolUsuario.CLIENTE:
-        ruta = f"/gestion-procesos/cliente?radicado={radicado_id}#radicado-{radicado_id}"
+        ruta = f"/gestion-procesos/cliente/procesos/{proceso_id}#radicado-{radicado_id}" if proceso_id else "/gestion-procesos/cliente/procesos"
     elif usuario.rol == models.RolUsuario.ABOGADO:
         ruta = f"/gestion-procesos/dashboard/radicados/{radicado_id}"
+    elif usuario.rol == models.RolUsuario.ADMIN:
+        ruta = f"/gestion-procesos/admin/radicados?detalle={radicado_id}"
     else:
         ruta = f"/gestion-procesos/abogado/radicados/{radicado_id}"
-    return f"{public_site_url()}{ruta}"
+    return user_portal_url(usuario, ruta)
 
 
 @router.post("/consultas/{ejecucion_id}/notificaciones/preparar")
@@ -368,7 +370,7 @@ def preparar_notificaciones_actuaciones(
                 omitida = _cuerpo_novedades([{
                     "proceso": proceso.nombre,
                     "radicado": radicado.numero,
-                    "detalle_url": _url_radicado(cliente, radicado.id),
+                    "detalle_url": _url_radicado(cliente, radicado.id, proceso.id),
                     "actuaciones": {actuacion["id"]: actuacion for actuacion in nuevas},
                 }])
                 emitir_notificacion_workflow(
@@ -620,6 +622,8 @@ def preparar_recordatorio_workflow(
         tarea_path = f"/gestion-procesos/dashboard/tareas/{tarea.id}"
     elif usuario.rol == models.RolUsuario.CLIENTE:
         tarea_path = f"/gestion-procesos/cliente/tareas?tarea={tarea.id}#tarea-{tarea.id}"
+    elif usuario.rol == models.RolUsuario.ADMIN:
+        tarea_path = f"/gestion-procesos/admin/tareas?detalle={tarea.id}"
     else:
         tarea_path = f"/gestion-procesos/abogado/tareas/{tarea.id}"
     mensaje = f"Recordatorio de tarea: {tarea.titulo}"
@@ -638,7 +642,8 @@ def preparar_recordatorio_workflow(
         anticipacion = recordatorio.anticipacion_minutos
         programado_por = f"{anticipacion // 60} horas antes" if anticipacion else "en el momento programado"
         mensaje += f"\nVencimiento: {format_colombia_datetime(fecha_limite)}\nAviso: {programado_por}"
-    mensaje += f"\n\nAbrir enlace: Ver tarea | {public_site_url()}{tarea_path}"
+    tarea_url = user_portal_url(usuario, tarea_path)
+    mensaje += f"\n\nAbrir enlace: Ver tarea | {tarea_url}"
     entrega_ids = emitir_notificacion_workflow(
         db,
         usuario,
@@ -659,7 +664,7 @@ def preparar_recordatorio_workflow(
                    "detalle": tarea.descripcion or "Sin detalles adicionales",
                    "fecha_limite": format_colombia_datetime(fecha_limite) if tarea.fecha_limite else "Sin fecha límite",
                    "anticipacion": programado_por},
-        enlace_texto="Ver tarea", enlace_url=f"{public_site_url()}{tarea_path}",
+        enlace_texto="Ver tarea", enlace_url=tarea_url,
     )
     if not entrega_ids:
         recordatorio.enviado_en = ahora

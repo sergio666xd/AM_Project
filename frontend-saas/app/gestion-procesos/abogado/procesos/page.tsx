@@ -5,13 +5,15 @@ import { apiRequest } from "@/lib/api";
 import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 
 import Link from "next/link";
+import { OperationResult } from "@/components/ui/OperationResult";
 import {
   ArrowRight,
   Archive,
   ArchiveRestore,
   BriefcaseBusiness,
-  CheckCircle2,
   FilePlus2,
+  LayoutGrid,
+  List,
   Loader2,
   Plus,
   Search,
@@ -60,12 +62,14 @@ export default function ProcesosPage() {
   const [query, setQuery] = useState("");
   const [showArchived, setShowArchived] = useState(false);
   const [scopeFilter, setScopeFilter] = useState("TODAS");
+  const [viewMode, setViewMode] = useState<"cards" | "list">("cards");
 
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
 
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
+  const [noticeHref, setNoticeHref] = useState<string | null>(null);
 
   const [loading, setLoading] = useState(true);
   const [working, setWorking] = useState(false);
@@ -105,16 +109,6 @@ export default function ProcesosPage() {
       .finally(() => { if (active) setLoading(false); });
     return () => { active = false; };
   }, [headers, showArchived]);
-
-  useEffect(() => {
-    if (!notice) return;
-
-    const timeout = window.setTimeout(() => {
-      setNotice("");
-    }, 4000);
-
-    return () => window.clearTimeout(timeout);
-  }, [notice]);
 
   const filtered = useMemo(() => {
     const normalizedQuery = query.trim().toLowerCase();
@@ -187,6 +181,7 @@ export default function ProcesosPage() {
       await load();
 
       setNotice("Proceso creado correctamente.");
+      setNoticeHref(typeof body.id === "number" ? `/gestion-procesos/abogado/procesos/${body.id}` : null);
     } catch (cause) {
       setError(
         cause instanceof Error
@@ -210,6 +205,7 @@ export default function ProcesosPage() {
       if (!response.ok) throw new Error(body.detail || "No fue posible actualizar el proceso.");
       await load();
       setNotice(body.mensaje || (archive ? "Proceso archivado." : "Proceso restaurado."));
+      setNoticeHref(null);
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "No fue posible actualizar el proceso.");
     } finally {
@@ -229,21 +225,9 @@ export default function ProcesosPage() {
   }
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-5 pb-24">
       {/* TOAST */}
-      {notice && (
-        <div className="fixed right-4 top-4 z-50 flex max-w-sm items-center gap-3 rounded-xl border border-emerald-500/20 bg-[var(--surface)] px-4 py-3 text-sm shadow-xl">
-          <CheckCircle2 className="size-5 shrink-0 text-emerald-500" />
-          <span className="text-[var(--foreground)]">{notice}</span>
-          <button
-            type="button"
-            onClick={() => setNotice("")}
-            className="ml-auto rounded-md p-1 text-[var(--foreground-muted)] hover:bg-[var(--surface-secondary)]"
-          >
-            <X className="size-4" />
-          </button>
-        </div>
-      )}
+      {notice && <OperationResult title={notice} description={noticeHref ? "El expediente quedó creado y puedes continuar con sus datos." : undefined} actionHref={noticeHref ?? undefined} actionLabel={noticeHref ? "Abrir expediente" : undefined} onDismiss={() => { setNotice(""); setNoticeHref(null); }} />}
 
       {/* HEADER */}
       <header className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
@@ -324,15 +308,15 @@ export default function ProcesosPage() {
                 setError("");
                 setShowCreateModal(true);
               }}
-              className="inline-flex items-center justify-center gap-2 rounded-lg bg-[var(--primary)] px-4 py-2.5 text-sm font-medium text-white shadow-sm transition hover:opacity-90"
+              className="inline-flex items-center justify-center gap-2 rounded-lg bg-[var(--primary)] px-4 py-2.5 text-sm font-medium !text-white shadow-sm transition hover:opacity-90"
             >
               <Plus className="size-4" />
               Nuevo proceso
             </button>}
 
             <div role="group" aria-label="Estado de los procesos" className="inline-flex rounded-lg border border-[var(--border)] p-1">
-              <button type="button" aria-pressed={!showArchived} onClick={() => { if (showArchived) { setLoading(true); setQuery(""); setShowArchived(false); } }} className={`rounded-md px-3 py-1.5 text-sm ${!showArchived ? "bg-[var(--primary)] text-white" : "text-[var(--foreground-muted)] hover:bg-[var(--surface-secondary)]"}`}>Activos</button>
-              <button type="button" aria-pressed={showArchived} onClick={() => { if (!showArchived) { setLoading(true); setQuery(""); setShowArchived(true); } }} className={`rounded-md px-3 py-1.5 text-sm ${showArchived ? "bg-[var(--primary)] text-white" : "text-[var(--foreground-muted)] hover:bg-[var(--surface-secondary)]"}`}>Archivados</button>
+              <button type="button" aria-pressed={!showArchived} onClick={() => { if (showArchived) { setLoading(true); setQuery(""); setShowArchived(false); } }} className={`rounded-md px-3 py-1.5 text-sm ${!showArchived ? "bg-[var(--primary)] !text-white" : "text-[var(--foreground-muted)] hover:bg-[var(--surface-secondary)]"}`}>Activos</button>
+              <button type="button" aria-pressed={showArchived} onClick={() => { if (!showArchived) { setLoading(true); setQuery(""); setShowArchived(true); } }} className={`rounded-md px-3 py-1.5 text-sm ${showArchived ? "bg-[var(--primary)] !text-white" : "text-[var(--foreground-muted)] hover:bg-[var(--surface-secondary)]"}`}>Archivados</button>
             </div>
 
             <button
@@ -383,9 +367,14 @@ export default function ProcesosPage() {
                 : `${filtered.length} de ${items.length} procesos`}
             </p>
           </div>
+          <div role="group" aria-label="Vista de procesos" className="inline-flex shrink-0 rounded-lg border border-[var(--border)] bg-[var(--surface)] p-1">
+            <button type="button" aria-label="Vista de fichas" aria-pressed={viewMode === "cards"} onClick={() => setViewMode("cards")} className={`inline-flex min-h-8 items-center gap-1.5 rounded-md px-2.5 text-xs font-medium ${viewMode === "cards" ? "bg-[var(--primary)] !text-white" : "text-[var(--foreground-muted)] hover:bg-[var(--surface-secondary)]"}`}><LayoutGrid className="size-3.5" /><span className="hidden sm:inline">Fichas</span></button>
+            <button type="button" aria-label="Vista de lista" aria-pressed={viewMode === "list"} onClick={() => setViewMode("list")} className={`inline-flex min-h-8 items-center gap-1.5 rounded-md px-2.5 text-xs font-medium ${viewMode === "list" ? "bg-[var(--primary)] !text-white" : "text-[var(--foreground-muted)] hover:bg-[var(--surface-secondary)]"}`}><List className="size-3.5" /><span className="hidden sm:inline">Lista</span></button>
+          </div>
         </div>
 
         {filtered.length > 0 ? (
+          viewMode === "cards" ? (
           <div className="grid gap-4 p-4 sm:p-5 md:grid-cols-2 xl:grid-cols-3">
             {filtered.map((item) => {
               const actuaciones = item.radicados.reduce(
@@ -509,6 +498,30 @@ export default function ProcesosPage() {
               );
             })}
           </div>
+          ) : (
+            <div className="divide-y divide-[var(--border)]">
+              {filtered.map((item) => {
+                const actuaciones = item.radicados.reduce((total, radicado) => total + radicado.actuaciones.length, 0);
+                return (
+                  <div key={item.id} className="flex flex-col gap-4 px-4 py-4 transition hover:bg-[var(--surface-secondary)]/40 sm:px-5 lg:flex-row lg:items-center lg:justify-between">
+                    <Link href={`/gestion-procesos/abogado/procesos/${item.id}`} className="flex min-w-0 flex-1 items-start gap-3 rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--primary)]">
+                      <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-[var(--primary)]/10 text-[var(--primary)]"><BriefcaseBusiness className="size-5" /></span>
+                      <span className="min-w-0 flex-1">
+                        <span className="flex flex-wrap items-center gap-2"><strong className="truncate text-sm text-[var(--foreground)]">{item.nombre}</strong><span className="text-[11px] text-[var(--foreground-muted)]">#{item.id}</span>{!item.soy_responsable && <span className="rounded-full bg-[var(--surface-secondary)] px-2 py-0.5 text-[10px] text-[var(--foreground-muted)]">Colaborador</span>}{!showArchived && <span className={`rounded-full px-2 py-0.5 text-[10px] ${item.estado_atencion === "ATENCION" ? "bg-amber-500/10 text-amber-700" : "bg-emerald-500/10 text-emerald-700"}`}>{item.estado_atencion === "ATENCION" ? "Requiere atención" : "Al día"}</span>}</span>
+                        <span className="mt-1 block truncate text-xs text-[var(--foreground-muted)]">{item.descripcion || "Sin descripción"}</span>
+                        <span className="mt-1 block truncate text-xs text-[var(--foreground-muted)]">{item.responsable ? `Responsable: ${item.responsable.nombre_completo}` : ""}{item.clientes?.length ? ` · ${item.clientes.length} cliente${item.clientes.length === 1 ? "" : "s"}` : ""}{item.radicados.length ? ` · ${item.radicados.length} radicado${item.radicados.length === 1 ? "" : "s"}` : ""}</span>
+                      </span>
+                    </Link>
+                    <div className="flex flex-wrap items-center gap-2 pl-[52px] lg:pl-0">
+                      <span className="rounded-lg border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-xs text-[var(--foreground-muted)]">{actuaciones} actuación{actuaciones === 1 ? "" : "es"}</span>
+                      {!showArchived && <span className="rounded-lg border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-xs text-[var(--foreground-muted)]">{item.tareas_pendientes ?? 0} tarea{(item.tareas_pendientes ?? 0) === 1 ? "" : "s"} pendiente{(item.tareas_pendientes ?? 0) === 1 ? "" : "s"}</span>}
+                      {showArchived ? <button type="button" disabled={working} onClick={() => void changeArchiveStatus(item.id, false)} className="inline-flex min-h-9 items-center gap-1.5 rounded-lg border border-[var(--border)] px-3 text-xs font-medium text-[var(--foreground)] hover:bg-[var(--surface-secondary)] disabled:opacity-50"><ArchiveRestore className="size-3.5" />Restaurar</button> : <><Link href={`/gestion-procesos/abogado/procesos/${item.id}`} className="inline-flex min-h-9 items-center gap-1.5 rounded-lg bg-[var(--primary)] px-3 text-xs font-medium !text-white hover:opacity-90">Abrir ficha<ArrowRight className="size-3.5" /></Link><button type="button" disabled={working} onClick={() => void changeArchiveStatus(item.id, true)} aria-label={`Archivar ${item.nombre}`} className="inline-flex size-9 items-center justify-center rounded-lg border border-[var(--border)] text-[var(--foreground-muted)] hover:border-amber-600/40 hover:text-amber-700 disabled:opacity-50"><Archive className="size-4" /></button></>}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )
         ) : (
           <div className="flex flex-col items-center justify-center px-6 py-16 text-center">
             <div className="flex size-12 items-center justify-center rounded-full bg-[var(--surface-secondary)]">
@@ -531,7 +544,7 @@ export default function ProcesosPage() {
               <button
                 type="button"
                 onClick={() => setShowCreateModal(true)}
-                className="mt-5 inline-flex items-center gap-2 rounded-lg bg-[var(--primary)] px-4 py-2.5 text-sm font-medium text-white"
+                className="mt-5 inline-flex items-center gap-2 rounded-lg bg-[var(--primary)] px-4 py-2.5 text-sm font-medium !text-white"
               >
                 <Plus className="size-4" />
                 Crear proceso
@@ -641,7 +654,7 @@ export default function ProcesosPage() {
                 <button
                   type="submit"
                   disabled={working || !name.trim()}
-                  className="inline-flex items-center justify-center gap-2 rounded-lg bg-[var(--primary)] px-4 py-2.5 text-sm font-medium text-white disabled:cursor-not-allowed disabled:opacity-50"
+                  className="inline-flex items-center justify-center gap-2 rounded-lg bg-[var(--primary)] px-4 py-2.5 text-sm font-medium !text-white disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   {working && (
                     <Loader2 className="size-4 animate-spin" />

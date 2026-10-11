@@ -10,6 +10,7 @@ import {
   AlertCircle,
   CheckCircle2,
   FileText,
+  FolderOpen,
   Loader2,
   Plus,
   RefreshCw,
@@ -35,6 +36,7 @@ type Document = {
   id: number;
   proceso_id: number;
   solicitud_id: number | null;
+  solicitud_item_id?: string | null;
   contrato_id?: number | null;
   proceso: string;
   cliente: string;
@@ -54,6 +56,14 @@ type Client = {
   id: number;
   nombre_completo: string;
 };
+
+function requestedDocumentName(document: Document, requests: Request[]) {
+  if (!document.solicitud_id) return null;
+  const request = requests.find((item) => item.id === document.solicitud_id);
+  if (!request) return null;
+  return request.documentos_requeridos.find((item) => item.id === document.solicitud_item_id)?.nombre
+    || (request.documentos_requeridos.length === 1 ? request.documentos_requeridos[0].nombre : request.titulo);
+}
 
 export default function DocumentosPage() {
   const { user } = useSession();
@@ -286,12 +296,12 @@ export default function DocumentosPage() {
       if (selectedProcessId !== null && item.proceso_id !== selectedProcessId) return false;
       return (
         !text ||
-        `${item.nombre_archivo} ${item.proceso} ${item.cliente} ${item.mime_type}`
+        `${item.nombre_archivo} ${requestedDocumentName(item, data.solicitudes) || ""} ${item.proceso} ${item.cliente} ${item.mime_type}`
           .toLowerCase()
           .includes(text)
       );
     });
-  }, [data.documentos, query, selectedProcessId]);
+  }, [data.documentos, data.solicitudes, query, selectedProcessId]);
   const documentosFiltrados = documentosVisibles.filter((item) => !item.contrato_id
     && (filtroEstadoArchivo === "TODOS" || (item.estado_revision || "RECIBIDO") === filtroEstadoArchivo));
   const contratosCargados = documentosVisibles.filter((item) => Boolean(item.contrato_id));
@@ -325,7 +335,7 @@ export default function DocumentosPage() {
 
   return (
     <div
-      className="space-y-5"
+      className="space-y-5 pb-24"
       style={{ color: "var(--foreground)" }}
     >
       {/* ENCABEZADO */}
@@ -441,7 +451,9 @@ export default function DocumentosPage() {
       </div>
 
       {/* RESUMEN */}
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+      <details className="rounded-xl border p-3" style={{ borderColor: "var(--border)", background: "var(--surface)" }}>
+        <summary className="flex min-h-11 cursor-pointer items-center justify-between gap-3 font-medium">Resumen del centro documental <span className="text-xs font-normal" style={{ color: "var(--foreground-muted)" }}>{pendientes} pendiente(s)</span></summary>
+        <div className="mt-3 grid grid-cols-2 gap-3 border-t pt-3 lg:grid-cols-4" style={{ borderColor: "var(--border)" }}>
         <ResumenCard
           label="Solicitudes"
           value={data.solicitudes.length}
@@ -463,7 +475,8 @@ export default function DocumentosPage() {
           label="Archivos"
           value={data.documentos.length}
         />
-      </div>
+        </div>
+      </details>
 
       {/* MENSAJES */}
       {error && (
@@ -560,143 +573,12 @@ export default function DocumentosPage() {
           </span>
         </div>
 
-        <div className="overflow-x-auto">
-          <table className="w-full min-w-[760px] text-left text-sm">
-            <thead>
-              <tr
-                className="border-b text-xs font-semibold uppercase tracking-wide"
-                style={{
-                  background: "var(--surface-muted)",
-                  borderColor: "var(--border)",
-                  color: "var(--foreground-muted)",
-                }}
-              >
-        <th className="p-4">Solicitud y documentos</th>
-                <th className="p-4">Proceso</th>
-                <th className="p-4">Cliente</th>
-                <th className="p-4">Estado</th>
-              </tr>
-            </thead>
-
-            <tbody>
-              {solicitudesFiltradas.length === 0 ? (
-                <tr>
-                  <td colSpan={4}>
-                    <EmptyState
-                      icon={<FileText size={30} />}
-                      title="No hay solicitudes"
-                      description={
-                        query || filtroEstado !== "TODAS"
-                          ? "No hay solicitudes que coincidan con los filtros."
-                          : "Todavía no has solicitado documentos a tus clientes."
-                      }
-                    />
-                  </td>
-                </tr>
-              ) : (
-                solicitudesFiltradas.map((item) => (
-                  <tr id={`solicitud-${item.id}`}
-                    key={item.id}
-                    className="border-b transition hover:bg-surface-hover"
-                    style={{
-                      borderColor: "var(--border)",
-                    }}
-                  >
-                    <td className="p-4">
-                      <div className="flex items-start gap-3">
-                        <div
-                          className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-lg"
-                          style={{
-                            background: item.atendida_en
-                              ? "var(--success-light)"
-                              : "var(--warning-light)",
-                            color: item.atendida_en
-                              ? "var(--success)"
-                              : "var(--warning)",
-                          }}
-                        >
-                          <FileText size={17} />
-                        </div>
-
-                        <div className="min-w-0">
-                          <p className="font-medium">
-                            {item.titulo}
-                          </p>
-
-                          <p
-                            className="mt-1 max-w-md text-xs"
-                            style={{
-                              color: "var(--foreground-muted)",
-                            }}
-                          >
-                            {item.instrucciones ||
-                              "Sin instrucciones adicionales."}
-                          </p>
-                          <ul className="mt-2 space-y-1 text-xs">
-                            {item.documentos_requeridos.map((requested) => (
-                              <li key={requested.id}>
-                                <span className="font-medium">{requested.nombre}</span>
-                                <span className="text-foreground-muted"> · {requested.estado.replaceAll("_", " ")}</span>
-                                {requested.documento && <span className="text-foreground-muted"> ({requested.documento.nombre_archivo})</span>}
-                                {requested.documento?.comentario_revision && <span className="block text-amber-700">Observación: {requested.documento.comentario_revision}</span>}
-                              </li>
-                            ))}
-                          </ul>
-                        </div>
-                      </div>
-                    </td>
-
-                    <td className="p-4">
-                      <span
-                        className="text-sm"
-                        style={{
-                          color: "var(--foreground-secondary)",
-                        }}
-                      >
-                        {item.proceso}
-                      </span>
-                    </td>
-
-                    <td className="p-4">
-                      <span className="text-sm">
-                        {item.cliente}
-                      </span>
-                    </td>
-
-                    <td className="p-4">
-                      {item.estado === "APROBADO" ? (
-                        <span
-                          className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold"
-                          style={{
-                            background: "var(--success-light)",
-                            color: "var(--success)",
-                          }}
-                        >
-                          <CheckCircle2 size={13} />
-                          Aprobada
-                        </span>
-                      ) : item.estado === "EN_REVISION" || item.estado === "DOCUMENTOS_SUMINISTRADOS" ? (
-                        <span className="inline-flex rounded-full px-2.5 py-1 text-xs font-semibold" style={{ background: "var(--primary-light)", color: "var(--primary)" }}>{item.estado === "EN_REVISION" ? "En revisión" : "Documentos suministrados"}</span>
-                      ) : item.estado === "RECHAZADO" ? (
-                        <span className="inline-flex rounded-full px-2.5 py-1 text-xs font-semibold" style={{ background: "var(--danger-light)", color: "var(--danger)" }}>Requiere corrección</span>
-                      ) : (
-                        <span
-                          className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold"
-                          style={{
-                            background: "var(--warning-light)",
-                            color: "var(--warning)",
-                          }}
-                        >
-                          <Upload size={13} />
-                          Faltan documentos
-                        </span>
-                      )}
-                    </td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
+        <div className="grid gap-3 p-4 md:grid-cols-2">
+          {solicitudesFiltradas.length === 0 ? <div className="md:col-span-2"><EmptyState icon={<FolderOpen size={30} />} title="No hay solicitudes" description={query || filtroEstado !== "TODAS" ? "No hay solicitudes que coincidan con los filtros." : "Todavía no has solicitado documentos a tus clientes."} /></div> : solicitudesFiltradas.map((item) => <article id={`solicitud-${item.id}`} key={item.id} className="overflow-hidden rounded-xl border bg-background shadow-sm" style={{ borderColor: "var(--border)" }}>
+            <header className="flex items-start gap-3 border-b bg-surface-muted p-4" style={{ borderColor: "var(--border)" }}><span className="grid size-11 shrink-0 place-items-center rounded-xl bg-amber-500/10 text-amber-700"><FolderOpen size={22} /></span><div className="min-w-0 flex-1"><p className="text-[10px] font-semibold uppercase tracking-wide" style={{ color: "var(--foreground-muted)" }}>Carpeta de solicitud</p><h3 className="mt-0.5 font-semibold">{item.titulo}</h3><p className="mt-1 truncate text-xs" style={{ color: "var(--foreground-muted)" }}>{item.proceso} · {item.cliente}</p></div><span className={`shrink-0 rounded-full px-2 py-1 text-[10px] font-semibold ${item.estado === "APROBADO" ? "bg-emerald-500/10 text-emerald-700" : item.estado === "RECHAZADO" ? "bg-red-500/10 text-red-700" : item.estado === "EN_REVISION" || item.estado === "DOCUMENTOS_SUMINISTRADOS" ? "bg-primary/10 text-primary" : "bg-amber-500/10 text-amber-700"}`}>{item.estado.replaceAll("_", " ")}</span></header>
+            {item.instrucciones && <p className="border-b px-4 py-3 text-xs text-(--foreground-secondary)" style={{ borderColor: "var(--border)" }}>{item.instrucciones}</p>}
+            <div className="divide-y" style={{ borderColor: "var(--border)" }}>{item.documentos_requeridos.map((requested) => <div key={requested.id} className="flex items-start gap-3 p-3"><FileText size={16} className="mt-0.5 shrink-0" style={{ color: "var(--primary)" }} /><div className="min-w-0 flex-1"><p className="text-sm font-medium">{requested.nombre}</p><p className="mt-0.5 text-xs" style={{ color: "var(--foreground-muted)" }}>{requested.estado.replaceAll("_", " ")}{requested.documento && <> · Archivo entregado: {requested.documento.nombre_archivo}</>}</p>{requested.documento?.comentario_revision && <p className="mt-1 text-xs text-amber-700">Observación: {requested.documento.comentario_revision}</p>}</div><span className="rounded-full bg-surface-muted px-2 py-1 text-[10px] text-(--foreground-muted)">{requested.documento ? "Recibido" : "Pendiente"}</span></div>)}</div>
+          </article>)}
         </div>
       </section>
 
@@ -746,7 +628,7 @@ export default function DocumentosPage() {
                   color: "var(--foreground-muted)",
                 }}
               >
-                <th className="p-4">Archivo</th>
+                <th className="p-4">Documento solicitado / archivo</th>
                 <th className="p-4">Proceso</th>
                 <th className="p-4">Cliente</th>
                 <th className="p-4">Tipo</th>
@@ -771,14 +653,22 @@ export default function DocumentosPage() {
                   </td>
                 </tr>
               ) : (
-                documentosFiltrados.map((item) => (
-                  <tr id={`documento-${item.id}`}
-                    key={item.id}
-                    className="border-b transition hover:bg-surface-hover"
-                    style={{
-                      borderColor: "var(--border)",
-                    }}
-                  >
+                (() => {
+                  const groups = new Map<string, { title: string; requestId: number | null; items: Document[] }>();
+                  for (const item of documentosFiltrados) {
+                    const request = data.solicitudes.find((candidate) => candidate.id === item.solicitud_id);
+                    const key = request ? `request:${request.id}` : `other:${item.proceso_id}:${item.cliente}`;
+                    const group = groups.get(key) || { title: request?.titulo || "Archivos sin solicitud asociada", requestId: request?.id ?? null, items: [] };
+                    group.items.push(item);
+                    groups.set(key, group);
+                  }
+                  return [...groups.entries()].flatMap(([key, group]) => [
+                    <tr key={`${key}:heading`} className="border-b" style={{ borderColor: "var(--border)", background: "var(--surface-muted)" }}>
+                      <td colSpan={6} className="px-4 py-3"><div className="flex flex-wrap items-center justify-between gap-2"><div className="flex min-w-0 items-center gap-3"><span className="grid size-10 shrink-0 place-items-center rounded-lg bg-amber-500/10 text-amber-700"><FolderOpen size={20} /></span><span className="min-w-0"><span className="block text-[10px] font-semibold uppercase tracking-wide" style={{ color: "var(--primary)" }}>{group.requestId ? "Carpeta de solicitud" : "Carpeta de otros archivos"}</span><span className="mt-0.5 block truncate font-medium">{group.title}</span></span></div><span className="rounded-full px-2 py-1 text-xs" style={{ background: "var(--surface)", color: "var(--foreground-muted)" }}>{group.items.length} {group.items.length === 1 ? "archivo" : "archivos"}</span></div></td>
+                    </tr>,
+                    ...group.items.map((item) => {
+                      const requiredName = requestedDocumentName(item, data.solicitudes);
+                      return <tr id={`documento-${item.id}`} key={item.id} className="border-b transition hover:bg-surface-hover" style={{ borderColor: "var(--border)" }}>
                     <td className="p-4">
                       <div className="flex items-center gap-3">
                         <div
@@ -791,9 +681,7 @@ export default function DocumentosPage() {
                           <FileText size={17} />
                         </div>
 
-                        <span className="font-medium">
-                          {item.nombre_archivo}
-                        </span>
+                        <span className="min-w-0"><span className="block font-medium">{requiredName || item.nombre_archivo}</span>{requiredName && <span className="mt-0.5 block truncate text-xs" style={{ color: "var(--foreground-muted)" }}>Archivo: {item.nombre_archivo}</span>}</span>
                       </div>
                     </td>
 
@@ -834,8 +722,10 @@ export default function DocumentosPage() {
                         </button>
                       </div>
                     </td>
-                  </tr>
-                ))
+                  </tr>;
+                    }),
+                  ]);
+                })()
               )}
             </tbody>
           </table>

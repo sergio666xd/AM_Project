@@ -15,7 +15,7 @@ def get_r2_client():
     access_key_id = os.getenv("R2_ACCESS_KEY_ID", "")
     secret_access_key = os.getenv("R2_SECRET_ACCESS_KEY", "")
 
-    if not all([account_id, access_key_id, secret_access_key, os.getenv("R2_BUCKET_NAME", "")]):
+    if not all([account_id, access_key_id, secret_access_key]):
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail="El almacenamiento de documentos no está configurado.",
@@ -32,11 +32,28 @@ def get_r2_client():
     )
 
 
-def get_r2_bucket() -> str:
-    bucket = os.getenv("R2_BUCKET_NAME", "")
+def get_r2_system_bucket() -> str:
+    """Bucket for files belonging to the case-management system."""
+    bucket = os.getenv("R2_SYSTEM_BUCKET_NAME") or os.getenv("R2_BUCKET_NAME", "")
     if not bucket:
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail="El almacenamiento de documentos no está configurado.",
         )
     return bucket
+
+
+def get_r2_tp_registros_bucket() -> str:
+    """Bucket reserved for professional registration documents."""
+    bucket = os.getenv("R2_TP_REGISTROS_BUCKET_NAME") or os.getenv("R2_BUCKET_NAME", "")
+    if not bucket:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="El almacenamiento de registros profesionales no estÃ¡ configurado.",
+        )
+    return bucket
+
+
+def get_r2_bucket() -> str:
+    """Backward-compatible name for the system bucket."""
+    return get_r2_system_bucket()

@@ -11,8 +11,10 @@ import {
   CalendarDays,
   ChevronRight,
   CreditCard,
+  Eraser,
   FileText,
   FolderOpen,
+  HardDrive,
   LayoutDashboard,
   ListChecks,
   LogOut,
@@ -31,6 +33,7 @@ import Breadcrumbs from "@/components/layout/Breadcrumbs";
 import { AdminAlertBell } from "@/components/admin/console/AdminAlertBell";
 import GlobalSearch from "@/components/layout/GlobalSearch";
 import ChatFloatingButton from "@/components/chat/ChatFloatingButton";
+import ChatPresenceHeartbeat from "@/components/chat/ChatPresenceHeartbeat";
 
 type Item = { label: string; href: string; icon: typeof LayoutDashboard };
 type Section = { title: string; scope: string; links: Item[] };
@@ -94,9 +97,19 @@ const sections: Section[] = [
         icon: UserRound,
       },
       {
+        label: "Almacenamiento R2",
+        href: "/gestion-procesos/admin/almacenamiento",
+        icon: HardDrive,
+      },
+      {
         label: "Chat",
         href: "/gestion-procesos/admin/chat",
         icon: MessageCircle,
+      },
+      {
+        label: "Limpiar conversaciones",
+        href: "/gestion-procesos/admin/chat/limpiar",
+        icon: Eraser,
       },
       {
         label: "Auditoría",
@@ -224,7 +237,7 @@ export default function AdminConsoleShell({
   const pathname = usePathname();
   const { user, logout, token } = useSession();
   const [mobileOpen, setMobileOpen] = useState(false);
-  const isChatRoute = pathname.split("/").includes("chat");
+  const isChatRoute = pathname.split("/").includes("chat") && pathname !== "/gestion-procesos/admin/chat/limpiar";
   const scope = activeScope(pathname);
 
   function renderNav() {
@@ -238,7 +251,8 @@ export default function AdminConsoleShell({
           {section.title}
         </h2>
         {section.links.map(({ label, href, icon: Icon }) => {
-          const isActive = pathname === href || pathname.startsWith(`${href}/`);
+          const isChatCleanupRoute = href === "/gestion-procesos/admin/chat" && pathname === "/gestion-procesos/admin/chat/limpiar";
+          const isActive = !isChatCleanupRoute && (pathname === href || pathname.startsWith(`${href}/`));
           return (
             <div key={`${section.title}-${href}`}>
               <Link
@@ -290,6 +304,7 @@ export default function AdminConsoleShell({
 
   return (
     <div className="min-h-screen bg-background text-foreground">
+      <ChatPresenceHeartbeat />
       <header className="fixed inset-x-0 top-0 z-40 flex h-16 items-center justify-between border-b border-border bg-surface px-4 md:hidden">
         <button
           type="button"

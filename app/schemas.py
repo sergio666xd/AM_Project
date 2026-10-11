@@ -10,6 +10,7 @@ from app.models import (
     EstadoTarea,
     PrioridadTarea,
     CanalRecordatorio,
+    TIPOS_NOTIFICACION,
 )
 
 
@@ -272,7 +273,10 @@ class CanalesNotificacionTipo(BaseModel):
 
 class UsuarioOut(BaseModel):
     id: int
-    email: EmailStr
+    # Los usuarios históricos pueden usar correos internos de desarrollo
+    # (por ejemplo, dominios .local); la validación se mantiene en los esquemas
+    # de creación y cambio de correo, no al serializar una cuenta existente.
+    email: str
     nombre_completo: str
     whatsapp_numero: str
     rol: RolUsuario
@@ -287,6 +291,35 @@ class UsuarioOut(BaseModel):
     created_at: Optional[datetime] = None
     ultimo_acceso: Optional[datetime] = None
 
+    @field_validator("preferencias_notificacion", mode="before")
+    @classmethod
+    def normalizar_preferencias_notificacion(cls, value: Any) -> dict[str, dict[str, bool]]:
+        """Acepta el formato histórico plano y completa preferencias parciales."""
+        if not isinstance(value, dict):
+            value = {}
+
+        # Algunas filas anteriores guardaban una sola preferencia global.
+        if "email" in value or "whatsapp" in value:
+            email = value.get("email", True)
+            whatsapp = value.get("whatsapp", False)
+            return {
+                tipo: {"email": bool(email), "whatsapp": bool(whatsapp)}
+                for tipo in TIPOS_NOTIFICACION
+            }
+
+        normalized: dict[str, dict[str, bool]] = {}
+        for tipo in TIPOS_NOTIFICACION:
+            canales = value.get(tipo, {})
+            if isinstance(canales, bool):
+                canales = {"email": canales, "whatsapp": False}
+            if not isinstance(canales, dict):
+                canales = {}
+            normalized[tipo] = {
+                "email": bool(canales.get("email", True)),
+                "whatsapp": bool(canales.get("whatsapp", False)),
+            }
+        return normalized
+
     class Config:
         from_attributes = True
 
@@ -294,7 +327,7 @@ class UsuarioOut(BaseModel):
 class SolicitudRegistroOut(BaseModel):
     id: int
     usuario_id: int
-    ruta_tarjeta_profesional: str
+    ruta_tarjeta_profesional: Optional[str] = None
     fecha_solicitud: datetime
     usuario: UsuarioOut
 
@@ -388,6 +421,10 @@ class ClienteCreate(BaseModel):
 class ClienteUpdate(BaseModel):
     nombre_completo: str
     whatsapp_numero: str = ""
+    genero: Optional[str] = Field(default=None, max_length=16)
+    numero_documento: Optional[str] = Field(default=None, max_length=40)
+    domicilio: Optional[str] = Field(default=None, max_length=120)
+    direccion: Optional[str] = Field(default=None, max_length=300)
 
 
 class AbogadoAdminCreate(BaseModel):
@@ -602,12 +639,16 @@ class ComunicacionClienteCreate(BaseModel):
 
 class ChatMensajeCreate(BaseModel):
     contenido: str = Field(min_length=1, max_length=12000)
-    referencia_tipo: Literal["ACTUACION", "TAREA", "EVENTO", "DOCUMENTO"] | None = None
+    referencia_tipo: Literal["ACTUACION", "RADICADO", "TAREA", "SUBTAREA", "EVENTO", "DOCUMENTO"] | None = None
     referencia_id: int | None = Field(default=None, gt=0)
 
 
 class ChatMensajeLeidoUpdate(BaseModel):
     mensaje_id: int = Field(gt=0)
+
+
+class ChatPresenciaUpdate(BaseModel):
+    session_id: str = Field(min_length=16, max_length=80, pattern=r"^[a-zA-Z0-9-]+$")
 
 
 class NotificacionesClienteLeidasUpdate(BaseModel):
