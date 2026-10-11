@@ -11,6 +11,8 @@ export type ChatListEntry = {
   proceso_id?: number | null;
   ultimo_mensaje?: string | null;
   ultimo_remitente?: string | null;
+  en_linea?: boolean;
+  participantes_en_linea?: number;
 };
 
 function sameChat(left: ChatListEntry, right: ChatListEntry) {
@@ -25,7 +27,9 @@ function sameChat(left: ChatListEntry, right: ChatListEntry) {
     && left.updated_at === right.updated_at
     && left.proceso_id === right.proceso_id
     && left.ultimo_mensaje === right.ultimo_mensaje
-    && left.ultimo_remitente === right.ultimo_remitente;
+    && left.ultimo_remitente === right.ultimo_remitente
+    && left.en_linea === right.en_linea
+    && left.participantes_en_linea === right.participantes_en_linea;
 }
 
 export function preserveChatList<T extends ChatListEntry>(current: T[], incoming: T[]): T[] {

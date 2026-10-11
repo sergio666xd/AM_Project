@@ -602,6 +602,20 @@ class ChatAvisoDestinatario(Base):
     destinatario = relationship("Usuario", foreign_keys=[destinatario_id])
 
 
+class ChatPushSubscription(Base):
+    __tablename__ = "chat_push_subscriptions"
+    __table_args__ = (UniqueConstraint("endpoint", name="uq_chat_push_subscription_endpoint"),)
+
+    id = Column(Integer, primary_key=True)
+    usuario_id = Column(Integer, ForeignKey("usuarios.id", ondelete="CASCADE"), nullable=False, index=True)
+    endpoint = Column(Text, nullable=False)
+    p256dh = Column(String(256), nullable=False)
+    auth = Column(String(128), nullable=False)
+    created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
+    updated_at = Column(DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow)
+    usuario = relationship("Usuario")
+
+
 class LecturaNotificacionAbogado(Base):
     __tablename__ = "lecturas_notificacion_abogado"
     __table_args__ = (UniqueConstraint("usuario_id", "notificacion_id", name="uq_lectura_notificacion_abogado"),)

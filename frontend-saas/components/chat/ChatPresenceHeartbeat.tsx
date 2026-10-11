@@ -43,7 +43,7 @@ export default function ChatPresenceHeartbeat() {
       }).catch(() => undefined);
 
     const heartbeat = () => {
-      if (!released) void request("POST");
+      if (!released && document.visibilityState === "visible") void request("POST");
     };
     const resume = () => {
       released = false;
@@ -54,13 +54,19 @@ export default function ChatPresenceHeartbeat() {
       released = true;
       void request("DELETE", true);
     };
+    const visibilityChanged = () => {
+      if (document.visibilityState === "visible") resume();
+      else release();
+    };
 
     heartbeat();
     const interval = window.setInterval(heartbeat, HEARTBEAT_INTERVAL_MS);
+    document.addEventListener("visibilitychange", visibilityChanged);
     window.addEventListener("pagehide", release);
     window.addEventListener("pageshow", resume);
     return () => {
       window.clearInterval(interval);
+      document.removeEventListener("visibilitychange", visibilityChanged);
       window.removeEventListener("pagehide", release);
       window.removeEventListener("pageshow", resume);
       release();

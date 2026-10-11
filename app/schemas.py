@@ -651,6 +651,22 @@ class ChatPresenciaUpdate(BaseModel):
     session_id: str = Field(min_length=16, max_length=80, pattern=r"^[a-zA-Z0-9-]+$")
 
 
+class ChatPushSubscriptionCreate(BaseModel):
+    endpoint: str = Field(min_length=1, max_length=2048)
+    keys: dict[str, str]
+
+    @field_validator("keys")
+    @classmethod
+    def validar_claves_push(cls, value: dict[str, str]) -> dict[str, str]:
+        if not value.get("p256dh") or not value.get("auth"):
+            raise ValueError("La suscripción del navegador no incluye sus claves de cifrado.")
+        return value
+
+
+class ChatPushSubscriptionDelete(BaseModel):
+    endpoint: str = Field(min_length=1, max_length=2048)
+
+
 class NotificacionesClienteLeidasUpdate(BaseModel):
     ids: list[str] = Field(min_length=1, max_length=500)
 

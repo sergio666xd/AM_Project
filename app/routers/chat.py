@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import logging
+import json
+import os
 from datetime import datetime, timedelta
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -12,6 +14,7 @@ from app.audit import registrar_evento_auditoria
 from app.database import get_db
 from app.firm_access import lawyer_process_ids, require_process_access, role_name
 from app.notification_service import emitir_notificacion_workflow
+from app.notification_policy import canales_habilitados
 from app.workflow_service import compact_portal_path, user_portal_url
 
 router = APIRouter(prefix="/api/chat", tags=["Chat"])
@@ -70,6 +73,98 @@ def cerrar_presencia_panel(
     ).delete(synchronize_session=False)
     db.commit()
     return {"activo": False}
+
+
+@router.get("/push/clave-publica")
+def obtener_clave_publica_push(user: models.Usuario = Depends(security.obtener_usuario_actual)):
+    public_key = os.getenv("WEB_PUSH_VAPID_PUBLIC_KEY", "").strip()
+    if not public_key:
+        raise HTTPException(status_code=503, detail="Las notificaciones del navegador aún no están configuradas.")
+    return {"public_key": public_key}
+
+
+@router.post("/push/suscripciones", status_code=201)
+def guardar_suscripcion_push(
+    data: schemas.ChatPushSubscriptionCreate,
+    db: Session = Depends(get_db),
+    user: models.Usuario = Depends(security.obtener_usuario_actual),
+):
+    if user.estado != models.EstadoUsuario.ACTIVO:
+        raise HTTPException(status_code=403, detail="La cuenta no está activa.")
+    if not os.getenv("WEB_PUSH_VAPID_PUBLIC_KEY") or not os.getenv("WEB_PUSH_VAPID_PRIVATE_KEY"):
+        raise HTTPException(status_code=503, detail="Las notificaciones del navegador aún no están configuradas.")
+    subscription = db.query(models.ChatPushSubscription).filter_by(endpoint=data.endpoint).with_for_update().first()
+    if subscription is None:
+        subscription = models.ChatPushSubscription(
+            usuario_id=user.id, endpoint=data.endpoint,
+            p256dh=data.keys["p256dh"], auth=data.keys["auth"],
+        )
+        db.add(subscription)
+    else:
+        subscription.usuario_id = user.id
+        subscription.p256dh = data.keys["p256dh"]
+        subscription.auth = data.keys["auth"]
+        subscription.updated_at = datetime.utcnow()
+    db.commit()
+    return {"registrada": True}
+
+
+@router.delete("/push/suscripciones")
+def eliminar_suscripcion_push(
+    data: schemas.ChatPushSubscriptionDelete,
+    db: Session = Depends(get_db),
+    user: models.Usuario = Depends(security.obtener_usuario_actual),
+):
+    db.query(models.ChatPushSubscription).filter_by(usuario_id=user.id, endpoint=data.endpoint).delete(synchronize_session=False)
+    db.commit()
+    return {"registrada": False}
+
+
+def _send_chat_push(db: Session, recipient: models.Usuario, sender: models.Usuario, link: str) -> bool:
+    public_key = os.getenv("WEB_PUSH_VAPID_PUBLIC_KEY", "").strip()
+    private_key = os.getenv("WEB_PUSH_VAPID_PRIVATE_KEY", "").strip()
+    subject = os.getenv("WEB_PUSH_VAPID_SUBJECT", "mailto:contacto@alejandramunozabogada.com").strip()
+    if not public_key or not private_key:
+        return False
+    subscriptions = db.query(models.ChatPushSubscription).filter_by(usuario_id=recipient.id).all()
+    if not subscriptions:
+        return False
+    try:
+        from pywebpush import WebPushException, webpush
+    except ImportError:
+        logger.error("pywebpush no está instalado; no se pudo enviar el aviso del chat.")
+        return False
+
+    delivered = False
+    payload = json.dumps({
+        "title": f"Nuevo mensaje de {sender.nombre_completo}",
+        "body": f"{sender.nombre_completo} te está escribiendo.",
+        "url": link,
+        "tag": f"chat-user-{sender.id}",
+    }, ensure_ascii=False)
+    for subscription in subscriptions:
+        try:
+            webpush(
+                subscription_info={
+                    "endpoint": subscription.endpoint,
+                    "keys": {"p256dh": subscription.p256dh, "auth": subscription.auth},
+                },
+                data=payload,
+                vapid_private_key=private_key,
+                vapid_claims={"sub": subject},
+                ttl=60 * 60,
+                timeout=8,
+            )
+            delivered = True
+        except WebPushException as exc:
+            status_code = getattr(exc, "status_code", None) or getattr(getattr(exc, "response", None), "status_code", None)
+            if status_code in {404, 410}:
+                db.delete(subscription)
+            else:
+                logger.warning("No se pudo entregar Web Push al usuario %s (HTTP %s).", recipient.id, status_code or "desconocido")
+        except Exception:
+            logger.exception("No se pudo enviar Web Push al usuario %s.", recipient.id)
+    return delivered
 
 
 def _path_id(value: str) -> int:
@@ -138,6 +233,12 @@ def _conversation_for_actor(db: Session, conversation_id: int, user: models.Usua
 
 def _display_conversation(db: Session, conversation: models.ChatConversacion, user: models.Usuario) -> dict:
     other = next((item.usuario for item in conversation.participantes if item.usuario_id != user.id and item.usuario), None)
+    now = datetime.utcnow()
+    other_ids = [item.usuario_id for item in conversation.participantes if item.usuario_id != user.id]
+    online_ids = {row[0] for row in db.query(models.ChatPresenciaPanel.usuario_id).filter(
+        models.ChatPresenciaPanel.usuario_id.in_(other_ids or [-1]),
+        models.ChatPresenciaPanel.last_seen_at >= now - PANEL_PRESENCE_TTL,
+    ).distinct().all()}
     if conversation.tipo == "PROCESO_COLABORADORES":
         title = "Colaboradores"
         subtitle = conversation.proceso.nombre if conversation.proceso else "Proceso"
@@ -168,6 +269,8 @@ def _display_conversation(db: Session, conversation: models.ChatConversacion, us
         "id": conversation.id, "clave": conversation.clave, "route_key": route_key, "tipo": conversation.tipo,
         "titulo": title, "subtitulo": subtitle, "href": base, "no_leidos": unread,
         "proceso_id": conversation.proceso_id,
+        "en_linea": bool(other and other.id in online_ids),
+        "participantes_en_linea": len(online_ids),
         "updated_at": last.created_at if last else conversation.updated_at,
         "ultimo_mensaje": last.contenido if last else None,
         "ultimo_remitente": last.remitente.nombre_completo if last and last.remitente else None,
@@ -616,17 +719,24 @@ def enviar_mensaje(conversation_id: int, data: schemas.ChatMensajeCreate, db: Se
         display = _display_conversation(db, conversation, recipient)
         link = user_portal_url(recipient, display["href"])
         process_name = process.nombre if process else "Conversacion del despacho"
+        push_enabled = db.query(models.ChatPushSubscription.id).filter_by(usuario_id=recipient.id).first() is not None
         if not (_supports_firm_panel_presence(user) and _supports_firm_panel_presence(recipient)):
+            if push_enabled:
+                _send_chat_push(db, recipient, user, link)
+                push_enabled = db.query(models.ChatPushSubscription.id).filter_by(usuario_id=recipient.id).first() is not None
             staff_sender = _role(user) != "CLIENTE"
             template = "COMUNICACION_ABOGADO_CLIENTE" if staff_sender else "COMUNICACION_CLIENTE_ABOGADO"
-            emitir_notificacion_workflow(
-                db, recipient, "RESUMENES", f"CHAT:{message.id}:{recipient.id}",
-                f"Nuevo mensaje de {user.nombre_completo}", f"{user.nombre_completo}: {content}",
-                emisor=user, plantilla_clave=template,
-                variables={"nombre": recipient.nombre_completo, "actor": user.nombre_completo,
-                           "proceso": process_name, "asunto": "Nuevo mensaje", "mensaje": content},
-                enlace_texto="Abrir conversacion", enlace_url=link,
-            )
+            whatsapp_enabled = "WHATSAPP" in canales_habilitados(recipient, "RESUMENES", emisor=user)
+            if not push_enabled or whatsapp_enabled:
+                emitir_notificacion_workflow(
+                    db, recipient, "RESUMENES", f"CHAT:{message.id}:{recipient.id}",
+                    f"Nuevo mensaje de {user.nombre_completo}", f"{user.nombre_completo}: {content}",
+                    emisor=user, plantilla_clave=template,
+                    variables={"nombre": recipient.nombre_completo, "actor": user.nombre_completo,
+                               "proceso": process_name, "asunto": "Nuevo mensaje", "mensaje": content},
+                    enlace_texto="Abrir conversacion", enlace_url=link,
+                    excluir_canales=("EMAIL",) if push_enabled else (),
+                )
             continue
 
         is_panel_active = db.query(models.ChatPresenciaPanel.id).filter(
@@ -645,8 +755,20 @@ def enviar_mensaje(conversation_id: int, data: schemas.ChatMensajeCreate, db: Se
             db.rollback()
             continue
 
+        if push_enabled:
+            _send_chat_push(db, recipient, user, link)
+            push_enabled = db.query(models.ChatPushSubscription.id).filter_by(usuario_id=recipient.id).first() is not None
+        whatsapp_enabled = "WHATSAPP" in canales_habilitados(recipient, "RESUMENES", emisor=user)
+        should_send_workflow = not push_enabled or whatsapp_enabled
         template_exists = db.query(models.PlantillaMensaje.id).filter_by(clave="CHAT_MENSAJE", activo=True).first()
-        if not template_exists:
+        if should_send_workflow and not template_exists:
+            if push_enabled:
+                if notice is None:
+                    db.add(models.ChatAvisoDestinatario(remitente_id=user.id, destinatario_id=recipient.id, ultima_notificacion_en=now))
+                else:
+                    notice.ultima_notificacion_en = now
+                db.commit()
+                continue
             db.rollback()
             logger.warning("Falta configurar la plantilla CHAT_MENSAJE; se omite el aviso externo del chat.")
             continue
@@ -666,13 +788,14 @@ def enviar_mensaje(conversation_id: int, data: schemas.ChatMensajeCreate, db: Se
                 emisor=user, plantilla_clave="CHAT_MENSAJE",
                 variables={"nombre": recipient.nombre_completo, "actor": user.nombre_completo},
                 enlace_texto="Abrir chat", enlace_url=link,
-            )
+                excluir_canales=("EMAIL",) if push_enabled else (),
+            ) if should_send_workflow else []
         except Exception:
             db.rollback()
             logger.exception("No se pudo preparar la notificacion agrupada del chat.")
             delivery_ids = []
 
-        if not delivery_ids:
+        if not delivery_ids and not push_enabled:
             db.query(models.Usuario.id).filter_by(id=recipient.id).with_for_update().first()
             current_notice = db.query(models.ChatAvisoDestinatario).filter_by(
                 remitente_id=user.id, destinatario_id=recipient.id,

@@ -12,6 +12,7 @@ bcrypt==4.0.1
 python-jose[cryptography]
 cryptography
 requests
+pywebpush>=2.0,<3
 boto3
 pypdf>=6.0,<7
 pypdfium2>=4.30,<5

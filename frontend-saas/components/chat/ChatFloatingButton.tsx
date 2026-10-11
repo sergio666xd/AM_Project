@@ -8,8 +8,9 @@ import { useSession } from "@/context/SessionContext";
 import { apiRequest } from "@/lib/api";
 import { renderMessageMarkdown } from "@/components/chat/ChatWorkspace";
 import { preserveChatList } from "@/components/chat/chatListState";
+import ChatPushNotifications from "@/components/chat/ChatPushNotifications";
 
-type Chat = { id: number; clave: string; route_key: string; tipo: string; titulo: string; subtitulo: string; href: string; no_leidos: number; updated_at: string; proceso_id?: number | null; ultimo_mensaje?: string | null; ultimo_remitente?: string | null };
+type Chat = { id: number; clave: string; route_key: string; tipo: string; titulo: string; subtitulo: string; href: string; no_leidos: number; updated_at: string; proceso_id?: number | null; ultimo_mensaje?: string | null; ultimo_remitente?: string | null; en_linea?: boolean; participantes_en_linea?: number };
 type Message = { id: number; contenido: string; remitente_id: number | null; remitente: string; es_mio: boolean; created_at: string; estado_entrega?: "ENVIADO" | "ENTREGADO" | "ENTREGADO_PARCIAL" | "LEIDO"; entregados?: number; leidos?: number; destinatarios?: number; referencia: { tipo: string; id: number; titulo: string; url: string } | null };
 type DeliveryStatus = Pick<Message, "estado_entrega" | "entregados" | "leidos" | "destinatarios">;
 
@@ -111,6 +112,7 @@ export default function ChatFloatingButton() {
       const response = await apiRequest("/api/chat/conversaciones", { token });
       const incoming = await response.json() as Chat[];
       setChats((current) => preserveChatList(current, incoming));
+      setSelected((current) => current ? incoming.find((chat) => chat.id === current.id) ?? current : current);
       setError("");
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "No se pudieron cargar los chats.");
@@ -202,7 +204,8 @@ export default function ChatFloatingButton() {
     {open && <section aria-label="Chat flotante" className={isFirmChat ? "fixed inset-0 z-[80] flex h-dvh w-screen flex-col overflow-hidden border-0 bg-surface shadow-2xl sm:inset-auto sm:bottom-24 sm:right-6 sm:h-[min(620px,calc(100dvh-6rem))] sm:w-[min(380px,calc(100vw-2rem))] sm:rounded-2xl sm:border" : "fixed bottom-20 right-4 z-[80] flex h-[min(620px,calc(100dvh-6rem))] w-[min(380px,calc(100vw-2rem))] flex-col overflow-hidden rounded-2xl border border-border bg-surface shadow-2xl sm:bottom-24 sm:right-6"}>
       <header className="flex items-center gap-2 border-b border-border bg-surface-muted px-3 py-3">
         {selected && <button type="button" onClick={() => { activeChatId.current = null; setSelected(null); setMessages([]); lastMessageId.current = 0; lastReadAckId.current = 0; setError(""); }} aria-label="Volver a la lista de chats" className={`grid ${isFirmChat ? "size-11" : "size-8"} place-items-center rounded-full hover:bg-surface-hover`}><ArrowLeft className="size-4" /></button>}
-        <div className="min-w-0 flex-1"><h2 className="truncate text-sm font-semibold">{selected?.titulo ?? (selectedProcessId ? processGroups.find((group) => group.id === selectedProcessId)?.titulo : null) ?? "Chats"}</h2><p className="text-[10px] text-foreground-muted">{selected ? selected.subtitulo : "Conversaciones recientes"}</p></div>
+        <div className="min-w-0 flex-1"><h2 className="truncate text-sm font-semibold">{selected?.titulo ?? (selectedProcessId ? processGroups.find((group) => group.id === selectedProcessId)?.titulo : null) ?? "Chats"}</h2><p className="text-[10px] text-foreground-muted">{selected ? selected.tipo === "PROCESO_COLABORADORES" ? selected.participantes_en_linea ? `${selected.participantes_en_linea} en línea` : "Nadie en línea" : selected.en_linea ? "En línea" : "Desconectado" : "Conversaciones recientes"}</p></div>
+        {!selected && <ChatPushNotifications />}
         {selected && <Link href={selected.href} title="Abrir pantalla completa" className="rounded-md px-2 py-1 text-xs font-medium text-primary hover:bg-primary/10">Pantalla completa</Link>}
         <button type="button" onClick={() => setOpen(false)} aria-label="Cerrar chat flotante" className={`grid ${isFirmChat ? "size-11" : "size-8"} place-items-center rounded-full hover:bg-surface-hover`}><X className="size-4" /></button>
       </header>
@@ -212,7 +215,7 @@ export default function ChatFloatingButton() {
           {topLevelItems.map((item) => {
             if (item.kind === "chat") {
               const chat = item.chat;
-              return <button key={chat.id} type="button" onClick={() => openChat(chat)} className="flex w-full items-center gap-3 border-b border-border px-3 py-3 text-left hover:bg-surface-hover"><span className="grid size-9 place-items-center rounded-full bg-primary/10 text-primary"><MessageCircle className="size-4" /></span><span className="min-w-0 flex-1"><strong className="block truncate text-xs">{chat.titulo}</strong><span className="block truncate text-[10px] text-foreground-muted">{chat.ultimo_remitente ? `${chat.ultimo_remitente}: ` : ""}{preview(chat.ultimo_mensaje)}</span></span>{chat.no_leidos > 0 && <span className="grid size-5 place-items-center rounded-full bg-emerald-600 text-[10px] text-white">{chat.no_leidos}</span>}</button>;
+              return <button key={chat.id} type="button" onClick={() => openChat(chat)} className="flex w-full items-center gap-3 border-b border-border px-3 py-3 text-left hover:bg-surface-hover"><span className="grid size-9 place-items-center rounded-full bg-primary/10 text-primary"><MessageCircle className="size-4" /></span><span className="min-w-0 flex-1"><strong className="block truncate text-xs">{chat.titulo}</strong><span className="block truncate text-[10px] text-foreground-muted">{chat.ultimo_remitente ? `${chat.ultimo_remitente}: ` : ""}{preview(chat.ultimo_mensaje)}</span></span>{chat.tipo === "PROCESO_COLABORADORES" ? chat.participantes_en_linea ? <span className="size-2 rounded-full bg-emerald-500" title={`${chat.participantes_en_linea} en línea`} /> : null : <span className={`size-2 rounded-full ${chat.en_linea ? "bg-emerald-500" : "bg-gray-400"}`} title={chat.en_linea ? "En línea" : "Desconectado"} />}{chat.no_leidos > 0 && <span className="grid size-5 place-items-center rounded-full bg-emerald-600 text-[10px] text-white">{chat.no_leidos}</span>}</button>;
             }
             const { group } = item;
             const unread = group.chats.reduce((sum, chat) => sum + chat.no_leidos, 0);
