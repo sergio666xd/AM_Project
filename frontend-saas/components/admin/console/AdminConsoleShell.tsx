@@ -39,11 +39,11 @@ type Item = { label: string; href: string; icon: typeof LayoutDashboard };
 type Section = { title: string; scope: string; links: Item[] };
 
 const operationsLinks: Item[] = [
-  { label: "Resumen", href: "/gestion-procesos/admin/operacion", icon: Activity },
-  { label: "Consultas judiciales", href: "/gestion-procesos/admin/operacion/consultas", icon: CalendarDays },
-  { label: "Integraciones", href: "/gestion-procesos/admin/operacion/integraciones", icon: ServerCog },
-  { label: "Notificaciones", href: "/gestion-procesos/admin/operacion/notificaciones", icon: Bell },
-  { label: "Mensajes del sistema", href: "/gestion-procesos/admin/operacion/mensajes", icon: FileText },
+  { label: "Resumen", href: "/operacion", icon: Activity },
+  { label: "Consultas judiciales", href: "/operacion/consultas", icon: CalendarDays },
+  { label: "Integraciones", href: "/operacion/integraciones", icon: ServerCog },
+  { label: "Notificaciones", href: "/operacion/notificaciones", icon: Bell },
+  { label: "Mensajes del sistema", href: "/operacion/mensajes", icon: FileText },
 ];
 const documentLinks: Item[] = [
   { label: "Archivos recibidos", href: "/gestion-procesos/admin/documentos", icon: BookOpenText },
@@ -118,7 +118,7 @@ const sections: Section[] = [
       },
       {
         label: "Operación",
-        href: "/gestion-procesos/admin/operacion",
+        href: "/operacion",
         icon: Activity,
       },
     ],
@@ -214,6 +214,8 @@ const sections: Section[] = [
 ];
 
 function activeScope(pathname: string) {
+  if (/^\/operacion(\/|$)/.test(pathname))
+    return "Global · todas las modalidades";
   if (pathname.startsWith("/gestion-procesos/admin/contenido"))
     return "Contenido institucional";
   if (pathname.startsWith("/gestion-procesos/admin/saas"))
@@ -252,7 +254,13 @@ export default function AdminConsoleShell({
         </h2>
         {section.links.map(({ label, href, icon: Icon }) => {
           const isChatCleanupRoute = href === "/gestion-procesos/admin/chat" && pathname === "/gestion-procesos/admin/chat/limpiar";
-          const isActive = !isChatCleanupRoute && (pathname === href || pathname.startsWith(`${href}/`));
+          const isOperationRoute = href === "/operacion" && (
+            pathname === "/operacion"
+            || pathname.startsWith("/operacion/")
+            || pathname === "/gestion-procesos/admin/operacion"
+            || pathname.startsWith("/gestion-procesos/admin/operacion/")
+          );
+          const isActive = !isChatCleanupRoute && (isOperationRoute || pathname === href || pathname.startsWith(`${href}/`));
           return (
             <div key={`${section.title}-${href}`}>
               <Link
@@ -274,10 +282,11 @@ export default function AdminConsoleShell({
                 {label}
                 {isActive && <ChevronRight className="ml-auto size-4" />}
               </Link>
-              {href === "/gestion-procesos/admin/operacion" && isActive && (
+              {(href === "/operacion" || href === "/gestion-procesos/admin/operacion") && isActive && (
                 <div className="ml-5 space-y-1 border-l border-border py-1 pl-3">
                   {operationsLinks.map(({ label: childLabel, href: childHref, icon: ChildIcon }) => {
-                    const childActive = pathname === childHref;
+                    const legacyChildHref = childHref.replace(/^\//, "/gestion-procesos/admin/");
+                    const childActive = pathname === childHref || pathname === legacyChildHref;
                     return (
                       <Link
                         key={childHref}
