@@ -1,10 +1,11 @@
 "use client";
 
 import { FormEvent, useEffect, useState } from "react";
-import { Bell, KeyRound, Mail, MessageCircle } from "lucide-react";
+import { Bell, Mail, MessageCircle } from "lucide-react";
 import { useSession } from "@/context/SessionContext";
 import { fetchApi } from "@/lib/api";
 import { SecurityChangeButton } from "@/components/security/SecurityChangeButton";
+import PushDeviceManager from "@/components/push/PushDeviceManager";
 
 export default function ClientSettingsPage() {
   const { user, token, refreshUser } = useSession();
@@ -52,6 +53,9 @@ export default function ClientSettingsPage() {
       </fieldset>
       <button type="submit" disabled={saving || !token} className="rounded-md bg-primary px-4 py-2.5 text-sm font-semibold text-primary-foreground disabled:opacity-50">{saving ? "Guardando…" : "Guardar preferencias"}</button>
     </form>
+    <section className="border-t border-border pt-5">
+      <PushDeviceManager />
+    </section>
     <section className="space-y-4 border-t border-border pt-5"><div><h2 className="font-semibold">Seguridad de la cuenta</h2><p className="mt-1 text-sm text-(--foreground-muted)">Solicita un código y valídalo antes de ingresar el nuevo dato. Al cerrar la ventana, el código se invalida.</p></div><div className="flex flex-wrap gap-3"><SecurityChangeButton action="email" title="Cambiar correo" token={token} whatsappAvailable={Boolean(user?.whatsapp_numero)} onComplete={refreshUser} /><SecurityChangeButton action="whatsapp" title="Cambiar WhatsApp" token={token} whatsappAvailable={Boolean(user?.whatsapp_numero)} onComplete={refreshUser} /><SecurityChangeButton action="password" title="Cambiar contraseña" token={token} whatsappAvailable={Boolean(user?.whatsapp_numero)} onComplete={refreshUser} /></div></section>
     <p className="border-t border-border pt-5 text-sm text-(--foreground-muted)">Los cambios de nombre y datos del contrato siguen solicitándose desde <a className="font-medium text-primary" href="/gestion-procesos/cliente/perfil">Mi perfil</a> para revisión del despacho.</p>
   </section>;

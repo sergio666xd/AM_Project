@@ -374,6 +374,8 @@ class PreferenciasNotificacionUpdate(BaseModel):
     canal_cliente: Literal["EMAIL", "WHATSAPP"] | None = None
     notificaciones_email: Optional[bool] = None
     notificaciones_whatsapp: Optional[bool] = None
+    silenciar_email_si_push: Optional[bool] = None
+    silenciar_whatsapp_si_push: Optional[bool] = None
 
 
 class PerfilUpdate(BaseModel):
@@ -668,6 +670,8 @@ class ChatPresenciaUpdate(BaseModel):
 class ChatPushSubscriptionCreate(BaseModel):
     endpoint: str = Field(min_length=1, max_length=2048)
     keys: dict[str, str]
+    user_agent: str = Field(default="", max_length=512)
+    device_label: str = Field(default="", max_length=120)
 
     @field_validator("keys")
     @classmethod

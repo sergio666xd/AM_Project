@@ -238,6 +238,8 @@ class Usuario(Base):
         default=preferencias_notificacion_por_defecto,
     )
     canal_notificacion_cliente = Column(String(16), nullable=True)
+    silenciar_email_si_push = Column(Boolean, nullable=False, default=False)
+    silenciar_whatsapp_si_push = Column(Boolean, nullable=False, default=False)
     created_at = Column(DateTime, default=datetime.utcnow)
     ultimo_acceso = Column(DateTime, nullable=True)
 
@@ -613,6 +615,8 @@ class ChatPushSubscription(Base):
     endpoint = Column(Text, nullable=False)
     p256dh = Column(String(256), nullable=False)
     auth = Column(String(128), nullable=False)
+    user_agent = Column(Text, nullable=False, default="")
+    device_label = Column(String(120), nullable=False, default="")
     created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
     updated_at = Column(DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow)
     usuario = relationship("Usuario")

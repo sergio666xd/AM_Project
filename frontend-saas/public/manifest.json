@@ -1,0 +1,19 @@
+{
+  "name": "AM Abogada — Panel de Gestión",
+  "short_name": "AM Panel",
+  "description": "Portal de gestión de procesos judiciales — Alejandra Muñoz Abogada y Asociados",
+  "start_url": "/gestion-procesos",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#f7f3e8",
+  "theme_color": "#002060",
+  "icons": [
+    {
+      "src": "/am_rounded.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}
+

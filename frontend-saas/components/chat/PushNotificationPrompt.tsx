@@ -44,6 +44,29 @@ async function getOrCreateSubscription(registration: ServiceWorkerRegistration, 
   }
 }
 
+function getDeviceLabel(): string {
+  if (typeof navigator === "undefined") return "";
+  const ua = navigator.userAgent;
+  const uaLower = ua.toLowerCase();
+
+  let os = "Dispositivo";
+  if (/iphone/i.test(ua)) os = "iPhone";
+  else if (/ipad/i.test(ua)) os = "iPad";
+  else if (/android/i.test(ua)) os = "Android";
+  else if (/macintosh|mac os/i.test(ua)) os = "Mac";
+  else if (/windows/i.test(ua)) os = "Windows";
+  else if (/linux/i.test(ua)) os = "Linux";
+
+  let browser = "";
+  if (/edg\//i.test(ua) || /edga\//i.test(ua) || /edgios\//i.test(ua)) browser = "Edge";
+  else if (/chrome\//i.test(ua) && /safari\//i.test(ua) && !/edg/i.test(ua)) browser = "Chrome";
+  else if (/firefox\//i.test(ua) || /fxios\//i.test(ua)) browser = "Firefox";
+  else if (/safari\//i.test(ua) && !/chrome/i.test(uaLower)) browser = "Safari";
+  else if (/samsungbrowser/i.test(ua)) browser = "Samsung Internet";
+
+  return browser ? `${os} · ${browser}` : os;
+}
+
 async function reportPushFailure(token: string, stage: string, cause: unknown) {
   const name = cause instanceof Error ? cause.name : "Error";
   const message = cause instanceof Error ? cause.message : String(cause);
@@ -70,10 +93,15 @@ export default function PushNotificationPrompt() {
 
   const persistSubscription = useCallback(async (subscription: PushSubscription) => {
     if (!token) return;
+    const subJson = subscription.toJSON();
     await apiRequest("/api/chat/push/suscripciones", {
       method: "POST",
       token,
-      body: JSON.stringify(subscription.toJSON()),
+      body: JSON.stringify({
+        ...subJson,
+        user_agent: navigator.userAgent || "",
+        device_label: getDeviceLabel(),
+      }),
     });
     setOpen(false);
     setError("");
@@ -105,7 +133,7 @@ export default function PushNotificationPrompt() {
           const keyResponse = await apiRequest("/api/chat/push/clave-publica", { token });
           const { public_key: publicKey } = await keyResponse.json() as { public_key: string };
           stage = "registrar_service_worker";
-          await navigator.serviceWorker.register("/chat-sw.js");
+          await navigator.serviceWorker.register("/chat-sw.js", { scope: "/" });
           stage = "esperar_service_worker";
           const registration = await navigator.serviceWorker.ready;
           const subscription = await getOrCreateSubscription(registration, publicKey, (value) => { stage = value; });
@@ -142,7 +170,7 @@ export default function PushNotificationPrompt() {
       const keyResponse = await apiRequest("/api/chat/push/clave-publica", { token });
       const { public_key: publicKey } = await keyResponse.json() as { public_key: string };
       stage = "registrar_service_worker";
-      await navigator.serviceWorker.register("/chat-sw.js");
+      await navigator.serviceWorker.register("/chat-sw.js", { scope: "/" });
       stage = "esperar_service_worker";
       const registration = await navigator.serviceWorker.ready;
       const subscription = await getOrCreateSubscription(registration, publicKey, (value) => { stage = value; });

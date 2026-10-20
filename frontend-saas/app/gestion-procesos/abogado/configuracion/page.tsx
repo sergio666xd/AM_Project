@@ -14,6 +14,7 @@ import {
 
 import { useSession } from "@/context/SessionContext";
 import { SecurityChangeButton } from "@/components/security/SecurityChangeButton";
+import PushDeviceManager from "@/components/push/PushDeviceManager";
 
 const TIPOS_MENSAJE = [
   { id: "ACCESO", label: "Acceso y cuenta" },
@@ -279,6 +280,11 @@ export default function ConfiguracionAbogadoPage() {
             {saving ? "Guardando…" : "Guardar preferencias"}
           </button>
         </div>
+      </section>
+
+      {/* Dispositivos Push */}
+      <section className="rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-5 sm:p-6">
+        <PushDeviceManager />
       </section>
 
       {/* Información de cuenta */}

@@ -16,6 +16,7 @@ export function PortalLoginForm({ portal }: { portal: Portal }) {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
+  const [rememberMe, setRememberMe] = useState(true);
   const [error, setError] = useState("");
   const [wrongPortal, setWrongPortal] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -30,7 +31,11 @@ export function PortalLoginForm({ portal }: { portal: Portal }) {
     setWrongPortal(false);
     setLoading(true);
     try {
-      const formData = new URLSearchParams({ username: email.trim(), password });
+      const formData = new URLSearchParams({
+        username: email.trim(),
+        password,
+        remember_me: rememberMe ? "true" : "false",
+      });
       const response = await fetch(`${API_URL}/api/auth/login`, {
         method: "POST",
         headers: { "Content-Type": "application/x-www-form-urlencoded" },
@@ -53,6 +58,11 @@ export function PortalLoginForm({ portal }: { portal: Portal }) {
       }
 
       localStorage.setItem("token", data.access_token);
+      if (rememberMe) {
+        localStorage.setItem("remember_me", "true");
+      } else {
+        localStorage.removeItem("remember_me");
+      }
       const redirect = safeInternalRedirect(new URLSearchParams(window.location.search).get("redirect"));
       if (data.debe_cambiar_password) {
         router.replace(redirect
@@ -93,6 +103,15 @@ export function PortalLoginForm({ portal }: { portal: Portal }) {
           <form onSubmit={handleLogin} className="mt-7 space-y-5" aria-describedby={error ? "login-error" : undefined}>
             <label className="block"><span className="mb-2 block text-sm font-semibold">Correo electrónico</span><span className="relative block"><Mail className="pointer-events-none absolute left-4 top-3.5 text-[#765d19]" size={19} aria-hidden="true" /><input type="email" name="email" autoComplete="username" required value={email} onChange={(event) => { setEmail(event.target.value); setError(""); setWrongPortal(false); }} aria-invalid={Boolean(error && !wrongPortal)} aria-describedby={error ? "login-error" : undefined} className="min-h-11 w-full rounded-lg border border-[#ccb56b]/80 bg-white py-3 pl-11 pr-4 text-sm outline-none transition focus:border-[#002060] focus:ring-2 focus:ring-[#002060]/30" /></span></label>
             <label className="block"><span className="mb-2 block text-sm font-semibold">Contraseña</span><span className="relative block"><LockKeyhole className="pointer-events-none absolute left-4 top-3.5 text-[#765d19]" size={19} aria-hidden="true" /><input type={showPassword ? "text" : "password"} name="password" autoComplete="current-password" required value={password} onChange={(event) => { setPassword(event.target.value); setError(""); setWrongPortal(false); }} aria-invalid={Boolean(error && !wrongPortal)} aria-describedby={error ? "login-error" : undefined} className="min-h-11 w-full rounded-lg border border-[#ccb56b]/80 bg-white py-3 pl-11 pr-14 text-sm outline-none transition focus:border-[#002060] focus:ring-2 focus:ring-[#002060]/30" /><button type="button" aria-label={showPassword ? "Ocultar contraseña" : "Mostrar contraseña"} aria-pressed={showPassword} onClick={() => setShowPassword((visible) => !visible)} className="absolute right-1 top-1 grid min-h-11 min-w-11 place-items-center rounded text-[#002060]/75 hover:bg-[#fff7df] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#002060]">{showPassword ? <EyeOff size={20} aria-hidden="true" /> : <Eye size={20} aria-hidden="true" />}</button></span></label>
+            <label className="flex items-center gap-2.5 cursor-pointer select-none">
+              <input
+                type="checkbox"
+                checked={rememberMe}
+                onChange={(e) => setRememberMe(e.target.checked)}
+                className="h-4 w-4 rounded border-[#ccb56b] text-[#002060] accent-[#002060] focus:ring-2 focus:ring-[#002060]/30"
+              />
+              <span className="text-sm text-[#002060]/80">Mantener sesión iniciada</span>
+            </label>
             <button type="submit" disabled={loading} className="inline-flex min-h-11 w-full items-center justify-center rounded-lg bg-[#002060] px-4 py-3 font-semibold !text-white outline-none transition hover:bg-[#003387] focus-visible:ring-2 focus-visible:ring-[#92792e] focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60">{loading ? "Verificando acceso…" : isAdminPortal ? "Ingresar a administración" : "Ingresar al portal"}</button>
           </form>
           {!isAdminPortal && <>

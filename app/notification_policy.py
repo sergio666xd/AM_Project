@@ -1,3 +1,5 @@
+from sqlalchemy.orm import Session
+
 from app import models
 
 
@@ -84,10 +86,23 @@ def _ambito_proceso(proceso: models.Proceso) -> str | None:
     return None
 
 
+def usuario_tiene_push_activo(usuario: models.Usuario, db: "Session | None" = None) -> bool:
+    """Devuelve True si el usuario tiene al menos una suscripción push registrada."""
+    if db is None:
+        return False
+    return (
+        db.query(models.ChatPushSubscription.id)
+        .filter_by(usuario_id=usuario.id)
+        .first()
+        is not None
+    )
+
+
 def canales_habilitados(
     usuario: models.Usuario | None,
     tipo: str,
     emisor: models.Usuario | None = None,
+    db: "Session | None" = None,
 ) -> tuple[str, ...]:
     if (
         usuario is None
@@ -96,11 +111,16 @@ def canales_habilitados(
     ):
         return ()
 
+    # Determinar si el usuario tiene push activo para aplicar silenciamiento
+    tiene_push = usuario_tiene_push_activo(usuario, db) if db else False
+    silenciar_email = tiene_push and getattr(usuario, "silenciar_email_si_push", False)
+    silenciar_whatsapp = tiene_push and getattr(usuario, "silenciar_whatsapp_si_push", False)
+
     if usuario.rol == models.RolUsuario.CLIENTE:
         resultado = []
-        if usuario.notificaciones_email and usuario.email:
+        if usuario.notificaciones_email and usuario.email and not silenciar_email:
             resultado.append("EMAIL")
-        if usuario.notificaciones_whatsapp and whatsapp_habilitado(usuario):
+        if usuario.notificaciones_whatsapp and whatsapp_habilitado(usuario) and not silenciar_whatsapp:
             resultado.append("WHATSAPP")
         return tuple(resultado)
 
@@ -114,9 +134,9 @@ def canales_habilitados(
         whatsapp_preferido = bool(canales.get("whatsapp", False))
 
     resultado = []
-    if email_habilitado and usuario.email:
+    if email_habilitado and usuario.email and not silenciar_email:
         resultado.append("EMAIL")
-    if whatsapp_preferido and whatsapp_habilitado(usuario):
+    if whatsapp_preferido and whatsapp_habilitado(usuario) and not silenciar_whatsapp:
         feature = PREFERENCIA_PLAN_WHATSAPP.get(tipo)
         plan_owner = usuario if usuario.rol == models.RolUsuario.ABOGADO else emisor
         if feature is None or plan_owner is None or plan_whatsapp_habilitado(plan_owner, feature):

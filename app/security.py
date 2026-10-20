@@ -13,6 +13,7 @@ from app import models
 
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 60 * 24  # 24 horas
+PERSISTENT_TOKEN_EXPIRE_MINUTES = 60 * 24 * 15  # 15 días para sesión persistente
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/auth/login")
@@ -33,11 +34,21 @@ def verify_password(plain_password: str, hashed_password: str) -> bool:
     return pwd_context.verify(plain_password, hashed_password)
 
 
-def create_access_token(data: dict) -> str:
+def create_access_token(data: dict, *, persistent: bool = False) -> str:
+    """Crea un JWT.  Si *persistent* es True usa la expiración de 15 días."""
     to_encode = data.copy()
-    expire = datetime.utcnow() + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
-    to_encode.update({"exp": expire})
+    expire_minutes = PERSISTENT_TOKEN_EXPIRE_MINUTES if persistent else ACCESS_TOKEN_EXPIRE_MINUTES
+    expire = datetime.now(timezone.utc) + timedelta(minutes=expire_minutes)
+    to_encode.update({"exp": expire, "persistent": persistent})
     return jwt.encode(to_encode, get_jwt_secret(), algorithm=ALGORITHM)
+
+
+def decode_token_payload(token: str) -> dict | None:
+    """Decodifica un JWT y devuelve el payload, o None si es inválido/expirado."""
+    try:
+        return jwt.decode(token, get_jwt_secret(), algorithms=[ALGORITHM])
+    except JWTError:
+        return None
 
 
 def _decode_password_reset_payload(token: str) -> dict | None:

@@ -112,7 +112,7 @@ def emitir_notificacion_workflow(
     canales = (
         canales_recordatorio_seleccionados(usuario, recordatorio)
         if tipo == "RECORDATORIOS" and recordatorio_id is not None
-        else canales_habilitados(usuario, tipo, emisor=emisor)
+        else canales_habilitados(usuario, tipo, emisor=emisor, db=db)
     )
     if incluir_email and usuario.estado == models.EstadoUsuario.ACTIVO and usuario.email:
         canales = tuple(dict.fromkeys((*canales, "EMAIL")))

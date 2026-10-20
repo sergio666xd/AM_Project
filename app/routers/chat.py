@@ -99,12 +99,15 @@ def guardar_suscripcion_push(
         subscription = models.ChatPushSubscription(
             usuario_id=user.id, endpoint=data.endpoint,
             p256dh=data.keys["p256dh"], auth=data.keys["auth"],
+            user_agent=data.user_agent, device_label=data.device_label,
         )
         db.add(subscription)
     else:
         subscription.usuario_id = user.id
         subscription.p256dh = data.keys["p256dh"]
         subscription.auth = data.keys["auth"]
+        subscription.user_agent = data.user_agent
+        subscription.device_label = data.device_label
         subscription.updated_at = datetime.utcnow()
     db.commit()
     return {"registrada": True}
@@ -119,6 +122,80 @@ def eliminar_suscripcion_push(
     db.query(models.ChatPushSubscription).filter_by(usuario_id=user.id, endpoint=data.endpoint).delete(synchronize_session=False)
     db.commit()
     return {"registrada": False}
+
+
+@router.get("/push/dispositivos")
+def listar_dispositivos_push(
+    db: Session = Depends(get_db),
+    user: models.Usuario = Depends(security.obtener_usuario_actual),
+):
+    """Lista los dispositivos del usuario con notificaciones push activas."""
+    subs = (
+        db.query(models.ChatPushSubscription)
+        .filter_by(usuario_id=user.id)
+        .order_by(models.ChatPushSubscription.updated_at.desc())
+        .all()
+    )
+    return [
+        {
+            "id": s.id,
+            "device_label": s.device_label or _label_from_user_agent(s.user_agent),
+            "user_agent": s.user_agent,
+            "created_at": s.created_at.isoformat() if s.created_at else None,
+            "updated_at": s.updated_at.isoformat() if s.updated_at else None,
+        }
+        for s in subs
+    ]
+
+
+@router.delete("/push/dispositivos/{device_id}")
+def eliminar_dispositivo_push(
+    device_id: int,
+    db: Session = Depends(get_db),
+    user: models.Usuario = Depends(security.obtener_usuario_actual),
+):
+    """Elimina una suscripción push específica del usuario por ID."""
+    deleted = (
+        db.query(models.ChatPushSubscription)
+        .filter_by(id=device_id, usuario_id=user.id)
+        .delete(synchronize_session=False)
+    )
+    if not deleted:
+        raise HTTPException(status_code=404, detail="Dispositivo no encontrado.")
+    db.commit()
+    return {"eliminado": True}
+
+
+def _label_from_user_agent(ua: str) -> str:
+    """Genera una etiqueta legible a partir del user-agent."""
+    if not ua:
+        return "Dispositivo desconocido"
+    ua_lower = ua.lower()
+    # Detectar SO
+    os_name = "Dispositivo"
+    if "iphone" in ua_lower or "ipad" in ua_lower:
+        os_name = "iPhone" if "iphone" in ua_lower else "iPad"
+    elif "android" in ua_lower:
+        os_name = "Android"
+    elif "macintosh" in ua_lower or "mac os" in ua_lower:
+        os_name = "Mac"
+    elif "windows" in ua_lower:
+        os_name = "Windows"
+    elif "linux" in ua_lower:
+        os_name = "Linux"
+    # Detectar navegador
+    browser = ""
+    if "edg/" in ua_lower or "edga/" in ua_lower or "edgios/" in ua_lower:
+        browser = "Edge"
+    elif "chrome/" in ua_lower and "safari/" in ua_lower and "edg" not in ua_lower:
+        browser = "Chrome"
+    elif "firefox/" in ua_lower or "fxios/" in ua_lower:
+        browser = "Firefox"
+    elif "safari/" in ua_lower and "chrome" not in ua_lower:
+        browser = "Safari"
+    elif "samsung" in ua_lower:
+        browser = "Samsung Internet"
+    return f"{os_name} · {browser}" if browser else os_name
 
 
 @router.post("/push/diagnosticos", status_code=204)
@@ -824,7 +901,7 @@ def enviar_mensaje(conversation_id: int, data: schemas.ChatMensajeCreate, db: Se
         if not (_supports_firm_panel_presence(user) and _supports_firm_panel_presence(recipient)):
             staff_sender = _role(user) != "CLIENTE"
             template = "COMUNICACION_ABOGADO_CLIENTE" if staff_sender else "COMUNICACION_CLIENTE_ABOGADO"
-            whatsapp_enabled = "WHATSAPP" in canales_habilitados(recipient, "RESUMENES", emisor=user)
+            whatsapp_enabled = "WHATSAPP" in canales_habilitados(recipient, "RESUMENES", emisor=user, db=db)
             if not push_delivered or whatsapp_enabled:
                 emitir_notificacion_workflow(
                     db, recipient, "RESUMENES", f"CHAT:{message.id}:{recipient.id}",
@@ -846,7 +923,7 @@ def enviar_mensaje(conversation_id: int, data: schemas.ChatMensajeCreate, db: Se
         if is_panel_active:
             continue
 
-        whatsapp_enabled = "WHATSAPP" in canales_habilitados(recipient, "RESUMENES", emisor=user)
+        whatsapp_enabled = "WHATSAPP" in canales_habilitados(recipient, "RESUMENES", emisor=user, db=db)
         should_send_workflow = not push_delivered or whatsapp_enabled
         if not should_send_workflow:
             continue

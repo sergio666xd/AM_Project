@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { SessionProvider } from "@/context/SessionContext";
 import { ToastProvider } from "@/components/ui/ToastProvider";
 import { SITE_URL } from "@/lib/siteUrl";
@@ -10,6 +10,16 @@ export const metadata: Metadata = {
   title: "Abogada en Sabaneta | Alejandra Mu\u00f1oz",
   description:
     "Asesoría jurídica integral con enfoque en prevención, estrategia y representación. Atención desde Sabaneta a todo Colombia.",
+  manifest: "/manifest.json",
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: "default",
+    title: "AM Panel",
+  },
+};
+
+export const viewport: Viewport = {
+  themeColor: "#002060",
 };
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {

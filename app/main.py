@@ -425,7 +425,9 @@ def registrar_abogado(
 
 @app.post("/api/auth/login", response_model=schemas.Token)
 def login(
-    form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get_db)
+    form_data: OAuth2PasswordRequestForm = Depends(),
+    remember_me: bool = Form(True),
+    db: Session = Depends(get_db),
 ):
     """Inicia sesión y genera el token JWT. Valida que la cuenta esté activa."""
     usuario = db.query(models.Usuario).filter(models.Usuario.email == form_data.username).first()
@@ -447,8 +449,33 @@ def login(
 
     usuario.ultimo_acceso = datetime.utcnow()
     db.commit()
-    access_token = security.create_access_token(data={"sub": str(usuario.id)})
+    access_token = security.create_access_token(
+        data={"sub": str(usuario.id)}, persistent=remember_me,
+    )
     return {"access_token": access_token, "token_type": "bearer", "debe_cambiar_password": usuario.debe_cambiar_password}
+
+
+@app.post("/api/auth/refresh-token", response_model=schemas.Token)
+def refresh_token(
+    usuario_actual: models.Usuario = Depends(security.obtener_usuario_actual),
+    token: str = Depends(security.oauth2_scheme),
+    db: Session = Depends(get_db),
+):
+    """Renueva el token JWT manteniendo la misma politica de expiracion (sliding window).
+
+    Si el token original fue emitido con persistent=True el nuevo token
+    tambien sera persistente (15 dias desde ahora).  Esto permite que la
+    sesion se mantenga activa indefinidamente mientras el usuario acceda
+    al menos una vez cada 15 dias.
+    """
+    payload = security.decode_token_payload(token)
+    persistent = bool(payload.get("persistent")) if payload else False
+    usuario_actual.ultimo_acceso = datetime.utcnow()
+    db.commit()
+    new_token = security.create_access_token(
+        data={"sub": str(usuario_actual.id)}, persistent=persistent,
+    )
+    return {"access_token": new_token, "token_type": "bearer", "debe_cambiar_password": usuario_actual.debe_cambiar_password}
 
 
 @app.post("/api/auth/cambiar-password")
@@ -567,6 +594,11 @@ def actualizar_preferencias_notificaciones(datos: schemas.PreferenciasNotificaci
         usuario_actual.notificaciones_whatsapp = any(
             canales["whatsapp"] for canales in usuario_actual.preferencias_notificacion.values()
         )
+    # Silenciamiento de canales cuando push está activo
+    if datos.silenciar_email_si_push is not None:
+        usuario_actual.silenciar_email_si_push = datos.silenciar_email_si_push
+    if datos.silenciar_whatsapp_si_push is not None:
+        usuario_actual.silenciar_whatsapp_si_push = datos.silenciar_whatsapp_si_push
     registrar_evento_auditoria(db, usuario_actual, "auth.notificaciones.actualizar", "usuario", usuario_actual.id)
     db.commit()
     return {
@@ -574,6 +606,8 @@ def actualizar_preferencias_notificaciones(datos: schemas.PreferenciasNotificaci
         "canal_notificacion_cliente": usuario_actual.canal_notificacion_cliente,
         "notificaciones_email": usuario_actual.notificaciones_email,
         "notificaciones_whatsapp": usuario_actual.notificaciones_whatsapp,
+        "silenciar_email_si_push": usuario_actual.silenciar_email_si_push,
+        "silenciar_whatsapp_si_push": usuario_actual.silenciar_whatsapp_si_push,
     }
 
 
@@ -923,6 +957,8 @@ def obtener_mi_usuario(
         "canal_notificacion_cliente": usuario.canal_notificacion_cliente,
         "preferencias_notificacion": usuario.preferencias_notificacion,
         "canal_notificacion_cliente": usuario.canal_notificacion_cliente,
+        "silenciar_email_si_push": usuario.silenciar_email_si_push,
+        "silenciar_whatsapp_si_push": usuario.silenciar_whatsapp_si_push,
         "plan": (
             {
                 "id": usuario.plan.id,

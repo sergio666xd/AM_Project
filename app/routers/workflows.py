@@ -278,7 +278,7 @@ def _agregar_actuaciones_a_grupo(
     proceso: models.Proceso | None,
     actuaciones: list[dict],
 ) -> None:
-    for canal in canales_habilitados(usuario, "ACTUACIONES", emisor=emisor):
+    for canal in canales_habilitados(usuario, "ACTUACIONES", emisor=emisor, db=db):
         clave = (usuario.id, canal)
         grupo = grupos.setdefault(clave, {"usuario": usuario, "canal": canal, "secciones": {}})
         proceso_id = proceso.id if proceso else None
@@ -483,7 +483,7 @@ def preparar_notificaciones_actuaciones(
         for cliente, proceso in clientes_notificables_para_radicado(radicado):
             for actuacion in nuevas:
                 push_targets.setdefault((cliente.id, actuacion["id"]), (cliente, proceso, radicado, actuacion))
-            if not canales_habilitados(cliente, "ACTUACIONES", emisor=proceso.abogado):
+            if not canales_habilitados(cliente, "ACTUACIONES", emisor=proceso.abogado, db=db):
                 omitida = _cuerpo_novedades([{
                     "proceso": proceso.nombre,
                     "radicado": radicado.numero,
@@ -863,7 +863,7 @@ def enviar_entrega_notificacion_workflow(
             db.query(models.RecordatorioTarea).filter_by(id=entrega.recordatorio_id).first(),
         )
         if entrega.tipo == "RECORDATORIOS" and entrega.recordatorio_id is not None
-        else usuario is not None and entrega.canal in canales_habilitados(usuario, entrega.tipo)
+        else usuario is not None and entrega.canal in canales_habilitados(usuario, entrega.tipo, db=db)
     )
     if not usuario or not canal_habilitado:
         entrega.estado = "OMITIDA"
