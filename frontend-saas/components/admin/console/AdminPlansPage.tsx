@@ -6,6 +6,7 @@ import { fetchApi } from "@/lib/api";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { Button } from "@/components/ui/Button";
 import { Badge } from "@/components/ui/Badge";
+import { useSession } from "@/context/SessionContext";
 
 type Plan = {
   id: number;
@@ -58,8 +59,7 @@ export default function AdminPlansPage() {
   const [editing, setEditing] = useState<Plan | null>(null);
   const [form, setForm] = useState<FormState>(emptyForm);
   const [selectedIds, setSelectedIds] = useState<number[]>([]);
-  const token =
-    typeof window === "undefined" ? "" : localStorage.getItem("token") || "";
+  const { token } = useSession();
 
   useEffect(() => {
     if (!token) return;

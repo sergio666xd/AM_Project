@@ -20,6 +20,7 @@ import { IntegrationSettingsPanel } from "@/components/admin/console/Integration
 import { PageHeader } from "@/components/ui/PageHeader";
 import { Button } from "@/components/ui/Button";
 import { StatCard } from "@/components/ui/StatCard";
+import { useSession } from "@/context/SessionContext";
 
 type Vision = {
   resumen: {
@@ -148,8 +149,7 @@ export default function AdminOperationsPage({ section = "resumen" }: { section?:
   const [sweepDetails, setSweepDetails] = useState<SweepDetails | null>(null);
   const [scheduleMessage, setScheduleMessage] = useState("");
   const [error, setError] = useState("");
-  const token =
-    typeof window === "undefined" ? "" : localStorage.getItem("token") || "";
+  const { token } = useSession();
 
   useEffect(() => {
     if (!token) return;

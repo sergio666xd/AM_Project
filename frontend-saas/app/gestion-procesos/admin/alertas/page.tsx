@@ -12,6 +12,7 @@ import { LoadingState } from "@/components/ui/LoadingState";
 import { FilterBar } from "@/components/ui/FilterBar";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { StatCard } from "@/components/ui/StatCard";
+import { useSession } from "@/context/SessionContext";
 
 type AlertState = "ACTIVA" | "ATENDIDA" | "DESCARTADA" | "ELIMINADA";
 type AlertItem = {
@@ -41,7 +42,7 @@ export default function AdminAlertsPage() {
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
   const [error, setError] = useState("");
-  const token = typeof window === "undefined" ? "" : localStorage.getItem("token") || "";
+  const { token } = useSession();
 
   const load = useCallback(async (showLoading = false) => {
     if (!token) return;

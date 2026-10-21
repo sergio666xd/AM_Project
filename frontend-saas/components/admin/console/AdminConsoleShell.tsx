@@ -130,14 +130,31 @@ const sections: NavSection[] = [
   },
 ];
 
+function normalizePath(path: string): string {
+  if (!path) return "/";
+  const withoutTrailing = path.replace(/\/+$/, "");
+  return withoutTrailing || "/";
+}
+
 function isActive(pathname: string, href: string): boolean {
-  if (href === "/gestion-procesos/admin") return pathname === href;
-  if (href === "/operacion") {
-    return pathname === "/operacion" || pathname.startsWith("/operacion/")
-      || pathname === "/gestion-procesos/admin/operacion"
-      || pathname.startsWith("/gestion-procesos/admin/operacion/");
+  const current = normalizePath(pathname);
+  const target = normalizePath(href);
+
+  if (target === "/gestion-procesos/admin") {
+    return current === "/gestion-procesos/admin";
   }
-  return pathname === href || pathname.startsWith(`${href}/`);
+
+  if (target === "/operacion" || target === "/gestion-procesos/admin/operacion") {
+    return (
+      current === "/operacion" ||
+      current.startsWith("/operacion/") ||
+      current === "/gestion-procesos/admin/operacion" ||
+      current.startsWith("/gestion-procesos/admin/operacion/")
+    );
+  }
+
+  if (current === target) return true;
+  return current.startsWith(`${target}/`);
 }
 
 function hasChildActive(items: NavItem[], pathname: string) {
@@ -148,6 +165,12 @@ function hasChildActive(items: NavItem[], pathname: string) {
 function NavSection({ section, pathname, onNavigate }: { section: NavSection; pathname: string; onNavigate: () => void }) {
   const childActive = hasChildActive(section.items, pathname);
   const [open, setOpen] = useState(section.defaultOpen || childActive);
+
+  useEffect(() => {
+    if (childActive) {
+      setOpen(true);
+    }
+  }, [childActive]);
 
   return (
     <section aria-label={section.title}>
@@ -175,31 +198,45 @@ function NavSection({ section, pathname, onNavigate }: { section: NavSection; pa
                     onNavigate();
                     if (isCMS) { event.preventDefault(); window.location.assign(item.href); }
                   }}
-                  aria-current={pathname === item.href ? "page" : undefined}
-                  className={`flex items-center gap-3 rounded-[var(--radius-md)] px-3 py-2 text-[13px] font-medium transition-colors ${
+                  aria-current={active ? "page" : undefined}
+                  className={`group relative flex items-center gap-3 rounded-[var(--radius-md)] px-3 py-2 text-[13px] font-medium transition-all ${
                     active
-                      ? "bg-brand-900 text-white"
+                      ? "bg-brand-900 text-white font-semibold shadow-xs dark:bg-brand-800 dark:text-white dark:ring-1 dark:ring-brand-700/50"
                       : "text-foreground-secondary hover:bg-surface-hover hover:text-foreground"
                   }`}
                 >
-                  <Icon className="size-4 shrink-0" aria-hidden="true" />
+                  {active && (
+                    <span
+                      className="absolute left-0 top-1.5 bottom-1.5 w-1 rounded-r-full bg-gold-400"
+                      aria-hidden="true"
+                    />
+                  )}
+                  <Icon
+                    className={`size-4 shrink-0 transition-colors ${
+                      active ? "text-gold-400 dark:text-gold-300" : "text-foreground-muted group-hover:text-foreground"
+                    }`}
+                    aria-hidden="true"
+                  />
                   <span className="truncate">{item.label}</span>
-                  {active && <ChevronRight className="ml-auto size-3.5 opacity-60" />}
+                  {active && <ChevronRight className="ml-auto size-3.5 text-gold-400/80 dark:text-gold-300/80" />}
                 </Link>
 
                 {/* Sub-navigation for Operations */}
                 {item.href === "/gestion-procesos/admin/operacion" && (pathname.startsWith("/gestion-procesos/admin/operacion") || pathname.startsWith("/operacion")) && (
-                  <div className="ml-5 space-y-0.5 border-l-2 border-brand-100 py-1 pl-3">
+                  <div className="ml-5 space-y-0.5 border-l-2 border-brand-200 dark:border-brand-800 py-1 pl-3">
                     {operationsChildren.map(({ label, href: childHref, icon: ChildIcon }) => {
-                      const childActive2 = pathname === childHref;
+                      const childActive2 = normalizePath(pathname) === normalizePath(childHref);
                       return (
                         <Link key={childHref} href={childHref} onClick={onNavigate}
                           aria-current={childActive2 ? "page" : undefined}
-                          className={`flex items-center gap-2 rounded-[var(--radius-sm)] px-2 py-1.5 text-xs font-medium transition-colors ${
-                            childActive2 ? "bg-brand-100 text-brand-900" : "text-foreground-muted hover:bg-surface-hover hover:text-foreground-secondary"
+                          className={`group flex items-center gap-2 rounded-[var(--radius-sm)] px-2.5 py-1.5 text-xs font-medium transition-all ${
+                            childActive2
+                              ? "bg-brand-900 text-white font-semibold shadow-xs dark:bg-brand-800 dark:text-white"
+                              : "text-foreground-muted hover:bg-surface-hover hover:text-foreground-secondary"
                           }`}
                         >
-                          <ChildIcon className="size-3.5 shrink-0" />{label}
+                          <ChildIcon className={`size-3.5 shrink-0 ${childActive2 ? "text-gold-400 dark:text-gold-300" : "text-foreground-muted group-hover:text-foreground-secondary"}`} />
+                          <span className="truncate">{label}</span>
                         </Link>
                       );
                     })}
@@ -208,33 +245,45 @@ function NavSection({ section, pathname, onNavigate }: { section: NavSection; pa
 
                 {/* Sub-navigation for Documents */}
                 {item.href === "/gestion-procesos/admin/documentos" && active && (
-                  <div className="ml-5 space-y-0.5 border-l-2 border-brand-100 py-1 pl-3">
-                    {documentChildren.map(({ label, href: childHref, icon: ChildIcon }) => (
-                      <Link key={childHref} href={childHref} onClick={onNavigate}
-                        aria-current={pathname === childHref ? "page" : undefined}
-                        className={`flex items-center gap-2 rounded-[var(--radius-sm)] px-2 py-1.5 text-xs font-medium transition-colors ${
-                          pathname === childHref ? "bg-brand-100 text-brand-900" : "text-foreground-muted hover:bg-surface-hover hover:text-foreground-secondary"
-                        }`}
-                      >
-                        <ChildIcon className="size-3.5" />{label}
-                      </Link>
-                    ))}
+                  <div className="ml-5 space-y-0.5 border-l-2 border-brand-200 dark:border-brand-800 py-1 pl-3">
+                    {documentChildren.map(({ label, href: childHref, icon: ChildIcon }) => {
+                      const childActive2 = normalizePath(pathname) === normalizePath(childHref);
+                      return (
+                        <Link key={childHref} href={childHref} onClick={onNavigate}
+                          aria-current={childActive2 ? "page" : undefined}
+                          className={`group flex items-center gap-2 rounded-[var(--radius-sm)] px-2.5 py-1.5 text-xs font-medium transition-all ${
+                            childActive2
+                              ? "bg-brand-900 text-white font-semibold shadow-xs dark:bg-brand-800 dark:text-white"
+                              : "text-foreground-muted hover:bg-surface-hover hover:text-foreground-secondary"
+                          }`}
+                        >
+                          <ChildIcon className={`size-3.5 shrink-0 ${childActive2 ? "text-gold-400 dark:text-gold-300" : "text-foreground-muted group-hover:text-foreground-secondary"}`} />
+                          <span className="truncate">{label}</span>
+                        </Link>
+                      );
+                    })}
                   </div>
                 )}
 
                 {/* Sub-navigation for Audit */}
                 {item.href === "/gestion-procesos/admin/auditoria" && (pathname.startsWith("/gestion-procesos/admin/auditoria") || pathname.startsWith("/gestion-procesos/admin/actividad")) && (
-                  <div className="ml-5 space-y-0.5 border-l-2 border-brand-100 py-1 pl-3">
-                    {auditChildren.map(({ label, href: childHref, icon: ChildIcon }) => (
-                      <Link key={childHref} href={childHref} onClick={onNavigate}
-                        aria-current={pathname === childHref ? "page" : undefined}
-                        className={`flex items-center gap-2 rounded-[var(--radius-sm)] px-2 py-1.5 text-xs font-medium transition-colors ${
-                          pathname === childHref ? "bg-brand-100 text-brand-900" : "text-foreground-muted hover:bg-surface-hover hover:text-foreground-secondary"
-                        }`}
-                      >
-                        <ChildIcon className="size-3.5" />{label}
-                      </Link>
-                    ))}
+                  <div className="ml-5 space-y-0.5 border-l-2 border-brand-200 dark:border-brand-800 py-1 pl-3">
+                    {auditChildren.map(({ label, href: childHref, icon: ChildIcon }) => {
+                      const childActive2 = normalizePath(pathname) === normalizePath(childHref);
+                      return (
+                        <Link key={childHref} href={childHref} onClick={onNavigate}
+                          aria-current={childActive2 ? "page" : undefined}
+                          className={`group flex items-center gap-2 rounded-[var(--radius-sm)] px-2.5 py-1.5 text-xs font-medium transition-all ${
+                            childActive2
+                              ? "bg-brand-900 text-white font-semibold shadow-xs dark:bg-brand-800 dark:text-white"
+                              : "text-foreground-muted hover:bg-surface-hover hover:text-foreground-secondary"
+                          }`}
+                        >
+                          <ChildIcon className={`size-3.5 shrink-0 ${childActive2 ? "text-gold-400 dark:text-gold-300" : "text-foreground-muted group-hover:text-foreground-secondary"}`} />
+                          <span className="truncate">{label}</span>
+                        </Link>
+                      );
+                    })}
                   </div>
                 )}
               </div>
@@ -317,7 +366,35 @@ export default function AdminConsoleShell({ children }: { children: ReactNode })
         </div>
 
         {/* Navigation */}
-        {!collapsed && (
+        {collapsed ? (
+          <nav className="flex-1 overflow-y-auto px-2 pb-4 space-y-1" aria-label="Navegación compacta">
+            {sections.flatMap((s) => s.items).map((item) => {
+              const Icon = item.icon;
+              const active = isActive(pathname, item.href);
+              return (
+                <Link
+                  key={item.href}
+                  href={item.href}
+                  title={item.label}
+                  aria-current={active ? "page" : undefined}
+                  className={`group relative flex size-10 mx-auto items-center justify-center rounded-[var(--radius-md)] transition-all ${
+                    active
+                      ? "bg-brand-900 text-white font-semibold shadow-xs dark:bg-brand-800 dark:text-white"
+                      : "text-foreground-secondary hover:bg-surface-hover hover:text-foreground"
+                  }`}
+                >
+                  {active && (
+                    <span
+                      className="absolute left-0 top-1.5 bottom-1.5 w-1 rounded-r-full bg-gold-400"
+                      aria-hidden="true"
+                    />
+                  )}
+                  <Icon className={`size-4 ${active ? "text-gold-400 dark:text-gold-300" : "text-foreground-muted group-hover:text-foreground"}`} />
+                </Link>
+              );
+            })}
+          </nav>
+        ) : (
           <nav className="flex-1 overflow-y-auto px-3 pb-4" aria-label="Navegación administrativa">
             {sections.map((section) => (
               <NavSection key={section.title} section={section} pathname={pathname} onNavigate={() => setMobileOpen(false)} />

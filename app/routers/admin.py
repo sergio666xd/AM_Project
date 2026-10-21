@@ -994,15 +994,15 @@ def _alertas_admin(db: Session) -> list[dict]:
 
 @router.get("/alertas")
 def listar_alertas_admin(
-    limite: int | None = Query(default=None, ge=1, le=500),
     db: Session = Depends(get_db),
     admin: models.Usuario = Depends(verificar_admin),
+    limite: int | None = Query(default=None, ge=1, le=500),
 ):
     alertas = _alertas_admin(db)
     leidas = {registro.notificacion_id for registro in db.query(models.LecturaNotificacionAdmin).filter_by(usuario_id=admin.id).all()}
     for alerta in alertas:
         alerta["leida"] = alerta["id"] in leidas
-    if limite is not None:
+    if isinstance(limite, int):
         alertas = [alerta for alerta in alertas if alerta["estado"] != "ELIMINADA"]
         alertas.sort(key=lambda item: datetime.fromisoformat(item["fecha"]).timestamp() if item["fecha"] else 0, reverse=True)
         return alertas[:limite]

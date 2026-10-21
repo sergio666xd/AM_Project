@@ -12,6 +12,7 @@ import { EmptyState } from "@/components/ui/EmptyState";
 import { LoadingState } from "@/components/ui/LoadingState";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { StatCard } from "@/components/ui/StatCard";
+import { useSession } from "@/context/SessionContext";
 
 type UserDetail = {
   id: number;
@@ -55,7 +56,7 @@ export default function AdminUserDetailPage() {
   const [phone, setPhone] = useState("");
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
-  const token = typeof window === "undefined" ? "" : localStorage.getItem("token") || "";
+  const { token } = useSession();
 
   async function load() {
     if (!token || !id) return;

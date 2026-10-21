@@ -21,9 +21,9 @@ export default function WorkloadDashboard() {
     if (!token || !allowed) return;
     fetchApi("/api/expedientes/metricas-carga", { token }).then(setData).catch((cause) => setError(cause instanceof Error ? cause.message : "No fue posible cargar las métricas."));
   }, [token, allowed]);
-  if (!allowed) return <section><h1 className="text-2xl font-semibold">Sin acceso</h1><p className="mt-2 text-sm text-(--foreground-muted)">Esta vista está disponible para administración y abogados administradores.</p></section>;
+  if (!allowed) return <section><h1 className="text-2xl font-semibold">Sin acceso</h1><p className="mt-2 text-sm text-foreground-muted">Esta vista está disponible para administración y abogados administradores.</p></section>;
   if (error) return <p role="alert" className="rounded-xl border border-danger/30 bg-danger/5 p-4 text-sm text-danger">{error}</p>;
-  if (!data) return <p className="py-12 text-center text-sm text-(--foreground-muted)"><RefreshCw className="mr-2 inline size-4 animate-spin" />Cargando métricas…</p>;
+  if (!data) return <p className="py-12 text-center text-sm text-foreground-muted"><RefreshCw className="mr-2 inline size-4 animate-spin" />Cargando métricas…</p>;
   const cards = [
     { label: "Procesos activos", value: data.procesos_activos, icon: FolderOpen },
     { label: "Tareas abiertas", value: data.tareas_abiertas, icon: CheckSquare },

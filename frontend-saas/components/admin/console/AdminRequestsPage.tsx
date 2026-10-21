@@ -6,6 +6,7 @@ import { API_URL, apiRequest, fetchApi } from "@/lib/api";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
+import { useSession } from "@/context/SessionContext";
 
 type Plan = { id: number; nombre: string; activo: boolean };
 type Request = {
@@ -35,8 +36,7 @@ export default function AdminRequestsPage() {
   const [viewer, setViewer] = useState<{ url: string; title: string } | null>(
     null,
   );
-  const token =
-    typeof window === "undefined" ? "" : localStorage.getItem("token") || "";
+  const { token } = useSession();
 
   useEffect(() => {
     if (!token) return;

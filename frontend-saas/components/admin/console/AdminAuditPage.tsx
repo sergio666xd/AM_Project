@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { LoadingState } from "@/components/ui/LoadingState";
+import { useSession } from "@/context/SessionContext";
 
 type TechnicalDetail = {
   endpoint: string | null;
@@ -53,7 +54,7 @@ export default function AdminAuditPage({ initialView = "actividad" }: { initialV
   const [selected, setSelected] = useState<AuditEvent | null>(null);
   const [selectedIds, setSelectedIds] = useState<number[]>([]);
   const [deleting, setDeleting] = useState(false);
-  const token = typeof window === "undefined" ? "" : localStorage.getItem("token") || "";
+  const { token } = useSession();
 
   async function loadEvents(activeFilters: AuditFilters) {
     if (!token) return;

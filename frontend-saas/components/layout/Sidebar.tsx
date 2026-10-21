@@ -134,14 +134,35 @@ const saasMenuItems: MenuItem[] = [
   { label: "Tareas", href: "/gestion-procesos/dashboard/tareas", icon: ListChecks },
 ];
 
+function normalizePath(path: string): string {
+  if (!path) return "/";
+  const withoutTrailing = path.replace(/\/+$/, "");
+  return withoutTrailing || "/";
+}
+
 function getIsActive(pathname: string, href: string): boolean {
+  const current = normalizePath(pathname);
+  const target = normalizePath(href);
+
+  // Exact match
+  if (current === target) return true;
+
+  // Root dashboards must only match exact path (or dashboard/abogado alias)
   const roots = [
     "/gestion-procesos/dashboard",
     "/gestion-procesos/abogado",
     "/gestion-procesos/cliente",
+    "/gestion-procesos/admin",
   ];
-  if (roots.includes(href)) return pathname === href;
-  return pathname === href || pathname.startsWith(`${href}/`);
+  if (roots.includes(target)) {
+    if (target === "/gestion-procesos/abogado" && current === "/gestion-procesos/dashboard") {
+      return true;
+    }
+    return current === target;
+  }
+
+  // Sub-routes match if current starts with target + "/"
+  return current.startsWith(`${target}/`);
 }
 
 /* ─── Component ─── */
@@ -160,25 +181,23 @@ export default function Sidebar({ variant }: SidebarProps) {
   const menuSections: MenuSection[] =
     variant === "client"
       ? clientSections
-      : variant === "saas" || user?.rol === "ABOGADO"
-        ? [{ title: "Panel", items: saasMenuItems }]
-        : getLawyerSections(isFirmAdmin);
+      : variant === "lawyer"
+        ? getLawyerSections(isFirmAdmin)
+        : [{ title: "Panel", items: saasMenuItems }];
 
   const homeHref =
     variant === "platform-admin"
       ? "/gestion-procesos/admin"
-      : user?.rol === "ABOGADO"
-        ? "/gestion-procesos/dashboard"
-        : variant === "lawyer" || variant === "saas"
-          ? "/gestion-procesos/abogado"
-          : "/gestion-procesos/cliente";
+      : variant === "client"
+        ? "/gestion-procesos/cliente"
+        : "/gestion-procesos/abogado";
 
   const accountBaseHref =
     variant === "platform-admin"
       ? "/gestion-procesos/admin"
-      : variant === "lawyer" || variant === "saas"
-        ? "/gestion-procesos/abogado"
-        : "/gestion-procesos/cliente";
+      : variant === "client"
+        ? "/gestion-procesos/cliente"
+        : "/gestion-procesos/abogado";
 
   const roleLabel =
     user?.rol === "ADMIN"
@@ -222,15 +241,26 @@ export default function Sidebar({ variant }: SidebarProps) {
         href={item.href}
         onClick={() => setMobileOpen(false)}
         aria-current={active ? "page" : undefined}
-        className={`flex w-full items-center gap-3 rounded-[var(--radius-md)] px-3 py-2 text-[13px] font-medium transition-colors ${
+        className={`group relative flex w-full items-center gap-3 rounded-[var(--radius-md)] px-3 py-2 text-[13px] font-medium transition-all ${
           active
-            ? "bg-brand-900 text-white"
+            ? "bg-brand-900 text-white font-semibold shadow-xs dark:bg-brand-800 dark:text-white dark:ring-1 dark:ring-brand-700/50"
             : "text-foreground-secondary hover:bg-surface-hover hover:text-foreground"
         }`}
       >
-        <Icon className="size-4 shrink-0" aria-hidden="true" />
+        {active && (
+          <span
+            className="absolute left-0 top-1.5 bottom-1.5 w-1 rounded-r-full bg-gold-400"
+            aria-hidden="true"
+          />
+        )}
+        <Icon
+          className={`size-4 shrink-0 transition-colors ${
+            active ? "text-gold-400 dark:text-gold-300" : "text-foreground-muted group-hover:text-foreground"
+          }`}
+          aria-hidden="true"
+        />
         <span className="truncate">{item.label}</span>
-        {active && <ChevronRight className="ml-auto size-3.5 opacity-60" />}
+        {active && <ChevronRight className="ml-auto size-3.5 text-gold-400/80 dark:text-gold-300/80" />}
       </Link>
     );
   }

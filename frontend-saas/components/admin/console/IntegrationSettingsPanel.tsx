@@ -23,7 +23,7 @@ const EMPTY_SETTINGS: IntegrationSettings = {
   whatsapp_token_configurado: false, smtp_configurado: false, whatsapp_configurado: false,
 };
 
-export function IntegrationSettingsPanel({ token }: { token: string }) {
+export function IntegrationSettingsPanel({ token }: { token?: string | null }) {
   const [settings, setSettings] = useState(EMPTY_SETTINGS);
   const [smtpPassword, setSmtpPassword] = useState("");
   const [whatsappToken, setWhatsappToken] = useState("");
@@ -35,6 +35,7 @@ export function IntegrationSettingsPanel({ token }: { token: string }) {
   const [notice, setNotice] = useState("");
 
   useEffect(() => {
+    if (!token) return;
     let active = true;
     fetchApi("/api/admin/integraciones/configuracion", { method: "GET", token })
       .then((result: IntegrationSettings) => { if (active) setSettings(result); })
