@@ -2,19 +2,19 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { Menu, X } from "lucide-react";
+import { ArrowRight, Menu, User, X } from "lucide-react";
 import { usePathname } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 
 const links = [
   { href: "/", label: "Inicio" },
   { href: "/areas-de-practica", label: "Áreas de práctica" },
+  { href: "/poliza-juridica", label: "Póliza jurídica" },
   { href: "/quienes-somos", label: "Quiénes somos" },
   { href: "/filosofia", label: "Filosofía" },
   { href: "/contacto", label: "Contacto" },
   // This public entry stays available regardless of the SaaS launch state.
   { href: "/gestion-procesos", label: "Gestión de procesos" },
-  { href: "/poliza-juridica", label: "Póliza jurídica" },
 ];
 
 export function SiteHeader() {
@@ -35,23 +35,118 @@ export function SiteHeader() {
   }, [open]);
 
   return (
-    <header className="sticky top-0 z-50 border-b border-[#ccb56b]/30 bg-[#fffdf8]/95 backdrop-blur">
-      <div className="mx-auto flex max-w-7xl items-center justify-between px-5 py-2 lg:px-8">
-        <Link href="/" aria-label="Alejandra Muñoz, inicio" className="relative block h-14 w-52 sm:h-16 sm:w-72">
-          <Image src="/AM_logo_Recurso 2_Landscape_web.svg" alt="Alejandra Muñoz Abogada y Asociados" fill priority className="object-contain object-left" />
+    <header className="sticky top-0 z-50 border-b border-border/80 bg-surface/95 backdrop-blur-md shadow-xs transition-colors">
+      <div className="mx-auto flex max-w-7xl items-center justify-between px-5 py-2.5 lg:px-8">
+        {/* Logo */}
+        <Link href="/" aria-label="Alejandra Muñoz, inicio" className="relative block h-12 w-48 sm:h-14 sm:w-64 transition-opacity hover:opacity-95">
+          <Image
+            src="/AM_logo_Recurso 2_Landscape_web.svg"
+            alt="Alejandra Muñoz Abogada y Asociados"
+            fill
+            priority
+            className="object-contain object-left"
+          />
         </Link>
-        <nav aria-label="Navegación principal" className="hidden items-center gap-6 text-sm font-semibold text-[#002060] md:flex">
-          {links.map((link) => <Link key={link.href} href={link.href} aria-current={pathname === link.href ? "page" : undefined} className={`marketing-nav-link inline-flex min-h-11 items-center transition-colors hover:text-[#a58e42] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#002060] ${pathname === link.href ? "text-[#002060]" : "text-[#002060]/75"}`}>{link.label}</Link>)}
-          <Link href="/gestion-procesos/auth/login" className="inline-flex min-h-11 items-center rounded-full bg-[#002060] px-4 !text-white transition hover:bg-[#00328f] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#92792e] focus-visible:ring-offset-2">Soy cliente</Link>
+
+        {/* Desktop navigation */}
+        <nav aria-label="Navegación principal" className="hidden items-center gap-5 xl:gap-7 text-xs xl:text-sm font-semibold text-brand-950 lg:flex">
+          {links.map((link) => {
+            const isActive = pathname === link.href;
+            return (
+              <Link
+                key={link.href}
+                href={link.href}
+                aria-current={isActive ? "page" : undefined}
+                className={`marketing-nav-link inline-flex min-h-11 items-center transition-colors hover:text-gold-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-700 ${
+                  isActive ? "text-brand-900 font-bold" : "text-brand-950/75"
+                }`}
+              >
+                {link.label}
+              </Link>
+            );
+          })}
         </nav>
-        <button ref={menuButtonRef} type="button" className="grid min-h-11 min-w-11 place-items-center rounded-md text-[#002060] hover:bg-[#fff7df] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#002060] md:hidden" aria-label={open ? "Cerrar menú" : "Abrir menú"} aria-controls="marketing-mobile-menu" aria-expanded={open} onClick={() => setOpenPath(open ? null : pathname)}>
-          {open ? <X aria-hidden="true" /> : <Menu aria-hidden="true" />}
+
+        {/* Action CTAs */}
+        <div className="hidden items-center gap-3 lg:flex">
+          <Link
+            href="/gestion-procesos/auth/login"
+            className="inline-flex min-h-10 items-center gap-1.5 rounded-lg border border-border bg-surface px-3.5 py-2 text-xs xl:text-sm font-semibold text-brand-900 transition-colors hover:bg-surface-hover hover:border-brand-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-700"
+          >
+            <User className="size-3.5 text-brand-700" aria-hidden="true" />
+            Soy cliente
+          </Link>
+          <Link
+            href="/contacto"
+            className="inline-flex min-h-10 items-center gap-1.5 rounded-lg bg-brand-900 px-4 py-2 text-xs xl:text-sm font-semibold !text-white transition-all hover:bg-brand-950 hover:shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold-400 focus-visible:ring-offset-2"
+          >
+            Agendar asesoría
+            <ArrowRight className="size-3.5 text-gold-300" aria-hidden="true" />
+          </Link>
+        </div>
+
+        {/* Mobile menu trigger */}
+        <button
+          ref={menuButtonRef}
+          type="button"
+          className="grid min-h-11 min-w-11 place-items-center rounded-lg border border-border/60 text-brand-950 transition hover:bg-surface-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-700 lg:hidden"
+          aria-label={open ? "Cerrar menú" : "Abrir menú"}
+          aria-controls="marketing-mobile-menu"
+          aria-expanded={open}
+          onClick={() => setOpenPath(open ? null : pathname)}
+        >
+          {open ? <X className="size-5" aria-hidden="true" /> : <Menu className="size-5" aria-hidden="true" />}
         </button>
       </div>
-      {open && <nav id="marketing-mobile-menu" aria-label="Navegación principal" className="marketing-menu-enter border-t border-[#ccb56b]/30 bg-[#fffdf8] px-5 py-3 md:hidden">
-        {links.map((link) => <Link key={link.href} href={link.href} aria-current={pathname === link.href ? "page" : undefined} onClick={() => setOpenPath(null)} className={`block min-h-11 border-l-4 py-3 pl-3 font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#002060] ${pathname === link.href ? "border-[#ccb56b] bg-[#ccb56b]/10 text-[#002060]" : "border-transparent text-[#002060]"}`}>{link.label}</Link>)}
-        <Link href="/gestion-procesos/auth/login" onClick={() => setOpenPath(null)} className="mt-3 flex min-h-11 items-center justify-center rounded-lg bg-[#002060] px-4 py-3 text-center font-bold !text-white transition hover:bg-[#00328f] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#92792e] focus-visible:ring-offset-2">Soy cliente</Link>
-      </nav>}
+
+      {/* Mobile drawer */}
+      {open && (
+        <nav
+          id="marketing-mobile-menu"
+          aria-label="Navegación principal móvil"
+          className="marketing-menu-enter border-t border-border bg-surface px-5 py-4 shadow-lg lg:hidden"
+        >
+          <div className="space-y-1">
+            {links.map((link) => {
+              const isActive = pathname === link.href;
+              return (
+                <Link
+                  key={link.href}
+                  href={link.href}
+                  aria-current={isActive ? "page" : undefined}
+                  onClick={() => setOpenPath(null)}
+                  className={`flex min-h-11 items-center rounded-lg px-3 py-2.5 text-sm font-semibold transition-colors ${
+                    isActive
+                      ? "border-l-4 border-gold-400 bg-gold-400/10 text-brand-900 font-bold"
+                      : "text-foreground-secondary hover:bg-surface-hover hover:text-brand-900"
+                  }`}
+                >
+                  {link.label}
+                </Link>
+              );
+            })}
+          </div>
+
+          <div className="mt-4 pt-4 border-t border-border space-y-2">
+            <Link
+              href="/contacto"
+              onClick={() => setOpenPath(null)}
+              className="flex min-h-11 w-full items-center justify-center gap-2 rounded-lg bg-brand-900 px-4 py-3 text-center text-sm font-bold !text-white transition hover:bg-brand-950 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold-400"
+            >
+              Agendar asesoría jurídica
+              <ArrowRight className="size-4 text-gold-300" aria-hidden="true" />
+            </Link>
+            <Link
+              href="/gestion-procesos/auth/login"
+              onClick={() => setOpenPath(null)}
+              className="flex min-h-11 w-full items-center justify-center gap-2 rounded-lg border border-border bg-surface px-4 py-2.5 text-center text-sm font-semibold text-brand-900 transition hover:bg-surface-hover"
+            >
+              <User className="size-4 text-brand-700" aria-hidden="true" />
+              Ingreso a portal de clientes
+            </Link>
+          </div>
+        </nav>
+      )}
     </header>
   );
 }

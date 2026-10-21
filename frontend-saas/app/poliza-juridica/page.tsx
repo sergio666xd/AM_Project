@@ -23,73 +23,125 @@ const benefitIcons = [MessageCircle, FileText, ShieldCheck, ClipboardCheck];
 
 export default async function PolizaJuridicaPage() {
   const content = await loadPublicPageContent("poliza-juridica", SITE_PAGE_DEFAULTS["poliza-juridica"]);
+
   return (
     <MarketingLayout>
       <main>
-        <section className="bg-[#002060] px-5 py-20 text-white lg:px-8 lg:py-28">
-          <div className="mx-auto grid max-w-7xl gap-12 lg:grid-cols-[1.15fr_.85fr] lg:items-center">
-            <div>
-              <p className="flex items-center gap-2 text-sm font-bold uppercase tracking-[.2em] text-[#ccb56b]">
-                <ShieldCheck size={17} /> {renderRichText(content.eyebrow)}
-              </p>
-              <h1 className="mt-5 max-w-4xl text-5xl font-semibold leading-tight sm:text-6xl">
+        {/* Hero Section */}
+        <section className="relative overflow-hidden bg-gradient-to-b from-brand-950 via-brand-900 to-brand-950 px-5 py-20 text-white lg:px-8 lg:py-28 border-b border-gold-400/20">
+          <div className="relative mx-auto grid max-w-7xl gap-12 lg:grid-cols-[1.15fr_.85fr] lg:items-center">
+            <div className="space-y-6">
+              <span className="inline-flex items-center gap-2 rounded-full border border-gold-400/40 bg-gold-400/10 px-4 py-1.5 text-xs font-bold uppercase tracking-widest text-gold-300">
+                <ShieldCheck className="size-4 text-gold-400" aria-hidden="true" />
+                {renderRichText(content.eyebrow)}
+              </span>
+              <h1 className="max-w-4xl text-4xl sm:text-5xl lg:text-6xl font-bold tracking-tight text-white leading-[1.12]">
                 {renderRichText(content.title)}
               </h1>
-              <p className="mt-7 max-w-2xl text-lg leading-8 text-white/80">
+              <p className="max-w-2xl text-lg sm:text-xl leading-relaxed text-neutral-300">
                 {renderRichText(content.intro)}
               </p>
-              <a
-                href={whatsappUrl}
-                target="_blank"
-                rel="noreferrer"
-                className="mt-8 inline-flex min-h-11 items-center gap-2 rounded-lg bg-[#ccb56b] px-6 py-3.5 font-bold text-[#002060] transition outline-none hover:bg-[#dcc982] focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-[#002060]"
-              >
-                <MessageCircle size={20} /> Solicitar estudio de la póliza
-              </a>
+              <div className="pt-2">
+                <a
+                  href={whatsappUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="marketing-cta inline-flex min-h-12 items-center gap-2.5 rounded-xl bg-gold-400 px-6 py-3.5 text-sm font-bold text-brand-950 hover:bg-gold-300 transition-all shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold-400 focus-visible:ring-offset-2 focus-visible:ring-offset-brand-900"
+                >
+                  <MessageCircle className="size-4" aria-hidden="true" />
+                  Solicitar estudio de la póliza
+                </a>
+              </div>
             </div>
 
-            <aside className="rounded-3xl border border-[#ccb56b]/60 bg-white/10 p-8 sm:p-10">
-              <Scale className="text-[#ccb56b]" size={36} />
-              <h2 className="mt-5 text-2xl font-semibold">{renderRichText(content.asideTitle)}</h2>
-              <p className="mt-4 leading-7 text-white/80">
+            <aside className="rounded-3xl border border-gold-400/30 bg-white/5 p-8 sm:p-10 shadow-2xl backdrop-blur-md space-y-4">
+              <span className="grid size-14 place-items-center rounded-2xl bg-gold-400/20 text-gold-300">
+                <Scale className="size-7" aria-hidden="true" />
+              </span>
+              <h2 className="text-xl sm:text-2xl font-bold text-white">
+                {renderRichText(content.asideTitle)}
+              </h2>
+              <p className="text-sm sm:text-base leading-relaxed text-neutral-300">
                 {renderRichText(content.asideDescription)}
               </p>
             </aside>
           </div>
         </section>
 
-        <section className="mx-auto max-w-7xl px-5 py-16 lg:px-8">
-          <div className="max-w-3xl">
-            <p className="text-sm font-bold uppercase tracking-[.2em] text-[#92792e]">{renderRichText(content.coverageEyebrow)}</p>
-            <h2 className="mt-3 text-3xl font-semibold sm:text-4xl">{renderRichText(content.coverageTitle)}</h2>
-            <p className="mt-4 leading-7 text-[#002060]/75">{renderRichText(content.coverageDescription)}</p>
+        {/* Benefits Grid */}
+        <section className="mx-auto max-w-7xl px-5 py-20 lg:px-8 space-y-12">
+          <div className="max-w-3xl space-y-3">
+            <span className="inline-block text-xs font-bold uppercase tracking-widest text-gold-600">
+              {renderRichText(content.coverageEyebrow)}
+            </span>
+            <h2 className="text-3xl sm:text-4xl font-bold tracking-tight text-foreground">
+              {renderRichText(content.coverageTitle)}
+            </h2>
+            <p className="text-base leading-relaxed text-foreground-muted">
+              {renderRichText(content.coverageDescription)}
+            </p>
           </div>
-          <div className="mt-10 grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
+
+          <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
             {content.benefits.map((benefit, index) => {
               const Icon = benefitIcons[index % benefitIcons.length];
               return (
-              <article key={benefit.title} className="rounded-2xl border border-[#ccb56b]/40 bg-white p-6">
-                <Icon className="text-[#ccb56b]" size={28} />
-                <h3 className="mt-5 text-xl font-bold">{renderRichText(benefit.title)}</h3>
-                <p className="mt-3 text-sm leading-6 text-[#002060]/75">{renderRichText(benefit.description)}</p>
-              </article>
+                <article
+                  key={benefit.title}
+                  className="marketing-card rounded-2xl border border-border bg-surface p-6 shadow-xs hover:border-gold-400 hover:shadow-md transition-all flex flex-col justify-between"
+                >
+                  <div>
+                    <span className="grid size-12 place-items-center rounded-xl bg-brand-50 text-brand-900">
+                      <Icon className="size-6" aria-hidden="true" />
+                    </span>
+                    <h3 className="mt-5 text-lg font-bold text-foreground">
+                      {renderRichText(benefit.title)}
+                    </h3>
+                    <p className="mt-3 text-sm leading-relaxed text-foreground-muted">
+                      {renderRichText(benefit.description)}
+                    </p>
+                  </div>
+                </article>
               );
             })}
           </div>
         </section>
 
-        <section className="bg-[#fff7df] px-5 py-16 lg:px-8">
+        {/* Team & Assessment CTA Banner */}
+        <section className="border-y border-border bg-surface-secondary px-5 py-20 lg:px-8">
           <div className="mx-auto grid max-w-7xl gap-8 md:grid-cols-[.8fr_1.2fr] md:items-center">
-            <UsersRound className="mx-auto text-[#ccb56b]" size={76} />
-            <div>
-              <p className="text-sm font-bold uppercase tracking-[.2em] text-[#92792e]">{renderRichText(content.closingEyebrow)}</p>
-              <h2 className="mt-3 text-3xl font-semibold">{renderRichText(content.closingTitle)}</h2>
-              <p className="mt-4 leading-7 text-[#002060]/75">{renderRichText(content.closingDescription)}</p>
-              <a href={whatsappUrl} target="_blank" rel="noreferrer" className="mt-6 inline-flex min-h-11 items-center gap-2 rounded px-1 font-bold underline decoration-[#92792e] decoration-2 underline-offset-4 outline-none focus-visible:ring-2 focus-visible:ring-[#002060]"><MessageCircle size={19} aria-hidden="true" /> {renderRichText(content.closingCta)}</a>
+            <div className="grid size-28 place-items-center rounded-3xl bg-brand-50 text-brand-900 border border-brand-100 mx-auto">
+              <UsersRound className="size-14 text-brand-900" aria-hidden="true" />
+            </div>
+            <div className="space-y-4">
+              <span className="inline-block text-xs font-bold uppercase tracking-widest text-gold-600">
+                {renderRichText(content.closingEyebrow)}
+              </span>
+              <h2 className="text-2xl sm:text-3xl font-bold tracking-tight text-foreground">
+                {renderRichText(content.closingTitle)}
+              </h2>
+              <p className="text-base leading-relaxed text-foreground-muted">
+                {renderRichText(content.closingDescription)}
+              </p>
+              <div className="pt-2">
+                <a
+                  href={whatsappUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-brand-900 px-6 py-2.5 text-sm font-bold text-white hover:bg-brand-950 transition-colors"
+                >
+                  <MessageCircle className="size-4 text-gold-300" aria-hidden="true" />
+                  {renderRichText(content.closingCta)}
+                </a>
+              </div>
             </div>
           </div>
         </section>
-        <div className="mx-auto max-w-7xl px-5 py-12 lg:px-8"><MarketingContactCta /></div>
+
+        {/* Contact CTA */}
+        <div className="mx-auto max-w-7xl px-5 py-16 lg:px-8">
+          <MarketingContactCta />
+        </div>
       </main>
     </MarketingLayout>
   );
