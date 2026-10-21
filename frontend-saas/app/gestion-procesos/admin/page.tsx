@@ -9,6 +9,7 @@ import {
   BriefcaseBusiness,
   CalendarClock,
   FileText,
+  FolderOpen,
   RefreshCw,
   UserCheck,
   Users,
@@ -23,7 +24,9 @@ import { DataTable, type DataTableColumn } from "@/components/ui/DataTable";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { FilterBar } from "@/components/ui/FilterBar";
 import { LoadingState } from "@/components/ui/LoadingState";
+import { PageHeader } from "@/components/ui/PageHeader";
 import { Pagination } from "@/components/ui/Pagination";
+import { StatCard } from "@/components/ui/StatCard";
 import { useToast } from "@/components/ui/ToastProvider";
 
 type MetricKey =
@@ -107,29 +110,6 @@ function formatDate(value: string | null, includeTime = false) {
   });
 }
 
-function MetricCard({ label, value, hint, href, icon: Icon }: {
-  label: string;
-  value: number;
-  hint: string;
-  href: string;
-  icon: typeof Activity;
-}) {
-  return (
-    <Link href={href} className="block rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"><Card className="h-full transition-colors hover:border-primary/40 hover:bg-surface-hover">
-      <div className="flex items-start justify-between gap-3">
-        <div>
-          <p className="text-sm text-foreground-muted">{label}</p>
-          <p className="mt-2 text-2xl font-semibold text-foreground">{value.toLocaleString("es-CO")}</p>
-          <p className="mt-1 text-xs text-foreground-muted">{hint}</p>
-        </div>
-        <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-primary-light text-primary">
-          <Icon aria-hidden="true" className="size-5" />
-        </span>
-      </div>
-    </Card></Link>
-  );
-}
-
 function greetingAt(date: Date) {
   const hour = Number(new Intl.DateTimeFormat("es-CO", {
     hour: "numeric",
@@ -201,30 +181,31 @@ export default function AdminDashboard() {
       key: "proceso",
       header: "Proceso",
       render: (process) => (
-        <Link href={`/gestion-procesos/admin/procesos?detalle=${process.id}`} className="font-semibold text-primary hover:underline">
-          {process.nombre}
-          <span className="mt-1 block max-w-52 truncate text-xs font-normal text-foreground-muted">
+        <Link href={`/gestion-procesos/admin/procesos?detalle=${process.id}`} className="group">
+          <span className="font-semibold text-foreground group-hover:text-brand-700">{process.nombre}</span>
+          <span className="mt-0.5 block max-w-52 truncate text-xs text-foreground-muted">
             {process.cliente ?? (process.clientes ? `${process.clientes} clientes` : "Sin cliente asignado")}
           </span>
         </Link>
       ),
     },
-    { key: "responsable", header: "Responsable", render: (process) => process.responsable },
+    { key: "responsable", header: "Responsable", render: (process) => <span className="text-foreground">{process.responsable}</span>, hideOnMobile: true },
     { key: "estado", header: "Estado", render: () => <Badge tone="normal">Activo</Badge> },
-    { key: "actividad", header: "Última actividad", render: (process) => formatDate(process.ultima_actividad) },
+    { key: "actividad", header: "Última actividad", render: (process) => <span className="text-xs">{formatDate(process.ultima_actividad)}</span>, hideOnMobile: true },
     {
       key: "riesgo",
       header: "Riesgo",
       render: (process) => process.riesgo
         ? <Badge tone={process.vencido ? "overdue" : "risk"}>{process.riesgo}</Badge>
-        : <span className="text-foreground-muted">Sin alerta</span>,
+        : <span className="text-xs text-foreground-muted">Sin alerta</span>,
     },
     {
       key: "accion",
       header: "Próxima acción",
+      hideOnMobile: true,
       render: (process) => process.proxima_accion
-        ? <Link href="/gestion-procesos/admin/tareas" className="font-medium text-primary hover:underline">{process.proxima_accion}</Link>
-        : <span className="text-foreground-muted">Sin tareas pendientes</span>,
+        ? <Link href="/gestion-procesos/admin/tareas" className="text-sm font-medium text-brand-700 hover:underline">{process.proxima_accion}</Link>
+        : <span className="text-xs text-foreground-muted">Sin tareas pendientes</span>,
     },
   ];
 
@@ -238,74 +219,113 @@ export default function AdminDashboard() {
         <Alert kind="error" title="No se pudo cargar el centro de control">
           Revisa tu conexión e inténtalo de nuevo.
         </Alert>
-        <Button onClick={() => void refresh()} disabled={loading}>
-          <RefreshCw aria-hidden="true" className={`size-4 ${loading ? "animate-spin" : ""}`} />
+        <Button onClick={() => void refresh()} loading={loading} icon={<RefreshCw className="size-4" />}>
           Reintentar
         </Button>
       </div>
     );
   }
 
-  const metrics = [
-    { label: "Usuarios activos", value: data.resumen.usuarios_activos, hint: "En todas las áreas", href: "/gestion-procesos/admin/usuarios", icon: Users },
-    { label: "Solicitudes pendientes", value: data.resumen.solicitudes_pendientes, hint: "Registro y perfil", href: "/gestion-procesos/admin/solicitudes", icon: UserCheck },
-    { label: "Procesos activos", value: data.resumen.procesos_activos, hint: "Firma y SaaS", href: "/gestion-procesos/admin/procesos", icon: BriefcaseBusiness },
-    { label: "Tareas pendientes", value: data.resumen.tareas_pendientes, hint: "Por completar o en curso", href: "/gestion-procesos/admin/tareas", icon: CalendarClock },
-    { label: "Documentos por revisar", value: data.resumen.documentos_pendientes, hint: "Solicitudes sin atender", href: "/gestion-procesos/admin/documentos/solicitudes", icon: FileText },
-    { label: "Alertas activas", value: data.resumen.alertas, hint: "Elementos que requieren atención", href: "/gestion-procesos/admin/alertas", icon: AlertTriangle },
-    { label: "Errores operativos", value: data.resumen.errores_operativos, hint: "Consultas y notificaciones críticas", href: "/gestion-procesos/admin/operacion", icon: Activity },
-  ];
-  const quickActions = [
-    { label: "Crear usuario", href: "/gestion-procesos/admin/usuarios/nuevo" },
-    { label: "Revisar solicitudes", href: "/gestion-procesos/admin/solicitudes" },
-    { label: "Ver procesos", href: "/gestion-procesos/admin/procesos" },
-    { label: "Documentos pendientes", href: "/gestion-procesos/admin/documentos" },
-    { label: "Ver operación", href: "/gestion-procesos/admin/operacion" },
-    { label: "Abrir auditoría", href: "/gestion-procesos/admin/auditoria" },
-    { label: "Editar sitio público", href: "/gestion-procesos/admin/contenido" },
-  ];
+  const attentionItems = data.atencion.filter((item) => item.count > 0);
 
   return (
     <section className="mx-auto max-w-7xl space-y-6">
       {error && <Alert kind="error">Algunos datos no pudieron actualizarse. Puedes reintentar.</Alert>}
 
-      <header className="flex flex-wrap items-end justify-between gap-4">
-        <div>
-          <p className="text-sm font-semibold text-primary">{greetingAt(now)}</p>
-          <h1 className="mt-1 text-3xl font-semibold text-foreground">Centro de control</h1>
-          <p className="mt-2 text-sm text-foreground-secondary">
-            Alejandra Muñoz | Abogada y Asociados · {now.toLocaleDateString("es-CO", { timeZone: "America/Bogota", weekday: "long", day: "numeric", month: "long", year: "numeric" })}
-          </p>
-        </div>
-        <Button variant="outline" onClick={() => void refresh()} disabled={loading}>
-          <RefreshCw aria-hidden="true" className={`size-4 ${loading ? "animate-spin" : ""}`} />
-          Actualizar
-        </Button>
-      </header>
+      {/* Page header with greeting */}
+      <PageHeader
+        title="Resumen"
+        description={`${greetingAt(now)} · ${now.toLocaleDateString("es-CO", { timeZone: "America/Bogota", weekday: "long", day: "numeric", month: "long", year: "numeric" })}`}
+        action={
+          <Button variant="outline" onClick={() => void refresh()} loading={loading} icon={<RefreshCw className="size-4" />}>
+            Actualizar
+          </Button>
+        }
+      />
 
-      <section aria-label="Resumen de la plataforma" className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-        {metrics.map((metric) => <MetricCard key={metric.label} {...metric} />)}
+      {/* KPI row */}
+      <section aria-label="Indicadores clave" className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        <StatCard
+          label="Usuarios activos"
+          value={data.resumen.usuarios_activos.toLocaleString("es-CO")}
+          icon={Users}
+          detail="En todas las áreas"
+          href="/gestion-procesos/admin/usuarios"
+        />
+        <StatCard
+          label="Solicitudes pendientes"
+          value={data.resumen.solicitudes_pendientes.toLocaleString("es-CO")}
+          icon={UserCheck}
+          detail="Registro y perfil"
+          href="/gestion-procesos/admin/solicitudes"
+          tone={data.resumen.solicitudes_pendientes > 0 ? "warning" : "default"}
+        />
+        <StatCard
+          label="Procesos activos"
+          value={data.resumen.procesos_activos.toLocaleString("es-CO")}
+          icon={BriefcaseBusiness}
+          detail="Firma y SaaS"
+          href="/gestion-procesos/admin/procesos"
+        />
+        <StatCard
+          label="Alertas activas"
+          value={data.resumen.alertas.toLocaleString("es-CO")}
+          icon={AlertTriangle}
+          detail="Requieren atención"
+          href="/gestion-procesos/admin/alertas"
+          tone={data.resumen.alertas > 0 ? "danger" : "default"}
+        />
       </section>
 
-      <Card title="Acciones rápidas" description="Accede directamente a las tareas administrativas frecuentes.">
-        <div className="flex flex-wrap gap-2">
-          {quickActions.map((action) => (
-            <Link key={action.href} href={action.href} prefetch={action.href !== "/gestion-procesos/admin/contenido"} onClick={(event) => { if (action.href === "/gestion-procesos/admin/contenido") { event.preventDefault(); window.location.assign(action.href); } }} className="inline-flex min-h-10 items-center gap-2 rounded-lg bg-primary px-3 py-2 text-sm font-semibold text-primary-foreground transition-colors hover:bg-primary-hover">
-              {action.label}<ArrowRight aria-hidden="true" className="size-4" />
-            </Link>
-          ))}
-        </div>
-      </Card>
+      {/* Secondary metrics row */}
+      <section aria-label="Métricas secundarias" className="grid gap-3 sm:grid-cols-3">
+        <StatCard
+          label="Tareas pendientes"
+          value={data.resumen.tareas_pendientes.toLocaleString("es-CO")}
+          icon={CalendarClock}
+          detail="Por completar o en curso"
+          href="/gestion-procesos/admin/tareas"
+          tone={data.resumen.tareas_pendientes > 5 ? "warning" : "default"}
+        />
+        <StatCard
+          label="Documentos por revisar"
+          value={data.resumen.documentos_pendientes.toLocaleString("es-CO")}
+          icon={FileText}
+          detail="Solicitudes sin atender"
+          href="/gestion-procesos/admin/documentos/solicitudes"
+        />
+        <StatCard
+          label="Errores operativos"
+          value={data.resumen.errores_operativos.toLocaleString("es-CO")}
+          icon={Activity}
+          detail="Consultas y notificaciones"
+          href="/gestion-procesos/admin/operacion"
+          tone={data.resumen.errores_operativos > 0 ? "danger" : "default"}
+        />
+      </section>
 
+      {/* Attention + Activity row */}
       <section className="grid gap-5 xl:grid-cols-2">
-        <Card title="Requiere atención" description="Pendientes y errores confirmados por los registros del sistema.">
-          {data.atencion.some((item) => item.count > 0) ? (
-            <ul className="space-y-2">
-              {data.atencion.filter((item) => item.count > 0).map((item) => (
+        {/* Attention panel */}
+        <Card title="Requiere atención" description="Pendientes y errores confirmados.">
+          {attentionItems.length > 0 ? (
+            <ul className="space-y-1.5">
+              {attentionItems.map((item) => (
                 <li key={item.key}>
-                  <Link href={item.href} className="flex items-center justify-between gap-3 rounded-lg border border-border px-3 py-3 transition-colors hover:bg-surface-hover">
-                    <span className="text-sm font-medium text-foreground">{item.label}</span>
-                    <Badge tone={item.tone === "danger" ? "risk" : "attention"}>{item.count.toLocaleString("es-CO")}</Badge>
+                  <Link
+                    href={item.href}
+                    className="flex items-center justify-between gap-3 rounded-[var(--radius-md)] border border-border px-4 py-3 transition-colors hover:bg-surface-hover"
+                  >
+                    <div className="flex items-center gap-2.5">
+                      <span
+                        className={`size-2 shrink-0 rounded-full ${item.tone === "danger" ? "bg-danger" : "bg-warning"}`}
+                        aria-hidden="true"
+                      />
+                      <span className="text-sm font-medium text-foreground">{item.label}</span>
+                    </div>
+                    <Badge tone={item.tone === "danger" ? "risk" : "attention"}>
+                      {item.count.toLocaleString("es-CO")}
+                    </Badge>
                   </Link>
                 </li>
               ))}
@@ -315,22 +335,29 @@ export default function AdminDashboard() {
           )}
         </Card>
 
+        {/* Recent activity */}
         <Card
           title="Actividad reciente"
-          description="Cambios y resultados recientes en lenguaje claro."
-          action={<Link href="/gestion-procesos/admin/auditoria" className="inline-flex items-center gap-1 text-sm font-semibold text-primary hover:underline">Ver auditoría<ArrowRight aria-hidden="true" className="size-4" /></Link>}
+          description="Últimos cambios en la plataforma."
+          action={
+            <Link href="/gestion-procesos/admin/auditoria" className="inline-flex items-center gap-1 text-sm font-semibold text-brand-700 hover:underline">
+              Ver auditoría<ArrowRight aria-hidden="true" className="size-3.5" />
+            </Link>
+          }
         >
           {data.actividad.length > 0 ? (
             <ol className="space-y-4">
               {data.actividad.map((event) => (
                 <li key={event.id} className="flex gap-3">
-                  <span className={`mt-0.5 grid size-8 shrink-0 place-items-center rounded-full ${event.tipo === "error" ? "bg-danger-light text-danger" : "bg-primary-light text-primary"}`}>
+                  <span className={`mt-0.5 grid size-8 shrink-0 place-items-center rounded-full ${event.tipo === "error" ? "bg-danger-light text-danger" : "bg-brand-50 text-brand-700"}`}>
                     <Activity aria-hidden="true" className="size-4" />
                   </span>
                   <div className="min-w-0 flex-1">
-                    <p className="text-sm text-foreground"><span className="font-semibold">{event.actor}</span> {event.descripcion}</p>
+                    <p className="text-sm text-foreground">
+                      <span className="font-semibold">{event.actor}</span> {event.descripcion}
+                    </p>
                     <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-foreground-muted">
-                      <Link href={event.href} className="font-medium text-primary hover:underline">{event.recurso}</Link>
+                      <Link href={event.href} className="font-medium text-brand-700 hover:underline">{event.recurso}</Link>
                       <span aria-hidden="true">·</span>
                       <time dateTime={event.fecha ?? undefined}>{formatDate(event.fecha, true)}</time>
                       {event.tipo === "error" && <Badge tone="risk">Error</Badge>}
@@ -345,6 +372,7 @@ export default function AdminDashboard() {
         </Card>
       </section>
 
+      {/* Critical processes table */}
       <Card title="Procesos que requieren seguimiento" description="Procesos activos de la firma, ordenados por riesgo y tareas pendientes.">
         <div className="space-y-4">
           <FilterBar>
@@ -356,7 +384,7 @@ export default function AdminDashboard() {
                   setProcessFilter(event.target.value as ProcessFilter);
                   setPage(1);
                 }}
-                className="min-h-10 min-w-56 rounded-lg border border-border bg-surface px-3 text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                className="min-h-10 min-w-56 rounded-[var(--radius-md)] border border-border bg-surface px-3 text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-700"
               >
                 {filterOptions.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
               </select>
@@ -375,21 +403,62 @@ export default function AdminDashboard() {
         </div>
       </Card>
 
+      {/* Scope indicators */}
       <section aria-label="Indicadores por ámbito" className="grid gap-5 lg:grid-cols-2">
         <Card title="Firma" description="Alejandra Muñoz | Abogada y Asociados">
           <dl className="grid grid-cols-2 gap-4 text-sm">
-            <div><dt className="text-foreground-muted">Procesos activos</dt><dd className="mt-1 text-xl font-semibold"><Link href="/gestion-procesos/admin/procesos" className="hover:text-primary hover:underline">{data.firma.procesos}</Link></dd></div>
-            <div><dt className="text-foreground-muted">Radicados</dt><dd className="mt-1 text-xl font-semibold"><Link href="/gestion-procesos/admin/radicados" className="hover:text-primary hover:underline">{data.firma.radicados}</Link></dd></div>
-            <div><dt className="text-foreground-muted">Tareas</dt><dd className="mt-1 text-xl font-semibold"><Link href="/gestion-procesos/admin/tareas" className="hover:text-primary hover:underline">{data.firma.tareas}</Link></dd></div>
-            <div><dt className="text-foreground-muted">Documentos</dt><dd className="mt-1 text-xl font-semibold"><Link href="/gestion-procesos/admin/documentos" className="hover:text-primary hover:underline">{data.firma.documentos}</Link></dd></div>
+            <div>
+              <dt className="text-foreground-muted">Procesos activos</dt>
+              <dd className="mt-1 text-xl font-bold text-foreground">
+                <Link href="/gestion-procesos/admin/procesos" className="hover:text-brand-700">{data.firma.procesos}</Link>
+              </dd>
+            </div>
+            <div>
+              <dt className="text-foreground-muted">Radicados</dt>
+              <dd className="mt-1 text-xl font-bold text-foreground">
+                <Link href="/gestion-procesos/admin/radicados" className="hover:text-brand-700">{data.firma.radicados}</Link>
+              </dd>
+            </div>
+            <div>
+              <dt className="text-foreground-muted">Tareas</dt>
+              <dd className="mt-1 text-xl font-bold text-foreground">
+                <Link href="/gestion-procesos/admin/tareas" className="hover:text-brand-700">{data.firma.tareas}</Link>
+              </dd>
+            </div>
+            <div>
+              <dt className="text-foreground-muted">Documentos</dt>
+              <dd className="mt-1 text-xl font-bold text-foreground">
+                <Link href="/gestion-procesos/admin/documentos" className="hover:text-brand-700">{data.firma.documentos}</Link>
+              </dd>
+            </div>
           </dl>
         </Card>
         <Card title="SaaS individual" description={`${data.saas.abogados} cuentas de abogados externos`}>
           <dl className="grid grid-cols-2 gap-4 text-sm">
-            <div><dt className="text-foreground-muted">Procesos activos</dt><dd className="mt-1 text-xl font-semibold"><Link href="/gestion-procesos/admin/saas/procesos" className="hover:text-primary hover:underline">{data.saas.procesos}</Link></dd></div>
-            <div><dt className="text-foreground-muted">Radicados</dt><dd className="mt-1 text-xl font-semibold"><Link href="/gestion-procesos/admin/saas/radicados" className="hover:text-primary hover:underline">{data.saas.radicados}</Link></dd></div>
-            <div><dt className="text-foreground-muted">Tareas</dt><dd className="mt-1 text-xl font-semibold"><Link href="/gestion-procesos/admin/saas/tareas" className="hover:text-primary hover:underline">{data.saas.tareas}</Link></dd></div>
-            <div><dt className="text-foreground-muted">Abogados</dt><dd className="mt-1 text-xl font-semibold"><Link href="/gestion-procesos/admin/usuarios" className="hover:text-primary hover:underline">{data.saas.abogados}</Link></dd></div>
+            <div>
+              <dt className="text-foreground-muted">Procesos activos</dt>
+              <dd className="mt-1 text-xl font-bold text-foreground">
+                <Link href="/gestion-procesos/admin/saas/procesos" className="hover:text-brand-700">{data.saas.procesos}</Link>
+              </dd>
+            </div>
+            <div>
+              <dt className="text-foreground-muted">Radicados</dt>
+              <dd className="mt-1 text-xl font-bold text-foreground">
+                <Link href="/gestion-procesos/admin/saas/radicados" className="hover:text-brand-700">{data.saas.radicados}</Link>
+              </dd>
+            </div>
+            <div>
+              <dt className="text-foreground-muted">Tareas</dt>
+              <dd className="mt-1 text-xl font-bold text-foreground">
+                <Link href="/gestion-procesos/admin/saas/tareas" className="hover:text-brand-700">{data.saas.tareas}</Link>
+              </dd>
+            </div>
+            <div>
+              <dt className="text-foreground-muted">Abogados</dt>
+              <dd className="mt-1 text-xl font-bold text-foreground">
+                <Link href="/gestion-procesos/admin/usuarios" className="hover:text-brand-700">{data.saas.abogados}</Link>
+              </dd>
+            </div>
           </dl>
         </Card>
       </section>

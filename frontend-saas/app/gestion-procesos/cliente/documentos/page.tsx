@@ -6,6 +6,9 @@ import Link from "next/link";
 import { ChangeEvent, useEffect, useState } from "react";
 import { AlertCircle, CheckCircle2, Download, FileText, FileUp, FolderOpen, Loader2, RefreshCw, Upload } from "lucide-react";
 import { useSession } from "@/context/SessionContext";
+import { PageHeader } from "@/components/ui/PageHeader";
+import { Button } from "@/components/ui/Button";
+import { Badge } from "@/components/ui/Badge";
 
 const MAX_FILE_SIZE = 15 * 1024 * 1024;
 const ALLOWED_TYPES = new Set([
@@ -207,19 +210,35 @@ export default function DocumentosClientePage() {
 
 	return (
 		<section className="mx-auto max-w-5xl space-y-6 pb-24">
-			<header className="flex flex-wrap items-end justify-between gap-4">
-				<div>
-					<p className="text-sm text-(--foreground-muted)">Portal del cliente</p>
-					<h1 className="mt-1 text-2xl font-semibold text-foreground">Documentos</h1>
-					<p className="mt-1 text-sm text-(--foreground-muted)">Solicitudes de tus procesos y archivos entregados.</p>
-				</div>
-				<button type="button" onClick={() => void reload()} disabled={loading || sessionLoading} className="inline-flex items-center gap-2 rounded-lg border border-border bg-surface px-3 py-2 text-sm font-medium text-foreground hover:bg-surface-hover disabled:opacity-50">
-					<RefreshCw className={`size-4 ${loading ? "animate-spin" : ""}`} /> Actualizar
-				</button>
-			</header>
+			<PageHeader
+				overline="Portal del cliente"
+				title="Documentos"
+				description="Solicitudes de tus procesos y archivos entregados."
+				action={
+					<Button
+						variant="outline"
+						size="sm"
+						onClick={() => void reload()}
+						loading={loading || sessionLoading}
+						icon={<RefreshCw className="size-4" />}
+					>
+						Actualizar
+					</Button>
+				}
+			/>
 
-			{error && <div role="alert" className="flex items-center gap-2 rounded-lg border border-red-500/20 bg-red-500/5 p-4 text-sm text-red-700"><AlertCircle className="size-4 shrink-0" />{error}</div>}
-			{notice && <div role="status" className="flex items-center gap-2 rounded-lg border border-emerald-700/20 bg-surface p-4 text-sm text-emerald-700"><CheckCircle2 className="size-4 shrink-0" />{notice}</div>}
+			{error && (
+				<div role="alert" className="flex items-center gap-2 rounded-lg border border-risk/30 bg-risk/10 p-3.5 text-sm font-medium text-risk">
+					<AlertCircle className="size-4 shrink-0" />
+					{error}
+				</div>
+			)}
+			{notice && (
+				<div role="status" className="flex items-center gap-2 rounded-lg border border-completed/30 bg-completed/10 p-3.5 text-sm font-medium text-completed">
+					<CheckCircle2 className="size-4 shrink-0" />
+					{notice}
+				</div>
+			)}
 
 			{loading || sessionLoading ? <div className="flex min-h-40 items-center justify-center gap-3 text-sm text-(--foreground-muted)"><RefreshCw className="size-5 animate-spin" />Cargando documentos...</div> : <>
 								<section className="space-y-3">

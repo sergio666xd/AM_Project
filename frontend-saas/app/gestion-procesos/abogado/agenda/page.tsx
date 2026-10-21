@@ -6,6 +6,8 @@ import { AlertCircle, Bell, CalendarDays, Clock3, RefreshCw } from "lucide-react
 import { fetchApi } from "@/lib/api";
 import { useSession } from "@/context/SessionContext";
 import TaskMonthCalendar, { type CalendarTask } from "@/components/calendar/TaskMonthCalendar";
+import { PageHeader } from "@/components/ui/PageHeader";
+import { Button } from "@/components/ui/Button";
 
 type Reminder = { id: number; activo: boolean; fecha_hora?: string | null };
 type Task = {
@@ -182,17 +184,34 @@ export default function AgendaPage() {
 
   return (
     <section className="mx-auto max-w-5xl space-y-5 pb-24">
-      <header className="flex flex-wrap items-end justify-between gap-4">
-        <div>
-          <p className="text-sm text-(--foreground-muted)">Trabajo jurídico</p>
-          <h1 className="mt-1 text-2xl font-semibold text-foreground">Agenda</h1>
-          <p className="mt-1 text-sm text-(--foreground-muted)">Tareas, eventos y actuaciones judiciales de tus procesos.</p>
-        </div>
-        <button type="button" onClick={() => void actualizar()} disabled={loading || sessionLoading} className="inline-flex items-center gap-2 rounded-lg border border-border bg-surface px-3 py-2 text-sm font-medium text-foreground hover:bg-surface-hover disabled:opacity-50"><RefreshCw className={`size-4 ${loading ? "animate-spin" : ""}`} />Actualizar</button>
-      </header>
+      <PageHeader
+        overline="Trabajo jurídico"
+        title="Agenda"
+        description="Tareas, eventos y actuaciones judiciales de tus procesos."
+        action={
+          <Button
+            variant="outline"
+            onClick={() => void actualizar()}
+            disabled={loading || sessionLoading}
+            icon={<RefreshCw className={`size-4 ${loading ? "animate-spin" : ""}`} />}
+          >
+            Actualizar
+          </Button>
+        }
+      />
 
       <div role="group" aria-label="Filtrar agenda" className="inline-flex flex-wrap gap-1 rounded-lg border border-border p-1">
-        {filters.map((item) => <button key={item.id} type="button" aria-pressed={filter === item.id} onClick={() => setFilter(item.id)} className={`rounded-md px-3 py-1.5 text-sm ${filter === item.id ? "bg-primary !text-white" : "text-(--foreground-muted) hover:bg-surface-secondary"}`}>{item.label}</button>)}
+        {filters.map((item) => (
+          <button
+            key={item.id}
+            type="button"
+            aria-pressed={filter === item.id}
+            onClick={() => setFilter(item.id)}
+            className={`rounded-md px-3 py-1.5 text-sm transition-colors ${filter === item.id ? "bg-brand-900 text-white" : "text-(--foreground-muted) hover:bg-surface-secondary"}`}
+          >
+            {item.label}
+          </button>
+        ))}
       </div>
 
       <details className="rounded-lg border border-border bg-surface p-3">

@@ -4,6 +4,9 @@ import { apiRequest } from "@/lib/api";
 import Image from "next/image";
 import Link from "next/link";
 import { useSession } from "@/context/SessionContext";
+import { PageHeader } from "@/components/ui/PageHeader";
+import { StatCard } from "@/components/ui/StatCard";
+import { Button } from "@/components/ui/Button";
 
 import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 import {
@@ -339,57 +342,28 @@ export default function DocumentosPage() {
       style={{ color: "var(--foreground)" }}
     >
       {/* ENCABEZADO */}
-      <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-        <div>
-          <div className="flex items-center gap-2">
-            <FileText
-              size={24}
-              style={{ color: "var(--primary)" }}
-            />
-            <h1 className="text-2xl font-semibold">
-              Documentos
-            </h1>
-          </div>
-
-          <p
-            className="mt-1 text-sm"
-            style={{ color: "var(--foreground-muted)" }}
+      <PageHeader
+        overline="Gestión documental"
+        title="Documentos"
+        description="Solicita documentos a tus clientes y consulta los archivos entregados."
+        action={
+          <Button
+            variant="primary"
+            onClick={() => setMostrarModal(true)}
+            icon={<Plus className="size-4" />}
           >
-            Solicita documentos a tus clientes y consulta los
-            archivos entregados.
-          </p>
-        </div>
-
-        <button
-          onClick={() => setMostrarModal(true)}
-          className="flex items-center justify-center gap-2 rounded-lg px-4 py-2.5 text-sm font-medium transition"
-          style={{
-            background: "var(--primary)",
-            color: "var(--primary-foreground)",
-          }}
-        >
-          <Plus size={17} />
-          Solicitar documento
-        </button>
-      </div>
+            Solicitar documento
+          </Button>
+        }
+      />
 
       {/* BARRA DE HERRAMIENTAS */}
-      <div
-        className="rounded-xl border"
-        style={{
-          background: "var(--surface)",
-          borderColor: "var(--border)",
-          boxShadow: "var(--shadow-sm)",
-        }}
-      >
-        <div className="flex flex-col gap-3 p-3 sm:flex-row sm:items-center">
+      <div className="rounded-xl border border-border bg-surface p-3 shadow-xs">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
           <div className="relative flex-1">
             <Search
               size={16}
-              className="absolute left-3 top-1/2 -translate-y-1/2"
-              style={{
-                color: "var(--foreground-muted)",
-              }}
+              className="absolute left-3 top-1/2 -translate-y-1/2 text-muted"
             />
 
             <input
@@ -398,12 +372,7 @@ export default function DocumentosPage() {
                 setQuery(event.target.value)
               }
               placeholder="Buscar proceso, cliente o documento..."
-              className="w-full rounded-lg border py-2.5 pl-9 pr-3 text-sm outline-none"
-              style={{
-                background: "var(--surface-muted)",
-                borderColor: "var(--border)",
-                color: "var(--foreground)",
-              }}
+              className="w-full rounded-lg border border-border bg-surface-secondary py-2 pl-9 pr-3 text-sm text-foreground placeholder:text-muted focus:border-brand-500 focus:outline-none"
             />
           </div>
 
@@ -412,19 +381,19 @@ export default function DocumentosPage() {
             onChange={(event) =>
               setFiltroEstado(event.target.value)
             }
-            className="rounded-lg border px-3 py-2.5 text-sm outline-none"
-            style={{
-              background: "var(--surface-muted)",
-              borderColor: "var(--border)",
-              color: "var(--foreground)",
-            }}
+            className="rounded-lg border border-border bg-surface-secondary px-3 py-2 text-sm text-foreground focus:border-brand-500 focus:outline-none"
           >
             <option value="TODAS">Todas las solicitudes</option>
             <option value="PENDIENTES">Pendientes</option>
             <option value="ENTREGADAS">Entregadas</option>
           </select>
 
-          <select value={filtroEstadoArchivo} onChange={(event) => setFiltroEstadoArchivo(event.target.value)} aria-label="Filtrar archivos por estado" className="rounded-lg border px-3 py-2.5 text-sm outline-none" style={{ background: "var(--surface-muted)", borderColor: "var(--border)", color: "var(--foreground)" }}>
+          <select
+            value={filtroEstadoArchivo}
+            onChange={(event) => setFiltroEstadoArchivo(event.target.value)}
+            aria-label="Filtrar archivos por estado"
+            className="rounded-lg border border-border bg-surface-secondary px-3 py-2 text-sm text-foreground focus:border-brand-500 focus:outline-none"
+          >
             <option value="TODOS">Todos los estados de archivo</option>
             <option value="RECIBIDO">Recibidos</option>
             <option value="EN_REVISION">En revisión</option>
@@ -433,60 +402,49 @@ export default function DocumentosPage() {
             <option value="RECHAZADO">Rechazados</option>
           </select>
 
-          <button
+          <Button
+            variant="outline"
+            size="sm"
             onClick={() => void load()}
-            disabled={actualizando}
-            className="flex items-center justify-center gap-2 rounded-lg px-3 py-2.5 text-sm transition disabled:opacity-50"
-            style={{
-              color: "var(--foreground-secondary)",
-            }}
+            loading={actualizando}
+            icon={<RefreshCw className="size-4" />}
           >
-            <RefreshCw
-              size={16}
-              className={actualizando ? "animate-spin" : ""}
-            />
             Actualizar
-          </button>
+          </Button>
         </div>
       </div>
 
       {/* RESUMEN */}
-      <details className="rounded-xl border p-3" style={{ borderColor: "var(--border)", background: "var(--surface)" }}>
-        <summary className="flex min-h-11 cursor-pointer items-center justify-between gap-3 font-medium">Resumen del centro documental <span className="text-xs font-normal" style={{ color: "var(--foreground-muted)" }}>{pendientes} pendiente(s)</span></summary>
-        <div className="mt-3 grid grid-cols-2 gap-3 border-t pt-3 lg:grid-cols-4" style={{ borderColor: "var(--border)" }}>
-        <ResumenCard
+      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+        <StatCard
           label="Solicitudes"
           value={data.solicitudes.length}
+          icon={FolderOpen}
         />
-
-        <ResumenCard
+        <StatCard
           label="Pendientes"
           value={pendientes}
-          danger={pendientes > 0}
+          tone={pendientes > 0 ? "warning" : "default"}
+          icon={FolderOpen}
         />
-
-        <ResumenCard
+        <StatCard
           label="Entregadas"
           value={entregadas}
-          success
+          tone="success"
+          icon={CheckCircle2}
         />
-
-        <ResumenCard
+        <StatCard
           label="Archivos"
           value={data.documentos.length}
+          icon={FileText}
         />
-        </div>
-      </details>
+      </div>
 
       {/* MENSAJES */}
       {error && (
         <div
-          className="flex items-center justify-between rounded-lg border px-4 py-3 text-sm"
-          style={{
-            background: "var(--danger-light)",
-            borderColor: "var(--danger)",
-            color: "var(--danger)",
-          }}
+          role="alert"
+          className="flex items-center justify-between rounded-lg border border-risk/30 bg-risk/10 px-4 py-3 text-sm font-medium text-risk"
         >
           <div className="flex items-center gap-2">
             <AlertCircle size={17} />
@@ -496,6 +454,7 @@ export default function DocumentosPage() {
           <button
             onClick={() => setError("")}
             aria-label="Cerrar error"
+            className="rounded p-1 hover:bg-risk/20"
           >
             <X size={17} />
           </button>
@@ -504,12 +463,8 @@ export default function DocumentosPage() {
 
       {notice && (
         <div
-          className="flex items-center justify-between rounded-lg border px-4 py-3 text-sm"
-          style={{
-            background: "var(--success-light)",
-            borderColor: "var(--success)",
-            color: "var(--success)",
-          }}
+          role="status"
+          className="flex items-center justify-between rounded-lg border border-completed/30 bg-completed/10 px-4 py-3 text-sm font-medium text-completed"
         >
           <div className="flex items-center gap-2">
             <CheckCircle2 size={17} />
@@ -519,6 +474,7 @@ export default function DocumentosPage() {
           <button
             onClick={() => setNotice("")}
             aria-label="Cerrar notificación"
+            className="rounded p-1 hover:bg-completed/20"
           >
             <X size={17} />
           </button>
@@ -974,10 +930,7 @@ function SolicitudDocumentoModal({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-4"
-      style={{
-        background: "rgba(0, 0, 0, 0.5)",
-      }}
+      className="fixed inset-0 z-50 flex items-center justify-center bg-brand-950/40 p-4 backdrop-blur-xs"
       onMouseDown={(event) => {
         if (event.target === event.currentTarget) {
           onClose();
@@ -986,24 +939,14 @@ function SolicitudDocumentoModal({
     >
       <form
         onSubmit={submit}
-        className="max-h-[90vh] w-full max-w-xl overflow-y-auto rounded-2xl border p-5 sm:p-6"
-        style={{
-          background: "var(--surface)",
-          borderColor: "var(--border)",
-          color: "var(--foreground)",
-          boxShadow: "var(--shadow-lg)",
-        }}
+        className="max-h-[90vh] w-full max-w-xl overflow-y-auto rounded-2xl border border-border bg-surface p-5 sm:p-6 text-foreground shadow-2xl"
       >
         {/* HEADER */}
         <div className="flex items-start justify-between gap-4">
           <div>
             <div className="flex items-center gap-2">
               <div
-                className="flex h-9 w-9 items-center justify-center rounded-lg"
-                style={{
-                  background: "var(--primary-light)",
-                  color: "var(--primary)",
-                }}
+                className="flex size-9 items-center justify-center rounded-lg bg-brand-50 text-brand-700 dark:bg-brand-950 dark:text-brand-300"
               >
                 <FileText size={18} />
               </div>
@@ -1014,10 +957,7 @@ function SolicitudDocumentoModal({
             </div>
 
             <p
-              className="mt-2 text-xs"
-              style={{
-                color: "var(--foreground-muted)",
-              }}
+              className="mt-2 text-xs text-muted"
             >
               Envía una solicitud de documento a un cliente
               asociada a un proceso.
@@ -1027,10 +967,7 @@ function SolicitudDocumentoModal({
           <button
             type="button"
             onClick={onClose}
-            className="rounded-lg p-2"
-            style={{
-              color: "var(--foreground-muted)",
-            }}
+            className="rounded-lg p-2 text-muted hover:bg-surface-secondary hover:text-foreground"
             aria-label="Cerrar"
           >
             <X size={19} />
@@ -1193,46 +1130,23 @@ function SolicitudDocumentoModal({
           </div>
 
           {/* ACTIONS */}
-          <div
-            className="flex justify-end gap-2 border-t pt-4"
-            style={{
-              borderColor: "var(--border)",
-            }}
-          >
-            <button
+          <div className="flex justify-end gap-2 border-t border-border pt-4">
+            <Button
               type="button"
+              variant="outline"
               onClick={onClose}
               disabled={saving}
-              className="rounded-lg border px-4 py-2.5 text-sm font-medium"
-              style={{
-                background: "var(--surface)",
-                borderColor: "var(--border)",
-                color: "var(--foreground-secondary)",
-              }}
             >
               Cancelar
-            </button>
+            </Button>
 
-            <button
+            <Button
               type="submit"
-              disabled={saving}
-              className="flex items-center gap-2 rounded-lg px-4 py-2.5 text-sm font-medium disabled:opacity-50"
-              style={{
-                background: "var(--primary)",
-                color: "var(--primary-foreground)",
-              }}
+              variant="primary"
+              loading={saving}
             >
-              {saving && (
-                <RefreshCw
-                  size={15}
-                  className="animate-spin"
-                />
-              )}
-
-              {saving
-                ? "Enviando..."
-                : "Enviar solicitud"}
-            </button>
+              Enviar solicitud
+            </Button>
           </div>
         </div>
       </form>

@@ -22,10 +22,16 @@ import {
   ChevronRight,
   Users,
   Gavel,
+  Clock,
+  AlertCircle,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useSession } from "@/context/SessionContext";
 import TaskMonthCalendar, { type CalendarTask } from "@/components/calendar/TaskMonthCalendar";
+import { PageHeader } from "@/components/ui/PageHeader";
+import { StatCard } from "@/components/ui/StatCard";
+import { Button } from "@/components/ui/Button";
+import { Badge } from "@/components/ui/Badge";
 
 
 type NivelTarea =
@@ -461,25 +467,31 @@ export default function TareasPage() {
       style={{ color: "var(--foreground)" }}
     >
       {/* ENCABEZADO */}
-      <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-        <div>
+      <PageHeader
+        overline="Gestión del despacho"
+        title="Tareas"
+        description="Organiza pendientes, procesos, clientes y fechas límite de tu despacho."
+        action={
           <div className="flex items-center gap-2">
-            <ClipboardList
-              size={24}
-              style={{ color: "var(--primary)" }}
-            />
-            <h1 className="text-2xl font-semibold">Tareas</h1>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => void load()}
+              loading={actualizando}
+              icon={<RefreshCw className="size-4" />}
+            >
+              Actualizar
+            </Button>
+            <Button
+              variant="primary"
+              onClick={() => setMostrarModal(true)}
+              icon={<Plus className="size-4" />}
+            >
+              Nueva tarea
+            </Button>
           </div>
-
-          <p
-            className="mt-1 text-sm"
-            style={{ color: "var(--foreground-muted)" }}
-          >
-            Organiza pendientes, procesos, clientes y fechas
-            límite de tu despacho.
-          </p>
-        </div>
-      </div>
+        }
+      />
 
       {/* BARRA DE ACCIONES */}
       <div
@@ -670,13 +682,29 @@ export default function TareasPage() {
 
       {/* RESUMEN */}
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-        <ResumenCard label="Pendientes" value={pendientes} />
-        <ResumenCard label="En curso" value={enCurso} />
-        <ResumenCard label="Vencidas" value={vencidas} danger />
-        <ResumenCard
+        <StatCard
+          label="Pendientes"
+          value={pendientes}
+          tone={pendientes > 0 ? "warning" : "default"}
+          icon={ClipboardList}
+        />
+        <StatCard
+          label="En curso"
+          value={enCurso}
+          tone="default"
+          icon={Clock}
+        />
+        <StatCard
+          label="Vencidas"
+          value={vencidas}
+          tone={vencidas > 0 ? "danger" : "default"}
+          icon={AlertCircle}
+        />
+        <StatCard
           label="Completadas"
           value={completadas}
-          success
+          tone="success"
+          icon={Check}
         />
       </div>
 
@@ -717,7 +745,22 @@ export default function TareasPage() {
       )}
 
       <div className="flex flex-wrap gap-2" role="tablist" aria-label="Vista de tareas">
-        {([ ["LISTA", "Lista"], ["KANBAN", "Kanban"], ["CALENDARIO", "Calendario"] ] as const).map(([key, label]) => <button key={key} type="button" role="tab" aria-selected={vista === key} onClick={() => setVista(key)} className="rounded-lg border px-3 py-2 text-sm font-medium" style={{ borderColor: vista === key ? "var(--primary)" : "var(--border)", background: vista === key ? "var(--primary-light)" : "var(--surface)", color: vista === key ? "var(--primary)" : "var(--foreground-secondary)" }}>{label}</button>)}
+        {([ ["LISTA", "Lista"], ["KANBAN", "Kanban"], ["CALENDARIO", "Calendario"] ] as const).map(([key, label]) => (
+          <button
+            key={key}
+            type="button"
+            role="tab"
+            aria-selected={vista === key}
+            onClick={() => setVista(key)}
+            className={`rounded-lg px-3.5 py-2 text-sm font-medium transition-colors ${
+              vista === key
+                ? "bg-brand-900 text-white shadow-xs font-semibold"
+                : "border border-border bg-surface text-muted hover:bg-surface-hover hover:text-foreground"
+            }`}
+          >
+            {label}
+          </button>
+        ))}
       </div>
 
       {vista === "CALENDARIO" ? <TaskMonthCalendar tasks={calendarTasks} /> : vista === "KANBAN" ? <div className="grid gap-4 lg:grid-cols-4">{["PENDIENTE", "EN_CURSO", "COMPLETADA", "CANCELADA"].map((status) => <section key={status} className="min-h-48 rounded-xl border p-3" style={{ borderColor: "var(--border)", background: "var(--surface-muted)" }}><h2 className="mb-3 flex items-center justify-between text-sm font-semibold">{estadoLabel(status)}<span className="rounded-full bg-[var(--surface)] px-2 py-0.5 text-xs">{filteredTasks.filter((task) => task.estado === status).length}</span></h2><div className="space-y-2">{filteredTasks.filter((task) => task.estado === status).map((task) => <TaskCard key={task.id} task={task} processes={processes} clients={clients} radicados={radicados} onOpen={() => openTask(task.id)} onComplete={() => void request(`/api/tareas/${task.id}/completar`, "PATCH")} onDelete={() => { if (confirm("¿Eliminar tarea?")) void request(`/api/tareas/${task.id}`, "DELETE"); }} onStatusChange={(estado) => void request(`/api/tareas/${task.id}`, "PUT", { estado })} />)}</div></section>)}</div> : <>

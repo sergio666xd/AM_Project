@@ -3,6 +3,9 @@
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import { Pencil, Plus, RefreshCw, Search, Trash2, X } from "lucide-react";
 import { fetchApi } from "@/lib/api";
+import { PageHeader } from "@/components/ui/PageHeader";
+import { Button } from "@/components/ui/Button";
+import { Badge } from "@/components/ui/Badge";
 
 type Plan = {
   id: number;
@@ -244,37 +247,17 @@ export default function AdminPlansPage() {
 
   return (
     <section className="mx-auto max-w-6xl space-y-5">
-      <header className="flex flex-wrap items-end justify-between gap-4">
-        <div>
-          <p className="text-xs font-semibold uppercase tracking-wide text-primary">
-            Panel Administrativo · SaaS individual
-          </p>
-          <h1 className="mt-1 text-2xl font-semibold text-foreground">
-            Planes
-          </h1>
-          <p className="mt-1 text-sm text-foreground-muted">
-            Límites y funciones de las cuentas de abogados externos.
-          </p>
-        </div>
-        <div className="flex gap-2">
-          <button
-            type="button"
-            onClick={() => void reload()}
-            aria-label="Actualizar planes"
-            className="grid size-10 place-items-center rounded-lg border border-border bg-surface hover:bg-surface-hover"
-          >
-            <RefreshCw className={`size-4 ${loading ? "animate-spin" : ""}`} />
-          </button>
-          <button
-            type="button"
-            onClick={openCreate}
-            className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground"
-          >
-            <Plus className="size-4" />
-            Nuevo plan
-          </button>
-        </div>
-      </header>
+      <PageHeader
+          overline="Panel Administrativo · SaaS individual"
+          title="Planes"
+          description="Límites y funciones de las cuentas de abogados externos."
+          action={
+            <div className="flex gap-2">
+              <Button variant="outline" onClick={() => void reload()} aria-label="Actualizar planes" icon={<RefreshCw className={`size-4 ${loading ? "animate-spin" : ""}`} />} />
+              <Button variant="primary" onClick={openCreate} icon={<Plus className="size-4" />}>Nuevo plan</Button>
+            </div>
+          }
+        />
       {error && (
         <p
           role="alert"
@@ -356,11 +339,9 @@ export default function AdminPlansPage() {
                     {plan.notificaciones_whatsapp_procesos ? "· Tareas" : "—"}
                   </td>
                   <td className="px-4 py-3">
-                    <span
-                      className={`rounded-md px-2 py-1 text-xs ${plan.activo ? "bg-success-light text-success" : "bg-surface-secondary text-foreground-muted"}`}
-                    >
+                    <Badge tone={plan.activo ? "completed" : "archived"}>
                       {plan.activo ? "Activo" : "Inactivo"}
-                    </span>
+                    </Badge>
                   </td>
                   <td className="px-4 py-3">
                     <div className="flex justify-end gap-1">
@@ -411,7 +392,7 @@ export default function AdminPlansPage() {
           role="dialog"
           aria-modal="true"
           aria-label={editing ? "Editar plan" : "Crear plan"}
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+          className="fixed inset-0 z-50 flex items-center justify-center bg-brand-950/40 backdrop-blur-sm p-4"
         >
           <form
             onSubmit={save}
@@ -419,7 +400,7 @@ export default function AdminPlansPage() {
           >
             <header className="flex items-center justify-between">
               <div>
-                <p className="text-xs font-semibold uppercase text-primary">
+                <p className="text-xs font-semibold uppercase text-brand-700">
                   SaaS individual
                 </p>
                 <h2 className="mt-1 text-lg font-semibold">
@@ -519,20 +500,10 @@ export default function AdminPlansPage() {
               WhatsApp para recordatorios de tareas
             </label>
             <footer className="flex justify-end gap-2 border-t border-border pt-4">
-              <button
-                type="button"
-                onClick={() => setFormOpen(false)}
-                className="rounded-md border border-border px-3 py-2 text-sm"
-              >
-                Cancelar
-              </button>
-              <button
-                type="submit"
-                disabled={working}
-                className="rounded-md bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground disabled:opacity-50"
-              >
+              <Button variant="outline" onClick={() => setFormOpen(false)}>Cancelar</Button>
+              <Button type="submit" variant="primary" loading={working}>
                 {working ? "Guardando..." : "Guardar plan"}
-              </button>
+              </Button>
             </footer>
           </form>
         </div>

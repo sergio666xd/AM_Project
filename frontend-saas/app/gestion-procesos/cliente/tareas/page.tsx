@@ -8,6 +8,9 @@ import { fetchApi } from "@/lib/api";
 import TaskMonthCalendar, {
   type CalendarTask,
 } from "@/components/calendar/TaskMonthCalendar";
+import { PageHeader } from "@/components/ui/PageHeader";
+import { Button } from "@/components/ui/Button";
+import { Badge } from "@/components/ui/Badge";
 
 type Task = CalendarTask & {
   proceso_id?: number | null;
@@ -243,45 +246,51 @@ export default function TareasClientePage() {
   }, new Map<string, CalendarTask[]>())).sort(([left], [right]) => left.localeCompare(right)).slice(0, 6);
 
   return (
-    <section className="mx-auto max-w-5xl space-y-5 pb-24">
-      <header className="flex flex-wrap items-end justify-between gap-4">
-        <div>
-          <p className="text-sm text-(--foreground-muted)">
-            Portal del cliente
-          </p>
-          <h1 className="mt-1 text-2xl font-semibold text-foreground">
-            Mis tareas
-          </h1>
-          <p className="mt-1 text-sm text-(--foreground-muted)">
-            Revisa los vencimientos y completa únicamente las tareas o subtareas que te asignaron.
-          </p>
-        </div>
-        <button
-          type="button"
-          onClick={() => void refresh()}
-          disabled={loading || sessionLoading}
-          className="inline-flex items-center gap-2 rounded-lg border border-border bg-surface px-3 py-2 text-sm font-medium hover:bg-surface-hover disabled:opacity-50"
-        >
-          <RefreshCw className={`size-4 ${loading ? "animate-spin" : ""}`} />
-          Actualizar
-        </button>
-        {processes.length > 0 && <label className="min-w-48 text-sm"><span className="sr-only">Filtrar tareas por proceso</span><select value={processFilter} onChange={(event) => setProcessFilter(event.target.value)} className="min-h-11 w-full rounded-lg border border-border bg-surface px-3 text-sm"><option value="TODOS">Todos los procesos</option><option value="GENERAL">Tareas generales</option>{processes.map((process) => <option key={process.id} value={String(process.id)}>{process.nombre}</option>)}</select></label>}
-      </header>
+    <section className="mx-auto max-w-5xl space-y-6 pb-24">
+      <PageHeader
+        overline="Portal del cliente"
+        title="Mis tareas"
+        description="Revisa los vencimientos y completa únicamente las tareas o subtareas que te asignaron."
+        action={
+          <div className="flex flex-wrap items-center gap-2">
+            {processes.length > 0 && (
+              <select
+                value={processFilter}
+                onChange={(event) => setProcessFilter(event.target.value)}
+                aria-label="Filtrar tareas por proceso"
+                className="min-h-9 rounded-lg border border-border bg-surface-secondary px-3 text-xs text-foreground focus:border-brand-500 focus:outline-none"
+              >
+                <option value="TODOS">Todos los procesos</option>
+                <option value="GENERAL">Tareas generales</option>
+                {processes.map((process) => (
+                  <option key={process.id} value={String(process.id)}>
+                    {process.nombre}
+                  </option>
+                ))}
+              </select>
+            )}
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => void refresh()}
+              loading={loading || sessionLoading}
+              icon={<RefreshCw className="size-4" />}
+            >
+              Actualizar
+            </Button>
+          </div>
+        }
+      />
+
       {error && (
-        <p
-          role="alert"
-          className="rounded-lg border border-danger/30 bg-danger-light p-3 text-sm text-danger"
-        >
+        <div role="alert" className="rounded-lg border border-risk/30 bg-risk/10 p-3.5 text-sm font-medium text-risk">
           {error}
-        </p>
+        </div>
       )}
       {notice && (
-        <p
-          role="status"
-          className="rounded-lg border border-success/30 bg-success-light p-3 text-sm text-success"
-        >
+        <div role="status" className="rounded-lg border border-completed/30 bg-completed/10 p-3.5 text-sm font-medium text-completed">
           {notice}
-        </p>
+        </div>
       )}
       {loading || sessionLoading ? (
         <div className="grid min-h-48 place-items-center gap-3 text-sm text-(--foreground-muted)">

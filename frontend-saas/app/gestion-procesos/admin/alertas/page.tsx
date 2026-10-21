@@ -10,6 +10,8 @@ import { Card } from "@/components/ui/Card";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { LoadingState } from "@/components/ui/LoadingState";
 import { FilterBar } from "@/components/ui/FilterBar";
+import { PageHeader } from "@/components/ui/PageHeader";
+import { StatCard } from "@/components/ui/StatCard";
 
 type AlertState = "ACTIVA" | "ATENDIDA" | "DESCARTADA" | "ELIMINADA";
 type AlertItem = {
@@ -133,23 +135,27 @@ export default function AdminAlertsPage() {
   }
 
   return (
-    <div className="space-y-6 p-6">
-      <header className="flex flex-wrap items-start justify-between gap-4">
-        <div>
-          <p className="text-sm text-foreground-muted">Centro de atención</p>
-          <h1 className="mt-1 flex items-center gap-2 text-2xl font-semibold"><Bell className="size-6" /> Alertas</h1>
-          <p className="mt-2 text-sm text-foreground-muted">Pendientes, riesgos y eventos importantes de la operación.</p>
-        </div>
-        <div className="flex gap-2">
-          <Button variant="secondary" onClick={() => void load(true)} disabled={loading || busy}><RefreshCw className="mr-2 size-4" /> Actualizar</Button>
-          <Button variant="danger" onClick={() => void deleteAll()} disabled={!items.length || busy}><Trash2 className="mr-2 size-4" /> Eliminar todas</Button>
-        </div>
-      </header>
+    <div className="mx-auto max-w-7xl space-y-6">
+      <PageHeader
+        overline="Centro de atención"
+        title="Alertas"
+        description="Pendientes, riesgos y eventos importantes de la operación."
+        action={
+          <div className="flex gap-2">
+            <Button variant="secondary" onClick={() => void load(true)} disabled={loading || busy} icon={<RefreshCw className="size-4" />}>
+              Actualizar
+            </Button>
+            <Button variant="danger" onClick={() => void deleteAll()} disabled={!items.length || busy} icon={<Trash2 className="size-4" />}>
+              Eliminar todas
+            </Button>
+          </div>
+        }
+      />
 
       <div className="grid gap-3 sm:grid-cols-3">
-        <Card className="p-4"><p className="text-sm text-foreground-muted">Alertas activas</p><p className="mt-1 text-2xl font-semibold">{activeCount}</p></Card>
-        <Card className="p-4"><p className="text-sm text-foreground-muted">Errores y riesgos</p><p className="mt-1 text-2xl font-semibold">{items.filter((item) => item.estado === "ACTIVA" && ["Error", "Riesgo"].includes(item.tipo)).length}</p></Card>
-        <Card className="p-4"><p className="text-sm text-foreground-muted">Pendientes y eventos</p><p className="mt-1 text-2xl font-semibold">{items.filter((item) => item.estado === "ACTIVA" && ["Pendiente", "Evento"].includes(item.tipo)).length}</p></Card>
+        <StatCard label="Alertas activas" value={activeCount} icon={Bell} tone={activeCount > 0 ? "warning" : "default"} />
+        <StatCard label="Errores y riesgos" value={items.filter((item) => item.estado === "ACTIVA" && ["Error", "Riesgo"].includes(item.tipo)).length} icon={Bell} tone={items.some((item) => item.estado === "ACTIVA" && ["Error", "Riesgo"].includes(item.tipo)) ? "danger" : "default"} />
+        <StatCard label="Pendientes y eventos" value={items.filter((item) => item.estado === "ACTIVA" && ["Pendiente", "Evento"].includes(item.tipo)).length} icon={Bell} />
       </div>
 
       <FilterBar>

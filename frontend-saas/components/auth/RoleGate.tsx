@@ -39,7 +39,8 @@ export function RoleGate({ roles, children, restrictedBehavior = "redirect" }: {
       return;
     }
     if (user.debe_cambiar_password) {
-      router.replace("/cambiar-password");
+      const emailQuery = user.email ? `?email=${encodeURIComponent(user.email)}` : "";
+      router.replace(`/cambiar-password${emailQuery}`);
       return;
     }
     if (!roles.includes(user.rol as Role)) {

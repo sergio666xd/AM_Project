@@ -33,9 +33,12 @@ export default function AppShell({
       {variant !== "saas" && <PushNotificationPrompt />}
       <Sidebar variant={variant} />
 
-      <main className={`${isChatPage ? "flex h-full min-h-0 flex-col overflow-hidden" : "min-h-screen"} pt-[var(--header-height)] md:ml-[260px] md:pt-0`}>
+      <main className={`${isChatPage ? "flex h-full min-h-0 flex-col overflow-hidden" : "min-h-screen"} pt-[var(--header-height)] md:ml-[var(--sidebar-width)] md:pt-0`}>
         <header className={`${isChatPage ? "relative flex-none" : "sticky top-0"} z-30 border-b border-border bg-surface/95 px-5 py-3 backdrop-blur md:px-8`}>
-          <div className="flex items-center justify-between gap-4"><Breadcrumbs /><GlobalSearch /></div>
+          <div className="flex items-center justify-between gap-4">
+            <Breadcrumbs />
+            <GlobalSearch />
+          </div>
         </header>
         <div className={isChatPage ? "min-h-0 flex-1 p-0" : "p-5 sm:p-6 lg:p-8"}>
           {children}

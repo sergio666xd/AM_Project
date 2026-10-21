@@ -4,6 +4,8 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { ChevronLeft, ChevronRight, Loader2, MessageSquare, RefreshCw, Search, Trash2 } from "lucide-react";
 import { useSession } from "@/context/SessionContext";
 import { apiRequest } from "@/lib/api";
+import { PageHeader } from "@/components/ui/PageHeader";
+import { Button } from "@/components/ui/Button";
 
 type Conversation = {
   id: number;
@@ -97,24 +99,26 @@ export default function AdminChatCleanupPage() {
     setOffset(nextOffset); setSearch("");
   }
 
-  return <div className="space-y-5">
-    <header className="flex flex-wrap items-start justify-between gap-3">
-      <div>
-        <h1 className="text-2xl font-semibold">Limpiar conversaciones</h1>
-        <p className="mt-1 max-w-3xl text-sm text-foreground-muted">Administra la limpieza de chats sin acceder a sus mensajes. Solo se muestran participantes, proceso, cantidad de mensajes y fecha de actividad.</p>
-      </div>
-      <button type="button" onClick={() => void load()} disabled={loading || workingId !== null} className="inline-flex items-center gap-2 rounded-md border border-border px-3 py-2 text-sm disabled:opacity-50">
-        <RefreshCw className={`size-4 ${loading ? "animate-spin" : ""}`} />Actualizar
-      </button>
-    </header>
+  return (
+    <div className="space-y-5">
+      <PageHeader
+        overline="Panel Administrativo · Chat"
+        title="Limpiar conversaciones"
+        description="Administra la limpieza de chats sin acceder a sus mensajes. Solo se muestran participantes, proceso, cantidad de mensajes y fecha de actividad."
+        action={
+          <Button variant="outline" onClick={() => void load()} disabled={loading || workingId !== null} icon={<RefreshCw className={`size-4 ${loading ? "animate-spin" : ""}`} />}>
+            Actualizar
+          </Button>
+        }
+      />
 
     <label className="relative block max-w-lg text-sm font-medium">Filtrar conversaciones
       <Search className="pointer-events-none absolute left-3 top-9 size-4 text-foreground-muted" />
       <input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Proceso o participante" className="mt-1 block w-full rounded-md border border-border bg-background py-2 pl-9 pr-3" />
     </label>
 
-    {error && <p role="alert" className="rounded-lg border border-red-500/30 bg-red-500/5 p-3 text-sm text-red-700">{error}</p>}
-    {notice && <p role="status" className="rounded-lg border border-emerald-500/30 bg-emerald-500/5 p-3 text-sm text-emerald-700">{notice}</p>}
+    {error && <p role="alert" className="rounded-lg border border-danger/30 bg-danger-100 p-3 text-sm text-danger">{error}</p>}
+    {notice && <p role="status" className="rounded-lg border border-success/30 bg-success-100 p-3 text-sm text-success">{notice}</p>}
 
     <section className="overflow-hidden rounded-xl border border-border bg-surface">
       {loading && !listing ? <div className="grid min-h-48 place-items-center"><Loader2 className="size-6 animate-spin text-primary" /></div> : <>
@@ -127,7 +131,7 @@ export default function AdminChatCleanupPage() {
                 <td className="max-w-80 px-4 py-3 text-xs">{conversation.participantes.join(", ") || "Sin participantes"}</td>
                 <td className="whitespace-nowrap px-4 py-3">{conversation.cantidad_mensajes}</td>
                 <td className="whitespace-nowrap px-4 py-3 text-xs text-foreground-muted">{dateInBogota(conversation.ultimo_mensaje_en)}</td>
-                <td className="px-4 py-3"><button type="button" disabled={workingId !== null || conversation.cantidad_mensajes === 0} onClick={() => void clearConversation(conversation)} className="inline-flex items-center gap-2 rounded-md border border-red-500/30 px-3 py-2 text-xs text-red-700 disabled:cursor-not-allowed disabled:opacity-40">{workingId === conversation.id ? <Loader2 className="size-3.5 animate-spin" /> : <Trash2 className="size-3.5" />}Limpiar</button></td>
+                <td className="px-4 py-3"><button type="button" disabled={workingId !== null || conversation.cantidad_mensajes === 0} onClick={() => void clearConversation(conversation)} className="inline-flex items-center gap-2 rounded-md border border-danger/30 px-3 py-2 text-xs text-danger disabled:cursor-not-allowed disabled:opacity-40">{workingId === conversation.id ? <Loader2 className="size-3.5 animate-spin" /> : <Trash2 className="size-3.5" />}Limpiar</button></td>
               </tr>)}
             </tbody>
           </table>
@@ -139,5 +143,6 @@ export default function AdminChatCleanupPage() {
         </footer>
       </>}
     </section>
-  </div>;
+  </div>
+  );
 }

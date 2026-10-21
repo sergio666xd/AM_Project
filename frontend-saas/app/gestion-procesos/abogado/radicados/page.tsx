@@ -5,6 +5,10 @@ import { useSession } from "@/context/SessionContext";
 
 import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
+import { PageHeader } from "@/components/ui/PageHeader";
+import { StatCard } from "@/components/ui/StatCard";
+import { Button } from "@/components/ui/Button";
+import { Badge } from "@/components/ui/Badge";
 import {
   ArrowDown,
   ArrowUp,
@@ -579,70 +583,57 @@ export default function RadicadosPage() {
   return (
     <section className="space-y-6">
       {/* HEADER */}
-      <header>
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
-          <div>
-            <p
-              className="text-sm"
-              style={{ color: "var(--foreground-muted)" }}
-            >
-              Gestión judicial
-            </p>
-
-            <h1
-              className="mt-1 text-2xl font-semibold"
-              style={{ color: "var(--foreground)" }}
-            >
-              Radicados
-            </h1>
-
-            <p
-              className="mt-1 text-sm"
-              style={{ color: "var(--foreground-muted)" }}
-            >
-              Administra tus procesos judiciales y consulta sus
-              actuaciones.
-            </p>
-          </div>
-
+      <PageHeader
+        overline="Gestión judicial"
+        title="Radicados"
+        description="Administra tus procesos judiciales y consulta sus actuaciones en tiempo real."
+        action={
           <div className="flex items-center gap-2">
-            <button
-              type="button"
+            <Button
+              variant="outline"
+              size="sm"
               onClick={() => void refresh()}
-              disabled={refreshing}
-              className="inline-flex items-center gap-2 rounded-lg border px-3.5 py-2.5 text-sm font-medium transition disabled:cursor-not-allowed disabled:opacity-50"
-              style={{
-                background: "var(--surface)",
-                borderColor: "var(--border)",
-                color: "var(--foreground-secondary)",
-              }}
+              loading={refreshing}
+              icon={<RefreshCw className="size-4" />}
             >
-              <RefreshCw
-                size={16}
-                className={refreshing ? "animate-spin" : ""}
-              />
               Actualizar
-            </button>
+            </Button>
 
-            <button
-              type="button"
+            <Button
+              variant="primary"
               onClick={() => {
                 setError("");
                 setMessage("");
                 setShowCreateModal(true);
               }}
-              className="inline-flex items-center gap-2 rounded-lg px-4 py-2.5 text-sm font-medium transition"
-              style={{
-                background: "var(--primary)",
-                color: "var(--primary-foreground)",
-              }}
+              icon={<Plus className="size-4" />}
             >
-              <Plus size={17} />
               Nuevo radicado
-            </button>
+            </Button>
           </div>
-        </div>
-      </header>
+        }
+      />
+
+      {/* RESUMEN */}
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+        <StatCard
+          label="Total radicados"
+          value={radicados.length}
+          icon={FileText}
+        />
+        <StatCard
+          label="Al día"
+          value={radicados.filter((r) => r.estado_consulta === "COMPLETADA").length}
+          tone="success"
+          icon={Check}
+        />
+        <StatCard
+          label="En consulta"
+          value={radicados.filter((r) => ["ENCOLADA", "EJECUTANDO"].includes(r.estado_consulta || "")).length}
+          tone={radicados.some((r) => ["ENCOLADA", "EJECUTANDO"].includes(r.estado_consulta || "")) ? "warning" : "default"}
+          icon={RefreshCw}
+        />
+      </div>
 
       {/* MENSAJES */}
       {error && (
@@ -1303,7 +1294,7 @@ export default function RadicadosPage() {
       {/* MODAL CREAR RADICADO */}
       {showCreateModal && (
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4"
+          className="fixed inset-0 z-50 flex items-center justify-center bg-brand-950/40 px-4 backdrop-blur-xs"
           onMouseDown={(event) => {
             if (event.target === event.currentTarget) {
               setShowCreateModal(false);
@@ -1311,35 +1302,15 @@ export default function RadicadosPage() {
           }}
         >
           <div
-            className="w-full max-w-md overflow-hidden rounded-xl border shadow-xl"
-            style={{
-              background: "var(--surface)",
-              borderColor: "var(--border)",
-            }}
+            className="w-full max-w-md overflow-hidden rounded-2xl border border-border bg-surface text-foreground shadow-2xl"
           >
-            <div
-              className="flex items-center justify-between border-b px-5 py-4"
-              style={{
-                borderColor: "var(--border)",
-              }}
-            >
+            <div className="flex items-center justify-between border-b border-border px-5 py-4">
               <div>
-                <h2
-                  className="font-semibold"
-                  style={{
-                    color: "var(--foreground)",
-                  }}
-                >
+                <h2 className="text-base font-semibold text-foreground">
                   Nuevo radicado
                 </h2>
 
-                <p
-                  className="mt-0.5 text-xs"
-                  style={{
-                    color:
-                      "var(--foreground-muted)",
-                  }}
-                >
+                <p className="mt-0.5 text-xs text-muted">
                   Agrega un proceso para iniciar su seguimiento.
                 </p>
               </div>
@@ -1349,11 +1320,7 @@ export default function RadicadosPage() {
                 onClick={() =>
                   setShowCreateModal(false)
                 }
-                className="rounded-lg p-2 transition hover:bg-[var(--surface-muted)]"
-                style={{
-                  color:
-                    "var(--foreground-muted)",
-                }}
+                className="rounded-lg p-2 text-muted hover:bg-surface-secondary hover:text-foreground"
               >
                 <X size={18} />
               </button>
@@ -1364,11 +1331,7 @@ export default function RadicadosPage() {
                 <div>
                   <label
                     htmlFor="numero-radicado"
-                    className="mb-1.5 block text-sm font-medium"
-                    style={{
-                      color:
-                        "var(--foreground)",
-                    }}
+                    className="mb-1.5 block text-sm font-medium text-foreground"
                   >
                     Número de radicado
                   </label>
@@ -1385,81 +1348,39 @@ export default function RadicadosPage() {
                     placeholder="Ej. 05001310300120260012300"
                     autoFocus
                     required
-                    className="w-full rounded-lg border px-3 py-2.5 text-sm outline-none transition"
-                    style={{
-                      background:
-                        "var(--surface-muted)",
-                      borderColor:
-                        "var(--border)",
-                      color:
-                        "var(--foreground)",
-                    }}
+                    className="w-full rounded-lg border border-border bg-surface-secondary px-3 py-2.5 text-sm text-foreground outline-none transition placeholder:text-muted focus:border-brand-500"
                   />
 
-                  <p
-                    className="mt-1.5 text-xs"
-                    style={{
-                      color:
-                        "var(--foreground-muted)",
-                    }}
-                  >
+                  <p className="mt-1.5 text-xs text-muted">
                     El número será utilizado para consultar
                     automáticamente el proceso.
                   </p>
                 </div>
               </div>
 
-              <div
-                className="flex justify-end gap-2 border-t px-5 py-4"
-                style={{
-                  borderColor:
-                    "var(--border)",
-                }}
-              >
-                <button
+              <div className="flex justify-end gap-2 border-t border-border px-5 py-4">
+                <Button
                   type="button"
+                  variant="outline"
                   onClick={() =>
                     setShowCreateModal(false)
                   }
                   disabled={creating}
-                  className="rounded-lg border px-4 py-2.5 text-sm font-medium transition disabled:opacity-50"
-                  style={{
-                    background:
-                      "var(--surface)",
-                    borderColor:
-                      "var(--border)",
-                    color:
-                      "var(--foreground-secondary)",
-                  }}
                 >
                   Cancelar
-                </button>
+                </Button>
 
-                <button
+                <Button
                   type="submit"
+                  variant="primary"
+                  loading={creating}
                   disabled={
                     creating ||
                     !nuevoNumero.trim()
                   }
-                  className="inline-flex items-center gap-2 rounded-lg px-4 py-2.5 text-sm font-medium transition disabled:cursor-not-allowed disabled:opacity-50"
-                  style={{
-                    background:
-                      "var(--primary)",
-                    color:
-                      "var(--primary-foreground)",
-                  }}
                 >
-                  {creating && (
-                    <RefreshCw
-                      size={16}
-                      className="animate-spin"
-                    />
-                  )}
-
-                  {creating
-                    ? "Agregando..."
-                    : "Agregar radicado"}
-                </button>
+                  Agregar radicado
+                </Button>
               </div>
             </form>
           </div>

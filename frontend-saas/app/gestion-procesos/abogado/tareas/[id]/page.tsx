@@ -22,6 +22,9 @@ import {
 import { useParams, useRouter } from "next/navigation";
 import { fetchApi } from "@/lib/api";
 import { useSession } from "@/context/SessionContext";
+import { Button } from "@/components/ui/Button";
+import { Badge } from "@/components/ui/Badge";
+import { PageHeader } from "@/components/ui/PageHeader";
 
 type EstadoTarea = "PENDIENTE" | "EN_CURSO" | "COMPLETADA" | "CANCELADA";
 
@@ -887,40 +890,38 @@ export default function TareaDetalleAbogadoPage() {
   return (
     <div className="mx-auto max-w-6xl space-y-6">
       {/* HEADER */}
-      <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-        <button
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <Button
+          variant="ghost"
+          size="sm"
           onClick={() => router.push("/gestion-procesos/abogado/tareas")}
-          className="flex w-fit items-center gap-2 text-sm font-medium text-foreground-secondary transition hover:text-foreground"
+          icon={<ArrowLeft className="size-4" />}
         >
-          <ArrowLeft size={18} />
           Volver a tareas
-        </button>
+        </Button>
 
         <div className="flex items-center gap-2">
           {!editing && (
-            <button
+            <Button
+              variant="outline"
+              size="sm"
               onClick={() => setEditing(true)}
-              className="flex items-center gap-2 rounded-lg border border-border bg-surface px-4 py-2 text-sm font-medium text-foreground transition hover:bg-surface-hover"
+              icon={<Pencil className="size-4" />}
             >
-              <Pencil size={16} />
               Editar
-            </button>
+            </Button>
           )}
 
-          <button
+          <Button
+            variant={tarea.estado === "COMPLETADA" ? "outline" : "primary"}
+            size="sm"
             onClick={toggleCompleted}
-            className={`flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-semibold transition ${
-              tarea.estado === "COMPLETADA"
-                ? "border border-border bg-surface text-foreground"
-                : "bg-primary text-primary-foreground hover:bg-primary-hover"
-            }`}
+            icon={<CheckCircle2 className="size-4" />}
           >
-            <CheckCircle2 size={17} />
-
             {tarea.estado === "COMPLETADA"
               ? "Reabrir tarea"
               : "Marcar completada"}
-          </button>
+          </Button>
         </div>
       </div>
 

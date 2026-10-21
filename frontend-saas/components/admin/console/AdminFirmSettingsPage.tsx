@@ -4,6 +4,8 @@ import { useEffect, useState } from "react";
 import { Save } from "lucide-react";
 import { fetchApi } from "@/lib/api";
 import { useSession } from "@/context/SessionContext";
+import { PageHeader } from "@/components/ui/PageHeader";
+import { Button } from "@/components/ui/Button";
 
 type FirmSettings = {
   nombre: string; correo_contacto: string | null; correo_pqr: string | null;
@@ -99,7 +101,7 @@ export default function AdminFirmSettingsPage() {
   }));
 
   return <section className="mx-auto max-w-5xl space-y-6">
-    <header><p className="text-xs font-semibold uppercase tracking-wide text-primary">Panel Administrativo · Firma</p><h1 className="mt-1 text-2xl font-semibold">Configuración de la firma</h1><p className="mt-1 text-sm text-foreground-muted">Identidad, contacto público y parámetros operativos de la firma. Las credenciales técnicas se administran aparte en Integraciones.</p></header>
+    <PageHeader overline="Panel Administrativo · Firma" title="Configuración de la firma" description="Identidad, contacto público y parámetros operativos de la firma. Las credenciales técnicas se administran aparte en Integraciones." />
     {error && <p role="alert" className="rounded-md border border-danger/30 bg-danger-light p-3 text-sm text-danger">{error}</p>}
     {notice && <p role="status" className="rounded-md border border-success/30 bg-success-light p-3 text-sm text-success">{notice}</p>}
     {settings.updated_at && <p className="text-xs text-foreground-muted">Última actualización: {new Date(`${settings.updated_at.replace(/Z$/, "")}Z`).toLocaleString("es-CO", { timeZone: "America/Bogota" })}</p>}
@@ -139,7 +141,7 @@ export default function AdminFirmSettingsPage() {
         <div className="space-y-3 text-sm"><p className="font-medium">Canales habilitados para comunicaciones de la firma</p><label className="flex items-center gap-2"><input type="checkbox" checked={settings.preferencias_notificacion.email ?? true} onChange={(e) => setSettings((current) => ({ ...current, preferencias_notificacion: { ...current.preferencias_notificacion, email: e.target.checked } }))} />Correo</label><label className="flex items-center gap-2"><input type="checkbox" checked={settings.preferencias_notificacion.whatsapp ?? true} onChange={(e) => setSettings((current) => ({ ...current, preferencias_notificacion: { ...current.preferencias_notificacion, whatsapp: e.target.checked } }))} />WhatsApp</label></div>
         <p className="text-xs text-foreground-muted sm:col-span-2">Las preferencias de cada usuario y las credenciales SMTP/WhatsApp permanecen independientes. Los parámetros comerciales del SaaS se administran en Planes.</p>
       </fieldset>
-      <div className="flex justify-end"><button type="submit" disabled={saving} className="inline-flex h-10 items-center gap-2 rounded-md bg-primary px-4 text-sm font-semibold !text-white disabled:opacity-50"><Save className="size-4" />{saving ? "Guardando…" : "Guardar configuración"}</button></div>
+      <div className="flex justify-end"><Button type="submit" variant="primary" loading={saving} icon={<Save className="size-4" />}>{saving ? "Guardando…" : "Guardar configuración"}</Button></div>
     </form>}
   </section>;
 }

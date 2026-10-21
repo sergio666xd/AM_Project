@@ -4,6 +4,8 @@ import { useEffect, useState } from "react";
 import { Save, Search } from "lucide-react";
 import { fetchApi } from "@/lib/api";
 import { useSession } from "@/context/SessionContext";
+import { PageHeader } from "@/components/ui/PageHeader";
+import { Button } from "@/components/ui/Button";
 
 type Template = {
   clave: string; nombre: string; asunto_email: string | null; cuerpo_email: string;
@@ -63,7 +65,7 @@ export default function AdminMessageTemplatesPage() {
   }
 
   return <section className="space-y-5">
-    <header><p className="text-xs font-semibold uppercase tracking-wide text-primary">Operación</p><h1 className="mt-1 text-2xl font-semibold">Mensajes del sistema</h1><p className="mt-1 text-sm text-foreground-muted">Edita los textos de correo y WhatsApp. Los enlaces y botones se agregan automáticamente según el tipo de mensaje.</p></header>
+    <PageHeader overline="Operación" title="Mensajes del sistema" description="Edita los textos de correo y WhatsApp. Los enlaces y botones se agregan automáticamente según el tipo de mensaje." />
     {error && <p role="alert" className="rounded-md border border-danger/30 bg-danger/5 p-3 text-sm text-danger">{error}</p>}
     {notice && <p role="status" className="rounded-md border border-success/30 bg-success/5 p-3 text-sm">{notice}</p>}
     {loading ? <p className="py-10 text-center text-sm text-foreground-muted">Cargando mensajes…</p> : <div className="grid gap-5 xl:grid-cols-[260px_minmax(0,1fr)]">
@@ -74,7 +76,7 @@ export default function AdminMessageTemplatesPage() {
           <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Buscar tipo de mensaje" className="h-10 w-full rounded-md border border-border bg-background pl-9 pr-3 text-sm" />
         </label>
         <div className="max-h-[65vh] space-y-1 overflow-y-auto">
-          {visibleItems.map((item) => <button key={item.clave} type="button" aria-pressed={selected === item.clave} onClick={() => setSelected(item.clave)} className={`min-h-11 w-full rounded-md px-3 py-2 text-left text-sm ${selected === item.clave ? "bg-primary !text-white" : "hover:bg-surface-hover"}`}>{item.nombre}</button>)}
+          {visibleItems.map((item) => <button key={item.clave} type="button" aria-pressed={selected === item.clave} onClick={() => setSelected(item.clave)} className={`min-h-11 w-full rounded-md px-3 py-2 text-left text-sm ${selected === item.clave ? "bg-brand-900 text-white" : "hover:bg-surface-hover"}`}>{item.nombre}</button>)}
           {visibleItems.length === 0 && <p className="p-3 text-sm text-foreground-muted">No hay plantillas que coincidan con la búsqueda.</p>}
         </div>
       </nav>
@@ -85,7 +87,7 @@ export default function AdminMessageTemplatesPage() {
         <label className="block rounded-lg border border-border bg-surface p-4 text-sm font-medium">Texto de WhatsApp<textarea rows={7} value={template.cuerpo_whatsapp} onChange={(event) => update("cuerpo_whatsapp", event.target.value)} className="mt-2 w-full rounded-md border border-border bg-background p-3 font-normal" /></label>
         {(template.titulo_push !== null || template.cuerpo_push !== null || template.clave === "ACTUACIONES_DIGEST") && <section className="space-y-4 rounded-lg border border-border bg-surface p-4"><div><h3 className="font-semibold">Notificación del navegador</h3><p className="mt-1 text-xs text-foreground-muted">Se envía a los usuarios que activaron las notificaciones Push. El clic abre el radicado correspondiente.</p></div><label className="block text-sm font-medium">Título Push<input value={template.titulo_push || ""} onChange={(event) => update("titulo_push", event.target.value)} maxLength={500} className="mt-2 h-10 w-full rounded-md border border-border bg-background px-3 font-normal" placeholder="Nueva actuación judicial en {{radicado}}" /></label><label className="block text-sm font-medium">Descripción Push<textarea rows={3} value={template.cuerpo_push || ""} onChange={(event) => update("cuerpo_push", event.target.value)} maxLength={5000} className="mt-2 w-full rounded-md border border-border bg-background p-3 font-normal" placeholder="{{actuacion}}" /></label><article className="rounded-md border border-border bg-background p-3"><h4 className="text-sm font-semibold">Vista previa Push</h4><p className="mt-2 text-sm font-semibold">{preview(template.titulo_push || "", template.variables_ejemplo || {}, null, null)}</p><p className="mt-1 whitespace-pre-wrap text-sm text-foreground-muted">{preview(template.cuerpo_push || "", template.variables_ejemplo || {}, null, null)}</p></article></section>}
         <div className="grid gap-4 lg:grid-cols-2"><article className="rounded-lg border border-border bg-surface p-4"><h3 className="text-sm font-semibold">Vista previa de correo</h3><pre className="mt-3 whitespace-pre-wrap font-sans text-sm">{preview(template.cuerpo_email, template.variables_ejemplo || {}, template.enlace_ejemplo, template.texto_enlace_ejemplo)}</pre></article><article className="rounded-lg border border-border bg-surface p-4"><h3 className="text-sm font-semibold">Vista previa de WhatsApp</h3><pre className="mt-3 whitespace-pre-wrap font-sans text-sm">{preview(template.cuerpo_whatsapp, template.variables_ejemplo || {}, template.enlace_ejemplo, template.texto_enlace_ejemplo)}</pre></article></div>
-        <button type="button" onClick={() => void save()} disabled={saving} className="inline-flex h-10 items-center gap-2 rounded-md bg-primary px-4 text-sm font-semibold !text-white disabled:opacity-50"><Save className="size-4" />{saving ? "Guardando…" : "Guardar mensaje"}</button>
+        <Button variant="primary" onClick={() => void save()} loading={saving} icon={<Save className="size-4" />}>{saving ? "Guardando…" : "Guardar mensaje"}</Button>
       </div> : <div className="rounded-lg border border-dashed border-border bg-surface p-10 text-center text-sm text-foreground-muted">No hay tipos de mensaje configurados. Aplica la migración de plantillas.</div>}
     </div>}
   </section>;

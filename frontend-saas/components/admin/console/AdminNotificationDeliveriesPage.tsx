@@ -6,6 +6,8 @@ import { ArrowLeft, RefreshCw, X } from "lucide-react";
 import { fetchApi } from "@/lib/api";
 import { useSession } from "@/context/SessionContext";
 import { Pagination } from "@/components/ui/Pagination";
+import { PageHeader } from "@/components/ui/PageHeader";
+import { Button } from "@/components/ui/Button";
 
 type Delivery = {
   id: number;
@@ -91,12 +93,9 @@ export default function AdminNotificationDeliveriesPage() {
     <section className="mx-auto max-w-7xl space-y-5">
       <header className="flex flex-wrap items-end justify-between gap-3">
         <div>
-          <Link href="/gestion-procesos/admin/notificaciones" className="inline-flex items-center gap-1 text-sm text-primary hover:underline"><ArrowLeft className="size-4" />Centro de notificaciones</Link>
-          <p className="mt-3 text-xs font-semibold uppercase tracking-wide text-primary">Panel Administrativo</p>
-          <h1 className="mt-1 text-2xl font-semibold">Entregas de correo y WhatsApp</h1>
-          <p className="mt-1 text-sm text-foreground-muted">Historial de mensajes construidos, destinatarios, contenido y resultado de cada intento.</p>
+          <Link href="/gestion-procesos/admin/notificaciones" className="inline-flex items-center gap-1 text-sm text-brand-700 hover:underline"><ArrowLeft className="size-4" />Centro de notificaciones</Link>
+          <PageHeader overline="Panel Administrativo" title="Entregas de correo y WhatsApp" description="Historial de mensajes construidos, destinatarios, contenido y resultado de cada intento." action={<Button variant="outline" onClick={() => void load()} disabled={loading} icon={<RefreshCw className={`size-4 ${loading ? "animate-spin" : ""}`} />}>Actualizar</Button>} />
         </div>
-        <button type="button" onClick={() => void load()} disabled={loading} className="inline-flex h-10 items-center gap-2 rounded-md border border-border px-3 text-sm disabled:opacity-50"><RefreshCw className={`size-4 ${loading ? "animate-spin" : ""}`} />Actualizar</button>
       </header>
 
       <div className="flex flex-wrap gap-3 rounded-lg border border-border bg-surface p-3">
@@ -151,7 +150,7 @@ export default function AdminNotificationDeliveriesPage() {
         </article>)}
       </div>}
       <Pagination page={page} pageSize={PAGE_SIZE} total={total} onPageChange={setPage} label="entregas" />
-      {selectedDelivery && <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) setSelectedDelivery(null); }}>
+      {selectedDelivery && <div className="fixed inset-0 z-50 flex items-center justify-center bg-brand-950/40 backdrop-blur-sm p-4" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) setSelectedDelivery(null); }}>
         <section role="dialog" aria-modal="true" aria-labelledby="delivery-detail-title" className="max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-xl border border-border bg-surface shadow-2xl">
           <header className="sticky top-0 flex items-start justify-between gap-4 border-b border-border bg-surface p-4 sm:p-5"><div className="min-w-0"><p className="text-xs font-semibold uppercase tracking-wide text-primary">{selectedDelivery.canal === "EMAIL" ? "Correo" : "WhatsApp"} · {selectedDelivery.estado}</p><h2 id="delivery-detail-title" className="mt-1 break-words text-lg font-semibold">{selectedDelivery.asunto || selectedDelivery.tipo}</h2><p className="mt-1 break-words text-sm text-foreground-muted">{selectedDelivery.destinatario}</p></div><button type="button" onClick={() => setSelectedDelivery(null)} aria-label="Cerrar detalle" className="grid size-11 shrink-0 place-items-center rounded-md hover:bg-surface-hover"><X className="size-5" /></button></header>
           <div className="space-y-4 p-4 sm:p-5"><dl className="grid gap-3 sm:grid-cols-2"><div><dt className="text-xs text-foreground-muted">Creada</dt><dd className="mt-1 text-sm">{new Date(selectedDelivery.creada_en).toLocaleString("es-CO", { timeZone: "America/Bogota" })}</dd></div><div><dt className="text-xs text-foreground-muted">Enviada</dt><dd className="mt-1 text-sm">{selectedDelivery.enviada_en ? new Date(selectedDelivery.enviada_en).toLocaleString("es-CO", { timeZone: "America/Bogota" }) : `Intentos: ${selectedDelivery.intentos}`}</dd></div><div><dt className="text-xs text-foreground-muted">Tipo de mensaje</dt><dd className="mt-1 break-words text-sm">{selectedDelivery.tipo}</dd></div><div><dt className="text-xs text-foreground-muted">Destino</dt><dd className="mt-1 break-words text-sm">{selectedDelivery.canal === "EMAIL" ? selectedDelivery.email : selectedDelivery.whatsapp}</dd></div></dl>

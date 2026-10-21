@@ -20,6 +20,10 @@ import {
 
 import { fetchApi, iniciarWorkflowConsultaRadicado } from "@/lib/api";
 import { useSession } from "@/context/SessionContext";
+import { PageHeader } from "@/components/ui/PageHeader";
+import { StatCard } from "@/components/ui/StatCard";
+import { Button } from "@/components/ui/Button";
+import { Badge } from "@/components/ui/Badge";
 
 interface Actuacion {
   id: number;
@@ -483,25 +487,25 @@ export default function DetalleRadicadoPage() {
           VOLVER
       ========================================================= */}
 
-      <button
-        type="button"
+      <Button
+        variant="ghost"
+        size="sm"
         onClick={() =>
           router.push(
             "/gestion-procesos/abogado/radicados"
           )
         }
-        className="inline-flex items-center gap-2 rounded-lg px-1 py-1 text-sm text-[var(--foreground-muted)] transition hover:text-[var(--foreground)]"
+        icon={<ArrowLeft className="size-4" />}
       >
-        <ArrowLeft className="h-4 w-4" />
         Volver a Radicados
-      </button>
+      </Button>
 
       {/* ========================================================
           ERROR
       ========================================================= */}
 
       {error && (
-        <div className="flex items-start justify-between gap-4 rounded-xl border border-red-500/20 bg-red-500/10 p-4 text-red-700 dark:text-red-300">
+        <div className="flex items-start justify-between gap-4 rounded-xl border border-risk/30 bg-risk/10 p-4 text-risk">
           <div className="flex items-start gap-3">
             <AlertCircle className="mt-0.5 h-5 w-5 shrink-0" />
 
@@ -520,7 +524,7 @@ export default function DetalleRadicadoPage() {
             <button
               type="button"
               onClick={() => setError("")}
-              className="shrink-0 rounded-lg p-1 transition hover:bg-red-500/10"
+              className="shrink-0 rounded-lg p-1 transition hover:bg-risk/20"
             >
               <X className="h-4 w-4" />
             </button>
@@ -529,29 +533,29 @@ export default function DetalleRadicadoPage() {
       )}
 
       {!radicado ? (
-        <div className="rounded-xl border border-[var(--border)] bg-[var(--surface)] p-10 text-center">
-          <FileText className="mx-auto h-10 w-10 text-[var(--foreground-muted)]" />
+        <div className="rounded-xl border border-border bg-surface p-10 text-center shadow-xs">
+          <FileText className="mx-auto h-10 w-10 text-muted" />
 
-          <h2 className="mt-4 text-lg font-semibold text-[var(--foreground)]">
+          <h2 className="mt-4 text-lg font-semibold text-foreground">
             Radicado no encontrado
           </h2>
 
-          <p className="mx-auto mt-1 max-w-md text-sm text-[var(--foreground-muted)]">
+          <p className="mx-auto mt-1 max-w-md text-sm text-muted">
             El radicado solicitado no existe o no se
             encuentra disponible para tu cuenta.
           </p>
 
-          <button
-            type="button"
+          <Button
+            variant="primary"
             onClick={() =>
               router.push(
                 "/gestion-procesos/abogado/radicados"
               )
             }
-            className="mt-5 rounded-lg bg-[var(--primary)] px-4 py-2.5 text-sm font-medium !text-white transition hover:opacity-90"
+            className="mt-5"
           >
             Volver a Radicados
-          </button>
+          </Button>
         </div>
       ) : (
         <>
@@ -559,44 +563,25 @@ export default function DetalleRadicadoPage() {
               CABECERA DEL EXPEDIENTE
           ======================================================= */}
 
-          <section className="rounded-xl border border-[var(--border)] bg-[var(--surface)]">
-            <div className="flex flex-col gap-5 p-5 sm:p-6 lg:flex-row lg:items-center lg:justify-between">
-              <div className="min-w-0">
-                <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-[var(--primary)]">
-                  <FileText className="h-4 w-4" />
-                  Expediente judicial
-                </div>
-
-                <h1 className="mt-2 break-all text-xl font-semibold tracking-tight text-[var(--foreground)] sm:text-2xl">
-                  {radicado.numero}
-                </h1>
-
-                <div className="mt-2 flex items-start gap-2 text-sm text-[var(--foreground-muted)]">
-                  <Building2 className="mt-0.5 h-4 w-4 shrink-0" />
-
-                  <span>
-                    {radicado.despacho_departamento ||
-                      "Despacho no especificado"}
-                  </span>
-                </div>
-              </div>
-
-              {user?.rol === "ADMIN" && (
-                <button
-                  type="button"
+          <PageHeader
+            overline="Expediente judicial"
+            title={radicado.numero}
+            description={radicado.despacho_departamento || "Despacho no especificado"}
+            action={
+              user?.rol === "ADMIN" ? (
+                <Button
+                  variant="primary"
                   onClick={handleConsultar}
-                  disabled={consultando}
-                  className="inline-flex w-full shrink-0 items-center justify-center gap-2 rounded-lg bg-[var(--primary)] px-4 py-2.5 text-sm font-medium !text-white transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto"
+                  loading={consultando}
+                  icon={<RefreshCw className="size-4" />}
                 >
-                  {consultando ? (
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                  ) : (
-                    <RefreshCw className="h-4 w-4" />
-                  )}
-                  {consultando ? "Consultando..." : "Consultar ahora"}
-                </button>
-              )}
-            </div>
+                  Consultar ahora
+                </Button>
+              ) : undefined
+            }
+          />
+
+          <section className="rounded-xl border border-border bg-surface shadow-xs">
 
             {/* ====================================================
                 INFORMACIÓN GENERAL

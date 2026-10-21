@@ -20,6 +20,10 @@ import {
 } from "lucide-react";
 import { useSession } from "@/context/SessionContext";
 import TaskMonthCalendar, { type CalendarTask } from "@/components/calendar/TaskMonthCalendar";
+import { PageHeader } from "@/components/ui/PageHeader";
+import { StatCard } from "@/components/ui/StatCard";
+import { Button } from "@/components/ui/Button";
+import { Card } from "@/components/ui/Card";
 
 
 interface SummaryData {
@@ -222,7 +226,7 @@ export default function AbogadoPage() {
   if (loading) {
     return (
       <div className="flex min-h-[400px] items-center justify-center">
-        <div className="flex items-center gap-3 text-[var(--foreground-muted)]">
+        <div className="flex items-center gap-3 text-foreground-muted">
           <RefreshCw className="h-5 w-5 animate-spin" />
           Cargando panel...
         </div>
@@ -232,102 +236,54 @@ export default function AbogadoPage() {
 
   return (
     <div className="space-y-6">
-      {/* Encabezado */}
-      <div className="flex items-start justify-between gap-4">
-        <div>
-          <p className="text-sm text-[var(--foreground-muted)]">
-            {isSaasLawyer ? "Cuenta SaaS" : "Despacho"}
-          </p>
-
-          <h1 className="mt-1 text-2xl font-semibold text-[var(--foreground)]">
-            {isSaasLawyer ? "Espacio de trabajo" : user?.rol === "ADMIN" ? "Gestión de la firma" : "Panel del abogado"}
-          </h1>
-
-          <p className="mt-1 text-sm text-[var(--foreground-muted)]">
-            {isSaasLawyer
-              ? "Consulta tus procesos, actividad judicial y uso del plan."
-              : "Administra procesos, clientes y trabajo operativo."}
-          </p>
-        </div>
-
-        <button
-          type="button"
-          onClick={() => void load()}
-          disabled={loading}
-          className="inline-flex items-center gap-2 rounded-lg border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-sm font-medium text-[var(--foreground)] shadow-sm transition hover:bg-[var(--surface-hover)] disabled:cursor-not-allowed disabled:opacity-60"
-        >
-          <RefreshCw className="h-4 w-4" />
-          <span className="hidden sm:inline">Actualizar</span>
-        </button>
-      </div>
+      <PageHeader
+        overline={isSaasLawyer ? "Cuenta SaaS" : "Despacho"}
+        title={isSaasLawyer ? "Espacio de trabajo" : user?.rol === "ADMIN" ? "Gestión de la firma" : "Panel del abogado"}
+        description={
+          isSaasLawyer
+            ? "Consulta tus procesos, actividad judicial y uso del plan."
+            : "Administra procesos, clientes y trabajo operativo."
+        }
+        action={
+          <Button variant="outline" onClick={() => void load()} disabled={loading} icon={<RefreshCw className={`size-4 ${loading ? "animate-spin" : ""}`} />}>
+            Actualizar
+          </Button>
+        }
+      />
 
       {/* Error */}
       {error && (
-        <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700 dark:border-red-900 dark:bg-red-950 dark:text-red-300">
+        <div className="rounded-[var(--radius-lg)] border border-red-200 bg-red-50 p-4 text-sm text-red-700 dark:border-red-900 dark:bg-red-950 dark:text-red-300">
           {error}
         </div>
       )}
 
       {!isSaasLawyer && data.processes === 0 && data.clients === 0 && data.tasks === 0 && (
-        <section className="rounded-xl border border-[var(--primary)]/20 bg-[var(--primary)]/5 p-5 sm:p-6" aria-labelledby="firm-welcome-title">
-          <p className="text-sm font-medium text-[var(--primary)]">Configuración inicial</p>
-          <h2 id="firm-welcome-title" className="mt-1 text-lg font-semibold text-[var(--foreground)]">Tu espacio de trabajo está listo</h2>
-          <p className="mt-1 max-w-2xl text-sm text-[var(--foreground-muted)]">Empieza creando un expediente. Desde su ficha podrás vincular al cliente, registrar radicados y organizar tareas, documentos y actividades.</p>
-          <Link href="/gestion-procesos/abogado/procesos" className="mt-4 inline-flex min-h-11 items-center gap-2 rounded-lg bg-[var(--primary)] px-4 py-2 text-sm font-semibold !text-white hover:opacity-90">Ir a procesos <ArrowRight aria-hidden="true" className="size-4" /></Link>
+        <section className="rounded-[var(--radius-lg)] border border-brand-900/20 bg-brand-900/5 p-5 sm:p-6" aria-labelledby="firm-welcome-title">
+          <p className="text-sm font-medium text-brand-900">Configuración inicial</p>
+          <h2 id="firm-welcome-title" className="mt-1 text-lg font-semibold text-foreground">Tu espacio de trabajo está listo</h2>
+          <p className="mt-1 max-w-2xl text-sm text-foreground-muted">Empieza creando un expediente. Desde su ficha podrás vincular al cliente, registrar radicados y organizar tareas, documentos y actividades.</p>
+          <Link href="/gestion-procesos/abogado/procesos" className="mt-4 inline-flex min-h-11 items-center gap-2 rounded-lg bg-brand-900 px-4 py-2 text-sm font-semibold !text-white hover:opacity-90">Ir a procesos <ArrowRight aria-hidden="true" className="size-4" /></Link>
         </section>
       )}
 
       {/* Tarjetas principales */}
       <div className={`grid grid-cols-1 gap-4 ${isSaasLawyer ? "md:grid-cols-2" : "md:grid-cols-3"}`}>
-        {cards.map(
-          ({
-            title,
-            value,
-            description,
-            href,
-            icon: Icon,
-            iconClass,
-          }) => (
-            <Link
-              key={href}
-              href={href}
-              className="group rounded-xl border border-[var(--border)] bg-[var(--surface)] p-5 shadow-sm transition hover:border-[var(--primary)]/40 hover:shadow-md"
-            >
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-[var(--foreground-muted)]">
-                    {title}
-                  </p>
-
-                  <p className="mt-2 text-3xl font-semibold text-[var(--foreground)]">
-                    {value}
-                  </p>
-                </div>
-
-                <div
-                  className={`rounded-lg p-3 ${iconClass}`}
-                >
-                  <Icon className="h-6 w-6" />
-                </div>
-              </div>
-
-              <p className="mt-3 text-sm text-[var(--foreground-muted)]">
-                {description}
-              </p>
-
-              <div className="mt-5 flex items-center gap-1 text-sm font-medium text-[var(--primary)]">
-                Administrar
-                <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-1" />
-              </div>
-            </Link>
-          )
-        )}
+        {cards.map(({ title, value, href, icon }) => (
+          <StatCard
+            key={href}
+            label={title}
+            value={value}
+            href={href}
+            icon={icon}
+          />
+        ))}
       </div>
 
       {!isSaasLawyer && firmDashboard && <section className="space-y-5" aria-label="Centro de trabajo de la firma">
-        <details className="rounded-xl border border-[var(--border)] bg-[var(--surface)] p-4">
-          <summary className="flex min-h-11 cursor-pointer items-center justify-between gap-3 font-medium text-[var(--foreground)]">Indicadores del despacho <span className="text-xs font-normal text-[var(--foreground-muted)]">8 métricas</span></summary>
-          <div className="mt-3 grid gap-3 border-t border-[var(--border)] pt-3 sm:grid-cols-2 xl:grid-cols-4">{[
+        <details className="rounded-[var(--radius-lg)] border border-border bg-surface p-4">
+          <summary className="flex min-h-11 cursor-pointer items-center justify-between gap-3 font-medium text-foreground">Indicadores del despacho <span className="text-xs font-normal text-foreground-muted">8 métricas</span></summary>
+          <div className="mt-3 grid gap-3 border-t border-border pt-3 sm:grid-cols-2 xl:grid-cols-4">{[
           ["Procesos activos", firmDashboard.resumen.procesos_activos, "/gestion-procesos/abogado/procesos"],
           ["Tareas pendientes", firmDashboard.resumen.tareas_pendientes, "/gestion-procesos/abogado/tareas"],
           ["Tareas vencidas", firmDashboard.resumen.tareas_vencidas, "/gestion-procesos/abogado/tareas"],
@@ -336,13 +292,13 @@ export default function AbogadoPage() {
           ["Consultas judiciales con error", firmDashboard.resumen.consultas_con_error, "/gestion-procesos/abogado/radicados"],
           ["Próximos vencimientos", firmDashboard.resumen.proximos_eventos, "/gestion-procesos/abogado/agenda"],
           ["Procesos sin actividad", firmDashboard.resumen.procesos_sin_actividad, "/gestion-procesos/abogado/procesos?filtro=ATENCION"],
-          ].map(([label, value, href]) => <Link key={String(label)} href={String(href)} className="rounded-xl border border-[var(--border)] bg-[var(--surface)] p-4 transition hover:border-[var(--primary)]/40"><p className="text-sm text-[var(--foreground-muted)]">{label}</p><p className="mt-2 text-2xl font-semibold text-[var(--foreground)]">{value}</p></Link>)}</div>
+          ].map(([label, value, href]) => <Link key={String(label)} href={String(href)} className="rounded-[var(--radius-lg)] border border-border bg-surface p-4 transition hover:border-brand-900/40"><p className="text-sm text-foreground-muted">{label}</p><p className="mt-2 text-2xl font-semibold text-foreground">{value}</p></Link>)}</div>
         </details>
         <div className="grid gap-5 xl:grid-cols-[1fr_1.2fr]">
-          <section className="overflow-hidden rounded-xl border border-[var(--border)] bg-[var(--surface)]"><header className="flex items-center justify-between border-b border-[var(--border)] px-5 py-4"><div><h2 className="font-semibold">Requiere tu atención</h2><p className="mt-1 text-xs text-[var(--foreground-muted)]">Tareas, documentos, consultas y procesos sin actividad reciente</p></div><Link href="/gestion-procesos/abogado/notificaciones" className="text-xs font-medium text-[var(--primary)] hover:underline">Ver avisos</Link></header>{firmDashboard.atencion.length ? <div className="divide-y divide-[var(--border)]">{firmDashboard.atencion.slice(0, 8).map((item, index) => <Link key={`${item.tipo}-${item.titulo}-${index}`} href={item.href} className="flex items-center justify-between gap-3 px-5 py-3 hover:bg-[var(--surface-hover)]"><span className="min-w-0"><span className="block truncate text-sm font-medium">{item.titulo}</span><span className="mt-1 block text-xs text-[var(--foreground-muted)]">{item.descripcion}</span></span><ArrowRight className="size-4 shrink-0 text-[var(--primary)]" /></Link>)}</div> : <p className="px-5 py-8 text-center text-sm text-[var(--foreground-muted)]">No hay elementos que requieran atención ahora.</p>}</section>
-          <section className="overflow-hidden rounded-xl border border-[var(--border)] bg-[var(--surface)]"><header className="border-b border-[var(--border)] px-5 py-4"><h2 className="font-semibold">Actividad reciente</h2><p className="mt-1 text-xs text-[var(--foreground-muted)]">Movimientos recientes de procesos, documentos y tareas.</p></header>{firmDashboard.actividad_reciente.length ? <div className="max-h-[28rem] divide-y divide-[var(--border)] overflow-y-auto">{firmDashboard.actividad_reciente.slice(0, 12).map((item) => <Link key={item.id} href={item.href} className="block px-5 py-3 hover:bg-[var(--surface-hover)]"><div className="flex items-center justify-between gap-3"><p className="truncate text-sm font-medium">{item.titulo}</p><span className="shrink-0 text-[10px] text-[var(--foreground-muted)]">{new Date(item.fecha).toLocaleString("es-CO", { timeZone: "America/Bogota" })}</span></div><p className="mt-1 truncate text-xs text-[var(--foreground-muted)]">{item.proceso} · {item.tipo} · {item.descripcion}</p></Link>)}</div> : <p className="px-5 py-8 text-center text-sm text-[var(--foreground-muted)]">No hay actividad reciente.</p>}</section>
+          <section className="overflow-hidden rounded-[var(--radius-lg)] border border-border bg-surface"><header className="flex items-center justify-between border-b border-border px-5 py-4"><div><h2 className="font-semibold">Requiere tu atención</h2><p className="mt-1 text-xs text-foreground-muted">Tareas, documentos, consultas y procesos sin actividad reciente</p></div><Link href="/gestion-procesos/abogado/notificaciones" className="text-xs font-medium text-brand-900 hover:underline">Ver avisos</Link></header>{firmDashboard.atencion.length ? <div className="divide-y divide-border">{firmDashboard.atencion.slice(0, 8).map((item, index) => <Link key={`${item.tipo}-${item.titulo}-${index}`} href={item.href} className="flex items-center justify-between gap-3 px-5 py-3 hover:bg-surface-hover"><span className="min-w-0"><span className="block truncate text-sm font-medium">{item.titulo}</span><span className="mt-1 block text-xs text-foreground-muted">{item.descripcion}</span></span><ArrowRight className="size-4 shrink-0 text-brand-900" /></Link>)}</div> : <p className="px-5 py-8 text-center text-sm text-foreground-muted">No hay elementos que requieran atención ahora.</p>}</section>
+          <section className="overflow-hidden rounded-[var(--radius-lg)] border border-border bg-surface"><header className="border-b border-border px-5 py-4"><h2 className="font-semibold">Actividad reciente</h2><p className="mt-1 text-xs text-foreground-muted">Movimientos recientes de procesos, documentos y tareas.</p></header>{firmDashboard.actividad_reciente.length ? <div className="max-h-[28rem] divide-y divide-border overflow-y-auto">{firmDashboard.actividad_reciente.slice(0, 12).map((item) => <Link key={item.id} href={item.href} className="block px-5 py-3 hover:bg-surface-hover"><div className="flex items-center justify-between gap-3"><p className="truncate text-sm font-medium">{item.titulo}</p><span className="shrink-0 text-[10px] text-foreground-muted">{new Date(item.fecha).toLocaleString("es-CO", { timeZone: "America/Bogota" })}</span></div><p className="mt-1 truncate text-xs text-foreground-muted">{item.proceso} · {item.tipo} · {item.descripcion}</p></Link>)}</div> : <p className="px-5 py-8 text-center text-sm text-foreground-muted">No hay actividad reciente.</p>}</section>
         </div>
-        <section className="rounded-xl border border-[var(--border)] bg-[var(--surface)] p-4"><h2 className="mb-3 font-semibold">Acciones rápidas</h2><div className="flex flex-wrap gap-2">{firmDashboard.acciones.map((action) => <Link key={action.label} href={action.href} className="rounded-lg border border-[var(--border)] px-3 py-2 text-sm font-medium hover:bg-[var(--surface-hover)]">{action.label}</Link>)}</div></section>
+        <section className="rounded-[var(--radius-lg)] border border-border bg-surface p-4"><h2 className="mb-3 font-semibold">Acciones rápidas</h2><div className="flex flex-wrap gap-2">{firmDashboard.acciones.map((action) => <Link key={action.label} href={action.href} className="rounded-lg border border-border px-3 py-2 text-sm font-medium hover:bg-surface-hover">{action.label}</Link>)}</div></section>
       </section>}
 
       <TaskMonthCalendar tasks={calendarTasks} />
@@ -356,58 +312,58 @@ export default function AbogadoPage() {
               { label: "Actuaciones nuevas", value: saasData.resumen.actuaciones_nuevas, detail: "Detectadas en consultas", icon: TrendingUp },
               { label: "Consultas con error", value: saasData.resumen.consultas_error, detail: "Requieren revisión", icon: AlertCircle },
             ].map(({ label, value, detail, icon: Icon }) => (
-              <div key={label} className="rounded-xl border border-[var(--border)] bg-[var(--surface)] p-4">
+              <div key={label} className="rounded-[var(--radius-lg)] border border-border bg-surface p-4">
                 <div className="flex items-start justify-between gap-3">
                   <div>
-                    <p className="text-sm text-[var(--foreground-muted)]">{label}</p>
-                    <p className="mt-2 text-2xl font-semibold text-[var(--foreground)]">{value}</p>
-                    <p className="mt-1 text-xs text-[var(--foreground-muted)]">{detail}</p>
+                    <p className="text-sm text-foreground-muted">{label}</p>
+                    <p className="mt-2 text-2xl font-semibold text-foreground">{value}</p>
+                    <p className="mt-1 text-xs text-foreground-muted">{detail}</p>
                   </div>
-                  <Icon className="size-5 shrink-0 text-[var(--primary)]" />
+                  <Icon className="size-5 shrink-0 text-brand-900" />
                 </div>
               </div>
             ))}
           </div>
 
           <div className="grid gap-5 xl:grid-cols-2">
-            <section className="rounded-xl border border-[var(--border)] bg-[var(--surface)] p-5">
-              <h2 className="font-semibold text-[var(--foreground)]">Mi plan</h2>
+            <section className="rounded-[var(--radius-lg)] border border-border bg-surface p-5">
+              <h2 className="font-semibold text-foreground">Mi plan</h2>
               {saasData.plan ? (
                 <>
-                  <p className="mt-3 text-lg font-semibold text-[var(--foreground)]">{saasData.plan.nombre}</p>
+                  <p className="mt-3 text-lg font-semibold text-foreground">{saasData.plan.nombre}</p>
                   <div className="mt-4 flex justify-between gap-3 text-sm">
-                    <span className="text-[var(--foreground-muted)]">Uso de radicados</span>
-                    <span className="font-medium text-[var(--foreground)]">{saasData.resumen.total_radicados} / {saasData.plan.limite_radicados}</span>
+                    <span className="text-foreground-muted">Uso de radicados</span>
+                    <span className="font-medium text-foreground">{saasData.resumen.total_radicados} / {saasData.plan.limite_radicados}</span>
                   </div>
                   <div role="progressbar" aria-label="Uso del plan" aria-valuemin={0} aria-valuemax={100} aria-valuenow={saasData.plan.limite_radicados > 0 ? Math.min(100, Math.round(saasData.resumen.total_radicados / saasData.plan.limite_radicados * 100)) : 0} className="mt-2 h-2 overflow-hidden rounded-full bg-[var(--surface-secondary)]">
-                    <div className="h-full rounded-full bg-[var(--primary)]" style={{ width: `${saasData.plan.limite_radicados > 0 ? Math.min(100, saasData.resumen.total_radicados / saasData.plan.limite_radicados * 100) : 0}%` }} />
+                    <div className="h-full rounded-full bg-brand-900" style={{ width: `${saasData.plan.limite_radicados > 0 ? Math.min(100, saasData.resumen.total_radicados / saasData.plan.limite_radicados * 100) : 0}%` }} />
                   </div>
-                  <p className="mt-3 text-sm text-[var(--foreground-muted)]">{Math.max(saasData.plan.limite_radicados - saasData.resumen.total_radicados, 0)} cupos disponibles</p>
+                  <p className="mt-3 text-sm text-foreground-muted">{Math.max(saasData.plan.limite_radicados - saasData.resumen.total_radicados, 0)} cupos disponibles</p>
                 </>
-              ) : <p className="mt-3 text-sm text-[var(--foreground-muted)]">No tienes un plan asignado.</p>}
+              ) : <p className="mt-3 text-sm text-foreground-muted">No tienes un plan asignado.</p>}
             </section>
 
-            <section className="rounded-xl border border-[var(--border)] bg-[var(--surface)]">
-              <div className="border-b border-[var(--border)] px-5 py-4">
-                <h2 className="font-semibold text-[var(--foreground)]">Procesos que requieren atención</h2>
+            <section className="rounded-[var(--radius-lg)] border border-border bg-surface">
+              <div className="border-b border-border px-5 py-4">
+                <h2 className="font-semibold text-foreground">Procesos que requieren atención</h2>
               </div>
               {saasData.procesos_atencion.length ? saasData.procesos_atencion.slice(0, 5).map((item) => (
-                <div key={`${item.radicado_id}-${item.tipo}`} className="flex items-center justify-between gap-4 border-b border-[var(--border)] px-5 py-3 last:border-0">
-                  <div className="min-w-0"><p className="truncate font-medium text-[var(--foreground)]">{item.numero}</p><p className="mt-1 truncate text-sm text-[var(--foreground-muted)]">{item.motivo}</p></div>
+                <div key={`${item.radicado_id}-${item.tipo}`} className="flex items-center justify-between gap-4 border-b border-border px-5 py-3 last:border-0">
+                  <div className="min-w-0"><p className="truncate font-medium text-foreground">{item.numero}</p><p className="mt-1 truncate text-sm text-foreground-muted">{item.motivo}</p></div>
                   <span className="shrink-0 rounded-full bg-amber-500/10 px-2.5 py-1 text-xs text-amber-700">Atención</span>
                 </div>
-              )) : <div className="flex items-center gap-2 px-5 py-6 text-sm text-[var(--foreground-muted)]"><CheckCircle2 className="size-4 text-emerald-600" />No hay procesos que requieran atención.</div>}
+              )) : <div className="flex items-center gap-2 px-5 py-6 text-sm text-foreground-muted"><CheckCircle2 className="size-4 text-emerald-600" />No hay procesos que requieran atención.</div>}
             </section>
           </div>
 
-          <section className="overflow-hidden rounded-xl border border-[var(--border)] bg-[var(--surface)]">
-            <div className="border-b border-[var(--border)] px-5 py-4"><h2 className="font-semibold text-[var(--foreground)]">Últimas consultas</h2></div>
+          <section className="overflow-hidden rounded-[var(--radius-lg)] border border-border bg-surface">
+            <div className="border-b border-border px-5 py-4"><h2 className="font-semibold text-foreground">Últimas consultas</h2></div>
             <div className="overflow-x-auto">
               <table className="w-full min-w-[620px] text-left text-sm">
-                <thead className="border-b border-[var(--border)] text-xs uppercase text-[var(--foreground-muted)]"><tr><th className="px-5 py-3 font-medium">Radicado</th><th className="px-5 py-3 font-medium">Tipo</th><th className="px-5 py-3 font-medium">Estado</th><th className="px-5 py-3 font-medium">Novedades</th><th className="px-5 py-3 font-medium">Inicio</th></tr></thead>
+                <thead className="border-b border-border text-xs uppercase text-foreground-muted"><tr><th className="px-5 py-3 font-medium">Radicado</th><th className="px-5 py-3 font-medium">Tipo</th><th className="px-5 py-3 font-medium">Estado</th><th className="px-5 py-3 font-medium">Novedades</th><th className="px-5 py-3 font-medium">Inicio</th></tr></thead>
                 <tbody>{saasData.ultimas_consultas.length ? saasData.ultimas_consultas.slice(0, 5).map((item) => (
-                  <tr key={item.id} className="border-b border-[var(--border)] last:border-0"><td className="px-5 py-3 font-medium text-[var(--foreground)]">{item.radicado}</td><td className="px-5 py-3 text-[var(--foreground-muted)]">{item.tipo}</td><td className="px-5 py-3 text-[var(--foreground-muted)]">{item.estado}</td><td className="px-5 py-3 text-[var(--foreground-muted)]">{item.actuaciones_nuevas}</td><td className="px-5 py-3 text-[var(--foreground-muted)]">{item.inicio ? new Date(item.inicio).toLocaleString("es-CO", { timeZone: "America/Bogota" }) : "—"}</td></tr>
-                )) : <tr><td colSpan={5} className="px-5 py-7 text-center text-[var(--foreground-muted)]">Todavía no hay consultas registradas.</td></tr>}</tbody>
+                  <tr key={item.id} className="border-b border-border last:border-0"><td className="px-5 py-3 font-medium text-foreground">{item.radicado}</td><td className="px-5 py-3 text-foreground-muted">{item.tipo}</td><td className="px-5 py-3 text-foreground-muted">{item.estado}</td><td className="px-5 py-3 text-foreground-muted">{item.actuaciones_nuevas}</td><td className="px-5 py-3 text-foreground-muted">{item.inicio ? new Date(item.inicio).toLocaleString("es-CO", { timeZone: "America/Bogota" }) : "—"}</td></tr>
+                )) : <tr><td colSpan={5} className="px-5 py-7 text-center text-foreground-muted">Todavía no hay consultas registradas.</td></tr>}</tbody>
               </table>
             </div>
           </section>
@@ -416,23 +372,23 @@ export default function AbogadoPage() {
 
       {/* Flujo del despacho */}
       {!isSaasLawyer && <>
-      <div className="rounded-xl border border-[var(--border)] bg-[var(--surface)] shadow-sm">
-        <div className="border-b border-[var(--border)] px-5 py-4">
-          <h2 className="font-semibold text-[var(--foreground)]">
+      <div className="rounded-[var(--radius-lg)] border border-border bg-surface shadow-sm">
+        <div className="border-b border-border px-5 py-4">
+          <h2 className="font-semibold text-foreground">
             Flujo del despacho
           </h2>
 
-          <p className="mt-1 text-sm text-[var(--foreground-muted)]">
+          <p className="mt-1 text-sm text-foreground-muted">
             Gestiona la información de tus clientes y sus procesos
             desde un mismo flujo de trabajo.
           </p>
         </div>
 
-        <div className="grid grid-cols-1 divide-y divide-[var(--border)] md:grid-cols-3 md:divide-x md:divide-y-0">
+        <div className="grid grid-cols-1 divide-y divide-border md:grid-cols-3 md:divide-x md:divide-y-0">
           {/* Paso 1 */}
           <Link
             href="/gestion-procesos/abogado/clientes"
-            className="group p-5 transition hover:bg-[var(--surface-hover)]"
+            className="group p-5 transition hover:bg-surface-hover"
           >
             <div className="flex items-center gap-3">
               <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-green-50 text-green-600 dark:bg-green-950 dark:text-green-400">
@@ -440,17 +396,17 @@ export default function AbogadoPage() {
               </div>
 
               <div>
-                <p className="text-xs font-medium uppercase tracking-wide text-[var(--foreground-muted)]">
+                <p className="text-xs font-medium uppercase tracking-wide text-foreground-muted">
                   Paso 1
                 </p>
 
-                <h3 className="font-medium text-[var(--foreground)]">
+                <h3 className="font-medium text-foreground">
                   Crear cliente
                 </h3>
               </div>
             </div>
 
-            <p className="mt-3 text-sm text-[var(--foreground-muted)]">
+            <p className="mt-3 text-sm text-foreground-muted">
               Registra y administra las personas vinculadas al
               despacho.
             </p>
@@ -459,7 +415,7 @@ export default function AbogadoPage() {
           {/* Paso 2 */}
           <Link
             href="/gestion-procesos/abogado/procesos"
-            className="group p-5 transition hover:bg-[var(--surface-hover)]"
+            className="group p-5 transition hover:bg-surface-hover"
           >
             <div className="flex items-center gap-3">
               <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-blue-50 text-blue-600 dark:bg-blue-950 dark:text-blue-400">
@@ -467,17 +423,17 @@ export default function AbogadoPage() {
               </div>
 
               <div>
-                <p className="text-xs font-medium uppercase tracking-wide text-[var(--foreground-muted)]">
+                <p className="text-xs font-medium uppercase tracking-wide text-foreground-muted">
                   Paso 2
                 </p>
 
-                <h3 className="font-medium text-[var(--foreground)]">
+                <h3 className="font-medium text-foreground">
                   Gestionar proceso
                 </h3>
               </div>
             </div>
 
-            <p className="mt-3 text-sm text-[var(--foreground-muted)]">
+            <p className="mt-3 text-sm text-foreground-muted">
               Asocia clientes, consulta actuaciones y realiza el
               seguimiento judicial.
             </p>
@@ -486,7 +442,7 @@ export default function AbogadoPage() {
           {/* Paso 3 */}
           <Link
             href="/gestion-procesos/abogado/tareas"
-            className="group p-5 transition hover:bg-[var(--surface-hover)]"
+            className="group p-5 transition hover:bg-surface-hover"
           >
             <div className="flex items-center gap-3">
               <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-amber-50 text-amber-600 dark:bg-amber-950 dark:text-amber-400">
@@ -494,17 +450,17 @@ export default function AbogadoPage() {
               </div>
 
               <div>
-                <p className="text-xs font-medium uppercase tracking-wide text-[var(--foreground-muted)]">
+                <p className="text-xs font-medium uppercase tracking-wide text-foreground-muted">
                   Paso 3
                 </p>
 
-                <h3 className="font-medium text-[var(--foreground)]">
+                <h3 className="font-medium text-foreground">
                   Ejecutar tareas
                 </h3>
               </div>
             </div>
 
-            <p className="mt-3 text-sm text-[var(--foreground-muted)]">
+            <p className="mt-3 text-sm text-foreground-muted">
               Organiza pendientes del despacho y actividades
               relacionadas con los procesos.
             </p>
@@ -515,18 +471,18 @@ export default function AbogadoPage() {
 
       {/* Nota operativa */}
       {!isSaasLawyer && <>
-      <div className="rounded-xl border border-[var(--border)] bg-[var(--surface)] p-5 shadow-sm">
+      <div className="rounded-[var(--radius-lg)] border border-border bg-surface p-5 shadow-sm">
         <div className="flex gap-3">
-          <div className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-[var(--primary)]/10 text-[var(--primary)]">
+          <div className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-brand-900/10 text-brand-900">
             <FolderOpen className="h-4 w-4" />
           </div>
 
           <div>
-            <h2 className="font-semibold text-[var(--foreground)]">
+            <h2 className="font-semibold text-foreground">
               Gestión centralizada
             </h2>
 
-            <p className="mt-1 text-sm leading-6 text-[var(--foreground-muted)]">
+            <p className="mt-1 text-sm leading-6 text-foreground-muted">
               Desde cada proceso puedes consultar sus actuaciones,
               gestionar tareas, solicitar documentos a los clientes y
               decidir cuándo enviar notificaciones sobre nuevas

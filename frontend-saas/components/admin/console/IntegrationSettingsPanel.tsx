@@ -107,8 +107,8 @@ export function IntegrationSettingsPanel({ token }: { token: string }) {
           {settings.whatsapp_token_configurado && <label className="flex items-center gap-2 text-xs text-foreground-muted"><input type="checkbox" checked={clearWhatsappToken} onChange={(e) => { setClearWhatsappToken(e.target.checked); setWhatsappToken(""); }} />Borrar token almacenado</label>}
         </fieldset>
       </>}
-      {error && <p role="alert" className="text-sm text-red-700">{error}</p>}
-      {notice && <p role="status" className="text-sm text-emerald-700">{notice}</p>}
+      {error && <p role="alert" className="text-sm text-danger">{error}</p>}
+      {notice && <p role="status" className="text-sm text-success">{notice}</p>}
       <button type="submit" disabled={loading || saving} className="inline-flex h-10 items-center gap-2 rounded-md bg-primary px-4 text-sm font-medium !text-white disabled:opacity-50"><Save className="size-4" />{saving ? "Guardando…" : "Guardar credenciales"}</button>
     </form>
   );

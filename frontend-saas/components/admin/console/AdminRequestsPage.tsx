@@ -3,6 +3,9 @@
 import { useEffect, useMemo, useState } from "react";
 import { Check, FileImage, RefreshCw, Search, X } from "lucide-react";
 import { API_URL, apiRequest, fetchApi } from "@/lib/api";
+import { PageHeader } from "@/components/ui/PageHeader";
+import { Button } from "@/components/ui/Button";
+import { Card } from "@/components/ui/Card";
 
 type Plan = { id: number; nombre: string; activo: boolean };
 type Request = {
@@ -190,32 +193,25 @@ export default function AdminRequestsPage() {
 
   return (
     <section className="mx-auto max-w-6xl space-y-5">
-      <header className="flex flex-wrap items-end justify-between gap-4">
-        <div>
-          <p className="text-xs font-semibold uppercase tracking-wide text-primary">
-            Panel Administrativo · SaaS individual
-          </p>
-          <h1 className="mt-1 text-2xl font-semibold text-foreground">
-            Solicitudes de acceso
-          </h1>
-          <p className="mt-1 text-sm text-foreground-muted">
-            Verifica la tarjeta profesional y asigna un plan al aprobar.
-          </p>
-        </div>
-        <button
-          type="button"
-          onClick={() => void reload()}
-          disabled={loading}
-          aria-label="Actualizar solicitudes"
-          className="grid size-10 place-items-center rounded-lg border border-border bg-surface hover:bg-surface-hover"
-        >
-          <RefreshCw className={`size-4 ${loading ? "animate-spin" : ""}`} />
-        </button>
-      </header>
+      <PageHeader
+        overline="Panel Administrativo · SaaS individual"
+        title="Solicitudes de acceso"
+        description="Verifica la tarjeta profesional y asigna un plan al aprobar."
+        action={
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => void reload()}
+            disabled={loading}
+            aria-label="Actualizar solicitudes"
+            icon={<RefreshCw className={`size-4 ${loading ? "animate-spin" : ""}`} />}
+          />
+        }
+      />
       {error && (
         <p
           role="alert"
-          className="rounded-lg border border-danger/30 bg-danger-light p-3 text-sm text-danger"
+          className="rounded-[var(--radius-md)] border border-danger/30 bg-danger-light p-3 text-sm text-danger"
         >
           {error}
         </p>
@@ -223,176 +219,195 @@ export default function AdminRequestsPage() {
       {notice && (
         <p
           role="status"
-          className="rounded-lg border border-success/30 bg-success-light p-3 text-sm text-success"
+          className="rounded-[var(--radius-md)] border border-success/30 bg-success-light p-3 text-sm text-success"
         >
           {notice}
         </p>
       )}
-      <section className="flex flex-wrap items-end gap-3 rounded-lg border border-border bg-surface p-3">
-        <label className="min-w-60 flex-1 text-sm">
-          <span className="sr-only">Buscar profesional</span>
-          <span className="relative block">
-            <Search className="absolute left-3 top-2.5 size-4 text-foreground-muted" />
+      <Card flush>
+        <section className="flex flex-wrap items-end gap-3 p-3">
+          <label className="min-w-60 flex-1 text-sm">
+            <span className="sr-only">Buscar profesional</span>
+            <span className="relative block">
+              <Search className="absolute left-3 top-2.5 size-4 text-foreground-muted" />
+              <input
+                value={search}
+                onChange={(event) => setSearch(event.target.value)}
+                placeholder="Buscar profesional o correo"
+                className="w-full rounded-[var(--radius-md)] border border-border bg-background py-2 pl-9 pr-3"
+              />
+            </span>
+          </label>
+          <label className="min-w-52 text-sm">
+            Plan al aprobar
+            <select
+              value={planId}
+              onChange={(event) => setPlanId(event.target.value)}
+              className="mt-1 w-full rounded-[var(--radius-md)] border border-border bg-background px-3 py-2"
+            >
+              <option value="">Seleccionar plan</option>
+              {data.plans.map((plan) => (
+                <option key={plan.id} value={plan.id}>
+                  {plan.nombre}
+                </option>
+              ))}
+            </select>
+          </label>
+        </section>
+      </Card>
+      <Card flush>
+        <section className="flex flex-wrap items-center justify-between gap-3 px-3 py-2">
+          <label className="inline-flex items-center gap-2 text-sm">
             <input
-              value={search}
-              onChange={(event) => setSearch(event.target.value)}
-              placeholder="Buscar profesional o correo"
-              className="w-full rounded-md border border-border bg-background py-2 pl-9 pr-3"
+              type="checkbox"
+              aria-label="Seleccionar todas las solicitudes visibles"
+              checked={visible.length > 0 && visible.every((item) => selected.includes(item.id))}
+              onChange={(event) => setSelected((current) => event.target.checked
+                ? Array.from(new Set([...current, ...visible.map((item) => item.id)]))
+                : current.filter((id) => !visible.some((item) => item.id === id)))}
             />
-          </span>
-        </label>
-        <label className="min-w-52 text-sm">
-          Plan al aprobar
-          <select
-            value={planId}
-            onChange={(event) => setPlanId(event.target.value)}
-            className="mt-1 w-full rounded-md border border-border bg-background px-3 py-2"
-          >
-            <option value="">Seleccionar plan</option>
-            {data.plans.map((plan) => (
-              <option key={plan.id} value={plan.id}>
-                {plan.nombre}
-              </option>
-            ))}
-          </select>
-        </label>
-      </section>
-      <section className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-border bg-surface px-3 py-2">
-        <label className="inline-flex items-center gap-2 text-sm">
-          <input
-            type="checkbox"
-            aria-label="Seleccionar todas las solicitudes visibles"
-            checked={visible.length > 0 && visible.every((item) => selected.includes(item.id))}
-            onChange={(event) => setSelected((current) => event.target.checked
-              ? Array.from(new Set([...current, ...visible.map((item) => item.id)]))
-              : current.filter((id) => !visible.some((item) => item.id === id)))}
-          />
-          {selected.length} seleccionadas
-        </label>
-        <div className="flex gap-2">
-          <button type="button" disabled={!selected.length || workingId !== null} onClick={() => void decideSelected("RECHAZAR")} className="rounded-md border border-danger/30 px-3 py-2 text-xs text-danger disabled:opacity-50">Rechazar seleccionadas</button>
-          <button type="button" disabled={!selected.length || !planId || workingId !== null} onClick={() => void decideSelected("APROBAR")} className="rounded-md bg-primary px-3 py-2 text-xs font-semibold text-primary-foreground disabled:opacity-50">Aprobar seleccionadas</button>
-        </div>
-      </section>
-      <section className="overflow-x-auto rounded-lg border border-border bg-surface">
-        <table className="w-full min-w-205 text-left text-sm">
-          <thead className="border-b border-border bg-surface-secondary text-xs uppercase text-foreground-muted">
-            <tr>
-              <th className="px-4 py-3">
-                <span className="sr-only">Seleccionar solicitud</span>
-              </th>
-              <th className="px-4 py-3">Profesional</th>
-              <th className="px-4 py-3">Contacto</th>
-              <th className="px-4 py-3">Recibida</th>
-              <th className="px-4 py-3">Verificación</th>
-              <th className="px-4 py-3 text-right">Decisión</th>
-            </tr>
-          </thead>
-          <tbody>
-            {loading ? (
+            {selected.length} seleccionadas
+          </label>
+          <div className="flex gap-2">
+            <Button
+              variant="danger"
+              size="sm"
+              disabled={!selected.length || workingId !== null}
+              onClick={() => void decideSelected("RECHAZAR")}
+            >
+              Rechazar seleccionadas
+            </Button>
+            <Button
+              variant="primary"
+              size="sm"
+              disabled={!selected.length || !planId || workingId !== null}
+              onClick={() => void decideSelected("APROBAR")}
+            >
+              Aprobar seleccionadas
+            </Button>
+          </div>
+        </section>
+      </Card>
+      <Card flush>
+        <section className="overflow-x-auto">
+          <table className="w-full min-w-205 text-left text-sm">
+            <thead className="border-b border-border bg-surface-secondary text-xs uppercase text-foreground-muted">
               <tr>
-                <td
-                  colSpan={6}
-                  className="px-4 py-10 text-center text-foreground-muted"
-                >
-                  Cargando solicitudes...
-                </td>
+                <th className="px-4 py-3">
+                  <span className="sr-only">Seleccionar solicitud</span>
+                </th>
+                <th className="px-4 py-3">Profesional</th>
+                <th className="px-4 py-3">Contacto</th>
+                <th className="px-4 py-3">Recibida</th>
+                <th className="px-4 py-3">Verificación</th>
+                <th className="px-4 py-3 text-right">Decisión</th>
               </tr>
-            ) : visible.length ? (
-              visible.map((request) => (
-                <tr
-                  key={request.id}
-                  className="border-b border-border last:border-0"
-                >
-                  <td className="px-4 py-3">
-                    <input
-                      type="checkbox"
-                      checked={selected.includes(request.id)}
-                      onChange={() => setSelected((current) => current.includes(request.id)
-                        ? current.filter((id) => id !== request.id)
-                        : [...current, request.id])}
-                      aria-label={`Seleccionar solicitud de ${request.usuario.nombre_completo}`}
-                    />
-                  </td>
-                  <td className="px-4 py-3 font-medium text-foreground">
-                    {request.usuario.nombre_completo}
-                  </td>
-                  <td className="px-4 py-3 text-foreground-secondary">
-                    <div>{request.usuario.email}</div>
-                    <div className="text-xs text-foreground-muted">
-                      {request.usuario.whatsapp_numero || "Sin WhatsApp"}
-                    </div>
-                  </td>
-                  <td className="px-4 py-3 text-foreground-secondary">
-                    {new Intl.DateTimeFormat("es-CO", {
-                      dateStyle: "medium",
-                      timeZone: "America/Bogota",
-                    }).format(new Date(request.fecha_solicitud))}
-                  </td>
-                  <td className="px-4 py-3">
-                    <button
-                      type="button"
-                      onClick={() => void viewCard(request)}
-                      className="inline-flex items-center gap-2 rounded-md border border-border px-3 py-2 text-xs text-foreground hover:bg-surface-hover"
-                    >
-                      <FileImage className="size-4" />
-                      Ver tarjeta
-                    </button>
-                  </td>
-                  <td className="px-4 py-3">
-                    <div className="flex justify-end gap-2">
-                      <button
-                        type="button"
-                        disabled={workingId !== null}
-                        onClick={() => void decide(request, "rechazar")}
-                        className="rounded-md border border-danger/30 px-3 py-2 text-xs text-danger hover:bg-danger-light disabled:opacity-50"
-                      >
-                        Rechazar
-                      </button>
-                      <button
-                        type="button"
-                        disabled={workingId !== null || !planId}
-                        onClick={() => void decide(request, "aprobar")}
-                        className="inline-flex items-center gap-1.5 rounded-md bg-primary px-3 py-2 text-xs font-semibold text-primary-foreground disabled:opacity-50"
-                      >
-                        <Check className="size-3.5" />
-                        Aprobar
-                      </button>
-                    </div>
+            </thead>
+            <tbody>
+              {loading ? (
+                <tr>
+                  <td
+                    colSpan={6}
+                    className="px-4 py-10 text-center text-foreground-muted"
+                  >
+                    Cargando solicitudes...
                   </td>
                 </tr>
-              ))
-            ) : (
-              <tr>
-                <td
-                  colSpan={6}
-                  className="px-4 py-12 text-center text-foreground-muted"
-                >
-                  No hay solicitudes pendientes.
-                </td>
-              </tr>
-            )}
-          </tbody>
-        </table>
-      </section>
+              ) : visible.length ? (
+                visible.map((request) => (
+                  <tr
+                    key={request.id}
+                    className="border-b border-border last:border-0"
+                  >
+                    <td className="px-4 py-3">
+                      <input
+                        type="checkbox"
+                        checked={selected.includes(request.id)}
+                        onChange={() => setSelected((current) => current.includes(request.id)
+                          ? current.filter((id) => id !== request.id)
+                          : [...current, request.id])}
+                        aria-label={`Seleccionar solicitud de ${request.usuario.nombre_completo}`}
+                      />
+                    </td>
+                    <td className="px-4 py-3 font-medium text-foreground">
+                      {request.usuario.nombre_completo}
+                    </td>
+                    <td className="px-4 py-3 text-foreground-secondary">
+                      <div>{request.usuario.email}</div>
+                      <div className="text-xs text-foreground-muted">
+                        {request.usuario.whatsapp_numero || "Sin WhatsApp"}
+                      </div>
+                    </td>
+                    <td className="px-4 py-3 text-foreground-secondary">
+                      {new Intl.DateTimeFormat("es-CO", {
+                        dateStyle: "medium",
+                        timeZone: "America/Bogota",
+                      }).format(new Date(request.fecha_solicitud))}
+                    </td>
+                    <td className="px-4 py-3">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => void viewCard(request)}
+                        icon={<FileImage className="size-4" />}
+                      >
+                        Ver tarjeta
+                      </Button>
+                    </td>
+                    <td className="px-4 py-3">
+                      <div className="flex justify-end gap-2">
+                        <Button
+                          variant="danger"
+                          size="sm"
+                          disabled={workingId !== null}
+                          onClick={() => void decide(request, "rechazar")}
+                        >
+                          Rechazar
+                        </Button>
+                        <Button
+                          variant="primary"
+                          size="sm"
+                          disabled={workingId !== null || !planId}
+                          onClick={() => void decide(request, "aprobar")}
+                          icon={<Check className="size-3.5" />}
+                        >
+                          Aprobar
+                        </Button>
+                      </div>
+                    </td>
+                  </tr>
+                ))
+              ) : (
+                <tr>
+                  <td
+                    colSpan={6}
+                    className="px-4 py-12 text-center text-foreground-muted"
+                  >
+                    No hay solicitudes pendientes.
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </section>
+      </Card>
       {viewer && (
         <div
           role="dialog"
           aria-modal="true"
           aria-label={viewer.title}
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4"
+          className="fixed inset-0 z-50 flex items-center justify-center bg-brand-950/40 backdrop-blur-sm p-4"
         >
-          <div className="flex h-[min(88vh,900px)] w-full max-w-5xl flex-col overflow-hidden rounded-xl border border-border bg-surface">
+          <div className="flex h-[min(88vh,900px)] w-full max-w-5xl flex-col overflow-hidden rounded-[var(--radius-lg)] border border-border bg-surface">
             <header className="flex items-center justify-between border-b border-border px-4 py-3">
               <h2 className="font-medium">{viewer.title}</h2>
-              <button
-                type="button"
+              <Button
+                variant="ghost"
+                size="sm"
                 onClick={closeViewer}
                 aria-label="Cerrar tarjeta"
-                className="grid size-9 place-items-center rounded-md hover:bg-surface-hover"
-              >
-                <X className="size-4" />
-              </button>
+                icon={<X className="size-4" />}
+              />
             </header>
             <iframe
               className="min-h-0 flex-1 bg-surface-secondary"

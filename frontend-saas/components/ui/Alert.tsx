@@ -18,7 +18,7 @@ export function Alert({
   const config = kinds[kind];
   const Icon = config.icon;
   return (
-    <div role={config.role} className={`flex gap-3 rounded-lg border p-4 ${config.classes} ${className}`} {...props}>
+    <div role={config.role} className={`flex gap-3 rounded-[var(--radius-md)] border p-4 ${config.classes} ${className}`} {...props}>
       <Icon aria-hidden="true" className="mt-0.5 size-5 shrink-0" />
       <div className="min-w-0 text-sm">
         {title && <p className="font-semibold">{title}</p>}

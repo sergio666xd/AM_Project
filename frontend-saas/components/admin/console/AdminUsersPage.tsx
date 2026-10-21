@@ -5,6 +5,9 @@ import Link from "next/link";
 import { KeyRound, Mail, Pencil, Plus, RefreshCw, Search, Trash2, X } from "lucide-react";
 import { apiRequest, fetchApi } from "@/lib/api";
 import { ApiErrorState } from "@/components/ui/ApiErrorState";
+import { PageHeader } from "@/components/ui/PageHeader";
+import { Button } from "@/components/ui/Button";
+import { Badge } from "@/components/ui/Badge";
 
 type Role = "ABOGADO_ADMIN" | "ABOGADO" | "CLIENTE" | "ADMIN";
 type Status = "ACTIVO" | "SUSPENDIDO" | "PENDIENTE_APROBACION" | "RECHAZADO";
@@ -351,37 +354,17 @@ export default function AdminUsersPage() {
 
   return (
     <section className="mx-auto max-w-6xl space-y-5">
-      <header className="flex flex-wrap items-end justify-between gap-4">
-        <div>
-          <p className="text-xs font-semibold uppercase tracking-wide text-primary">
-            Panel Administrativo · Usuarios
-          </p>
-          <h1 className="mt-1 text-2xl font-semibold text-foreground">
-            Cuentas y acceso
-          </h1>
-          <p className="mt-1 text-sm text-foreground-muted">
-            SaaS, personal de la firma y clientes con alcance asignado.
-          </p>
-        </div>
-        <div className="flex gap-2">
-          <button
-            type="button"
-            onClick={() => void reload()}
-            aria-label="Actualizar usuarios"
-            className="grid size-10 place-items-center rounded-lg border border-border bg-surface hover:bg-surface-hover"
-          >
-            <RefreshCw className="size-4" />
-          </button>
-          {scope !== "ADMIN" && <button
-            type="button"
-            onClick={openCreate}
-            className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground"
-          >
-            <Plus className="size-4" />
-            Crear usuario
-          </button>}
-        </div>
-      </header>
+      <PageHeader
+          overline="Panel Administrativo · Usuarios"
+          title="Cuentas y acceso"
+          description="SaaS, personal de la firma y clientes con alcance asignado."
+          action={
+            <div className="flex gap-2">
+              <Button variant="outline" onClick={() => void reload()} aria-label="Actualizar usuarios" icon={<RefreshCw className={`size-4 ${loading ? "animate-spin" : ""}`} />} />
+              {scope !== "ADMIN" && <Button variant="primary" onClick={openCreate} icon={<Plus className="size-4" />}>Crear usuario</Button>}
+            </div>
+          }
+        />
       {loadError && <ApiErrorState error={loadError} onRetry={() => void reload()} retrying={loading} compact />}
       {error && <p role="alert" className="rounded-lg border border-danger/30 bg-danger-light p-3 text-sm text-danger">{error}</p>}
       {notice && (
@@ -410,7 +393,7 @@ export default function AdminUsersPage() {
             type="button"
             aria-pressed={scope === item.id}
             onClick={() => setScope(item.id)}
-            className={`rounded-md px-3 py-1.5 text-sm ${scope === item.id ? "bg-primary !text-white" : "text-foreground-muted hover:bg-surface-hover"}`}
+            className={`rounded-[var(--radius-md)] px-3 py-1.5 text-sm transition-colors ${scope === item.id ? "bg-brand-900 text-white" : "text-foreground-muted hover:bg-surface-hover"}`}
           >
             {item.label}
           </button>
@@ -493,7 +476,7 @@ export default function AdminUsersPage() {
                   <td className="px-4 py-3"><input type="checkbox" checked={selectedIds.includes(user.id)} onChange={() => setSelectedIds((current) => current.includes(user.id) ? current.filter((id) => id !== user.id) : [...current, user.id])} aria-label={`Seleccionar ${user.nombre_completo}`} /></td>
                   <td className="px-4 py-3">
                     <p className="font-medium text-foreground">
-                      <Link className="hover:text-primary hover:underline" href={`/gestion-procesos/admin/usuarios/${user.id}`}>{user.nombre_completo}</Link>
+                      <Link className="hover:text-brand-700 hover:underline" href={`/gestion-procesos/admin/usuarios/${user.id}`}>{user.nombre_completo}</Link>
                     </p>
                     <p className="mt-0.5 text-xs text-foreground-muted">
                       {user.email} · {user.whatsapp_numero || "Sin WhatsApp"}
@@ -506,11 +489,9 @@ export default function AdminUsersPage() {
                     {user.plan?.nombre || "Sin plan"}
                   </td>
                   <td className="px-4 py-3">
-                    <span
-                      className={`rounded-md px-2 py-1 text-xs ${user.estado === "ACTIVO" ? "bg-success-light text-success" : user.estado === "RECHAZADO" ? "bg-danger-light text-danger" : "bg-warning-light text-warning"}`}
-                    >
+                    <Badge tone={user.estado === "ACTIVO" ? "completed" : user.estado === "RECHAZADO" ? "rejected" : "pending"}>
                       {stateLabels[user.estado]}
-                    </span>
+                    </Badge>
                   </td>
                   <td className="px-4 py-3 text-xs text-foreground-muted">
                     {user.debe_cambiar_password
@@ -585,15 +566,15 @@ export default function AdminUsersPage() {
           role="dialog"
           aria-modal="true"
           aria-label={editing ? "Editar usuario" : "Crear usuario"}
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+          className="fixed inset-0 z-50 flex items-center justify-center bg-brand-950/40 backdrop-blur-sm p-4"
         >
           <form
             onSubmit={save}
-            className="max-h-[90vh] w-full max-w-xl space-y-4 overflow-y-auto rounded-xl border border-border bg-surface p-5 shadow-2xl"
+            className="max-h-[90vh] w-full max-w-xl space-y-4 overflow-y-auto rounded-[var(--radius-xl)] border border-border bg-surface p-5 shadow-2xl"
           >
             <header className="flex items-start justify-between">
               <div>
-                <p className="text-xs font-semibold uppercase tracking-wide text-primary">
+                <p className="text-xs font-semibold uppercase tracking-wide text-brand-700">
                   {scope === "SAAS"
                     ? "Abogados SaaS"
                     : scope === "FIRMA"
@@ -733,22 +714,10 @@ export default function AdminUsersPage() {
               </label>
             )}
             <footer className="flex justify-end gap-2 border-t border-border pt-4">
-              <button
-                type="button"
-                disabled={working}
-                onClick={() => setFormOpen(false)}
-                className="rounded-md border border-border px-3 py-2 text-sm"
-              >
-                Cancelar
-              </button>
-              <button
-                type="submit"
-                disabled={working}
-                className="inline-flex items-center gap-2 rounded-md bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground disabled:opacity-50"
-              >
-                {working && <RefreshCw className="size-4 animate-spin" />}
+              <Button variant="outline" onClick={() => setFormOpen(false)} disabled={working}>Cancelar</Button>
+              <Button type="submit" variant="primary" loading={working} icon={working ? undefined : undefined}>
                 {editing ? "Guardar cambios" : "Crear cuenta"}
-              </button>
+              </Button>
             </footer>
           </form>
         </div>

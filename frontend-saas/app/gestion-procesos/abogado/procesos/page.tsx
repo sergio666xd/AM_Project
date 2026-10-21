@@ -6,6 +6,10 @@ import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 
 import Link from "next/link";
 import { OperationResult } from "@/components/ui/OperationResult";
+import { PageHeader } from "@/components/ui/PageHeader";
+import { StatCard } from "@/components/ui/StatCard";
+import { Button } from "@/components/ui/Button";
+import { Badge } from "@/components/ui/Badge";
 import {
   ArrowRight,
   Archive,
@@ -230,105 +234,145 @@ export default function ProcesosPage() {
       {notice && <OperationResult title={notice} description={noticeHref ? "El expediente quedó creado y puedes continuar con sus datos." : undefined} actionHref={noticeHref ?? undefined} actionLabel={noticeHref ? "Abrir expediente" : undefined} onDismiss={() => { setNotice(""); setNoticeHref(null); }} />}
 
       {/* HEADER */}
-      <header className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-        <div>
-          <p className="text-sm font-medium text-[var(--foreground-muted)]">
-            Despacho
-          </p>
+      <PageHeader
+        overline="Despacho"
+        title={showArchived ? "Procesos archivados" : "Procesos"}
+        description="Administra los expedientes y procesos del despacho y accede a la ficha de cada uno para consultar su información."
+        action={
+          !showArchived ? (
+            <Button
+              variant="primary"
+              onClick={() => {
+                setError("");
+                setShowCreateModal(true);
+              }}
+              icon={<Plus className="size-4" />}
+            >
+              Nuevo proceso
+            </Button>
+          ) : undefined
+        }
+      />
 
-          <h1 className="mt-1 text-2xl font-semibold tracking-tight text-[var(--foreground)] sm:text-3xl">
-            {showArchived ? "Archivados" : "Procesos"}
-          </h1>
-
-          <p className="mt-1 max-w-2xl text-sm text-[var(--foreground-muted)]">
-            Administra los procesos del despacho y accede a la ficha de cada
-            uno para consultar su información.
-          </p>
-        </div>
-
-        {/* RESUMEN */}
-        <div className="grid grid-cols-2 gap-2 sm:flex">
-          <div className="rounded-xl border border-[var(--border)] bg-[var(--surface)] px-4 py-3">
-            <p className="text-xs text-[var(--foreground-muted)]">
-              Procesos
-            </p>
-            <p className="mt-1 text-lg font-semibold text-[var(--foreground)]">
-              {items.length}
-            </p>
-          </div>
-
-          <div className="rounded-xl border border-[var(--border)] bg-[var(--surface)] px-4 py-3">
-            <p className="text-xs text-[var(--foreground-muted)]">
-              Radicados
-            </p>
-            <p className="mt-1 text-lg font-semibold text-[var(--foreground)]">
-              {totalRadicados}
-            </p>
-          </div>
-
-          <div className="hidden rounded-xl border border-[var(--border)] bg-[var(--surface)] px-4 py-3 sm:block">
-            <p className="text-xs text-[var(--foreground-muted)]">
-              Actuaciones
-            </p>
-            <p className="mt-1 text-lg font-semibold text-[var(--foreground)]">
-              {totalActuaciones}
-            </p>
-          </div>
-        </div>
-      </header>
+      {/* RESUMEN */}
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+        <StatCard
+          label="Procesos"
+          value={items.length}
+          icon={BriefcaseBusiness}
+        />
+        <StatCard
+          label="Radicados"
+          value={totalRadicados}
+          icon={FilePlus2}
+        />
+        <StatCard
+          label="Actuaciones"
+          value={totalActuaciones}
+          icon={List}
+        />
+      </div>
 
       {/* ERROR */}
       {error && (
         <div
           role="alert"
-          className="flex items-center justify-between gap-4 rounded-xl border border-red-500/20 bg-red-500/5 px-4 py-3 text-sm text-red-600 dark:text-red-400"
+          className="flex items-center justify-between gap-4 rounded-xl border border-risk/30 bg-risk/10 px-4 py-3 text-sm font-medium text-risk"
         >
           <span>{error}</span>
 
-          <button
-            type="button"
+          <Button
+            variant="outline"
+            size="sm"
             onClick={() => {
               setError("");
               void load();
             }}
-            className="shrink-0 rounded-lg border border-red-500/20 px-3 py-1.5 text-xs font-medium hover:bg-red-500/10"
           >
             Reintentar
-          </button>
+          </Button>
         </div>
       )}
 
       {/* CINTA DE OPCIONES */}
-      <section className="rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-3">
+      <section className="rounded-2xl border border-border bg-surface p-3 shadow-xs">
         <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
           <div className="flex flex-wrap gap-2">
-            {!showArchived && <button
-              type="button"
-              onClick={() => {
-                setError("");
-                setShowCreateModal(true);
-              }}
-              className="inline-flex items-center justify-center gap-2 rounded-lg bg-[var(--primary)] px-4 py-2.5 text-sm font-medium !text-white shadow-sm transition hover:opacity-90"
-            >
-              <Plus className="size-4" />
-              Nuevo proceso
-            </button>}
+            {!showArchived && (
+              <Button
+                variant="primary"
+                onClick={() => {
+                  setError("");
+                  setShowCreateModal(true);
+                }}
+                icon={<Plus className="size-4" />}
+              >
+                Nuevo proceso
+              </Button>
+            )}
 
-            <div role="group" aria-label="Estado de los procesos" className="inline-flex rounded-lg border border-[var(--border)] p-1">
-              <button type="button" aria-pressed={!showArchived} onClick={() => { if (showArchived) { setLoading(true); setQuery(""); setShowArchived(false); } }} className={`rounded-md px-3 py-1.5 text-sm ${!showArchived ? "bg-[var(--primary)] !text-white" : "text-[var(--foreground-muted)] hover:bg-[var(--surface-secondary)]"}`}>Activos</button>
-              <button type="button" aria-pressed={showArchived} onClick={() => { if (!showArchived) { setLoading(true); setQuery(""); setShowArchived(true); } }} className={`rounded-md px-3 py-1.5 text-sm ${showArchived ? "bg-[var(--primary)] !text-white" : "text-[var(--foreground-muted)] hover:bg-[var(--surface-secondary)]"}`}>Archivados</button>
+            <div role="group" aria-label="Estado de los procesos" className="inline-flex rounded-lg border border-border bg-surface-secondary p-1">
+              <button
+                type="button"
+                aria-pressed={!showArchived}
+                onClick={() => {
+                  if (showArchived) {
+                    setLoading(true);
+                    setQuery("");
+                    setShowArchived(false);
+                  }
+                }}
+                className={`rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${
+                  !showArchived
+                    ? "bg-brand-900 text-white shadow-xs"
+                    : "text-muted hover:text-foreground"
+                }`}
+              >
+                Activos
+              </button>
+              <button
+                type="button"
+                aria-pressed={showArchived}
+                onClick={() => {
+                  if (!showArchived) {
+                    setLoading(true);
+                    setQuery("");
+                    setShowArchived(true);
+                  }
+                }}
+                className={`rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${
+                  showArchived
+                    ? "bg-brand-900 text-white shadow-xs"
+                    : "text-muted hover:text-foreground"
+                }`}
+              >
+                Archivados
+              </button>
             </div>
 
-            <button
-              type="button"
+            <Button
+              variant="outline"
+              size="sm"
               onClick={() => void load()}
-              className="inline-flex items-center justify-center gap-2 rounded-lg border border-[var(--border)] bg-[var(--surface)] px-4 py-2.5 text-sm font-medium text-[var(--foreground)] transition hover:bg-[var(--surface-secondary)]"
             >
               Actualizar
-            </button>
+            </Button>
           </div>
 
-          {!showArchived && <select aria-label="Filtrar procesos" value={scopeFilter} onChange={(event) => setScopeFilter(event.target.value)} className="h-10 rounded-lg border border-[var(--border)] bg-[var(--surface-secondary)] px-3 text-sm text-[var(--foreground)]"><option value="TODAS">Todos los procesos</option><option value="PROPIOS">Propios</option><option value="COLABORATIVOS">Colaborativos</option><option value="ATENCION">Requieren atención</option><option value="RIESGO">En riesgo</option></select>}
+          {!showArchived && (
+            <select
+              aria-label="Filtrar procesos"
+              value={scopeFilter}
+              onChange={(event) => setScopeFilter(event.target.value)}
+              className="h-10 rounded-lg border border-border bg-surface-secondary px-3 text-sm text-foreground focus:border-brand-500 focus:outline-none"
+            >
+              <option value="TODAS">Todos los procesos</option>
+              <option value="PROPIOS">Propios</option>
+              <option value="COLABORATIVOS">Colaborativos</option>
+              <option value="ATENCION">Requieren atención</option>
+              <option value="RIESGO">En riesgo</option>
+            </select>
+          )}
           <div className="relative w-full lg:max-w-sm">
             <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-[var(--foreground-muted)]" />
 
@@ -541,14 +585,14 @@ export default function ProcesosPage() {
             </p>
 
             {!query && !showArchived && (
-              <button
-                type="button"
+              <Button
+                variant="primary"
                 onClick={() => setShowCreateModal(true)}
-                className="mt-5 inline-flex items-center gap-2 rounded-lg bg-[var(--primary)] px-4 py-2.5 text-sm font-medium !text-white"
+                icon={<Plus className="size-4" />}
+                className="mt-5"
               >
-                <Plus className="size-4" />
                 Crear proceso
-              </button>
+              </Button>
             )}
           </div>
         )}
@@ -556,23 +600,23 @@ export default function ProcesosPage() {
 
       {/* MODAL CREAR PROCESO */}
       {showCreateModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-brand-950/40 p-4 backdrop-blur-xs">
           <div
             role="dialog"
             aria-modal="true"
             aria-labelledby="create-process-title"
-            className="w-full max-w-lg overflow-hidden rounded-2xl border border-[var(--border)] bg-[var(--surface)] shadow-2xl"
+            className="w-full max-w-lg overflow-hidden rounded-2xl border border-border bg-surface text-foreground shadow-2xl"
           >
-            <div className="flex items-center justify-between border-b border-[var(--border)] px-5 py-4">
+            <div className="flex items-center justify-between border-b border-border px-5 py-4">
               <div>
                 <h2
                   id="create-process-title"
-                  className="text-base font-semibold text-[var(--foreground)]"
+                  className="text-base font-semibold text-foreground"
                 >
                   Nuevo proceso
                 </h2>
 
-                <p className="mt-0.5 text-xs text-[var(--foreground-muted)]">
+                <p className="mt-0.5 text-xs text-muted">
                   Registra un nuevo proceso en el despacho.
                 </p>
               </div>
@@ -586,7 +630,7 @@ export default function ProcesosPage() {
                     setDescription("");
                   }
                 }}
-                className="rounded-lg p-2 text-[var(--foreground-muted)] hover:bg-[var(--surface-secondary)] hover:text-[var(--foreground)]"
+                className="rounded-lg p-2 text-muted hover:bg-surface-secondary hover:text-foreground"
               >
                 <X className="size-5" />
               </button>
@@ -597,7 +641,7 @@ export default function ProcesosPage() {
                 <div>
                   <label
                     htmlFor="process-name"
-                    className="mb-1.5 block text-sm font-medium text-[var(--foreground)]"
+                    className="mb-1.5 block text-sm font-medium text-foreground"
                   >
                     Nombre del proceso
                   </label>
@@ -609,17 +653,17 @@ export default function ProcesosPage() {
                     value={name}
                     onChange={(event) => setName(event.target.value)}
                     placeholder="Ej. Proceso ejecutivo Juan Pérez"
-                    className="w-full rounded-lg border border-[var(--border)] bg-[var(--surface-secondary)] px-3 py-2.5 text-sm text-[var(--foreground)] outline-none transition placeholder:text-[var(--foreground-muted)] focus:border-[var(--primary)]"
+                    className="w-full rounded-lg border border-border bg-surface-secondary px-3 py-2.5 text-sm text-foreground outline-none transition placeholder:text-muted focus:border-brand-500"
                   />
                 </div>
 
                 <div>
                   <label
                     htmlFor="process-description"
-                    className="mb-1.5 block text-sm font-medium text-[var(--foreground)]"
+                    className="mb-1.5 block text-sm font-medium text-foreground"
                   >
                     Descripción
-                    <span className="ml-1 font-normal text-[var(--foreground-muted)]">
+                    <span className="ml-1 font-normal text-muted">
                       (opcional)
                     </span>
                   </label>
@@ -632,36 +676,33 @@ export default function ProcesosPage() {
                     }
                     placeholder="Descripción breve del proceso..."
                     rows={4}
-                    className="w-full resize-none rounded-lg border border-[var(--border)] bg-[var(--surface-secondary)] px-3 py-2.5 text-sm text-[var(--foreground)] outline-none transition placeholder:text-[var(--foreground-muted)] focus:border-[var(--primary)]"
+                    className="w-full resize-none rounded-lg border border-border bg-surface-secondary px-3 py-2.5 text-sm text-foreground outline-none transition placeholder:text-muted focus:border-brand-500"
                   />
                 </div>
               </div>
 
-              <div className="flex flex-col-reverse gap-2 border-t border-[var(--border)] bg-[var(--surface-secondary)] px-5 py-4 sm:flex-row sm:justify-end">
-                <button
+              <div className="flex flex-col-reverse gap-2 border-t border-border bg-surface-secondary px-5 py-4 sm:flex-row sm:justify-end">
+                <Button
                   type="button"
+                  variant="outline"
                   disabled={working}
                   onClick={() => {
                     setShowCreateModal(false);
                     setName("");
                     setDescription("");
                   }}
-                  className="rounded-lg border border-[var(--border)] px-4 py-2.5 text-sm font-medium text-[var(--foreground)] hover:bg-[var(--surface)] disabled:opacity-50"
                 >
                   Cancelar
-                </button>
+                </Button>
 
-                <button
+                <Button
                   type="submit"
+                  variant="primary"
+                  loading={working}
                   disabled={working || !name.trim()}
-                  className="inline-flex items-center justify-center gap-2 rounded-lg bg-[var(--primary)] px-4 py-2.5 text-sm font-medium !text-white disabled:cursor-not-allowed disabled:opacity-50"
                 >
-                  {working && (
-                    <Loader2 className="size-4 animate-spin" />
-                  )}
-
-                  {working ? "Creando..." : "Crear proceso"}
-                </button>
+                  Crear proceso
+                </Button>
               </div>
             </form>
           </div>

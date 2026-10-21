@@ -3,6 +3,10 @@
 import { apiRequest } from "@/lib/api";
 import { iniciarWorkflowConsultaRadicado } from "@/lib/api";
 import ProcessContracts from "@/components/contracts/ProcessContracts";
+import { PageHeader } from "@/components/ui/PageHeader";
+import { StatCard } from "@/components/ui/StatCard";
+import { Button } from "@/components/ui/Button";
+import { Badge } from "@/components/ui/Badge";
 
 import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
@@ -632,21 +636,21 @@ export default function ProcesoDetallePage({ section }: { section?: string }) {
       {/* HEADER */}
       <header className="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
         <div className="min-w-0">
-          <p className="text-sm font-medium text-[var(--foreground-muted)]">
+          <p className="text-sm font-medium text-muted">
             Ficha integral del proceso
           </p>
 
           <div className="mt-1 flex items-center gap-3">
-            <div className="flex size-11 shrink-0 items-center justify-center rounded-xl bg-[var(--primary)]/10 text-[var(--primary)]">
+            <div className="flex size-11 shrink-0 items-center justify-center rounded-xl bg-brand-50 text-brand-700 dark:bg-brand-950 dark:text-brand-300">
               <BriefcaseBusiness className="size-5" />
             </div>
 
             <div className="min-w-0">
-              <h1 className="truncate text-2xl font-semibold tracking-tight text-[var(--foreground)] sm:text-3xl">
+              <h1 className="truncate text-2xl font-semibold tracking-tight text-foreground sm:text-3xl">
                 {process.nombre}
               </h1>
 
-              <p className="mt-0.5 text-xs text-[var(--foreground-muted)]">
+              <p className="mt-0.5 text-xs text-muted">
                 Proceso #{process.id}
               </p>
             </div>
@@ -655,46 +659,51 @@ export default function ProcesoDetallePage({ section }: { section?: string }) {
 
         {/* RESUMEN */}
         <div className="grid grid-cols-3 gap-2">
-          <div className="rounded-xl border border-[var(--border)] bg-[var(--surface)] px-4 py-3">
-            <p className="text-xs text-[var(--foreground-muted)]">
-              Clientes
-            </p>
-            <p className="mt-1 text-lg font-semibold text-[var(--foreground)]">
-              {process.clientes.length}
-            </p>
-          </div>
-
-          <div className="rounded-xl border border-[var(--border)] bg-[var(--surface)] px-4 py-3">
-            <p className="text-xs text-[var(--foreground-muted)]">
-              Radicados
-            </p>
-            <p className="mt-1 text-lg font-semibold text-[var(--foreground)]">
-              {process.radicados.length}
-            </p>
-          </div>
-
-          <div className="rounded-xl border border-[var(--border)] bg-[var(--surface)] px-4 py-3">
-            <p className="text-xs text-[var(--foreground-muted)]">
-              Actuaciones
-            </p>
-            <p className="mt-1 text-lg font-semibold text-[var(--foreground)]">
-              {totalActuaciones}
-            </p>
-          </div>
+          <StatCard
+            label="Clientes"
+            value={process.clientes.length}
+            icon={Users}
+          />
+          <StatCard
+            label="Radicados"
+            value={process.radicados.length}
+            icon={FileText}
+          />
+          <StatCard
+            label="Actuaciones"
+            value={totalActuaciones}
+            icon={BriefcaseBusiness}
+          />
         </div>
       </header>
 
       <div className="grid gap-4 lg:grid-cols-[14rem_minmax(0,1fr)] lg:items-start">
         <aside className="min-w-0 lg:sticky lg:top-4">
-          <div className="overflow-hidden rounded-xl border border-[var(--border)] bg-[var(--surface)]">
-            <p className="hidden border-b border-[var(--border)] px-4 py-3 text-[11px] font-semibold uppercase tracking-wide text-[var(--foreground-muted)] lg:block">
+          <div className="overflow-hidden rounded-xl border border-border bg-surface shadow-xs">
+            <p className="hidden border-b border-border px-4 py-3 text-[11px] font-semibold uppercase tracking-wider text-muted lg:block">
               Secciones del expediente
             </p>
             <nav aria-label="Subpáginas del proceso" className="flex snap-x gap-1 overflow-x-auto p-2 lg:flex-col lg:overflow-visible">
-              {processSections.map((item) => <Link key={item.id} href={`/gestion-procesos/abogado/procesos/${id}/${item.id}`} aria-current={activeTab === item.id ? "page" : undefined} className={`flex min-h-10 shrink-0 snap-start items-center gap-2 rounded-lg px-3 py-2 text-left text-sm font-medium transition lg:w-full ${activeTab === item.id ? "bg-[var(--primary)]/10 text-[var(--primary)]" : "text-[var(--foreground-secondary)] hover:bg-[var(--surface-secondary)] hover:text-[var(--foreground)]"}`}>
-                <span aria-hidden="true" className={`size-2 shrink-0 rounded-full ${activeTab === item.id ? "bg-[var(--primary)]" : "bg-[var(--border)]"}`} />
-                <span className="whitespace-nowrap lg:whitespace-normal">{item.label}</span>
-              </Link>)}
+              {processSections.map((item) => (
+                <Link
+                  key={item.id}
+                  href={`/gestion-procesos/abogado/procesos/${id}/${item.id}`}
+                  aria-current={activeTab === item.id ? "page" : undefined}
+                  className={`flex min-h-10 shrink-0 snap-start items-center gap-2 rounded-lg px-3 py-2 text-left text-sm font-medium transition-colors lg:w-full ${
+                    activeTab === item.id
+                      ? "bg-brand-900 text-white shadow-xs font-semibold"
+                      : "text-muted hover:bg-surface-hover hover:text-foreground"
+                  }`}
+                >
+                  <span
+                    aria-hidden="true"
+                    className={`size-2 shrink-0 rounded-full ${
+                      activeTab === item.id ? "bg-white" : "bg-border-strong"
+                    }`}
+                  />
+                  <span className="whitespace-nowrap lg:whitespace-normal">{item.label}</span>
+                </Link>
+              ))}
             </nav>
           </div>
         </aside>

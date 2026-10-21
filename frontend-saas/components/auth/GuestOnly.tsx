@@ -24,9 +24,11 @@ export default function GuestOnly({ children }: { children: ReactNode }) {
     if (loading || !user) return;
     const redirect = safeInternalRedirect(new URLSearchParams(window.location.search).get("redirect"));
     if (user.debe_cambiar_password) {
-      const changePassword = redirect
-        ? `/cambiar-password?redirect=${encodeURIComponent(redirect)}`
-        : "/cambiar-password";
+      const params = new URLSearchParams();
+      if (user.email) params.set("email", user.email);
+      if (redirect) params.set("redirect", redirect);
+      const query = params.toString();
+      const changePassword = query ? `/cambiar-password?${query}` : "/cambiar-password";
       navigateToPortal(router, user.rol, changePassword);
       return;
     }

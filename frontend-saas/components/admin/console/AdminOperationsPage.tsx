@@ -17,6 +17,9 @@ import {
 } from "lucide-react";
 import { fetchApi } from "@/lib/api";
 import { IntegrationSettingsPanel } from "@/components/admin/console/IntegrationSettingsPanel";
+import { PageHeader } from "@/components/ui/PageHeader";
+import { Button } from "@/components/ui/Button";
+import { StatCard } from "@/components/ui/StatCard";
 
 type Vision = {
   resumen: {
@@ -352,34 +355,14 @@ export default function AdminOperationsPage({ section = "resumen" }: { section?:
 
   return (
     <section className="mx-auto max-w-6xl space-y-5">
-      <header className="flex flex-wrap items-end justify-between gap-4">
-        <div>
-          <p className="text-xs font-semibold uppercase tracking-wide text-primary">
-            Panel Administrativo · Global
-          </p>
-          <h1 className={`mt-1 text-2xl font-semibold text-foreground ${section === "resumen" ? "" : "hidden"}`}>
-            Operación
-          </h1>
-          <p className={`mt-1 text-sm text-foreground-muted ${section === "resumen" ? "" : "hidden"}`}>
-            Estado de servicios y colas disponibles en el backend.
-          </p>
-        </div>
-        <button
-          type="button"
-          onClick={() => void refresh()}
-          disabled={loading}
-          aria-label="Actualizar estado de operación"
-          className="grid size-10 place-items-center rounded-lg border border-border bg-surface hover:bg-surface-hover disabled:opacity-50"
-        >
-          <RefreshCw className={`size-4 ${loading ? "animate-spin" : ""}`} />
-        </button>
-      </header>
-      {section !== "resumen" && (
-        <div>
-          <h1 className="text-2xl font-semibold text-foreground">{SECTION_COPY[section].title}</h1>
-          <p className="mt-1 text-sm text-foreground-muted">{SECTION_COPY[section].description}</p>
-        </div>
-      )}
+      <PageHeader
+          overline="Panel Administrativo · Global"
+          title={section === "resumen" ? "Operación" : SECTION_COPY[section].title}
+          description={section === "resumen" ? "Estado de servicios y colas disponibles en el backend." : SECTION_COPY[section].description}
+          action={
+            <Button variant="outline" onClick={() => void refresh()} disabled={loading} aria-label="Actualizar estado de operación" icon={<RefreshCw className={`size-4 ${loading ? "animate-spin" : ""}`} />} />
+          }
+        />
       {error && (
         <p
           role="alert"
@@ -396,26 +379,21 @@ export default function AdminOperationsPage({ section = "resumen" }: { section?:
         data && (
           <>
             {section === "resumen" && <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-              <Metric
+              <StatCard
                 icon={ServerCog}
                 label="Motor de tareas"
                 value={data.vision.operacion.motor_local}
               />
-              <Metric
+              <StatCard
                 icon={Clock3}
                 label="Consultas en cola"
                 value={data.vision.resumen.consultas_en_cola}
-                tone="text-info"
               />
-              <Metric
+              <StatCard
                 icon={AlertCircle}
                 label="Consultas con error"
                 value={data.vision.resumen.consultas_error}
-                tone={
-                  data.vision.resumen.consultas_error
-                    ? "text-danger"
-                    : "text-success"
-                }
+                tone={data.vision.resumen.consultas_error ? "danger" : "success"}
               />
             </section>}
             {section === "consultas" && <section className="space-y-4 border-t border-border pt-5">
@@ -459,30 +437,18 @@ export default function AdminOperationsPage({ section = "resumen" }: { section?:
                 ))}
               </div>
               <div className="flex flex-wrap items-center gap-2">
-                <button
-                  type="button"
-                  onClick={() => void saveSchedule()}
-                  disabled={savingSchedule}
-                  className="inline-flex items-center gap-2 rounded-md bg-primary px-3 py-2 text-sm font-medium !text-white disabled:opacity-50"
-                >
-                  <Save className="size-4" />
+                <Button variant="primary" onClick={() => void saveSchedule()} loading={savingSchedule} icon={<Save className="size-4" />}>
                   {savingSchedule ? "Guardando..." : "Guardar configuración"}
-                </button>
-                <button
-                  type="button"
-                  onClick={() => void startManualSweep()}
-                  disabled={startingManual || manualMode === "SELECCION" && selectedRadicadoIds.length === 0}
-                  className="inline-flex items-center gap-2 rounded-md border border-border px-3 py-2 text-sm font-medium hover:bg-surface-hover disabled:opacity-50"
-                >
-                  <Play className="size-4" />
+                </Button>
+                <Button variant="outline" onClick={() => void startManualSweep()} disabled={startingManual || manualMode === "SELECCION" && selectedRadicadoIds.length === 0} icon={<Play className="size-4" />}>
                   {startingManual ? "Iniciando..." : manualMode === "TODOS" ? "Consultar todos" : `Consultar selección (${selectedRadicadoIds.length})`}
-                </button>
+                </Button>
                 {scheduleMessage && <span role="status" className="text-sm text-success">{scheduleMessage}</span>}
               </div>
               <div className="space-y-3 rounded-md border border-border p-3">
                 <div role="group" aria-label="Alcance de consulta manual" className="inline-flex gap-1 rounded-md border border-border p-1">
                   {(["TODOS", "SELECCION"] as const).map((mode) => (
-                    <button key={mode} type="button" aria-pressed={manualMode === mode} onClick={() => setManualMode(mode)} className={`rounded px-3 py-1.5 text-sm ${manualMode === mode ? "bg-primary !text-white" : "text-foreground-muted hover:bg-surface-hover"}`}>
+                    <button key={mode} type="button" aria-pressed={manualMode === mode} onClick={() => setManualMode(mode)} className={`rounded px-3 py-1.5 text-sm ${manualMode === mode ? "bg-brand-900 text-white" : "text-foreground-muted hover:bg-surface-hover"}`}>
                       {mode === "TODOS" ? "Todos los radicados" : "Selección manual"}
                     </button>
                   ))}

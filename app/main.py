@@ -479,7 +479,12 @@ def refresh_token(
 
 
 @app.post("/api/auth/cambiar-password")
-def cambiar_password(datos: schemas.CambiarPasswordIn, usuario_actual: models.Usuario = Depends(security.obtener_usuario_para_cambio_password), db: Session = Depends(get_db)):
+def cambiar_password(
+    datos: schemas.CambiarPasswordIn,
+    usuario_actual: models.Usuario = Depends(security.obtener_usuario_para_cambio_password),
+    token: str = Depends(security.oauth2_scheme),
+    db: Session = Depends(get_db),
+):
     if not usuario_actual.debe_cambiar_password:
         raise HTTPException(status_code=403, detail="Para cambiar tu contraseña, solicita y verifica un código desde Configuración > Seguridad.")
     if not security.verify_password(datos.password_actual, usuario_actual.password_hash):
@@ -488,9 +493,30 @@ def cambiar_password(datos: schemas.CambiarPasswordIn, usuario_actual: models.Us
         raise HTTPException(status_code=400, detail="La nueva contraseña debe tener al menos 8 caracteres.")
     usuario_actual.password_hash = security.hash_password(datos.password_nueva)
     usuario_actual.debe_cambiar_password = False
+    usuario_actual.ultimo_acceso = datetime.utcnow()
     registrar_evento_auditoria(db, usuario_actual, "auth.password.cambiar", "usuario", usuario_actual.id)
     db.commit()
-    return {"mensaje": "Contraseña actualizada."}
+
+    # Generar token de sesión para que el usuario quede autenticado de inmediato
+    payload = security.decode_token_payload(token)
+    persistent = bool(payload.get("persistent", True)) if payload else True
+    new_token = security.create_access_token(
+        data={"sub": str(usuario_actual.id)}, persistent=persistent,
+    )
+    rol_str = (
+        usuario_actual.rol.value
+        if hasattr(usuario_actual.rol, "value")
+        else str(usuario_actual.rol)
+    )
+    return {
+        "mensaje": "Contraseña actualizada con éxito.",
+        "access_token": new_token,
+        "token_type": "bearer",
+        "debe_cambiar_password": False,
+        "rol": rol_str,
+        "email": usuario_actual.email,
+        "nombre_completo": usuario_actual.nombre_completo,
+    }
 
 
 @app.post("/api/auth/recuperar-password")
@@ -919,7 +945,7 @@ def actualizar_mi_perfil(datos: schemas.PerfilUpdate, usuario_actual: models.Usu
 
 @app.get("/api/auth/me")
 def obtener_mi_usuario(
-    usuario_actual: models.Usuario = Depends(obtener_usuario_actual),
+    usuario_actual: models.Usuario = Depends(security.obtener_usuario_para_cambio_password),
     db: Session = Depends(get_db),
 ):
     usuario = (

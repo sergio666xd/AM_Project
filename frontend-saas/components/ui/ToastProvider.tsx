@@ -48,7 +48,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
           const config = presentation[item.tone];
           const Icon = config.icon;
           return (
-            <div key={item.id} role={item.tone === "error" ? "alert" : "status"} className={`pointer-events-auto flex gap-3 rounded-xl border bg-surface p-4 shadow-lg ${config.classes}`}>
+            <div key={item.id} role={item.tone === "error" ? "alert" : "status"} className={`pointer-events-auto flex gap-3 rounded-[var(--radius-lg)] border bg-surface p-4 shadow-md ${config.classes}`}>
               <Icon aria-hidden="true" className="mt-0.5 size-5 shrink-0" />
               <div className="min-w-0 flex-1 text-sm">
                 <p className="font-semibold text-foreground">{item.title}</p>

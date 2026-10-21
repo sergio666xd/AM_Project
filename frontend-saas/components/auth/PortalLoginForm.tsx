@@ -65,9 +65,13 @@ export function PortalLoginForm({ portal }: { portal: Portal }) {
       }
       const redirect = safeInternalRedirect(new URLSearchParams(window.location.search).get("redirect"));
       if (data.debe_cambiar_password) {
-        router.replace(redirect
-          ? `/cambiar-password?redirect=${encodeURIComponent(redirect)}`
-          : "/cambiar-password");
+        localStorage.setItem("pending_user_email", email.trim());
+        const params = new URLSearchParams();
+        params.set("email", email.trim());
+        if (redirect) {
+          params.set("redirect", redirect);
+        }
+        router.replace(`/cambiar-password?${params.toString()}`);
         return;
       }
       await refreshUser();

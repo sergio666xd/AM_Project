@@ -11,6 +11,9 @@ import {
 } from "react";
 
 import Link from "next/link";
+import { PageHeader } from "@/components/ui/PageHeader";
+import { StatCard } from "@/components/ui/StatCard";
+import { Button } from "@/components/ui/Button";
 
 import {
   Check,
@@ -339,46 +342,29 @@ export default function ClientesPage() {
 
   return (
     <section className="mx-auto max-w-7xl space-y-5 px-4 py-5 sm:px-6 lg:px-8">
-      {/* Header */}
-      <header className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-        <div>
-          <div className="mb-1 flex items-center gap-2 text-sm text-[var(--foreground-muted)]">
-            <Users className="size-4" />
-            <span>Despacho</span>
-          </div>
-
-          <h1 className="text-2xl font-semibold tracking-tight text-[var(--foreground)] sm:text-3xl">
-            Clientes
-          </h1>
-
-          <p className="mt-1 max-w-2xl text-sm text-[var(--foreground-muted)]">
-            Gestiona los clientes, sus accesos y la relación con los
-            procesos del despacho.
-          </p>
-        </div>
-
-        <button
-          type="button"
-          onClick={openCreateModal}
-          className="inline-flex h-10 items-center justify-center gap-2 rounded-lg bg-[var(--primary)] px-4 text-sm font-medium !text-white transition hover:opacity-90"
-        >
-          <Plus className="size-4" />
-          Nuevo cliente
-        </button>
-      </header>
+      <PageHeader
+        overline="Despacho"
+        title="Clientes"
+        description="Gestiona los clientes, sus accesos y la relación con los procesos del despacho."
+        action={
+          <Button variant="primary" onClick={openCreateModal} icon={<Plus className="size-4" />}>
+            Nuevo cliente
+          </Button>
+        }
+      />
 
       {/* Messages */}
       {error && (
         <div
           role="alert"
-          className="flex items-start justify-between gap-3 rounded-xl border border-red-500/20 bg-red-500/10 px-4 py-3 text-sm text-red-600 dark:text-red-400"
+          className="flex items-start justify-between gap-3 rounded-[var(--radius-md)] border border-danger/30 bg-danger-100 px-4 py-3 text-sm text-danger"
         >
           <span>{error}</span>
 
           <button
             type="button"
             onClick={() => setError("")}
-            className="shrink-0 rounded p-1 hover:bg-red-500/10"
+            className="shrink-0 rounded p-1 hover:bg-danger/10"
           >
             <X className="size-4" />
           </button>
@@ -388,14 +374,14 @@ export default function ClientesPage() {
       {notice && (
         <div
           role="status"
-          className="flex items-start justify-between gap-3 rounded-xl border border-emerald-500/20 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-700 dark:text-emerald-400"
+          className="flex items-start justify-between gap-3 rounded-[var(--radius-md)] border border-success/30 bg-success-100 px-4 py-3 text-sm text-success"
         >
           <span>{notice}</span>
 
           <button
             type="button"
             onClick={() => setNotice("")}
-            className="shrink-0 rounded p-1 hover:bg-emerald-500/10"
+            className="shrink-0 rounded p-1 hover:bg-success/10"
           >
             <X className="size-4" />
           </button>
@@ -404,80 +390,30 @@ export default function ClientesPage() {
 
       {/* Summary */}
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        <div className="rounded-xl border border-[var(--border)] bg-[var(--surface)] p-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm text-[var(--foreground-muted)]">
-                Clientes registrados
-              </p>
-
-              <p className="mt-1 text-2xl font-semibold text-[var(--foreground)]">
-                {items.length}
-              </p>
-            </div>
-
-            <div className="flex size-10 items-center justify-center rounded-lg bg-[var(--primary)]/10 text-[var(--primary)]">
-              <Users className="size-5" />
-            </div>
-          </div>
-        </div>
-
-        <div className="rounded-xl border border-[var(--border)] bg-[var(--surface)] p-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm text-[var(--foreground-muted)]">
-                Resultados
-              </p>
-
-              <p className="mt-1 text-2xl font-semibold text-[var(--foreground)]">
-                {filteredClients.length}
-              </p>
-            </div>
-
-            <div className="flex size-10 items-center justify-center rounded-lg bg-[var(--surface-secondary)] text-[var(--foreground-muted)]">
-              <Search className="size-5" />
-            </div>
-          </div>
-        </div>
-
-        <div className="rounded-xl border border-[var(--border)] bg-[var(--surface)] p-4 sm:col-span-2 lg:col-span-1">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm text-[var(--foreground-muted)]">
-                Seleccionados
-              </p>
-
-              <p className="mt-1 text-2xl font-semibold text-[var(--foreground)]">
-                {selected.length}
-              </p>
-            </div>
-
-            <div className="flex size-10 items-center justify-center rounded-lg bg-[var(--surface-secondary)] text-[var(--foreground-muted)]">
-              <Check className="size-5" />
-            </div>
-          </div>
-        </div>
+        <StatCard label="Clientes registrados" value={items.length} icon={Users} />
+        <StatCard label="Resultados" value={filteredClients.length} icon={Search} />
+        <StatCard label="Seleccionados" value={selected.length} icon={Check} tone={selected.length > 0 ? "warning" : "default"} />
       </div>
 
       {/* Toolbar */}
-      <div className="rounded-xl border border-[var(--border)] bg-[var(--surface)] p-3">
+      <div className="rounded-[var(--radius-lg)] border border-border bg-surface p-3">
         <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
           <div className="relative min-w-0 flex-1 lg:max-w-xl">
-            <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-[var(--foreground-muted)]" />
+            <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-foreground-muted" />
 
             <input
               type="search"
               value={query}
               onChange={(event) => setQuery(event.target.value)}
               placeholder="Buscar por nombre, correo o WhatsApp..."
-              className="h-10 w-full rounded-lg border border-[var(--border)] bg-[var(--background)] pl-9 pr-3 text-sm text-[var(--foreground)] outline-none transition placeholder:text-[var(--foreground-muted)] focus:border-[var(--primary)]"
+              className="h-10 w-full rounded-lg border border-border bg-[var(--background)] pl-9 pr-3 text-sm text-foreground outline-none transition placeholder:text-foreground-muted focus:border-brand-900"
             />
           </div>
 
           <div className="flex items-center gap-2">
             {selected.length > 0 && (
               <>
-                <span className="hidden text-sm text-[var(--foreground-muted)] sm:inline">
+                <span className="hidden text-sm text-foreground-muted sm:inline">
                   {selected.length} seleccionado
                   {selected.length !== 1 ? "s" : ""}
                 </span>
@@ -485,7 +421,7 @@ export default function ClientesPage() {
                 <button
                   type="button"
                   onClick={clearSelection}
-                  className="inline-flex h-9 items-center gap-2 rounded-lg border border-[var(--border)] px-3 text-sm text-[var(--foreground)] transition hover:bg-[var(--surface-secondary)]"
+                  className="inline-flex h-9 items-center gap-2 rounded-lg border border-border px-3 text-sm text-foreground transition hover:bg-surface-secondary"
                 >
                   <X className="size-4" />
                   Limpiar
@@ -497,7 +433,7 @@ export default function ClientesPage() {
               type="button"
               onClick={() => void load()}
               disabled={loading}
-              className="inline-flex h-9 items-center gap-2 rounded-lg border border-[var(--border)] px-3 text-sm text-[var(--foreground)] transition hover:bg-[var(--surface-secondary)] disabled:cursor-not-allowed disabled:opacity-50"
+              className="inline-flex h-9 items-center gap-2 rounded-lg border border-border px-3 text-sm text-foreground transition hover:bg-surface-secondary disabled:cursor-not-allowed disabled:opacity-50"
             >
               <RefreshCw
                 className={`size-4 ${loading ? "animate-spin" : ""}`}
@@ -509,24 +445,24 @@ export default function ClientesPage() {
       </div>
 
       {/* Client list */}
-      <section className="overflow-hidden rounded-2xl border border-[var(--border)] bg-[var(--surface)] shadow-sm">
-        <div className="flex flex-col gap-3 border-b border-[var(--border)] bg-[var(--surface-secondary)]/50 px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-5">
+      <section className="overflow-hidden rounded-[var(--radius-xl)] border border-border bg-surface shadow-sm">
+        <div className="flex flex-col gap-3 border-b border-border bg-surface-secondary/50 px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-5">
           <div>
-            <h2 className="font-semibold text-[var(--foreground)]">Directorio de clientes</h2>
-            <p className="mt-0.5 text-xs text-[var(--foreground-muted)]">Información y accesos rápidos por cliente.</p>
+            <h2 className="font-semibold text-foreground">Directorio de clientes</h2>
+            <p className="mt-0.5 text-xs text-foreground-muted">Información y accesos rápidos por cliente.</p>
           </div>
           <div className="flex flex-wrap items-center gap-2">
-          <div role="group" aria-label="Vista de clientes" className="inline-flex rounded-lg border border-[var(--border)] bg-[var(--surface)] p-1">
-            <button type="button" aria-pressed={viewMode === "cards"} onClick={() => setViewMode("cards")} className={`inline-flex min-h-8 items-center gap-1.5 rounded-md px-2.5 text-xs font-medium ${viewMode === "cards" ? "bg-[var(--primary)] !text-white" : "text-[var(--foreground-muted)] hover:bg-[var(--surface-secondary)]"}`}><LayoutGrid className="size-3.5" />Fichas</button>
-            <button type="button" aria-pressed={viewMode === "list"} onClick={() => setViewMode("list")} className={`inline-flex min-h-8 items-center gap-1.5 rounded-md px-2.5 text-xs font-medium ${viewMode === "list" ? "bg-[var(--primary)] !text-white" : "text-[var(--foreground-muted)] hover:bg-[var(--surface-secondary)]"}`}><List className="size-3.5" />Lista</button>
+          <div role="group" aria-label="Vista de clientes" className="inline-flex rounded-lg border border-border bg-surface p-1">
+            <button type="button" aria-pressed={viewMode === "cards"} onClick={() => setViewMode("cards")} className={`inline-flex min-h-8 items-center gap-1.5 rounded-md px-2.5 text-xs font-medium ${viewMode === "cards" ? "bg-brand-900 !text-white" : "text-foreground-muted hover:bg-surface-secondary"}`}><LayoutGrid className="size-3.5" />Fichas</button>
+            <button type="button" aria-pressed={viewMode === "list"} onClick={() => setViewMode("list")} className={`inline-flex min-h-8 items-center gap-1.5 rounded-md px-2.5 text-xs font-medium ${viewMode === "list" ? "bg-brand-900 !text-white" : "text-foreground-muted hover:bg-surface-secondary"}`}><List className="size-3.5" />Lista</button>
           </div>
           <button
             type="button"
             onClick={toggleSelectAll}
             disabled={filteredClients.length === 0}
-            className="inline-flex min-h-9 items-center justify-center gap-2 self-start rounded-lg border border-[var(--border)] bg-[var(--surface)] px-3 text-xs font-medium text-[var(--foreground)] transition hover:bg-[var(--surface-secondary)] disabled:opacity-50 sm:self-auto"
+            className="inline-flex min-h-9 items-center justify-center gap-2 self-start rounded-lg border border-border bg-surface px-3 text-xs font-medium text-foreground transition hover:bg-surface-secondary disabled:opacity-50 sm:self-auto"
           >
-            <span className={`grid size-4 place-items-center rounded border ${allVisibleSelected ? "border-[var(--primary)] bg-[var(--primary)] !text-white" : "border-[var(--border)] bg-[var(--background)]"}`}>
+            <span className={`grid size-4 place-items-center rounded border ${allVisibleSelected ? "border-brand-900 bg-brand-900 !text-white" : "border-border bg-[var(--background)]"}`}>
               {allVisibleSelected && <Check className="size-3" />}
             </span>
             {allVisibleSelected ? "Quitar selección" : "Seleccionar visibles"}
@@ -537,40 +473,40 @@ export default function ClientesPage() {
         {loading ? (
           <div className="grid gap-3 p-4 sm:grid-cols-2 xl:grid-cols-3">
             {Array.from({ length: 6 }).map((_, index) => (
-              <div key={index} className="h-48 animate-pulse rounded-xl border border-[var(--border)] bg-[var(--surface-secondary)]/60" />
+              <div key={index} className="h-48 animate-pulse rounded-[var(--radius-lg)] border border-border bg-surface-secondary/60" />
             ))}
           </div>
         ) : filteredClients.length === 0 ? (
           <div className="px-6 py-14 text-center">
-            <div className="mx-auto flex size-12 items-center justify-center rounded-full bg-[var(--surface-secondary)] text-[var(--foreground-muted)]">
+            <div className="mx-auto flex size-12 items-center justify-center rounded-full bg-surface-secondary text-foreground-muted">
               {query ? <Search className="size-5" /> : <Users className="size-5" />}
             </div>
-            <h3 className="mt-3 font-medium text-[var(--foreground)]">
+            <h3 className="mt-3 font-medium text-foreground">
               {query ? "No se encontraron clientes" : "No hay clientes registrados"}
             </h3>
-            <p className="mx-auto mt-1 max-w-md text-sm text-[var(--foreground-muted)]">
+            <p className="mx-auto mt-1 max-w-md text-sm text-foreground-muted">
               {query ? "Prueba con otro nombre, correo o número de WhatsApp." : "Crea el primer cliente del despacho para comenzar a gestionar sus procesos."}
             </p>
-            {!query && <button type="button" onClick={openCreateModal} className="mt-4 inline-flex min-h-10 items-center gap-2 rounded-lg bg-[var(--primary)] px-4 text-sm font-medium !text-white"><Plus className="size-4" />Crear cliente</button>}
+            {!query && <button type="button" onClick={openCreateModal} className="mt-4 inline-flex min-h-10 items-center gap-2 rounded-lg bg-brand-900 px-4 text-sm font-medium !text-white"><Plus className="size-4" />Crear cliente</button>}
           </div>
         ) : viewMode === "cards" ? (
           <div className="grid gap-3 p-3 sm:grid-cols-2 sm:p-4 xl:grid-cols-3">
             {filteredClients.map((client) => {
               const isSelected = selected.includes(client.id);
               return (
-                <article key={client.id} className={`flex min-w-0 flex-col rounded-xl border p-4 transition ${isSelected ? "border-[var(--primary)]/50 bg-[var(--primary)]/[0.035]" : "border-[var(--border)] bg-[var(--surface)] hover:border-[var(--primary)]/30 hover:shadow-sm"}`}>
+                <article key={client.id} className={`flex min-w-0 flex-col rounded-[var(--radius-lg)] border p-4 transition ${isSelected ? "border-brand-900/50 bg-brand-900/[0.035]" : "border-border bg-surface hover:border-brand-900/30 hover:shadow-sm"}`}>
                   <div className="flex min-w-0 items-start gap-3">
                     <button
                       type="button"
                       onClick={() => toggleSelected(client.id)}
                       aria-label={isSelected ? `Deseleccionar ${client.nombre_completo}` : `Seleccionar ${client.nombre_completo}`}
-                      className={`mt-1 grid size-5 shrink-0 place-items-center rounded border transition ${isSelected ? "border-[var(--primary)] bg-[var(--primary)] !text-white" : "border-[var(--border)] bg-[var(--background)] hover:border-[var(--primary)]"}`}
+                      className={`mt-1 grid size-5 shrink-0 place-items-center rounded border transition ${isSelected ? "border-brand-900 bg-brand-900 !text-white" : "border-border bg-[var(--background)] hover:border-brand-900"}`}
                     >{isSelected && <Check className="size-3.5" />}</button>
-                    <div className="flex size-11 shrink-0 items-center justify-center rounded-xl bg-[var(--primary)]/10 text-sm font-semibold text-[var(--primary)]">
+                    <div className="flex size-11 shrink-0 items-center justify-center rounded-[var(--radius-lg)] bg-brand-900/10 text-sm font-semibold text-brand-900">
                       {getInitials(client.nombre_completo)}
                     </div>
                     <div className="min-w-0 flex-1">
-                      <Link href={`/gestion-procesos/abogado/clientes/${client.id}`} className="block truncate font-semibold text-[var(--foreground)] hover:text-[var(--primary)]">
+                      <Link href={`/gestion-procesos/abogado/clientes/${client.id}`} className="block truncate font-semibold text-foreground hover:text-brand-900">
                         {client.nombre_completo}
                       </Link>
                       <span className="mt-1 inline-flex items-center gap-1 rounded-full border border-emerald-500/20 bg-emerald-500/10 px-2 py-0.5 text-[10px] font-medium text-emerald-700 dark:text-emerald-400">
@@ -579,20 +515,20 @@ export default function ClientesPage() {
                     </div>
                   </div>
 
-                  <div className="mt-4 min-w-0 space-y-2 border-t border-[var(--border)] pt-3 text-sm text-[var(--foreground-muted)]">
+                  <div className="mt-4 min-w-0 space-y-2 border-t border-border pt-3 text-sm text-foreground-muted">
                     <div className="flex min-w-0 items-center gap-2"><Mail className="size-3.5 shrink-0" /><span className="truncate" title={client.email}>{client.email}</span></div>
                     <div className="flex min-w-0 items-center gap-2"><MessageCircle className="size-3.5 shrink-0" /><span className="truncate">{client.whatsapp_numero || "Sin WhatsApp registrado"}</span></div>
                     {(client.numero_documento || client.domicilio) && <p className="truncate pl-[22px] text-xs">{[client.numero_documento, client.domicilio].filter(Boolean).join(" · ")}</p>}
                   </div>
 
                   <div className={`mt-auto grid ${client.chat_href ? "grid-cols-3" : "grid-cols-2"} gap-2 pt-4`}>
-                    {client.chat_href && <Link href={client.chat_href} className="inline-flex min-h-9 items-center justify-center gap-1 rounded-lg bg-[var(--primary)] px-2 text-xs font-medium !text-white transition hover:opacity-90" aria-label={`Abrir chat con ${client.nombre_completo}`}>
+                    {client.chat_href && <Link href={client.chat_href} className="inline-flex min-h-9 items-center justify-center gap-1 rounded-lg bg-brand-900 px-2 text-xs font-medium !text-white transition hover:opacity-90" aria-label={`Abrir chat con ${client.nombre_completo}`}>
                       <MessageCircle className="size-3.5" /><span>Chat</span>
                     </Link>}
-                    <button type="button" onClick={() => openEditModal(client)} className="inline-flex min-h-9 items-center justify-center gap-1 rounded-lg border border-[var(--border)] px-2 text-xs font-medium text-[var(--foreground)] transition hover:bg-[var(--surface-secondary)]">
+                    <button type="button" onClick={() => openEditModal(client)} className="inline-flex min-h-9 items-center justify-center gap-1 rounded-lg border border-border px-2 text-xs font-medium text-foreground transition hover:bg-surface-secondary">
                       <Edit3 className="size-3.5" /><span>Editar</span>
                     </button>
-                    <Link href={`/gestion-procesos/abogado/clientes/${client.id}`} className="inline-flex min-h-9 items-center justify-center gap-1 rounded-lg border border-[var(--border)] px-2 text-xs font-medium text-[var(--foreground)] transition hover:bg-[var(--surface-secondary)]">
+                    <Link href={`/gestion-procesos/abogado/clientes/${client.id}`} className="inline-flex min-h-9 items-center justify-center gap-1 rounded-lg border border-border px-2 text-xs font-medium text-foreground transition hover:bg-surface-secondary">
                       <ExternalLink className="size-3.5" /><span>Ficha</span>
                     </Link>
                   </div>
@@ -601,24 +537,24 @@ export default function ClientesPage() {
             })}
           </div>
         ) : (
-          <div className="divide-y divide-[var(--border)]">
+          <div className="divide-y divide-border">
             {filteredClients.map((client) => {
               const isSelected = selected.includes(client.id);
               return (
-                <div key={client.id} className={`flex flex-col gap-3 px-4 py-4 transition hover:bg-[var(--surface-secondary)]/50 sm:flex-row sm:items-center sm:px-5 ${isSelected ? "bg-[var(--primary)]/[0.035]" : ""}`}>
+                <div key={client.id} className={`flex flex-col gap-3 px-4 py-4 transition hover:bg-surface-secondary/50 sm:flex-row sm:items-center sm:px-5 ${isSelected ? "bg-brand-900/[0.035]" : ""}`}>
                   <div className="flex min-w-0 flex-1 items-start gap-3">
-                    <button type="button" onClick={() => toggleSelected(client.id)} aria-label={isSelected ? `Deseleccionar ${client.nombre_completo}` : `Seleccionar ${client.nombre_completo}`} className={`mt-1 grid size-5 shrink-0 place-items-center rounded border ${isSelected ? "border-[var(--primary)] bg-[var(--primary)] !text-white" : "border-[var(--border)] bg-[var(--background)]"}`}>{isSelected && <Check className="size-3.5" />}</button>
-                    <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-[var(--primary)]/10 text-sm font-semibold text-[var(--primary)]">{getInitials(client.nombre_completo)}</div>
+                    <button type="button" onClick={() => toggleSelected(client.id)} aria-label={isSelected ? `Deseleccionar ${client.nombre_completo}` : `Seleccionar ${client.nombre_completo}`} className={`mt-1 grid size-5 shrink-0 place-items-center rounded border ${isSelected ? "border-brand-900 bg-brand-900 !text-white" : "border-border bg-[var(--background)]"}`}>{isSelected && <Check className="size-3.5" />}</button>
+                    <div className="flex size-10 shrink-0 items-center justify-center rounded-[var(--radius-lg)] bg-brand-900/10 text-sm font-semibold text-brand-900">{getInitials(client.nombre_completo)}</div>
                     <div className="min-w-0 flex-1">
-                      <Link href={`/gestion-procesos/abogado/clientes/${client.id}`} className="block truncate font-semibold text-[var(--foreground)] hover:text-[var(--primary)]">{client.nombre_completo}</Link>
-                      <p className="mt-1 truncate text-xs text-[var(--foreground-muted)]">{client.email} <span className="px-1">·</span>{client.whatsapp_numero || "Sin WhatsApp"}</p>
-                      {(client.numero_documento || client.domicilio) && <p className="mt-1 truncate text-xs text-[var(--foreground-muted)]">{[client.numero_documento, client.domicilio].filter(Boolean).join(" · ")}</p>}
+                      <Link href={`/gestion-procesos/abogado/clientes/${client.id}`} className="block truncate font-semibold text-foreground hover:text-brand-900">{client.nombre_completo}</Link>
+                      <p className="mt-1 truncate text-xs text-foreground-muted">{client.email} <span className="px-1">·</span>{client.whatsapp_numero || "Sin WhatsApp"}</p>
+                      {(client.numero_documento || client.domicilio) && <p className="mt-1 truncate text-xs text-foreground-muted">{[client.numero_documento, client.domicilio].filter(Boolean).join(" · ")}</p>}
                     </div>
                   </div>
                   <div className="flex flex-wrap items-center gap-2 pl-8 sm:pl-0">
-                    {client.chat_href && <Link href={client.chat_href} className="inline-flex min-h-9 items-center gap-1.5 rounded-lg bg-[var(--primary)] px-3 text-xs font-medium !text-white hover:opacity-90"><MessageCircle className="size-3.5" />Chat</Link>}
-                    <button type="button" onClick={() => openEditModal(client)} className="inline-flex min-h-9 items-center gap-1.5 rounded-lg border border-[var(--border)] px-3 text-xs font-medium text-[var(--foreground)] hover:bg-[var(--surface-secondary)]"><Edit3 className="size-3.5" />Editar</button>
-                    <Link href={`/gestion-procesos/abogado/clientes/${client.id}`} className="inline-flex min-h-9 items-center gap-1.5 rounded-lg border border-[var(--border)] px-3 text-xs font-medium text-[var(--foreground)] hover:bg-[var(--surface-secondary)]"><ExternalLink className="size-3.5" />Ficha</Link>
+                    {client.chat_href && <Link href={client.chat_href} className="inline-flex min-h-9 items-center gap-1.5 rounded-lg bg-brand-900 px-3 text-xs font-medium !text-white hover:opacity-90"><MessageCircle className="size-3.5" />Chat</Link>}
+                    <button type="button" onClick={() => openEditModal(client)} className="inline-flex min-h-9 items-center gap-1.5 rounded-lg border border-border px-3 text-xs font-medium text-foreground hover:bg-surface-secondary"><Edit3 className="size-3.5" />Editar</button>
+                    <Link href={`/gestion-procesos/abogado/clientes/${client.id}`} className="inline-flex min-h-9 items-center gap-1.5 rounded-lg border border-border px-3 text-xs font-medium text-foreground hover:bg-surface-secondary"><ExternalLink className="size-3.5" />Ficha</Link>
                   </div>
                 </div>
               );
@@ -627,7 +563,7 @@ export default function ClientesPage() {
         )}
 
         {!loading && filteredClients.length > 0 && (
-          <footer className="flex flex-col gap-1 border-t border-[var(--border)] px-4 py-3 text-xs text-[var(--foreground-muted)] sm:flex-row sm:items-center sm:justify-between">
+          <footer className="flex flex-col gap-1 border-t border-border px-4 py-3 text-xs text-foreground-muted sm:flex-row sm:items-center sm:justify-between">
             <span>Mostrando {filteredClients.length} de {items.length} clientes</span>
             {selectedVisibleCount > 0 && <span>{selectedVisibleCount} seleccionado{selectedVisibleCount === 1 ? "" : "s"}</span>}
           </footer>
@@ -639,7 +575,7 @@ export default function ClientesPage() {
           role="dialog"
           aria-modal="true"
           aria-labelledby="create-client-title"
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm"
+          className="fixed inset-0 z-50 flex items-center justify-center bg-brand-950/40 backdrop-blur-sm p-4 backdrop-blur-sm"
           onMouseDown={(event) => {
             if (event.target === event.currentTarget) {
               closeCreateModal();
@@ -648,22 +584,22 @@ export default function ClientesPage() {
         >
           <form
             onSubmit={createClient}
-            className="w-full max-w-lg overflow-hidden rounded-2xl border border-[var(--border)] bg-[var(--surface)] shadow-2xl"
+            className="w-full max-w-lg overflow-hidden rounded-[var(--radius-xl)] border border-border bg-surface shadow-2xl"
           >
-            <header className="flex items-start justify-between border-b border-[var(--border)] px-5 py-4">
+            <header className="flex items-start justify-between border-b border-border px-5 py-4">
               <div>
-                <div className="mb-2 flex size-9 items-center justify-center rounded-lg bg-[var(--primary)]/10 text-[var(--primary)]">
+                <div className="mb-2 flex size-9 items-center justify-center rounded-lg bg-brand-900/10 text-brand-900">
                   <UserPlus className="size-5" />
                 </div>
 
                 <h2
                   id="create-client-title"
-                  className="text-lg font-semibold text-[var(--foreground)]"
+                  className="text-lg font-semibold text-foreground"
                 >
                   Nuevo cliente
                 </h2>
 
-                <p className="mt-1 text-sm text-[var(--foreground-muted)]">
+                <p className="mt-1 text-sm text-foreground-muted">
                   Crea el acceso del cliente al sistema.
                 </p>
               </div>
@@ -671,7 +607,7 @@ export default function ClientesPage() {
               <button
                 type="button"
                 onClick={closeCreateModal}
-                className="rounded-lg p-2 text-[var(--foreground-muted)] hover:bg-[var(--surface-secondary)] hover:text-[var(--foreground)]"
+                className="rounded-lg p-2 text-foreground-muted hover:bg-surface-secondary hover:text-foreground"
               >
                 <X className="size-5" />
               </button>
@@ -733,22 +669,22 @@ export default function ClientesPage() {
                 hint="Debe tener al menos 8 caracteres."
               />
 
-              <label className="block text-sm font-medium text-[var(--foreground)]">
+              <label className="block text-sm font-medium text-foreground">
                 Enviar credenciales por
-                <select value={form.canal_envio} onChange={(event) => setForm((current) => ({ ...current, canal_envio: event.target.value as "EMAIL" | "WHATSAPP" }))} className="mt-1.5 h-10 w-full rounded-lg border border-[var(--border)] bg-[var(--background)] px-3 text-sm">
+                <select value={form.canal_envio} onChange={(event) => setForm((current) => ({ ...current, canal_envio: event.target.value as "EMAIL" | "WHATSAPP" }))} className="mt-1.5 h-10 w-full rounded-lg border border-border bg-[var(--background)] px-3 text-sm">
                   <option value="EMAIL">Correo electrónico</option>
                   <option value="WHATSAPP">WhatsApp</option>
                 </select>
-                <span className="mt-1 block text-xs font-normal text-[var(--foreground-muted)]">Se enviarán el usuario, la contraseña temporal y un botón para ingresar al portal. El cliente deberá cambiar la contraseña al iniciar sesión.</span>
+                <span className="mt-1 block text-xs font-normal text-foreground-muted">Se enviarán el usuario, la contraseña temporal y un botón para ingresar al portal. El cliente deberá cambiar la contraseña al iniciar sesión.</span>
               </label>
             </div>
 
-            <footer className="flex justify-end gap-2 border-t border-[var(--border)] px-5 py-4">
+            <footer className="flex justify-end gap-2 border-t border-border px-5 py-4">
               <button
                 type="button"
                 onClick={closeCreateModal}
                 disabled={saving}
-                className="rounded-lg border border-[var(--border)] px-4 py-2 text-sm font-medium text-[var(--foreground)] transition hover:bg-[var(--surface-secondary)] disabled:opacity-50"
+                className="rounded-lg border border-border px-4 py-2 text-sm font-medium text-foreground transition hover:bg-surface-secondary disabled:opacity-50"
               >
                 Cancelar
               </button>
@@ -756,7 +692,7 @@ export default function ClientesPage() {
               <button
                 type="submit"
                 disabled={saving}
-                className="inline-flex items-center gap-2 rounded-lg bg-[var(--primary)] px-4 py-2 text-sm font-medium !text-white transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
+                className="inline-flex items-center gap-2 rounded-lg bg-brand-900 px-4 py-2 text-sm font-medium !text-white transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
               >
                 {saving && (
                   <RefreshCw className="size-4 animate-spin" />
@@ -774,7 +710,7 @@ export default function ClientesPage() {
           role="dialog"
           aria-modal="true"
           aria-labelledby="edit-client-title"
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm"
+          className="fixed inset-0 z-50 flex items-center justify-center bg-brand-950/40 backdrop-blur-sm p-4 backdrop-blur-sm"
           onMouseDown={(event) => {
             if (event.target === event.currentTarget) {
               closeEditModal();
@@ -783,22 +719,22 @@ export default function ClientesPage() {
         >
           <form
             onSubmit={updateClient}
-            className="flex max-h-[90vh] w-full max-w-lg flex-col overflow-hidden rounded-2xl border border-[var(--border)] bg-[var(--surface)] shadow-2xl"
+            className="flex max-h-[90vh] w-full max-w-lg flex-col overflow-hidden rounded-[var(--radius-xl)] border border-border bg-surface shadow-2xl"
           >
-            <header className="flex items-start justify-between border-b border-[var(--border)] px-5 py-4">
+            <header className="flex items-start justify-between border-b border-border px-5 py-4">
               <div>
-                <div className="mb-2 flex size-9 items-center justify-center rounded-lg bg-[var(--primary)]/10 text-[var(--primary)]">
+                <div className="mb-2 flex size-9 items-center justify-center rounded-lg bg-brand-900/10 text-brand-900">
                   <Edit3 className="size-5" />
                 </div>
 
                 <h2
                   id="edit-client-title"
-                  className="text-lg font-semibold text-[var(--foreground)]"
+                  className="text-lg font-semibold text-foreground"
                 >
                   Editar cliente
                 </h2>
 
-                <p className="mt-1 text-sm text-[var(--foreground-muted)]">
+                <p className="mt-1 text-sm text-foreground-muted">
                   Actualiza la información de contacto del cliente.
                 </p>
               </div>
@@ -806,7 +742,7 @@ export default function ClientesPage() {
               <button
                 type="button"
                 onClick={closeEditModal}
-                className="rounded-lg p-2 text-[var(--foreground-muted)] hover:bg-[var(--surface-secondary)] hover:text-[var(--foreground)]"
+                className="rounded-lg p-2 text-foreground-muted hover:bg-surface-secondary hover:text-foreground"
               >
                 <X className="size-5" />
               </button>
@@ -847,12 +783,12 @@ export default function ClientesPage() {
                 placeholder="Opcional"
               />
 
-              <label className="block text-sm font-medium text-[var(--foreground)]">
+              <label className="block text-sm font-medium text-foreground">
                 Género
                 <select
                   value={form.genero}
                   onChange={(event) => setForm((current) => ({ ...current, genero: event.target.value as ClientForm["genero"] }))}
-                  className="mt-1.5 h-10 w-full rounded-lg border border-[var(--border)] bg-[var(--background)] px-3 text-sm text-[var(--foreground)]"
+                  className="mt-1.5 h-10 w-full rounded-lg border border-border bg-[var(--background)] px-3 text-sm text-foreground"
                 >
                   <option value="">Sin especificar</option>
                   <option value="FEMENINO">Femenino</option>
@@ -882,12 +818,12 @@ export default function ClientesPage() {
               />
             </div>
 
-            <footer className="flex justify-end gap-2 border-t border-[var(--border)] px-5 py-4">
+            <footer className="flex justify-end gap-2 border-t border-border px-5 py-4">
               <button
                 type="button"
                 onClick={closeEditModal}
                 disabled={saving}
-                className="rounded-lg border border-[var(--border)] px-4 py-2 text-sm font-medium text-[var(--foreground)] transition hover:bg-[var(--surface-secondary)] disabled:opacity-50"
+                className="rounded-lg border border-border px-4 py-2 text-sm font-medium text-foreground transition hover:bg-surface-secondary disabled:opacity-50"
               >
                 Cancelar
               </button>
@@ -895,7 +831,7 @@ export default function ClientesPage() {
               <button
                 type="submit"
                 disabled={saving}
-                className="inline-flex items-center gap-2 rounded-lg bg-[var(--primary)] px-4 py-2 text-sm font-medium !text-white transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
+                className="inline-flex items-center gap-2 rounded-lg bg-brand-900 px-4 py-2 text-sm font-medium !text-white transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
               >
                 {saving && (
                   <RefreshCw className="size-4 animate-spin" />
@@ -952,7 +888,7 @@ function ClientField({
 }: ClientFieldProps) {
   return (
     <label className="block">
-      <span className="text-sm font-medium text-[var(--foreground)]">
+      <span className="text-sm font-medium text-foreground">
         {label}
         {required && (
           <span className="ml-1 text-red-500">*</span>
@@ -968,11 +904,11 @@ function ClientField({
         minLength={minLength}
         placeholder={placeholder}
         autoFocus={autoFocus}
-        className="mt-1.5 h-10 w-full rounded-lg border border-[var(--border)] bg-[var(--background)] px-3 text-sm text-[var(--foreground)] outline-none transition placeholder:text-[var(--foreground-muted)] focus:border-[var(--primary)] disabled:cursor-not-allowed disabled:bg-[var(--surface-secondary)] disabled:opacity-70"
+        className="mt-1.5 h-10 w-full rounded-lg border border-border bg-[var(--background)] px-3 text-sm text-foreground outline-none transition placeholder:text-foreground-muted focus:border-brand-900 disabled:cursor-not-allowed disabled:bg-surface-secondary disabled:opacity-70"
       />
 
       {hint && (
-        <p className="mt-1.5 text-xs text-[var(--foreground-muted)]">
+        <p className="mt-1.5 text-xs text-foreground-muted">
           {hint}
         </p>
       )}

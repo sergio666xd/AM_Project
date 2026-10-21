@@ -15,6 +15,8 @@ import {
 import { useSession } from "@/context/SessionContext";
 import { SecurityChangeButton } from "@/components/security/SecurityChangeButton";
 import PushDeviceManager from "@/components/push/PushDeviceManager";
+import { PageHeader } from "@/components/ui/PageHeader";
+import { Button } from "@/components/ui/Button";
 
 const TIPOS_MENSAJE = [
   { id: "ACCESO", label: "Acceso y cuenta" },
@@ -117,38 +119,27 @@ export default function ConfiguracionAbogadoPage() {
   return (
     <section className="mx-auto w-full max-w-5xl space-y-8 px-4 py-6 sm:px-6 lg:px-8">
       {/* Encabezado */}
-      <header className="flex flex-col gap-5 sm:flex-row sm:items-end sm:justify-between">
-        <div>
-          <div className="mb-2 flex items-center gap-2 text-sm text-[var(--foreground-muted)]">
-            <Settings className="size-4" />
-            <span>Mi cuenta</span>
+      <PageHeader
+        overline="Mi cuenta"
+        title="Configuración"
+        description="Personaliza las preferencias de tu cuenta y define cómo deseas recibir las alertas de tu despacho."
+        action={
+          <div className="hidden rounded-[var(--radius-lg)] border border-border bg-surface px-4 py-2 text-right sm:block">
+            <p className="text-xs font-medium uppercase tracking-wide text-foreground-muted">
+              Cuenta
+            </p>
+            <p className="mt-0.5 text-sm font-medium text-foreground">
+              {user?.email || "Usuario"}
+            </p>
           </div>
-
-          <h1 className="text-3xl font-semibold tracking-tight text-[var(--foreground)]">
-            Configuración
-          </h1>
-
-          <p className="mt-2 max-w-2xl text-sm text-[var(--foreground-muted)]">
-            Personaliza las preferencias de tu cuenta y define cómo deseas
-            recibir las alertas de tu despacho.
-          </p>
-        </div>
-
-        <div className="hidden rounded-xl border border-[var(--border)] bg-[var(--surface)] px-4 py-3 sm:block">
-          <p className="text-xs font-medium uppercase tracking-wide text-[var(--foreground-muted)]">
-            Cuenta
-          </p>
-          <p className="mt-1 text-sm font-medium text-[var(--foreground)]">
-            {user?.email || "Usuario"}
-          </p>
-        </div>
-      </header>
+        }
+      />
 
       {/* Mensajes */}
       {error && (
         <div
           role="alert"
-          className="rounded-xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-700 dark:text-red-400"
+          className="rounded-[var(--radius-lg)] border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-700 dark:text-red-400"
         >
           {error}
         </div>
@@ -157,7 +148,7 @@ export default function ConfiguracionAbogadoPage() {
       {message && (
         <div
           role="status"
-          className="flex items-center gap-3 rounded-xl border border-emerald-500/30 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-700 dark:text-emerald-400"
+          className="flex items-center gap-3 rounded-[var(--radius-lg)] border border-emerald-500/30 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-700 dark:text-emerald-400"
         >
           <div className="flex size-7 shrink-0 items-center justify-center rounded-full bg-emerald-500/15">
             <Check className="size-4" />
@@ -168,19 +159,19 @@ export default function ConfiguracionAbogadoPage() {
       )}
 
       {/* Notificaciones */}
-      <section className="overflow-hidden rounded-2xl border border-[var(--border)] bg-[var(--surface)] shadow-sm">
+      <section className="overflow-hidden rounded-[var(--radius-xl)] border border-border bg-surface shadow-sm">
         {/* Cabecera de sección */}
-        <div className="flex items-start gap-4 border-b border-[var(--border)] p-5 sm:p-6">
-          <div className="flex size-11 shrink-0 items-center justify-center rounded-xl bg-[var(--primary)]/10">
-            <Bell className="size-5 text-[var(--primary)]" />
+        <div className="flex items-start gap-4 border-b border-border p-5 sm:p-6">
+          <div className="flex size-11 shrink-0 items-center justify-center rounded-[var(--radius-lg)] bg-brand-900/10">
+            <Bell className="size-5 text-brand-900" />
           </div>
 
           <div>
-            <h2 className="text-base font-semibold text-[var(--foreground)]">
+            <h2 className="text-base font-semibold text-foreground">
               Notificaciones
             </h2>
 
-            <p className="mt-1 text-sm leading-6 text-[var(--foreground-muted)]">
+            <p className="mt-1 text-sm leading-6 text-foreground-muted">
               Controla los canales mediante los cuales recibirás avisos
               relacionados con la gestión de tus procesos.
             </p>
@@ -190,10 +181,10 @@ export default function ConfiguracionAbogadoPage() {
         {/* Opciones */}
         {user?.rol === "CLIENTE" ? (
           <fieldset className="space-y-3 p-5 sm:p-6">
-            <legend className="text-sm font-semibold text-[var(--foreground)]">
+            <legend className="text-sm font-semibold text-foreground">
               Canales para tus alertas
             </legend>
-            <label className="flex cursor-pointer items-center gap-3 rounded-lg border border-[var(--border)] p-4">
+            <label className="flex cursor-pointer items-center gap-3 rounded-lg border border-border p-4">
               <input
                 type="checkbox"
                 checked={clientChannels.email}
@@ -202,7 +193,7 @@ export default function ConfiguracionAbogadoPage() {
               <Mail className="size-4" />
               <span className="text-sm">Correo · {user.email}</span>
             </label>
-            <label className={`flex items-center gap-3 rounded-lg border border-[var(--border)] p-4 ${user.whatsapp_numero ? "cursor-pointer" : "cursor-not-allowed opacity-50"}`}>
+            <label className={`flex items-center gap-3 rounded-lg border border-border p-4 ${user.whatsapp_numero ? "cursor-pointer" : "cursor-not-allowed opacity-50"}`}>
               <input
                 type="checkbox"
                 checked={clientChannels.whatsapp}
@@ -214,7 +205,7 @@ export default function ConfiguracionAbogadoPage() {
             </label>
           </fieldset>
         ) : (
-          <div className="divide-y divide-[var(--border)]">
+          <div className="divide-y divide-border">
             {TIPOS_MENSAJE.map(({ id, label }) => {
               const whatsappPlanFlag = WHATSAPP_PLAN_FLAGS[id];
               const whatsappAvailable = Boolean(user?.whatsapp_numero)
@@ -223,8 +214,8 @@ export default function ConfiguracionAbogadoPage() {
                   || user.plan?.[whatsappPlanFlag as keyof NonNullable<typeof user.plan>] === true);
               return (
                 <fieldset key={id} className="grid gap-3 p-5 sm:grid-cols-[minmax(0,1fr)_auto_auto] sm:items-center sm:px-6">
-                  <legend className="font-medium text-[var(--foreground)]">{label}</legend>
-                  <label className="flex items-center gap-2 text-sm text-[var(--foreground-muted)]">
+                  <legend className="font-medium text-foreground">{label}</legend>
+                  <label className="flex items-center gap-2 text-sm text-foreground-muted">
                     <input
                       type="checkbox"
                       checked={preferences[id].email}
@@ -236,7 +227,7 @@ export default function ConfiguracionAbogadoPage() {
                     <Mail className="size-4" />
                     Email
                   </label>
-                  <label className={`flex items-center gap-2 text-sm text-[var(--foreground-muted)] ${whatsappAvailable ? "" : "cursor-not-allowed opacity-50"}`}>
+                  <label className={`flex items-center gap-2 text-sm text-foreground-muted ${whatsappAvailable ? "" : "cursor-not-allowed opacity-50"}`}>
                     <input
                       type="checkbox"
                       checked={preferences[id].whatsapp}
@@ -250,7 +241,7 @@ export default function ConfiguracionAbogadoPage() {
                     WhatsApp
                   </label>
                   {!whatsappAvailable && (
-                    <p className="text-xs text-[var(--foreground-muted)] sm:col-start-2 sm:col-span-2">
+                    <p className="text-xs text-foreground-muted sm:col-start-2 sm:col-span-2">
                       {!user?.whatsapp_numero
                         ? "Configura un número de WhatsApp para activar este canal."
                         : "El plan actual no habilita WhatsApp para esta notificación."}
@@ -263,8 +254,8 @@ export default function ConfiguracionAbogadoPage() {
         )}
 
         {/* Footer */}
-        <div className="flex flex-col gap-3 border-t border-[var(--border)] bg-[var(--surface-secondary)] p-5 sm:flex-row sm:items-center sm:justify-between sm:p-6">
-          <div className="text-xs leading-5 text-[var(--foreground-muted)]">
+        <div className="flex flex-col gap-3 border-t border-border bg-surface-secondary p-5 sm:flex-row sm:items-center sm:justify-between sm:p-6">
+          <div className="text-xs leading-5 text-foreground-muted">
             {user?.rol === "CLIENTE"
               ? "Recibirás todas las alertas que te correspondan en el canal elegido."
               : "Cada tipo aplica sus canales de forma independiente."}
@@ -274,7 +265,7 @@ export default function ConfiguracionAbogadoPage() {
             type="button"
             onClick={() => void save()}
             disabled={saving}
-            className="inline-flex items-center justify-center gap-2 rounded-xl bg-[var(--primary)] px-5 py-2.5 text-sm font-medium !text-white shadow-sm transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
+            className="inline-flex items-center justify-center gap-2 rounded-[var(--radius-lg)] bg-brand-900 px-5 py-2.5 text-sm font-medium !text-white shadow-sm transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
           >
             <Save className="size-4" />
             {saving ? "Guardando…" : "Guardar preferencias"}
@@ -283,18 +274,18 @@ export default function ConfiguracionAbogadoPage() {
       </section>
 
       {/* Dispositivos Push */}
-      <section className="rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-5 sm:p-6">
+      <section className="rounded-[var(--radius-xl)] border border-border bg-surface p-5 sm:p-6">
         <PushDeviceManager />
       </section>
 
       {/* Información de cuenta */}
-      <section className="rounded-2xl border border-[var(--border)] bg-[var(--surface)]">
-        <div className="border-b border-[var(--border)] px-5 py-5 sm:px-6">
-          <h2 className="text-base font-semibold text-[var(--foreground)]">
+      <section className="rounded-[var(--radius-xl)] border border-border bg-surface">
+        <div className="border-b border-border px-5 py-5 sm:px-6">
+          <h2 className="text-base font-semibold text-foreground">
             Información de la cuenta
           </h2>
 
-          <p className="mt-1 text-sm text-[var(--foreground-muted)]">
+          <p className="mt-1 text-sm text-foreground-muted">
             Datos actualmente asociados a tu cuenta.
           </p>
         </div>
@@ -322,10 +313,10 @@ export default function ConfiguracionAbogadoPage() {
         </div>
       </section>
 
-      <section className="space-y-5 rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-5 sm:p-6">
+      <section className="space-y-5 rounded-[var(--radius-xl)] border border-border bg-surface p-5 sm:p-6">
         <div>
-          <h2 className="text-base font-semibold text-[var(--foreground)]">Seguridad de la cuenta</h2>
-          <p className="mt-1 text-sm text-[var(--foreground-muted)]">Confirma con un código enviado a tus datos actuales antes de cambiar correo, WhatsApp o contraseña.</p>
+          <h2 className="text-base font-semibold text-foreground">Seguridad de la cuenta</h2>
+          <p className="mt-1 text-sm text-foreground-muted">Confirma con un código enviado a tus datos actuales antes de cambiar correo, WhatsApp o contraseña.</p>
         </div>
         <div className="flex flex-wrap gap-3">
           <SecurityChangeButton action="email" title="Cambiar correo" token={token} whatsappAvailable={Boolean(user?.whatsapp_numero)} onComplete={refreshUser} />
@@ -345,12 +336,12 @@ function AccountField({
   value: string;
 }) {
   return (
-    <div className="rounded-xl border border-[var(--border)] bg-[var(--surface-secondary)] p-4">
-      <p className="text-xs font-medium uppercase tracking-wide text-[var(--foreground-muted)]">
+    <div className="rounded-[var(--radius-lg)] border border-border bg-surface-secondary p-4">
+      <p className="text-xs font-medium uppercase tracking-wide text-foreground-muted">
         {label}
       </p>
 
-      <p className="mt-2 truncate text-sm font-medium text-[var(--foreground)]">
+      <p className="mt-2 truncate text-sm font-medium text-foreground">
         {value}
       </p>
     </div>

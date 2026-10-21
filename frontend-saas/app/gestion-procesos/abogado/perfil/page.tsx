@@ -7,6 +7,8 @@ import { FormEvent, useState } from "react";
 import { SecurityChangeButton } from "@/components/security/SecurityChangeButton";
 import { Mail, Phone, Save, ShieldCheck, UserRound } from "lucide-react";
 import { useSession } from "@/context/SessionContext";
+import { PageHeader } from "@/components/ui/PageHeader";
+import { Button } from "@/components/ui/Button";
 
 
 export default function PerfilAbogadoPage() {
@@ -86,32 +88,16 @@ export default function PerfilAbogadoPage() {
   return (
     <section className="mx-auto max-w-5xl space-y-6 px-4 py-6 sm:px-6 lg:px-8">
       {/* ENCABEZADO */}
-      <header>
-        <p
-          className="text-sm"
-          style={{ color: "var(--foreground-muted)" }}
-        >
-          Mi cuenta
-        </p>
-
-        <h1
-          className="text-3xl font-semibold tracking-tight"
-          style={{ color: "var(--foreground)" }}
-        >
-          Mi perfil
-        </h1>
-
-        <p
-          className="mt-1 text-sm"
-          style={{ color: "var(--foreground-muted)" }}
-        >
-          Administra tus datos personales y la seguridad de tu
-          cuenta.
-        </p>
-        <Link href="/gestion-procesos/abogado/configuracion" className="mt-2 inline-block text-sm font-medium text-[var(--primary)] underline">
-          Cambiar correo, WhatsApp o contraseña con verificación
-        </Link>
-      </header>
+      <PageHeader
+        overline="Mi cuenta"
+        title="Mi perfil"
+        description="Administra tus datos personales y la seguridad de tu cuenta."
+        action={
+          <Link href="/gestion-procesos/abogado/configuracion" className="text-sm font-medium text-brand-900 underline hover:text-brand-800">
+            Cambiar correo, WhatsApp o contraseña
+          </Link>
+        }
+      />
 
       {/* PERFIL */}
       <div className="grid gap-6 lg:grid-cols-[280px_minmax(0,1fr)]">
@@ -350,25 +336,15 @@ export default function PerfilAbogadoPage() {
             </fieldset>
           </div>
 
-          <div
-            className="flex justify-end border-t px-5 py-4"
-            style={{ borderColor: "var(--border)" }}
-          >
-            <button
+          <div className="flex justify-end border-t border-border px-5 py-4">
+            <Button
               type="submit"
-              disabled={savingProfile}
-              className="inline-flex items-center gap-2 rounded-lg px-4 py-2.5 text-sm font-medium transition disabled:cursor-not-allowed disabled:opacity-50"
-              style={{
-                background: "var(--primary)",
-                color: "var(--primary-foreground)",
-              }}
+              variant="primary"
+              loading={savingProfile}
+              icon={<Save className="size-4" />}
             >
-              <Save size={17} />
-
-              {savingProfile
-                ? "Guardando..."
-                : "Guardar cambios"}
-            </button>
+              {savingProfile ? "Guardando..." : "Guardar cambios"}
+            </Button>
           </div>
         </form>
       </div>
