@@ -6,7 +6,9 @@ import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { useSession } from "@/context/SessionContext";
 
+import { MobileTabBar, OPEN_MOBILE_NAV_EVENT, type MobileTab } from "./MobileTabBar";
 import {
+  BarChart3,
   Bell,
   CalendarDays,
   ChevronDown,
@@ -17,11 +19,8 @@ import {
   LayoutDashboard,
   ListChecks,
   LogOut,
-  Menu,
   MessageCircle,
   Moon,
-  PanelLeftClose,
-  PanelLeftOpen,
   RefreshCw,
   ScrollText,
   Settings,
@@ -54,27 +53,32 @@ interface SidebarProps {
 function getLawyerSections(isFirmAdmin: boolean): MenuSection[] {
   return [
     {
-      title: "Trabajo",
+      title: "Mi día",
       items: [
         { label: "Resumen", href: "/gestion-procesos/abogado", icon: LayoutDashboard },
-        { label: "Procesos", href: "/gestion-procesos/abogado/procesos", icon: FolderOpen },
-        { label: "Clientes", href: "/gestion-procesos/abogado/clientes", icon: Users },
-        { label: "Tareas", href: "/gestion-procesos/abogado/tareas", icon: ListChecks },
         { label: "Agenda", href: "/gestion-procesos/abogado/agenda", icon: CalendarDays },
+        { label: "Tareas", href: "/gestion-procesos/abogado/tareas", icon: ListChecks },
       ],
     },
     {
       title: "Expedientes",
       items: [
+        { label: "Procesos", href: "/gestion-procesos/abogado/procesos", icon: FolderOpen },
         { label: "Radicados", href: "/gestion-procesos/abogado/radicados", icon: RefreshCw },
         { label: "Documentos", href: "/gestion-procesos/abogado/documentos", icon: FileText },
-        ...(isFirmAdmin ? [{ label: "Contratos", href: "/gestion-procesos/abogado/contratos", icon: FileText }] : []),
+        ...(isFirmAdmin ? [{ label: "Contratos", href: "/gestion-procesos/abogado/contratos", icon: ScrollText }] : []),
+      ],
+    },
+    {
+      title: "Clientes",
+      items: [
+        { label: "Clientes", href: "/gestion-procesos/abogado/clientes", icon: Users },
+        { label: "Solicitudes de perfil", href: "/gestion-procesos/abogado/solicitudes-perfil", icon: UserCheck },
       ],
     },
     {
       title: "Comunicación",
       items: [
-        { label: "Solicitudes de perfil", href: "/gestion-procesos/abogado/solicitudes-perfil", icon: UserCheck },
         { label: "Chat", href: "/gestion-procesos/abogado/chat", icon: MessageCircle },
         { label: "Notificaciones", href: "/gestion-procesos/abogado/notificaciones", icon: Bell },
       ],
@@ -82,7 +86,7 @@ function getLawyerSections(isFirmAdmin: boolean): MenuSection[] {
     {
       title: "Cuenta",
       items: [
-        ...(isFirmAdmin ? [{ label: "Métricas", href: "/gestion-procesos/abogado/metricas", icon: LayoutDashboard }] : []),
+        ...(isFirmAdmin ? [{ label: "Métricas", href: "/gestion-procesos/abogado/metricas", icon: BarChart3 }] : []),
         { label: "Perfil", href: "/gestion-procesos/abogado/perfil", icon: User },
         { label: "Configuración", href: "/gestion-procesos/abogado/configuracion", icon: Settings },
       ],
@@ -92,20 +96,10 @@ function getLawyerSections(isFirmAdmin: boolean): MenuSection[] {
 
 const clientSections: MenuSection[] = [
   {
-    title: "Inicio",
+    title: "Mi caso",
     items: [
       { label: "Inicio", href: "/gestion-procesos/cliente", icon: LayoutDashboard },
-    ],
-  },
-  {
-    title: "Mis asuntos",
-    items: [
       { label: "Mis procesos", href: "/gestion-procesos/cliente/procesos", icon: FolderOpen },
-    ],
-  },
-  {
-    title: "Pendientes",
-    items: [
       { label: "Mis tareas", href: "/gestion-procesos/cliente/tareas", icon: ListChecks },
       { label: "Documentos", href: "/gestion-procesos/cliente/documentos", icon: FileText },
       { label: "Calendario", href: "/gestion-procesos/cliente/calendario", icon: CalendarDays },
@@ -128,11 +122,26 @@ const clientSections: MenuSection[] = [
   },
 ];
 
+const lawyerTabs: MobileTab[] = [
+  { label: "Inicio", href: "/gestion-procesos/abogado", icon: LayoutDashboard },
+  { label: "Procesos", href: "/gestion-procesos/abogado/procesos", icon: FolderOpen },
+  { label: "Tareas", href: "/gestion-procesos/abogado/tareas", icon: ListChecks },
+  { label: "Agenda", href: "/gestion-procesos/abogado/agenda", icon: CalendarDays },
+];
+
+const clientTabs: MobileTab[] = [
+  { label: "Inicio", href: "/gestion-procesos/cliente", icon: LayoutDashboard },
+  { label: "Procesos", href: "/gestion-procesos/cliente/procesos", icon: FolderOpen },
+  { label: "Tareas", href: "/gestion-procesos/cliente/tareas", icon: ListChecks },
+  { label: "Chat", href: "/gestion-procesos/cliente/chat", icon: MessageCircle },
+];
+
 const saasMenuItems: MenuItem[] = [
   { label: "Resumen", href: "/gestion-procesos/dashboard", icon: LayoutDashboard },
   { label: "Radicados", href: "/gestion-procesos/dashboard/radicados", icon: RefreshCw },
   { label: "Tareas", href: "/gestion-procesos/dashboard/tareas", icon: ListChecks },
 ];
+const saasTabs: MobileTab[] = saasMenuItems;
 
 function normalizePath(path: string): string {
   if (!path) return "/";
@@ -217,7 +226,16 @@ export default function Sidebar({ variant }: SidebarProps) {
       .join("")
       .toUpperCase() || "U";
 
+  const tabs = variant === "client" ? clientTabs : variant === "lawyer" ? lawyerTabs : saasTabs;
+  const isChatPage = pathname.split("/").includes("chat");
+
   useEffect(() => { document.documentElement.classList.toggle("dark", darkMode); }, [darkMode]);
+
+  useEffect(() => {
+    const open = () => setMobileOpen(true);
+    window.addEventListener(OPEN_MOBILE_NAV_EVENT, open);
+    return () => window.removeEventListener(OPEN_MOBILE_NAV_EVENT, open);
+  }, []);
 
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
@@ -267,23 +285,6 @@ export default function Sidebar({ variant }: SidebarProps) {
 
   return (
     <>
-      {/* Mobile header bar */}
-      <div className="fixed inset-x-0 top-0 z-40 flex h-[var(--header-height)] items-center border-b border-border bg-surface px-4 md:hidden">
-        <button
-          type="button"
-          onClick={() => setMobileOpen(true)}
-          aria-expanded={mobileOpen}
-          aria-controls="app-navigation"
-          className="grid size-9 place-items-center rounded-[var(--radius-md)] text-foreground-secondary hover:bg-surface-hover"
-          aria-label="Abrir menú"
-        >
-          <Menu className="size-5" />
-        </button>
-        <Link href={homeHref} className="ml-3 flex items-center gap-2">
-          <Image src={logoSrc} alt="AM" width={120} height={32} className="h-6 w-auto" />
-        </Link>
-      </div>
-
       {/* Mobile backdrop */}
       {mobileOpen && (
         <button
@@ -380,6 +381,8 @@ export default function Sidebar({ variant }: SidebarProps) {
           )}
         </div>
       </aside>
+
+      {!isChatPage && <MobileTabBar tabs={tabs} homeHref={tabs[0].href} />}
     </>
   );
 }

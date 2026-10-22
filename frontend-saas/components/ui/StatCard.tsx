@@ -26,9 +26,9 @@ export function StatCard({
 }) {
   const toneClasses: Record<string, string> = {
     default: "border-border",
-    warning: "border-l-warning border-l-[3px]",
-    danger: "border-l-danger border-l-[3px]",
-    success: "border-l-success border-l-[3px]",
+    warning: "border-border border-l-warning border-l-[3px]",
+    danger: "border-border border-l-danger border-l-[3px]",
+    success: "border-border border-l-success border-l-[3px]",
   };
 
   const iconTones: Record<string, string> = {
@@ -44,15 +44,15 @@ export function StatCard({
   return (
     <Wrapper
       {...wrapperProps}
-      className={`group flex items-start gap-4 rounded-[var(--radius-lg)] border bg-surface p-4 shadow-xs transition-shadow ${href ? "hover:shadow-sm" : ""} ${toneClasses[tone]}`}
+      className={`group flex min-w-0 flex-col gap-2 rounded-[var(--radius-lg)] border bg-surface p-3 shadow-xs transition-shadow sm:flex-row sm:items-start sm:gap-4 sm:p-4 ${href ? "hover:shadow-sm" : ""} ${toneClasses[tone]}`}
     >
       {Icon && (
-        <span className={`mt-0.5 grid size-9 shrink-0 place-items-center rounded-[var(--radius-md)] bg-brand-50 ${iconTones[tone]}`}>
+        <span className={`grid size-8 shrink-0 place-items-center sm:mt-0.5 sm:size-9 rounded-[var(--radius-md)] bg-brand-50 ${iconTones[tone]}`}>
           <Icon aria-hidden="true" className="size-[18px]" />
         </span>
       )}
       <div className="min-w-0 flex-1">
-        <p className="text-xs font-medium text-foreground-muted">{label}</p>
+        <p className="text-xs font-medium leading-snug text-foreground-muted">{label}</p>
         <p className="mt-0.5 text-xl font-bold tracking-tight text-foreground">{value}</p>
         {detail && (
           <p className="mt-0.5 text-xs text-foreground-muted">{detail}</p>

@@ -40,7 +40,7 @@ export function Badge({
 }: HTMLAttributes<HTMLSpanElement> & { tone?: StatusTone }) {
   return (
     <span
-      className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold leading-5 ${tones[tone]} ${className}`}
+      className={`inline-flex items-center whitespace-nowrap rounded-full px-2.5 py-0.5 text-xs font-semibold leading-5 ${tones[tone]} ${className}`}
       {...props}
     />
   );

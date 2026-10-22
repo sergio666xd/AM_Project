@@ -6,7 +6,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { ArrowLeft, CalendarDays, Check, CheckCheck, ClipboardList, FileText, FolderOpen, Gavel, Link2, Loader2, MessageCircle, Send, Users, X } from "lucide-react";
 import { useSession } from "@/context/SessionContext";
 import { apiRequest } from "@/lib/api";
-import { preserveChatList, upsertChat } from "@/components/chat/chatListState";
+import { chatListEndpoint, preserveChatList, upsertChat } from "@/components/chat/chatListState";
 
 type Chat = { id: number; clave: string; route_key: string; tipo: string; titulo: string; subtitulo: string; href: string; no_leidos: number; primer_no_leido_id?: number | null; updated_at: string; proceso_id?: number | null; ultimo_mensaje?: string | null; ultimo_remitente?: string | null; en_linea?: boolean; participantes_en_linea?: number };
 type Message = { id: number; contenido: string; remitente_id: number | null; remitente: string; es_mio: boolean; created_at: string; estado_entrega?: "ENVIADO" | "ENTREGADO" | "ENTREGADO_PARCIAL" | "LEIDO"; entregados?: number; leidos?: number; destinatarios?: number; referencia: { tipo: string; id: number; titulo: string; url: string } | null };
@@ -157,6 +157,8 @@ export function renderMessageMarkdown(value: string): ReactNode {
   return <div className="space-y-1">{blocks}</div>;
 }
 
+const MESSAGE_PAGE_SIZE = 30;
+
 export default function ChatWorkspace() {
   const { user, token } = useSession();
   const pathname = usePathname();
@@ -181,7 +183,11 @@ export default function ChatWorkspace() {
   const [incomingAnnouncement, setIncomingAnnouncement] = useState("");
   const [newMessagesStartId, setNewMessagesStartId] = useState<number | null>(null);
   const [resolvedConversationId, setResolvedConversationId] = useState<number | null>(null);
+  const [hasOlderMessages, setHasOlderMessages] = useState(false);
+  const [loadingOlder, setLoadingOlder] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
+  const messageListRef = useRef<HTMLDivElement>(null);
+  const restoreScrollRef = useRef<number | null>(null);
   const followLatestRef = useRef(true);
   const [showLatestMessage, setShowLatestMessage] = useState(false);
   const composerRef = useRef<HTMLTextAreaElement>(null);
@@ -241,7 +247,7 @@ export default function ChatWorkspace() {
   const loadChats = useCallback(async () => {
     if (!token) return;
     try {
-      const response = await apiRequest("/api/chat/conversaciones", { token });
+      const response = await apiRequest(chatListEndpoint(), { token });
       const incoming = await response.json() as Chat[];
       setChats((current) => preserveChatList(current, incoming));
       setListError("");
@@ -254,14 +260,15 @@ export default function ChatWorkspace() {
     if (!token || !activeKey || document.visibilityState !== "visible") return;
     try {
       const after = reset ? 0 : messageIdRef.current;
-      const response = await apiRequest(`/api/chat/resolver?clave=${encodeURIComponent(activeKey)}&after_id=${after}`, { token });
-      const result = await response.json() as { conversacion: Chat; mensajes: Message[]; estados_mensajes?: ({ id: number } & DeliveryStatus)[] };
+      const response = await apiRequest(`/api/chat/resolver?clave=${encodeURIComponent(activeKey)}&after_id=${after}&limite=${MESSAGE_PAGE_SIZE}`, { token });
+      const result = await response.json() as { conversacion: Chat; mensajes: Message[]; hay_mas?: boolean; estados_mensajes?: ({ id: number } & DeliveryStatus)[] };
       if (activeKeyRef.current !== activeKey) return;
       setResolvedConversationId(result.conversacion.id);
       setChats((current) => upsertChat(current, result.conversacion));
       const statuses = new Map((result.estados_mensajes ?? []).map(({ id, ...status }) => [id, status]));
       if (reset) {
         setMessages(result.mensajes.map((item) => ({ ...item, ...statuses.get(item.id) })));
+        setHasOlderMessages(!!result.hay_mas);
         setNewMessagesStartId(result.conversacion.primer_no_leido_id ?? null);
         messageIdRef.current = result.mensajes.at(-1)?.id ?? 0;
       } else if (result.mensajes.length || statuses.size) {
@@ -297,6 +304,36 @@ export default function ChatWorkspace() {
     }
   }, [activeKey, isFirmChat, token]);
 
+  const loadOlderMessages = useCallback(async () => {
+    const oldest = messages[0]?.id;
+    if (!token || !activeKey || !oldest || loadingOlder || !hasOlderMessages) return;
+    setLoadingOlder(true);
+    try {
+      const response = await apiRequest(`/api/chat/resolver?clave=${encodeURIComponent(activeKey)}&before_id=${oldest}&limite=${MESSAGE_PAGE_SIZE}`, { token });
+      const result = await response.json() as { mensajes: Message[]; hay_mas?: boolean };
+      if (activeKeyRef.current !== activeKey) return;
+      const element = messageListRef.current;
+      restoreScrollRef.current = element ? element.scrollHeight - element.scrollTop : null;
+      setMessages((current) => {
+        const known = new Set(current.map((item) => item.id));
+        return [...result.mensajes.filter((item) => !known.has(item.id)), ...current];
+      });
+      setHasOlderMessages(!!result.hay_mas);
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "No se pudieron cargar los mensajes anteriores.");
+    } finally {
+      setLoadingOlder(false);
+    }
+  }, [activeKey, hasOlderMessages, loadingOlder, messages, token]);
+
+  // Al anteponer mensajes antiguos se conserva lo que el usuario estaba leyendo.
+  useLayoutEffect(() => {
+    const element = messageListRef.current;
+    if (restoreScrollRef.current === null || !element) return;
+    element.scrollTop = element.scrollHeight - restoreScrollRef.current;
+    restoreScrollRef.current = null;
+  }, [messages]);
+
   useEffect(() => {
     if (!token) return;
     void loadChats();
@@ -307,7 +344,7 @@ export default function ChatWorkspace() {
   }, [token, loadChats, loadMessages]);
 
   useEffect(() => {
-    setMessages([]); messageIdRef.current = 0; setResolvedConversationId(null); setLoading(!!activeKey); setError(""); setReferenceId(""); setIncomingAnnouncement(""); setNewMessagesStartId(null);
+    setMessages([]); messageIdRef.current = 0; setResolvedConversationId(null); setLoading(!!activeKey); setError(""); setReferenceId(""); setIncomingAnnouncement(""); setNewMessagesStartId(null); setHasOlderMessages(false);
     followLatestRef.current = true; setShowLatestMessage(false);
     readAckRef.current = { key: activeKey, messageId: 0 };
     if (activeKey) void loadMessages(true);
@@ -343,17 +380,20 @@ export default function ChatWorkspace() {
     return () => { cancelled = true; };
   }, [activeChat?.id, activeKey, canAttachReference, processId, referenceReload, token]);
 
+  // Solo un mensaje nuevo al final mueve el scroll; cargar historial arriba no.
+  const latestMessageId = messages.at(-1)?.id;
   useEffect(() => {
-    if (!messages.length) return;
+    if (!latestMessageId) return;
     if (!isFirmChat || followLatestRef.current) bottomRef.current?.scrollIntoView({ behavior: "smooth" });
     else setShowLatestMessage(true);
-  }, [isFirmChat, messages.length]);
+  }, [isFirmChat, latestMessageId]);
 
   function handleMessageScroll(event: UIEvent<HTMLDivElement>) {
     const element = event.currentTarget;
     const atLatest = element.scrollHeight - element.scrollTop - element.clientHeight < 80;
     followLatestRef.current = atLatest;
     setShowLatestMessage(!atLatest);
+    if (element.scrollTop < 120) void loadOlderMessages();
   }
 
   useLayoutEffect(() => {
@@ -473,7 +513,7 @@ export default function ChatWorkspace() {
       {activeKey && activeChat ? <>
         <header className="flex min-h-16 items-center gap-3 border-b border-border bg-surface px-3 py-2 md:px-5"><button type="button" onClick={() => router.push(root)} className="rounded-full p-2 hover:bg-surface-hover md:hidden" aria-label="Volver a conversaciones"><ArrowLeft className="size-5" /></button><span className="grid size-10 shrink-0 place-items-center rounded-full bg-primary/10 text-primary">{activeChat.tipo === "PROCESO_COLABORADORES" ? <Users className="size-5" /> : <MessageCircle className="size-5" />}</span><div className="min-w-0"><h2 className="truncate text-sm font-semibold">{activeChat.titulo}</h2><p className="truncate text-xs text-(--foreground-muted)">{activeChat.subtitulo}</p></div><span className="ml-auto flex items-center gap-1 text-[10px] text-(--foreground-muted)">{activeChat.tipo === "PROCESO_COLABORADORES" ? activeChat.participantes_en_linea ? `${activeChat.participantes_en_linea} en línea` : "Nadie en línea" : activeChat.en_linea ? "En línea" : "Desconectado"}</span></header>
         {isFirmChat && <p className="sr-only" aria-live="polite" aria-atomic="true">{incomingAnnouncement}</p>}
-        <div onScroll={handleMessageScroll} className="min-h-0 flex-1 overflow-y-auto px-3 py-4 md:px-8 md:py-6">{loading ? <div className="grid h-full place-items-center"><Loader2 className="size-6 animate-spin text-primary" /></div> : messages.length ? <div className="mx-auto flex max-w-3xl flex-col gap-0">{messages.map((message, index) => {
+        <div ref={messageListRef} onScroll={handleMessageScroll} className="min-h-0 flex-1 overflow-y-auto px-3 py-4 md:px-8 md:py-6">{loading ? <div className="grid h-full place-items-center"><Loader2 className="size-6 animate-spin text-primary" /></div> : messages.length ? <div className="mx-auto flex max-w-3xl flex-col gap-0">{hasOlderMessages ? <div className="mb-3 flex justify-center"><button type="button" onClick={() => void loadOlderMessages()} disabled={loadingOlder} className="inline-flex items-center gap-2 rounded-full border border-border bg-surface px-3 py-1 text-xs text-foreground-secondary hover:bg-surface-hover disabled:opacity-60">{loadingOlder ? <Loader2 className="size-3.5 animate-spin" /> : null}{loadingOlder ? "Cargando mensajes…" : "Ver mensajes anteriores"}</button></div> : <p className="mb-3 text-center text-[11px] text-(--foreground-muted)">Inicio de la conversación</p>}{messages.map((message, index) => {
           const previous = messages[index - 1];
           const next = messages[index + 1];
           const sameDayAsPrevious = !!previous && dayKey(previous.created_at) === dayKey(message.created_at);

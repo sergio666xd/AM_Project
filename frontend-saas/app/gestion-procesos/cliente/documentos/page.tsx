@@ -81,6 +81,17 @@ export default function DocumentosClientePage() {
 		return () => { active = false; };
 	}, [sessionLoading, token]);
 
+	// Los enlaces #solicitud-N llegan antes de que exista la tarjeta; se desplaza al cargar.
+	useEffect(() => {
+		if (loading || !window.location.hash) return;
+		const target = document.getElementById(decodeURIComponent(window.location.hash.slice(1)));
+		if (!target) return;
+		target.scrollIntoView({ behavior: "smooth", block: "start" });
+		target.classList.add("ring-2", "ring-primary");
+		const timer = window.setTimeout(() => target.classList.remove("ring-2", "ring-primary"), 2500);
+		return () => window.clearTimeout(timer);
+	}, [loading]);
+
 	async function reload() {
 		if (!token) return;
 		setLoading(true);

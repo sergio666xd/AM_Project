@@ -244,7 +244,7 @@ export default function AdminDashboard() {
       />
 
       {/* KPI row */}
-      <section aria-label="Indicadores clave" className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+      <section aria-label="Indicadores clave" className="grid grid-cols-2 gap-2 sm:gap-3 lg:grid-cols-4">
         <StatCard
           label="Usuarios activos"
           value={data.resumen.usuarios_activos.toLocaleString("es-CO")}

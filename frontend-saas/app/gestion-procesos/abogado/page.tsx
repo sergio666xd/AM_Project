@@ -8,7 +8,9 @@ import Link from "next/link";
 
 import {
   AlertCircle,
+  AlertTriangle,
   ArrowRight,
+  CalendarDays,
   CheckCircle2,
   Clock3,
   FileText,
@@ -23,7 +25,6 @@ import TaskMonthCalendar, { type CalendarTask } from "@/components/calendar/Task
 import { PageHeader } from "@/components/ui/PageHeader";
 import { StatCard } from "@/components/ui/StatCard";
 import { Button } from "@/components/ui/Button";
-import { Card } from "@/components/ui/Card";
 
 
 interface SummaryData {
@@ -268,7 +269,15 @@ export default function AbogadoPage() {
       )}
 
       {/* Tarjetas principales */}
-      <div className={`grid grid-cols-1 gap-4 ${isSaasLawyer ? "md:grid-cols-2" : "md:grid-cols-3"}`}>
+      {!isSaasLawyer && firmDashboard ? (
+        <div className="grid grid-cols-2 gap-2 sm:gap-3 lg:grid-cols-4">
+          <StatCard label="Tareas vencidas" value={firmDashboard.resumen.tareas_vencidas} href="/gestion-procesos/abogado/tareas" icon={AlertTriangle} tone={firmDashboard.resumen.tareas_vencidas ? "danger" : "default"} />
+          <StatCard label="Tareas pendientes" value={firmDashboard.resumen.tareas_pendientes} href="/gestion-procesos/abogado/tareas" icon={ListChecks} />
+          <StatCard label="Documentos por revisar" value={firmDashboard.resumen.documentos_pendientes} href="/gestion-procesos/abogado/documentos" icon={FileText} tone={firmDashboard.resumen.documentos_pendientes ? "warning" : "default"} />
+          <StatCard label="Próximos vencimientos" value={firmDashboard.resumen.proximos_eventos} href="/gestion-procesos/abogado/agenda" icon={CalendarDays} />
+        </div>
+      ) : (
+      <div className={`grid grid-cols-3 gap-2 sm:gap-4 ${isSaasLawyer ? "md:grid-cols-2" : "md:grid-cols-3"}`}>
         {cards.map(({ title, value, href, icon }) => (
           <StatCard
             key={href}
@@ -279,11 +288,17 @@ export default function AbogadoPage() {
           />
         ))}
       </div>
+      )}
 
       {!isSaasLawyer && firmDashboard && <section className="space-y-5" aria-label="Centro de trabajo de la firma">
+        <div className="grid gap-5 xl:grid-cols-[1fr_1.2fr]">
+          <section className="overflow-hidden rounded-[var(--radius-lg)] border border-border bg-surface"><header className="flex items-center justify-between border-b border-border px-5 py-4"><div><h2 className="font-semibold">Requiere tu atención</h2><p className="mt-1 text-xs text-foreground-muted">Tareas, documentos, consultas y procesos sin actividad reciente</p></div><Link href="/gestion-procesos/abogado/notificaciones" className="text-xs font-medium text-brand-900 hover:underline">Ver avisos</Link></header>{firmDashboard.atencion.length ? <div className="divide-y divide-border">{firmDashboard.atencion.slice(0, 8).map((item, index) => <Link key={`${item.tipo}-${item.titulo}-${index}`} href={item.href} className="flex items-center justify-between gap-3 px-5 py-3 hover:bg-surface-hover"><span className="min-w-0"><span className="block truncate text-sm font-medium">{item.titulo}</span><span className="mt-1 block text-xs text-foreground-muted">{item.descripcion}</span></span><ArrowRight className="size-4 shrink-0 text-brand-900" /></Link>)}</div> : <p className="px-5 py-8 text-center text-sm text-foreground-muted">No hay elementos que requieran atención ahora.</p>}</section>
+          <section className="overflow-hidden rounded-[var(--radius-lg)] border border-border bg-surface"><header className="border-b border-border px-5 py-4"><h2 className="font-semibold">Actividad reciente</h2><p className="mt-1 text-xs text-foreground-muted">Movimientos recientes de procesos, documentos y tareas.</p></header>{firmDashboard.actividad_reciente.length ? <div className="max-h-[28rem] divide-y divide-border overflow-y-auto">{firmDashboard.actividad_reciente.slice(0, 12).map((item) => <Link key={item.id} href={item.href} className="block px-5 py-3 hover:bg-surface-hover"><div className="flex items-center justify-between gap-3"><p className="truncate text-sm font-medium">{item.titulo}</p><span className="shrink-0 text-[10px] text-foreground-muted">{new Date(item.fecha).toLocaleString("es-CO", { timeZone: "America/Bogota" })}</span></div><p className="mt-1 truncate text-xs text-foreground-muted">{item.proceso} · {item.tipo} · {item.descripcion}</p></Link>)}</div> : <p className="px-5 py-8 text-center text-sm text-foreground-muted">No hay actividad reciente.</p>}</section>
+        </div>
+        <section className="rounded-[var(--radius-lg)] border border-border bg-surface p-4"><h2 className="mb-3 font-semibold">Acciones rápidas</h2><div className="flex flex-wrap gap-2">{firmDashboard.acciones.map((action) => <Link key={action.label} href={action.href} className="rounded-lg border border-border px-3 py-2 text-sm font-medium hover:bg-surface-hover">{action.label}</Link>)}</div></section>
         <details className="rounded-[var(--radius-lg)] border border-border bg-surface p-4">
-          <summary className="flex min-h-11 cursor-pointer items-center justify-between gap-3 font-medium text-foreground">Indicadores del despacho <span className="text-xs font-normal text-foreground-muted">8 métricas</span></summary>
-          <div className="mt-3 grid gap-3 border-t border-border pt-3 sm:grid-cols-2 xl:grid-cols-4">{[
+          <summary className="flex min-h-11 cursor-pointer items-center justify-between gap-3 font-medium text-foreground">Todos los indicadores del despacho <span className="text-xs font-normal text-foreground-muted">8 métricas</span></summary>
+          <div className="mt-3 grid grid-cols-2 gap-2 border-t border-border pt-3 sm:gap-3 xl:grid-cols-4">{[
           ["Procesos activos", firmDashboard.resumen.procesos_activos, "/gestion-procesos/abogado/procesos"],
           ["Tareas pendientes", firmDashboard.resumen.tareas_pendientes, "/gestion-procesos/abogado/tareas"],
           ["Tareas vencidas", firmDashboard.resumen.tareas_vencidas, "/gestion-procesos/abogado/tareas"],
@@ -292,13 +307,8 @@ export default function AbogadoPage() {
           ["Consultas judiciales con error", firmDashboard.resumen.consultas_con_error, "/gestion-procesos/abogado/radicados"],
           ["Próximos vencimientos", firmDashboard.resumen.proximos_eventos, "/gestion-procesos/abogado/agenda"],
           ["Procesos sin actividad", firmDashboard.resumen.procesos_sin_actividad, "/gestion-procesos/abogado/procesos?filtro=ATENCION"],
-          ].map(([label, value, href]) => <Link key={String(label)} href={String(href)} className="rounded-[var(--radius-lg)] border border-border bg-surface p-4 transition hover:border-brand-900/40"><p className="text-sm text-foreground-muted">{label}</p><p className="mt-2 text-2xl font-semibold text-foreground">{value}</p></Link>)}</div>
+          ].map(([label, value, href]) => <Link key={String(label)} href={String(href)} className="rounded-[var(--radius-lg)] border border-border bg-surface p-3 transition hover:border-brand-900/40 sm:p-4"><p className="text-xs leading-snug text-foreground-muted sm:text-sm">{label}</p><p className="mt-1 text-xl font-semibold text-foreground sm:mt-2 sm:text-2xl">{value}</p></Link>)}</div>
         </details>
-        <div className="grid gap-5 xl:grid-cols-[1fr_1.2fr]">
-          <section className="overflow-hidden rounded-[var(--radius-lg)] border border-border bg-surface"><header className="flex items-center justify-between border-b border-border px-5 py-4"><div><h2 className="font-semibold">Requiere tu atención</h2><p className="mt-1 text-xs text-foreground-muted">Tareas, documentos, consultas y procesos sin actividad reciente</p></div><Link href="/gestion-procesos/abogado/notificaciones" className="text-xs font-medium text-brand-900 hover:underline">Ver avisos</Link></header>{firmDashboard.atencion.length ? <div className="divide-y divide-border">{firmDashboard.atencion.slice(0, 8).map((item, index) => <Link key={`${item.tipo}-${item.titulo}-${index}`} href={item.href} className="flex items-center justify-between gap-3 px-5 py-3 hover:bg-surface-hover"><span className="min-w-0"><span className="block truncate text-sm font-medium">{item.titulo}</span><span className="mt-1 block text-xs text-foreground-muted">{item.descripcion}</span></span><ArrowRight className="size-4 shrink-0 text-brand-900" /></Link>)}</div> : <p className="px-5 py-8 text-center text-sm text-foreground-muted">No hay elementos que requieran atención ahora.</p>}</section>
-          <section className="overflow-hidden rounded-[var(--radius-lg)] border border-border bg-surface"><header className="border-b border-border px-5 py-4"><h2 className="font-semibold">Actividad reciente</h2><p className="mt-1 text-xs text-foreground-muted">Movimientos recientes de procesos, documentos y tareas.</p></header>{firmDashboard.actividad_reciente.length ? <div className="max-h-[28rem] divide-y divide-border overflow-y-auto">{firmDashboard.actividad_reciente.slice(0, 12).map((item) => <Link key={item.id} href={item.href} className="block px-5 py-3 hover:bg-surface-hover"><div className="flex items-center justify-between gap-3"><p className="truncate text-sm font-medium">{item.titulo}</p><span className="shrink-0 text-[10px] text-foreground-muted">{new Date(item.fecha).toLocaleString("es-CO", { timeZone: "America/Bogota" })}</span></div><p className="mt-1 truncate text-xs text-foreground-muted">{item.proceso} · {item.tipo} · {item.descripcion}</p></Link>)}</div> : <p className="px-5 py-8 text-center text-sm text-foreground-muted">No hay actividad reciente.</p>}</section>
-        </div>
-        <section className="rounded-[var(--radius-lg)] border border-border bg-surface p-4"><h2 className="mb-3 font-semibold">Acciones rápidas</h2><div className="flex flex-wrap gap-2">{firmDashboard.acciones.map((action) => <Link key={action.label} href={action.href} className="rounded-lg border border-border px-3 py-2 text-sm font-medium hover:bg-surface-hover">{action.label}</Link>)}</div></section>
       </section>}
 
       <TaskMonthCalendar tasks={calendarTasks} />
@@ -371,7 +381,7 @@ export default function AbogadoPage() {
       )}
 
       {/* Flujo del despacho */}
-      {!isSaasLawyer && <>
+      {!isSaasLawyer && data.processes === 0 && <>
       <div className="rounded-[var(--radius-lg)] border border-border bg-surface shadow-sm">
         <div className="border-b border-border px-5 py-4">
           <h2 className="font-semibold text-foreground">
@@ -470,7 +480,7 @@ export default function AbogadoPage() {
       </>}
 
       {/* Nota operativa */}
-      {!isSaasLawyer && <>
+      {!isSaasLawyer && data.processes === 0 && <>
       <div className="rounded-[var(--radius-lg)] border border-border bg-surface p-5 shadow-sm">
         <div className="flex gap-3">
           <div className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-brand-900/10 text-brand-900">

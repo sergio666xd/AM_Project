@@ -10,7 +10,12 @@ import {
   ReactNode,
 } from "react";
 
-import { getCurrentUser, API_URL } from "@/lib/api";
+import {
+  getCurrentUser,
+  API_URL,
+  apiErrorStatus,
+  SESSION_EXPIRED_EVENT,
+} from "@/lib/api";
 
 /** Intervalo de renovación del token: cada 12 horas (en ms). */
 const TOKEN_REFRESH_INTERVAL_MS = 12 * 60 * 60 * 1000;
@@ -48,8 +53,11 @@ interface SessionContextType {
   user: UsuarioActual | null;
   loading: boolean;
   token: string | null;
+  /** Mensaje cuando la sesión no se pudo validar por un fallo de red o del servidor. */
+  sessionError: string | null;
   logout: () => void;
   refreshUser: () => Promise<void>;
+  retrySession: () => Promise<void>;
 }
 
 const SessionContext = createContext<SessionContextType | undefined>(
@@ -93,6 +101,7 @@ export function SessionProvider({
   const [user, setUser] = useState<UsuarioActual | null>(null);
   const [token, setToken] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [sessionError, setSessionError] = useState<string | null>(null);
   const refreshTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   /** Renueva el token silenciosamente y lo guarda en localStorage. */
@@ -119,7 +128,19 @@ export function SessionProvider({
     }, TOKEN_REFRESH_INTERVAL_MS);
   }, [silentRefresh]);
 
-  async function loadSession() {
+  const clearSession = useCallback(() => {
+    localStorage.removeItem("token");
+    localStorage.removeItem("remember_me");
+    persistPortalRole(null);
+    setToken(null);
+    setUser(null);
+    if (refreshTimerRef.current) {
+      clearInterval(refreshTimerRef.current);
+      refreshTimerRef.current = null;
+    }
+  }, []);
+
+  const loadSession = useCallback(async () => {
     const storedToken = localStorage.getItem("token");
 
     if (!storedToken) {
@@ -131,6 +152,7 @@ export function SessionProvider({
     }
 
     setToken(storedToken);
+    setSessionError(null);
 
     try {
       const currentUser = await getCurrentUser(storedToken);
@@ -138,37 +160,48 @@ export function SessionProvider({
       setUser(currentUser);
       persistPortalRole(currentUser.rol);
 
-      // Si hay sesión persistente, renovar el token al cargar la app
-      // para extender la ventana de 15 días desde ahora.
-      const isRemembered = localStorage.getItem("remember_me") === "true";
-      if (isRemembered) {
-        const newToken = await refreshTokenFromApi(storedToken);
-        if (newToken) {
-          localStorage.setItem("token", newToken);
-          setToken(newToken);
-        }
+      // Si hay sesión persistente, renovar el token en segundo plano para
+      // extender la ventana de 15 días sin retrasar la carga del portal.
+      if (localStorage.getItem("remember_me") === "true") {
+        void silentRefresh();
       }
     } catch (error) {
-      console.error(
-        "No fue posible recuperar la sesión:",
-        error
-      );
-
-      localStorage.removeItem("token");
-      localStorage.removeItem("remember_me");
-      persistPortalRole(null);
-
-      setToken(null);
-      setUser(null);
+      const status = apiErrorStatus(error);
+      if (status === 401 || status === 403) {
+        clearSession();
+      } else {
+        // Un fallo de red o del servidor no invalida el token: se conserva
+        // para que el usuario pueda reintentar sin volver a iniciar sesión.
+        console.error("No fue posible recuperar la sesión:", error);
+        setSessionError(
+          error instanceof Error
+            ? error.message
+            : "No fue posible conectar con el servidor.",
+        );
+      }
     } finally {
       setLoading(false);
     }
-  }
+  }, [clearSession, silentRefresh]);
+
+  const retrySession = useCallback(async () => {
+    setLoading(true);
+    await loadSession();
+  }, [loadSession]);
 
   useEffect(() => {
-    loadSession();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+    void loadSession();
+  }, [loadSession]);
+
+  // La API avisa cuando rechaza el token; limpiar la sesión hace que RoleGate
+  // lleve al usuario al inicio de sesión conservando la ruta actual.
+  useEffect(() => {
+    const handleExpired = () => {
+      if (localStorage.getItem("token")) clearSession();
+    };
+    window.addEventListener(SESSION_EXPIRED_EVENT, handleExpired);
+    return () => window.removeEventListener(SESSION_EXPIRED_EVENT, handleExpired);
+  }, [clearSession]);
 
   // Iniciar/detener el timer de renovación cuando cambia el token
   useEffect(() => {
@@ -207,19 +240,8 @@ export function SessionProvider({
   }
 
   function logout() {
-    localStorage.removeItem("token");
-    localStorage.removeItem("remember_me");
-    persistPortalRole(null);
-
-    setToken(null);
-    setUser(null);
-
-    if (refreshTimerRef.current) {
-      clearInterval(refreshTimerRef.current);
-      refreshTimerRef.current = null;
-    }
-
-    window.location.href = "/";
+    clearSession();
+    window.location.assign("/");
   }
 
   return (
@@ -228,8 +250,10 @@ export function SessionProvider({
         user,
         loading,
         token,
+        sessionError,
         logout,
         refreshUser,
+        retrySession,
       }}
     >
       {children}

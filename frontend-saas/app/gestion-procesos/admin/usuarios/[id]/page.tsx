@@ -201,7 +201,7 @@ export default function AdminUserDetailPage() {
 
       {editing && <Card title="Editar datos personales"><form onSubmit={saveProfile} className="grid gap-3 md:grid-cols-3"><label className="text-sm">Nombre completo<input required value={name} onChange={(event) => setName(event.target.value)} className="mt-1 w-full rounded-lg border border-border bg-background px-3 py-2" /></label><label className="text-sm">WhatsApp<input value={phone} onChange={(event) => setPhone(event.target.value)} className="mt-1 w-full rounded-lg border border-border bg-background px-3 py-2" /></label><div className="flex items-end gap-2"><Button type="submit" disabled={working}><Save className="size-4" /> Guardar</Button><Button type="button" variant="ghost" onClick={() => setEditing(false)}>Cancelar</Button></div></form></Card>}
 
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="grid grid-cols-2 gap-2 sm:gap-3 lg:grid-cols-4">
         <StatCard label="Procesos" value={user.totales.procesos} icon={FolderOpen} />
         <StatCard label="Tareas" value={user.totales.tareas} icon={Clock3} />
         <StatCard label="Documentos" value={user.totales.documentos} icon={FileText} />

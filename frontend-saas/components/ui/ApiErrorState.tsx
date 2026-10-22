@@ -1,4 +1,5 @@
 import { AlertTriangle, RefreshCw } from "lucide-react";
+import { apiErrorStatus } from "@/lib/api";
 
 type ApiErrorStateProps = {
   error: unknown;
@@ -9,9 +10,9 @@ type ApiErrorStateProps = {
 
 function getErrorCopy(error: unknown) {
   const message = error instanceof Error ? error.message : "";
-  const status = Number(message.match(/\bHTTP\s+(\d{3})\b/i)?.[1]);
+  const status = apiErrorStatus(error) ?? 0;
 
-  if (/no se pudo conectar|failed to fetch|networkerror/i.test(message)) {
+  if (!status && /no se pudo conectar|failed to fetch|networkerror/i.test(message)) {
     return {
       title: "No se pudo conectar con el servicio",
       description: "Revisa tu conexión e inténtalo de nuevo.",
@@ -23,15 +24,23 @@ function getErrorCopy(error: unknown) {
       description: `El servicio respondió con un error${status ? ` (HTTP ${status})` : ""}. Inténtalo de nuevo; si continúa, contacta al administrador.`,
     };
   }
-  if (status === 401 || status === 403) {
+  if (status === 401) {
+    return {
+      title: "Tu sesión expiró",
+      description: "Te llevaremos al inicio de sesión para continuar.",
+    };
+  }
+  if (status === 403) {
     return {
       title: "No tienes acceso a estos datos",
-      description: "Actualiza la página o vuelve a iniciar sesión.",
+      description: message || "Si crees que es un error, contacta al administrador.",
     };
   }
   return {
     title: "No fue posible cargar estos datos",
-    description: "Inténtalo de nuevo. Si el problema continúa, contacta al administrador.",
+    description: status >= 400 && message
+      ? message
+      : "Inténtalo de nuevo. Si el problema continúa, contacta al administrador.",
   };
 }
 

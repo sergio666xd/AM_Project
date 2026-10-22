@@ -52,7 +52,7 @@ def enviar_resumen_mensual():
                 ultima_act = (
                     db.query(models.Actuacion)
                     .filter(models.Actuacion.radicado_id == rad.id)
-                    .order_by(models.Actuacion.orden.desc())
+                    .order_by(models.Actuacion.orden.asc())
                     .first()
                 )
                 mensaje += f"*{idx}. Radicado:* `{rad.numero}`\n"

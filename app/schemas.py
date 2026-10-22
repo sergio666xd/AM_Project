@@ -663,6 +663,12 @@ class ChatMensajeLeidoUpdate(BaseModel):
     mensaje_id: int = Field(gt=0)
 
 
+class ChatPushEntrega(BaseModel):
+    usuario_id: int = Field(gt=0)
+    mensaje_id: int = Field(gt=0)
+    firma: str = Field(min_length=64, max_length=64)
+
+
 class ChatPresenciaUpdate(BaseModel):
     session_id: str = Field(min_length=16, max_length=80, pattern=r"^[a-zA-Z0-9-]+$")
 

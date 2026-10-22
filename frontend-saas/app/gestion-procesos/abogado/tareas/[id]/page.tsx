@@ -231,6 +231,8 @@ export default function TareaDetalleAbogadoPage() {
 
   const [newSubtask, setNewSubtask] = useState("");
   const [editingSubtaskId, setEditingSubtaskId] = useState<number | null>(null);
+  const [changingStatus, setChangingStatus] = useState(false);
+  const [showSubtaskForm, setShowSubtaskForm] = useState(false);
   const [subtaskDraftTitle, setSubtaskDraftTitle] = useState("");
   const [subtaskDraftAssigned, setSubtaskDraftAssigned] = useState(false);
   const [subtaskDraftClientId, setSubtaskDraftClientId] = useState("");
@@ -457,6 +459,25 @@ export default function TareaDetalleAbogadoPage() {
       setError(
         err instanceof Error ? err.message : "No se pudo actualizar la tarea.",
       );
+    }
+  }
+
+  async function changeStatus(next: EstadoTarea) {
+    if (!tarea || !token || next === tarea.estado) return;
+    try {
+      setChangingStatus(true);
+      setError("");
+      const updated = await fetchApi(`/api/tareas/${tarea.id}`, {
+        method: "PUT",
+        token,
+        body: JSON.stringify({ estado: next }),
+      });
+      setTarea(updated);
+      setEstado(updated.estado);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "No se pudo cambiar el estado.");
+    } finally {
+      setChangingStatus(false);
     }
   }
 
@@ -1191,6 +1212,16 @@ export default function TareaDetalleAbogadoPage() {
               )}
             </div>
 
+            {!showSubtaskForm ? (
+              <button
+                type="button"
+                onClick={() => setShowSubtaskForm(true)}
+                className="mt-4 inline-flex min-h-10 items-center gap-2 rounded-lg border border-dashed border-border-strong px-4 text-sm font-medium text-primary hover:bg-surface-hover"
+              >
+                <Plus size={16} />
+                Agregar subtarea
+              </button>
+            ) : (
             <form
               onSubmit={addSubtask}
               className="mt-5 space-y-3 rounded-lg border border-border bg-surface-muted p-4"
@@ -1364,7 +1395,14 @@ export default function TareaDetalleAbogadoPage() {
                   </fieldset>
                 </div>
               )}
-              <div className="flex justify-end">
+              <div className="flex justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={() => setShowSubtaskForm(false)}
+                  className="rounded-md border border-border px-3 py-2 text-sm font-medium text-foreground hover:bg-surface-hover"
+                >
+                  Cancelar
+                </button>
                 <button
                   type="submit"
                   disabled={
@@ -1384,6 +1422,7 @@ export default function TareaDetalleAbogadoPage() {
                 </button>
               </div>
             </form>
+            )}
           </section>
 
           {/* NOTIFICACIONES */}
@@ -1682,17 +1721,20 @@ export default function TareaDetalleAbogadoPage() {
 
           {/* ESTADO */}
           <section className="rounded-xl border border-border bg-surface p-5 shadow-sm">
-            <h2 className="mb-4 font-semibold text-foreground">
-              Estado actual
-            </h2>
-
-            <div
-              className={`rounded-lg px-4 py-3 text-center text-sm font-semibold ${getStatusClass(
-                tarea.estado,
-              )}`}
+            <label htmlFor="task-status" className="mb-3 block font-semibold text-foreground">
+              Estado
+            </label>
+            <select
+              id="task-status"
+              value={tarea.estado}
+              disabled={changingStatus}
+              onChange={(event) => void changeStatus(event.target.value as EstadoTarea)}
+              className={`h-11 w-full rounded-lg border-0 px-3 text-sm font-semibold disabled:opacity-60 ${getStatusClass(tarea.estado)}`}
             >
-              {getStatusLabel(tarea.estado)}
-            </div>
+              {(["PENDIENTE", "EN_CURSO", "COMPLETADA", "CANCELADA"] as EstadoTarea[]).map((status) => (
+                <option key={status} value={status}>{getStatusLabel(status)}</option>
+              ))}
+            </select>
           </section>
         </aside>
       </div>

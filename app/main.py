@@ -2,6 +2,7 @@ import os
 import time
 import hashlib
 import hmac
+import inspect
 import logging
 import secrets
 from uuid import uuid4
@@ -11,7 +12,8 @@ from starlette.background import BackgroundTask
 from fastapi.security import OAuth2PasswordRequestForm
 from fastapi.responses import StreamingResponse
 from sqlalchemy import or_, text
-from sqlalchemy.orm import Session
+from sqlalchemy.exc import SQLAlchemyError
+from sqlalchemy.orm import Session, selectinload
 from fastapi.middleware.cors import CORSMiddleware
 from datetime import datetime, timedelta
 from pathlib import Path
@@ -20,7 +22,6 @@ from app.database import engine, Base, get_db
 from app import models, schemas, security, storage
 from app.email_service import enviar_correo
 from app.site_content import PUBLIC_CONTENT_PAGES, PUBLIC_PAGE_ROUTES
-from app.routers import admin
 from app.security import obtener_usuario_actual
 from app.routers import admin, tareas, expedientes, workflows, contratos, chat
 from app.radicados import (
@@ -41,8 +42,7 @@ from app.message_templates import render_message
 from app.password_reset import password_reset_url, send_password_reset_email
 from app.security_notifications import send_security_change_confirmation
 
-# Crear las tablas en la BD
-models.Base.metadata.create_all(bind=engine)
+RUTA_MIGRACION_PLANTILLAS = Path(__file__).resolve().parents[1] / "migrations" / "2026_10_10_mensajes_configurables.sql"
 
 
 def actualizar_esquema_planes() -> None:
@@ -127,6 +127,68 @@ def actualizar_esquema_planes() -> None:
         conexion.execute(text("ALTER TABLE documentos_proceso ADD COLUMN IF NOT EXISTS contrato_id INTEGER REFERENCES contratos_servicios(id) ON DELETE SET NULL"))
         conexion.execute(text("ALTER TABLE contratos_servicios ADD COLUMN IF NOT EXISTS campos_actual JSON NOT NULL DEFAULT '{}'::json"))
         conexion.execute(text("ALTER TABLE contratos_servicios_versiones ADD COLUMN IF NOT EXISTS campos JSON NOT NULL DEFAULT '{}'::json"))
+
+
+def huella_esquema() -> str:
+    """Resume modelos y migraciones de arranque para detectar cambios de esquema."""
+    huella = hashlib.sha256()
+    for tabla in sorted(models.Base.metadata.sorted_tables, key=lambda item: item.name):
+        huella.update(tabla.name.encode())
+        for columna in tabla.columns:
+            huella.update(f"{columna.name}:{columna.type!r}:{columna.nullable}".encode())
+    huella.update(inspect.getsource(actualizar_esquema_planes).encode())
+    if RUTA_MIGRACION_PLANTILLAS.is_file():
+        huella.update(RUTA_MIGRACION_PLANTILLAS.read_bytes())
+    return huella.hexdigest()
+
+
+def _huella_esquema_aplicada() -> str | None:
+    try:
+        with engine.connect() as conexion:
+            return conexion.execute(text("SELECT huella FROM esquema_arranque WHERE id = 1")).scalar()
+    except SQLAlchemyError:
+        return None
+
+
+def preparar_esquema() -> None:
+    """Crea tablas y aplica compatibilidad solo cuando cambian modelos o migraciones.
+
+    En Vercel cada arranque en frío ejecutaba ~70 sentencias DDL con bloqueos
+    exclusivos; la huella guardada permite omitirlas cuando ya están aplicadas.
+    """
+    if engine.dialect.name != "postgresql":
+        # Las sentencias de compatibilidad son específicas de PostgreSQL; en
+        # bases locales de desarrollo basta con crear las tablas.
+        models.Base.metadata.create_all(bind=engine)
+        return
+    huella = huella_esquema()
+    if _huella_esquema_aplicada() == huella:
+        return
+    models.Base.metadata.create_all(bind=engine)
+    actualizar_esquema_planes()
+    try:
+        if not RUTA_MIGRACION_PLANTILLAS.is_file():
+            raise FileNotFoundError(f"No se encontró la migración de plantillas: {RUTA_MIGRACION_PLANTILLAS}")
+        ddl, datos_plantillas = RUTA_MIGRACION_PLANTILLAS.read_text(encoding="utf-8").split("\n\n", maxsplit=1)
+        with engine.begin() as conexion:
+            conexion.exec_driver_sql(ddl)
+            conexion.exec_driver_sql(datos_plantillas)
+    except Exception:
+        # A fallida message-template migration must not take down authentication
+        # and the rest of the API during startup. Sin guardar la huella, se reintenta.
+        logging.getLogger(__name__).exception(
+            "No se pudieron preparar las plantillas de mensajes; la API continuará iniciando."
+        )
+        return
+    with engine.begin() as conexion:
+        conexion.execute(text(
+            "CREATE TABLE IF NOT EXISTS esquema_arranque ("
+            "id INTEGER PRIMARY KEY, huella VARCHAR(64) NOT NULL, "
+            "aplicado_en TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP)"
+        ))
+        conexion.execute(text("DELETE FROM esquema_arranque WHERE id = 1"))
+        conexion.execute(text("INSERT INTO esquema_arranque (id, huella) VALUES (1, :huella)"), {"huella": huella})
+
 
 ALLOWED_CARD_TYPES = {"application/pdf", "image/jpeg", "image/png"}
 ALLOWED_CARD_EXTENSIONS = {".pdf", ".jpg", ".jpeg", ".png"}
@@ -227,21 +289,7 @@ def _allow_password_reset_request(client_ip: str, email: str) -> bool:
 @app.on_event("startup")
 def crear_datos_iniciales():
     """Aplica compatibilidad y siembra planes SaaS solo si aún no existen."""
-    actualizar_esquema_planes()
-    ruta_plantillas = Path(__file__).resolve().parents[1] / "migrations" / "2026_10_10_mensajes_configurables.sql"
-    try:
-        if not ruta_plantillas.is_file():
-            raise FileNotFoundError(f"No se encontró la migración de plantillas: {ruta_plantillas}")
-        ddl, datos_plantillas = ruta_plantillas.read_text(encoding="utf-8").split("\n\n", maxsplit=1)
-        with engine.begin() as conexion:
-            conexion.exec_driver_sql(ddl)
-            conexion.exec_driver_sql(datos_plantillas)
-    except Exception:
-        # A fallida message-template migration must not take down authentication
-        # and the rest of the API during startup.
-        logging.getLogger(__name__).exception(
-            "No se pudieron preparar las plantillas de mensajes; la API continuará iniciando."
-        )
+    preparar_esquema()
     db = next(get_db())
     try:
         if not db.query(models.Plan).first():
@@ -946,20 +994,8 @@ def actualizar_mi_perfil(datos: schemas.PerfilUpdate, usuario_actual: models.Usu
 @app.get("/api/auth/me")
 def obtener_mi_usuario(
     usuario_actual: models.Usuario = Depends(security.obtener_usuario_para_cambio_password),
-    db: Session = Depends(get_db),
 ):
-    usuario = (
-        db.query(models.Usuario)
-        .filter(models.Usuario.id == usuario_actual.id)
-        .first()
-    )
-
-    if not usuario:
-        raise HTTPException(
-            status_code=404,
-            detail="Usuario no encontrado.",
-        )
-
+    usuario = usuario_actual
     return {
         "id": usuario.id,
         "email": usuario.email,
@@ -980,8 +1016,6 @@ def obtener_mi_usuario(
         "notificaciones_email": usuario.notificaciones_email,
         "notificaciones_whatsapp": usuario.notificaciones_whatsapp,
         "preferencias_notificacion": usuario.preferencias_notificacion or {},
-        "canal_notificacion_cliente": usuario.canal_notificacion_cliente,
-        "preferencias_notificacion": usuario.preferencias_notificacion,
         "canal_notificacion_cliente": usuario.canal_notificacion_cliente,
         "silenciar_email_si_push": usuario.silenciar_email_si_push,
         "silenciar_whatsapp_si_push": usuario.silenciar_whatsapp_si_push,
@@ -1394,23 +1428,54 @@ def agregar_radicado(
     return resultado
 
 
+def _limite_actuaciones_visibles(usuario: models.Usuario) -> int | None:
+    require_roles(usuario, ["ABOGADO", "ABOGADO_ADMIN", "ADMIN"], action="consultar radicados")
+    if usuario.rol == models.RolUsuario.ABOGADO and usuario.plan is None:
+        raise HTTPException(status_code=403, detail="Tu cuenta SaaS no tiene un plan asignado.")
+    return usuario.plan.limite_ultimas_actuaciones if usuario.rol == models.RolUsuario.ABOGADO else None
+
+
 @app.get("/api/radicados", response_model=list[schemas.RadicadoOut])
 def listar_mis_radicados(
+    resumen: bool = False,
     usuario_actual: models.Usuario = Depends(security.obtener_usuario_actual),
     db: Session = Depends(get_db),
 ):
-    """Retorna radicados dentro del alcance del rol en la firma."""
-    require_roles(usuario_actual, ["ABOGADO", "ABOGADO_ADMIN", "ADMIN"], action="consultar radicados")
-    if usuario_actual.rol == models.RolUsuario.ABOGADO and usuario_actual.plan is None:
-        raise HTTPException(status_code=403, detail="Tu cuenta SaaS no tiene un plan asignado.")
-    radicados = radicados_visibles(usuario_actual, db).all()
-    limite = usuario_actual.plan.limite_ultimas_actuaciones if usuario_actual.rol == models.RolUsuario.ABOGADO else None
+    """Retorna radicados dentro del alcance del rol en la firma.
+
+    Con ``resumen=true`` omite las actuaciones; sirve para selectores y
+    listados que solo necesitan los datos del radicado.
+    """
+    limite = _limite_actuaciones_visibles(usuario_actual)
+    query = radicados_visibles(usuario_actual, db).order_by(models.Radicado.id.desc())
+    if resumen:
+        return [serializar_radicado(radicado, 0) for radicado in query.all()]
+    radicados = query.options(selectinload(models.Radicado.actuaciones)).all()
     return [serializar_radicado(radicado, limite) for radicado in radicados]
+
+
+@app.get("/api/radicados/{radicado_id}", response_model=schemas.RadicadoOut)
+def obtener_radicado(
+    radicado_id: int,
+    usuario_actual: models.Usuario = Depends(security.obtener_usuario_actual),
+    db: Session = Depends(get_db),
+):
+    """Retorna un radicado visible con su historial de actuaciones autorizado."""
+    limite = _limite_actuaciones_visibles(usuario_actual)
+    radicado = (
+        radicados_visibles(usuario_actual, db)
+        .filter(models.Radicado.id == radicado_id)
+        .options(selectinload(models.Radicado.actuaciones))
+        .first()
+    )
+    if not radicado:
+        raise HTTPException(status_code=404, detail="Radicado no encontrado en tu alcance.")
+    return serializar_radicado(radicado, limite)
 
 
 def serializar_radicado(radicado: models.Radicado, limite_actuaciones: int | None) -> dict:
     """Serializa el historial de actuaciones autorizado."""
-    actuaciones = sorted(radicado.actuaciones, key=lambda actuacion: actuacion.orden)
+    actuaciones = [] if limite_actuaciones == 0 else sorted(radicado.actuaciones, key=lambda actuacion: actuacion.orden)
     if limite_actuaciones is not None:
         actuaciones = actuaciones[:limite_actuaciones]
     return {

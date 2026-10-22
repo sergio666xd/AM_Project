@@ -1,4 +1,5 @@
 import os
+from collections import defaultdict
 import re
 import logging
 import smtplib
@@ -16,7 +17,7 @@ from datetime import date, datetime, timedelta, timezone
 from zoneinfo import ZoneInfo
 from sqlalchemy import and_, func, or_
 from sqlalchemy.exc import IntegrityError
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, selectinload
 
 from app import models, schemas, security, storage
 from app.audit import registrar_evento_auditoria
@@ -1289,17 +1290,143 @@ def obtener_vision_global(
     }
 
 
+INVENTARIO_LIMITE_MAXIMO = 5000
+
+
+def _ultima_actuacion(radicado: models.Radicado) -> models.Actuacion | None:
+    # La Rama Judicial lista primero lo más reciente: orden 1 es la última actuación.
+    return min(radicado.actuaciones, key=lambda item: (item.orden, -item.id), default=None)
+
+
+def _inventario_procesos(db: Session, roles, archivados: bool, limite: int) -> list[dict]:
+    procesos = (
+        db.query(models.Proceso)
+        .join(models.Usuario, models.Usuario.id == models.Proceso.abogado_id)
+        .filter(models.Usuario.rol.in_(roles))
+        .filter(models.Proceso.archivado_en.is_not(None) if archivados else models.Proceso.archivado_en.is_(None))
+        .options(
+            selectinload(models.Proceso.abogado),
+            selectinload(models.Proceso.tareas),
+            selectinload(models.Proceso.documentos),
+            selectinload(models.Proceso.solicitudes_documento),
+            selectinload(models.Proceso.clientes).selectinload(models.ProcesoCliente.cliente),
+            selectinload(models.Proceso.radicados).selectinload(models.ProcesoRadicado.radicado),
+            selectinload(models.Proceso.colaboradores).selectinload(models.ProcesoColaborador.abogado),
+        )
+        .order_by(models.Proceso.created_at.desc())
+        .limit(limite)
+        .all()
+    )
+    ids = [proceso.id for proceso in procesos]
+    if not ids:
+        return []
+
+    # Consultas agregadas en bloque: antes se ejecutaban cuatro por proceso.
+    consultas_por_proceso: dict[int, list] = defaultdict(list)
+    errores_por_proceso: dict[int, int] = defaultdict(int)
+    for proceso_id, fecha, estado in (
+        db.query(
+            models.ProcesoRadicado.proceso_id,
+            func.coalesce(models.ConsultaRadicado.finalizacion, models.ConsultaRadicado.inicio),
+            models.ConsultaRadicado.estado,
+        )
+        .join(models.ConsultaRadicado, models.ConsultaRadicado.radicado_id == models.ProcesoRadicado.radicado_id)
+        .filter(models.ProcesoRadicado.proceso_id.in_(ids))
+        .all()
+    ):
+        if fecha:
+            consultas_por_proceso[proceso_id].append(fecha)
+        if estado == "ERROR":
+            errores_por_proceso[proceso_id] += 1
+    auditoria_por_proceso: dict[int, list] = defaultdict(list)
+    for recurso_id, fecha in db.query(models.EventoAuditoria.recurso_id, models.EventoAuditoria.created_at).filter(
+        models.EventoAuditoria.tipo_recurso == "proceso",
+        models.EventoAuditoria.recurso_id.in_([str(item) for item in ids]),
+        ~models.EventoAuditoria.accion.endswith(".crear"),
+    ).all():
+        if fecha and str(recurso_id).isdigit():
+            auditoria_por_proceso[int(recurso_id)].append(fecha)
+
+    ahora = datetime.now(timezone.utc).replace(tzinfo=None)
+    resultado = []
+    for proceso in procesos:
+        actividad = [tarea.updated_at for tarea in proceso.tareas if tarea.updated_at]
+        actividad.extend(documento.created_at for documento in proceso.documentos if documento.created_at)
+        actividad.extend(consultas_por_proceso[proceso.id])
+        actividad.extend(auditoria_por_proceso[proceso.id])
+        tareas_activas = [
+            tarea for tarea in proceso.tareas
+            if tarea.estado in (models.EstadoTarea.PENDIENTE, models.EstadoTarea.EN_CURSO)
+        ]
+        tareas_vencidas = [tarea for tarea in tareas_activas if tarea.fecha_limite and tarea.fecha_limite < ahora]
+        documentos_pendientes = sum(1 for solicitud in proceso.solicitudes_documento if solicitud.atendida_en is None)
+        errores_consulta = errores_por_proceso[proceso.id]
+        responsable_activo = bool(proceso.abogado and proceso.abogado.estado == models.EstadoUsuario.ACTIVO)
+        sin_actividad = not actividad
+        if proceso.archivado_en is not None:
+            salud = "ARCHIVADO"
+        elif tareas_vencidas or errores_consulta or not responsable_activo:
+            salud = "RIESGO"
+        elif sin_actividad or documentos_pendientes:
+            salud = "ATENCION"
+        else:
+            salud = "NORMAL"
+        senales = []
+        if sin_actividad:
+            senales.append("Sin actividad")
+        if tareas_vencidas:
+            senales.append(f"{len(tareas_vencidas)} tarea(s) vencida(s)")
+        if documentos_pendientes:
+            senales.append(f"{documentos_pendientes} documento(s) pendiente(s)")
+        if errores_consulta:
+            senales.append(f"{errores_consulta} consulta(s) con error")
+        if not responsable_activo:
+            senales.append("Sin responsable activo")
+        clientes = [enlace.cliente for enlace in proceso.clientes if enlace.cliente]
+        resultado.append({
+            "id": proceso.id,
+            "owner_id": proceso.abogado_id,
+            "owner_rol": proceso.abogado.rol.value,
+            "nombre": proceso.nombre,
+            "descripcion": proceso.descripcion,
+            "archivado_en": proceso.archivado_en,
+            "abogado": proceso.abogado.nombre_completo,
+            "colaboradores": [enlace.abogado.nombre_completo for enlace in proceso.colaboradores if enlace.abogado],
+            "radicados": len(proceso.radicados),
+            "radicados_numeros": [enlace.radicado.numero for enlace in proceso.radicados if enlace.radicado],
+            "clientes": len(clientes),
+            "cliente": clientes[0].nombre_completo if clientes else None,
+            "clientes_nombres": [cliente.nombre_completo for cliente in clientes],
+            "ultima_actividad": max(actividad).isoformat() if actividad else None,
+            "salud": salud,
+            "senales_salud": senales,
+            "tareas_activas": len(tareas_activas),
+            "tareas_vencidas": len(tareas_vencidas),
+            "documentos_pendientes": documentos_pendientes,
+            "consultas_con_error": errores_consulta,
+            "sin_responsable": not responsable_activo,
+            "sin_actividad": sin_actividad,
+            "created_at": proceso.created_at,
+        })
+    return resultado
+
+
 @router.get("/inventario/{recurso}")
 def listar_inventario_global(
     recurso: str,
     sector: str = "GLOBAL",
     archivados: bool = False,
-    limite: int = 100,
+    limite: int = INVENTARIO_LIMITE_MAXIMO,
     db: Session = Depends(get_db),
     admin: models.Usuario = Depends(verificar_admin),
 ):
-    """Read an inventory in one explicit platform, firm, or SaaS scope."""
-    limite = min(max(limite, 1), 250)
+    """Read an inventory in one explicit platform, firm, or SaaS scope.
+
+    Devuelve el inventario completo (hasta ``INVENTARIO_LIMITE_MAXIMO``) para
+    que la consola busque, ordene y pagine sobre todos los registros; antes se
+    cortaba en los 100 más recientes.
+    """
+    limite = min(max(limite, 1), INVENTARIO_LIMITE_MAXIMO)
     roles_por_sector = {
         "FIRMA": (models.RolUsuario.ABOGADO_ADMIN, models.RolUsuario.ADMIN),
         "SAAS": (models.RolUsuario.ABOGADO,),
@@ -1309,110 +1436,61 @@ def listar_inventario_global(
         raise HTTPException(status_code=400, detail="Selecciona un ámbito válido: FIRMA, SAAS o GLOBAL.")
     roles = roles_por_sector[sector]
     if recurso == "procesos":
-        query = db.query(models.Proceso).join(models.Usuario, models.Usuario.id == models.Proceso.abogado_id).filter(models.Usuario.rol.in_(roles))
-        query = query.filter(models.Proceso.archivado_en.is_not(None) if archivados else models.Proceso.archivado_en.is_(None))
-        procesos = query.order_by(models.Proceso.created_at.desc()).limit(limite).all()
+        return _inventario_procesos(db, roles, archivados, limite)
+    if recurso == "radicados":
+        query = _filtrar_radicados_por_sector(db.query(models.Radicado), sector).options(
+            selectinload(models.Radicado.creador),
+            selectinload(models.Radicado.actuaciones),
+            selectinload(models.Radicado.procesos).selectinload(models.ProcesoRadicado.proceso),
+        )
         resultado = []
-        for proceso in procesos:
-            actividad = []
-            actividad.extend(tarea.updated_at for tarea in proceso.tareas if tarea.updated_at)
-            actividad.extend(documento.created_at for documento in proceso.documentos if documento.created_at)
-            actividad.extend(
-                fecha
-                for (fecha,) in db.query(
-                    func.coalesce(models.ConsultaRadicado.finalizacion, models.ConsultaRadicado.inicio)
-                ).join(models.Radicado, models.Radicado.id == models.ConsultaRadicado.radicado_id)
-                .join(models.ProcesoRadicado, models.ProcesoRadicado.radicado_id == models.Radicado.id)
-                .filter(models.ProcesoRadicado.proceso_id == proceso.id)
-                .all()
-                if fecha
-            )
-            actividad.extend(
-                fecha
-                for (fecha,) in db.query(models.EventoAuditoria.created_at).filter(
-                    models.EventoAuditoria.tipo_recurso == "proceso",
-                    models.EventoAuditoria.recurso_id == str(proceso.id),
-                    ~models.EventoAuditoria.accion.endswith(".crear"),
-                ).all()
-                if fecha
-            )
-            tareas_activas = [
-                tarea for tarea in proceso.tareas
-                if tarea.estado in (models.EstadoTarea.PENDIENTE, models.EstadoTarea.EN_CURSO)
-            ]
-            tareas_vencidas = [
-                tarea for tarea in tareas_activas
-                if tarea.fecha_limite and tarea.fecha_limite < datetime.now(timezone.utc).replace(tzinfo=None)
-            ]
-            documentos_pendientes = sum(
-                1 for solicitud in proceso.solicitudes_documento if solicitud.atendida_en is None
-            )
-            errores_consulta = db.query(models.ConsultaRadicado.id).join(
-                models.Radicado, models.Radicado.id == models.ConsultaRadicado.radicado_id
-            ).join(
-                models.ProcesoRadicado, models.ProcesoRadicado.radicado_id == models.Radicado.id
-            ).filter(
-                models.ProcesoRadicado.proceso_id == proceso.id,
-                models.ConsultaRadicado.estado == "ERROR",
-            ).count()
-            responsable_activo = bool(
-                proceso.abogado and proceso.abogado.estado == models.EstadoUsuario.ACTIVO
-            )
-            sin_actividad = not actividad
-            archived = proceso.archivado_en is not None
-            if archived:
-                salud = "ARCHIVADO"
-            elif tareas_vencidas or errores_consulta or not responsable_activo:
-                salud = "RIESGO"
-            elif sin_actividad or documentos_pendientes:
-                salud = "ATENCION"
-            else:
-                salud = "NORMAL"
-            senales = []
-            if sin_actividad:
-                senales.append("Sin actividad")
-            if tareas_vencidas:
-                senales.append(f"{len(tareas_vencidas)} tarea(s) vencida(s)")
-            if documentos_pendientes:
-                senales.append(f"{documentos_pendientes} documento(s) pendiente(s)")
-            if errores_consulta:
-                senales.append(f"{errores_consulta} consulta(s) con error")
-            if not responsable_activo:
-                senales.append("Sin responsable activo")
+        for r in query.order_by(models.Radicado.created_at.desc()).limit(limite).all():
+            ultima = _ultima_actuacion(r)
+            procesos = [enlace.proceso for enlace in r.procesos if enlace.proceso]
             resultado.append({
-                "id": proceso.id,
-                "owner_id": proceso.abogado_id,
-                "owner_rol": proceso.abogado.rol.value,
-                "nombre": proceso.nombre,
-                "descripcion": proceso.descripcion,
-                "archivado_en": proceso.archivado_en,
-                "abogado": proceso.abogado.nombre_completo,
-                "radicados": len(proceso.radicados),
-                "clientes": len(proceso.clientes),
-                "cliente": proceso.clientes[0].cliente.nombre_completo if proceso.clientes else None,
-                "ultima_actividad": max(actividad).isoformat() if actividad else None,
-                "salud": salud,
-                "senales_salud": senales,
-                "tareas_vencidas": len(tareas_vencidas),
-                "documentos_pendientes": documentos_pendientes,
-                "consultas_con_error": errores_consulta,
-                "sin_responsable": not responsable_activo,
-                "sin_actividad": sin_actividad,
-                "created_at": proceso.created_at,
+                "id": r.id, "owner_id": r.creado_por_id, "numero": r.numero,
+                "abogado": r.creador.nombre_completo, "estado_consulta": r.estado_consulta,
+                "actuaciones": len(r.actuaciones), "consultado_en": r.consultado_en,
+                "despacho": r.despacho_departamento, "demandante": r.demandante, "demandado": r.demandado,
+                "procesos": [proceso.nombre for proceso in procesos],
+                "proceso_ids": [proceso.id for proceso in procesos],
+                "ultima_actuacion": ultima.actuacion if ultima else None,
+                "ultima_actuacion_fecha": ultima.fecha_actuacion if ultima else None,
+                "created_at": r.created_at,
             })
         return resultado
-    if recurso == "radicados":
-        query = _filtrar_radicados_por_sector(db.query(models.Radicado), sector)
-        return [{"id": r.id, "owner_id": r.creado_por_id, "numero": r.numero, "abogado": r.creador.nombre_completo, "estado_consulta": r.estado_consulta, "actuaciones": len(r.actuaciones), "consultado_en": r.consultado_en} for r in query.order_by(models.Radicado.created_at.desc()).limit(limite).all()]
     if recurso == "tareas":
-        query = db.query(models.Tarea).join(models.Usuario, models.Usuario.id == models.Tarea.usuario_id).filter(models.Usuario.rol.in_(roles))
-        query = query.filter(or_(models.Tarea.proceso_id.is_(None), models.Tarea.proceso.has(models.Proceso.archivado_en.is_(None))))
-        return [{"id": t.id, "owner_id": t.usuario_id, "titulo": t.titulo, "descripcion": t.descripcion, "estado": t.estado.value, "prioridad": t.prioridad.value, "abogado": t.usuario.nombre_completo, "cliente": t.cliente_asignado.nombre_completo if t.cliente_asignado else None, "cliente_id": t.cliente_id, "proceso": t.proceso.nombre if t.proceso else None, "proceso_id": t.proceso_id, "radicado_id": t.radicado_id, "fecha_limite": t.fecha_limite} for t in query.order_by(models.Tarea.created_at.desc()).limit(limite).all()]
+        query = (
+            db.query(models.Tarea)
+            .join(models.Usuario, models.Usuario.id == models.Tarea.usuario_id)
+            .filter(models.Usuario.rol.in_(roles))
+            .filter(or_(models.Tarea.proceso_id.is_(None), models.Tarea.proceso.has(models.Proceso.archivado_en.is_(None))))
+            .options(
+                selectinload(models.Tarea.usuario),
+                selectinload(models.Tarea.cliente_asignado),
+                selectinload(models.Tarea.proceso),
+                selectinload(models.Tarea.radicado),
+                selectinload(models.Tarea.subtareas),
+            )
+        )
+        return [{
+            "id": t.id, "owner_id": t.usuario_id, "titulo": t.titulo, "descripcion": t.descripcion,
+            "estado": t.estado.value, "prioridad": t.prioridad.value, "abogado": t.usuario.nombre_completo,
+            "cliente": t.cliente_asignado.nombre_completo if t.cliente_asignado else None, "cliente_id": t.cliente_id,
+            "proceso": t.proceso.nombre if t.proceso else None, "proceso_id": t.proceso_id,
+            "radicado_id": t.radicado_id, "radicado": t.radicado.numero if t.radicado else None,
+            "subtareas": len(t.subtareas), "subtareas_completadas": sum(1 for item in t.subtareas if item.completada),
+            "fecha_limite": t.fecha_limite, "completada_en": t.completada_en,
+            "created_at": t.created_at, "updated_at": t.updated_at,
+        } for t in query.order_by(models.Tarea.created_at.desc()).limit(limite).all()]
     if recurso == "documentos":
         query = _query_inventario_admin(db, recurso, sector).filter(or_(
             models.DocumentoProceso.proceso_id.is_(None),
             models.Proceso.archivado_en.is_(None),
-        ))
+        )).options(
+            selectinload(models.DocumentoProceso.proceso),
+            selectinload(models.DocumentoProceso.cliente),
+        )
         return [{"id": d.id, "owner_id": d.proceso.abogado_id if d.proceso else None, "nombre_archivo": d.nombre_archivo, "mime_type": d.mime_type, "proceso": d.proceso.nombre if d.proceso else "Sin proceso asociado", "proceso_id": d.proceso_id, "cliente": d.cliente.nombre_completo if d.cliente else "Usuario eliminado", "cliente_id": d.cliente_id, "solicitud_id": d.solicitud_id, "contrato_id": d.contrato_id, "estado_revision": d.estado_revision, "comentario_revision": d.comentario_revision, "revisado_en": d.revisado_en, "created_at": d.created_at} for d in query.order_by(models.DocumentoProceso.created_at.desc()).limit(limite).all()]
     raise HTTPException(status_code=404, detail="Inventario no disponible.")
 

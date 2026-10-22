@@ -47,7 +47,7 @@ def test_cambio_password_forzado_permite_acceso_me_y_retorna_nuevo_token():
         assert usuario_me.debe_cambiar_password is True
 
         # Endpoint /api/auth/me usando usuario_me
-        perfil = obtener_mi_usuario(usuario_actual=usuario_me, db=db)
+        perfil = obtener_mi_usuario(usuario_actual=usuario_me)
         assert perfil["email"] == "test-forzado@example.com"
         assert perfil["debe_cambiar_password"] is True
 

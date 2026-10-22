@@ -1,13 +1,16 @@
 from __future__ import annotations
 
+import hashlib
+import hmac
 import logging
 import json
 import os
 from datetime import datetime, timedelta
+from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy import or_
-from sqlalchemy.orm import Session
+from fastapi import APIRouter, Depends, HTTPException, Query
+from sqlalchemy import func, or_
+from sqlalchemy.orm import Session, selectinload
 
 from app import models, schemas, security
 from app.audit import registrar_evento_auditoria
@@ -219,6 +222,7 @@ def _send_chat_push(
     title: str | None = None,
     body: str | None = None,
     tag: str | None = None,
+    ack: dict | None = None,
 ) -> bool:
     public_key = os.getenv("WEB_PUSH_VAPID_PUBLIC_KEY", "").strip()
     private_key = os.getenv("WEB_PUSH_VAPID_PRIVATE_KEY", "").strip()
@@ -255,6 +259,8 @@ def _send_chat_push(
     }
     if body is not None:
         payload_data["body"] = body
+    if ack:
+        payload_data["ack"] = ack
     payload = json.dumps(payload_data, ensure_ascii=False)
     failed = 0
     for subscription in subscriptions:
@@ -299,6 +305,44 @@ def _send_chat_push(
             recipient.id, failed, len(subscriptions),
         )
     return delivered
+
+
+def _firma_entrega_push(usuario_id: int, mensaje_id: int) -> str:
+    return hmac.new(
+        security.get_jwt_secret().encode(),
+        f"chat-push-entrega:{usuario_id}:{mensaje_id}".encode(),
+        hashlib.sha256,
+    ).hexdigest()
+
+
+def _ack_entrega_push(usuario_id: int, mensaje_id: int) -> dict:
+    return {
+        "url": "/api/chat/push/entregado",
+        "usuario_id": usuario_id,
+        "mensaje_id": mensaje_id,
+        "firma": _firma_entrega_push(usuario_id, mensaje_id),
+    }
+
+
+@router.post("/push/entregado", status_code=204)
+def confirmar_entrega_push(data: schemas.ChatPushEntrega, db: Session = Depends(get_db)):
+    """El service worker confirma que la notificación llegó al dispositivo.
+
+    No lleva sesión: la firma HMAC emitida con el push autoriza solo ese mensaje para ese usuario.
+    """
+    if not hmac.compare_digest(data.firma, _firma_entrega_push(data.usuario_id, data.mensaje_id)):
+        raise HTTPException(status_code=403, detail="Confirmación de entrega no válida.")
+    message = db.get(models.ChatMensaje, data.mensaje_id)
+    if not message:
+        return None
+    participant = db.query(models.ChatParticipante).filter_by(
+        conversacion_id=message.conversacion_id,
+        usuario_id=data.usuario_id,
+    ).first()
+    if participant and participant.ultimo_entregado_mensaje_id < message.id:
+        participant.ultimo_entregado_mensaje_id = message.id
+        db.commit()
+    return None
 
 
 @router.post("/push/prueba")
@@ -395,13 +439,80 @@ def _conversation_for_actor(db: Session, conversation_id: int, user: models.Usua
 
 
 def _display_conversation(db: Session, conversation: models.ChatConversacion, user: models.Usuario) -> dict:
-    other = next((item.usuario for item in conversation.participantes if item.usuario_id != user.id and item.usuario), None)
-    now = datetime.utcnow()
-    other_ids = [item.usuario_id for item in conversation.participantes if item.usuario_id != user.id]
+    return _display_conversations(db, [conversation], user)[0]
+
+
+def _display_conversations(db: Session, conversations: list[models.ChatConversacion], user: models.Usuario) -> list[dict]:
+    """Serializa varias conversaciones con un número fijo de consultas.
+
+    La lista se consulta periódicamente desde cada pestaña abierta, por lo que
+    presencia, último mensaje y no leídos se calculan en bloque.
+    """
+    if not conversations:
+        return []
+    conversation_ids = [item.id for item in conversations]
+    other_ids = {
+        participant.usuario_id
+        for conversation in conversations
+        for participant in conversation.participantes
+        if participant.usuario_id != user.id
+    }
     online_ids = {row[0] for row in db.query(models.ChatPresenciaPanel.usuario_id).filter(
         models.ChatPresenciaPanel.usuario_id.in_(other_ids or [-1]),
-        models.ChatPresenciaPanel.last_seen_at >= now - PANEL_PRESENCE_TTL,
+        models.ChatPresenciaPanel.last_seen_at >= datetime.utcnow() - PANEL_PRESENCE_TTL,
     ).distinct().all()}
+    last_ids = (
+        db.query(func.max(models.ChatMensaje.id))
+        .filter(models.ChatMensaje.conversacion_id.in_(conversation_ids))
+        .group_by(models.ChatMensaje.conversacion_id)
+    )
+    last_by_conversation = {
+        message.conversacion_id: message
+        for message in db.query(models.ChatMensaje)
+        .options(selectinload(models.ChatMensaje.remitente))
+        .filter(models.ChatMensaje.id.in_(last_ids))
+        .all()
+    }
+    unread_by_conversation = {
+        row.conversacion_id: (row.total, row.primero)
+        for row in db.query(
+            models.ChatMensaje.conversacion_id,
+            func.count(models.ChatMensaje.id).label("total"),
+            func.min(models.ChatMensaje.id).label("primero"),
+        )
+        .join(
+            models.ChatParticipante,
+            (models.ChatParticipante.conversacion_id == models.ChatMensaje.conversacion_id)
+            & (models.ChatParticipante.usuario_id == user.id),
+        )
+        .filter(
+            models.ChatMensaje.conversacion_id.in_(conversation_ids),
+            models.ChatMensaje.remitente_id != user.id,
+            models.ChatMensaje.id > models.ChatParticipante.ultimo_leido_mensaje_id,
+        )
+        .group_by(models.ChatMensaje.conversacion_id)
+        .all()
+    }
+    return [
+        _serialize_conversation(
+            conversation, user, online_ids,
+            last_by_conversation.get(conversation.id),
+            unread_by_conversation.get(conversation.id, (0, None)),
+        )
+        for conversation in conversations
+    ]
+
+
+def _serialize_conversation(
+    conversation: models.ChatConversacion,
+    user: models.Usuario,
+    online_user_ids: set[int],
+    last: models.ChatMensaje | None,
+    unread_info: tuple[int, int | None],
+) -> dict:
+    other = next((item.usuario for item in conversation.participantes if item.usuario_id != user.id and item.usuario), None)
+    other_ids = {item.usuario_id for item in conversation.participantes if item.usuario_id != user.id}
+    online_ids = other_ids & online_user_ids
     if conversation.tipo == "PROCESO_COLABORADORES":
         title = "Colaboradores"
         subtitle = conversation.proceso.nombre if conversation.proceso else "Proceso"
@@ -420,20 +531,11 @@ def _display_conversation(db: Session, conversation: models.ChatConversacion, us
         base = f"/gestion-procesos/{_chat_area(user)}/chat/{target_path}"
         route_key = f"direct:{'administrador' if other and _role(other) == 'ADMIN' else (other.id if other else 0)}"
     base = compact_portal_path(user, base)
-    last = db.query(models.ChatMensaje).filter_by(conversacion_id=conversation.id).order_by(models.ChatMensaje.id.desc()).first()
-    own_participant = next((item for item in conversation.participantes if item.usuario_id == user.id), None)
-    last_read_id = own_participant.ultimo_leido_mensaje_id if own_participant else 0
-    unread_query = db.query(models.ChatMensaje.id).filter(
-        models.ChatMensaje.conversacion_id == conversation.id,
-        models.ChatMensaje.remitente_id != user.id,
-        models.ChatMensaje.id > last_read_id,
-    ).order_by(models.ChatMensaje.id.asc())
-    first_unread = unread_query.first()
-    unread = unread_query.count()
+    unread, first_unread_id = unread_info
     return {
         "id": conversation.id, "clave": conversation.clave, "route_key": route_key, "tipo": conversation.tipo,
         "titulo": title, "subtitulo": subtitle, "href": base, "no_leidos": unread,
-        "primer_no_leido_id": first_unread[0] if first_unread else None,
+        "primer_no_leido_id": first_unread_id,
         "proceso_id": conversation.proceso_id,
         "en_linea": bool(other and other.id in online_ids),
         "participantes_en_linea": len(online_ids),
@@ -632,37 +734,90 @@ def _resolve(db: Session, key: str, user: models.Usuario) -> models.ChatConversa
 
 
 @router.get("/conversaciones")
-def listar_conversaciones(db: Session = Depends(get_db), user: models.Usuario = Depends(security.obtener_usuario_actual)):
-    conversations = _create_available_conversations(db, user)
-    member_ids = [row.conversacion_id for row in db.query(models.ChatParticipante).filter_by(usuario_id=user.id).all()]
-    saved = db.query(models.ChatConversacion).filter(models.ChatConversacion.id.in_(member_ids or [-1])).all()
-    by_id = {item.id: item for item in [*saved, *conversations]}
-    db.commit()
-    result = []
-    for item in by_id.values():
-        try:
-            _conversation_for_actor(db, item.id, user)
-        except HTTPException:
-            continue
-        result.append(_display_conversation(db, item, user))
+def listar_conversaciones(
+    sincronizar: bool = True,
+    db: Session = Depends(get_db),
+    user: models.Usuario = Depends(security.obtener_usuario_actual),
+):
+    """Lista las conversaciones del usuario.
+
+    ``sincronizar=false`` omite la creación de conversaciones disponibles (que
+    escribe en la base de datos) y sirve para los sondeos periódicos.
+    """
+    if sincronizar:
+        _create_available_conversations(db, user)
+        db.commit()
+    member_ids = db.query(models.ChatParticipante.conversacion_id).filter_by(usuario_id=user.id)
+    conversations = (
+        db.query(models.ChatConversacion)
+        .filter(models.ChatConversacion.id.in_(member_ids))
+        .options(
+            selectinload(models.ChatConversacion.participantes).selectinload(models.ChatParticipante.usuario),
+            selectinload(models.ChatConversacion.proceso),
+        )
+        .all()
+    )
+    allowed_process_ids = _accessible_process_ids(
+        db, user, {item.proceso_id for item in conversations if item.proceso_id is not None},
+    )
+    visible = [
+        item for item in conversations
+        if item.proceso_id is None or item.proceso_id in allowed_process_ids
+    ]
+    result = _display_conversations(db, visible, user)
     return sorted(result, key=lambda item: item["updated_at"], reverse=True)
 
 
+def _accessible_process_ids(db: Session, user: models.Usuario, process_ids: set[int]) -> set[int]:
+    """Equivalente en bloque a ``_process`` para un conjunto de procesos."""
+    if not process_ids:
+        return set()
+    query = db.query(models.Proceso.id).filter(
+        models.Proceso.id.in_(process_ids),
+        models.Proceso.archivado_en.is_(None),
+    )
+    role = _role(user)
+    if role == "CLIENTE":
+        query = query.filter(models.Proceso.id.in_(
+            db.query(models.ProcesoCliente.proceso_id).filter(models.ProcesoCliente.cliente_id == user.id)
+        ))
+    elif role != "ADMIN":
+        query = query.filter(models.Proceso.id.in_(lawyer_process_ids(db, user)))
+    return {row[0] for row in query.all()}
+
+
 @router.get("/resolver")
-def resolver_conversacion(clave: str, after_id: int = 0, db: Session = Depends(get_db), user: models.Usuario = Depends(security.obtener_usuario_actual)):
+def resolver_conversacion(
+    clave: str,
+    after_id: int = 0,
+    before_id: int = 0,
+    limite: Annotated[int, Query(ge=1, le=200)] = 30,
+    db: Session = Depends(get_db),
+    user: models.Usuario = Depends(security.obtener_usuario_actual),
+):
     conversation = _resolve(db, clave, user)
     conversation = _conversation_for_actor(db, conversation.id, user)
     participant = next((item for item in conversation.participantes if item.usuario_id == user.id), None)
     message_query = db.query(models.ChatMensaje).filter(models.ChatMensaje.conversacion_id == conversation.id)
+    has_more = False
     if after_id > 0:
         messages = message_query.filter(models.ChatMensaje.id > after_id).order_by(models.ChatMensaje.id.asc()).limit(500).all()
     else:
-        messages = list(reversed(message_query.order_by(models.ChatMensaje.id.desc()).limit(500).all()))
-    status_messages = db.query(models.ChatMensaje).filter_by(
-        conversacion_id=conversation.id,
-        remitente_id=user.id,
-    ).order_by(models.ChatMensaje.id.desc()).limit(500).all()
-    if participant and messages:
+        # Carga paginada desde el final: los últimos `limite` mensajes, o los anteriores a `before_id`.
+        if before_id > 0:
+            message_query = message_query.filter(models.ChatMensaje.id < before_id)
+        page = message_query.order_by(models.ChatMensaje.id.desc()).limit(limite + 1).all()
+        has_more = len(page) > limite
+        messages = list(reversed(page[:limite]))
+    if before_id > 0:
+        # Al subir en el historial solo se piden mensajes antiguos; los estados ya están en el cliente.
+        status_messages = []
+    else:
+        status_messages = db.query(models.ChatMensaje).filter_by(
+            conversacion_id=conversation.id,
+            remitente_id=user.id,
+        ).order_by(models.ChatMensaje.id.desc()).limit(200).all()
+    if participant and messages and before_id <= 0:
         participant.ultimo_entregado_mensaje_id = max(
             participant.ultimo_entregado_mensaje_id,
             messages[-1].id,
@@ -670,6 +825,7 @@ def resolver_conversacion(clave: str, after_id: int = 0, db: Session = Depends(g
     db.commit()
     return {
         "conversacion": _display_conversation(db, conversation, user),
+        "hay_mas": has_more,
         "participantes": [{"id": item.usuario.id, "nombre": item.usuario.nombre_completo} for item in conversation.participantes if item.usuario],
         "estados_mensajes": [{"id": item.id, **_message_delivery(item, conversation.participantes)} for item in status_messages],
         "mensajes": [{
@@ -897,6 +1053,7 @@ def enviar_mensaje(conversation_id: int, data: schemas.ChatMensajeCreate, db: Se
             title=f"Nuevo mensaje de tu {sender_type} - {user.nombre_completo}.",
             body=content,
             tag=f"chat-message-{message.id}",
+            ack=_ack_entrega_push(recipient.id, message.id),
         ) if push_enabled else False
         if not (_supports_firm_panel_presence(user) and _supports_firm_panel_presence(recipient)):
             staff_sender = _role(user) != "CLIENTE"

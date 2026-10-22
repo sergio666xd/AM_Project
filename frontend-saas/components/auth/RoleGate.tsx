@@ -4,6 +4,7 @@ import { useEffect } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { useSession } from "@/context/SessionContext";
 import { LoadingState } from "@/components/ui/LoadingState";
+import { ApiErrorState } from "@/components/ui/ApiErrorState";
 import { loginUrlForRedirect } from "@/lib/authRedirect";
 import { isLocalPortalHost, portalHrefForRole } from "@/lib/portalHosts";
 
@@ -16,12 +17,15 @@ const homeByRole: Record<Role, string> = {
 };
 
 export function RoleGate({ roles, children, restrictedBehavior = "redirect" }: { roles: Role[]; children: React.ReactNode; restrictedBehavior?: "redirect" | "page" }) {
-  const { user, loading } = useSession();
+  const { user, loading, token, sessionError, retrySession } = useSession();
+  // Con token pero sin usuario por un fallo de red o servidor: se ofrece
+  // reintentar en lugar de enviar a iniciar sesión.
+  const backendUnavailable = !user && Boolean(token && sessionError);
   const router = useRouter();
   const pathname = usePathname();
 
   useEffect(() => {
-    if (loading) return;
+    if (loading || backendUnavailable) return;
     if (!user) {
       const currentUrl = typeof window === "undefined"
         ? pathname
@@ -55,7 +59,17 @@ export function RoleGate({ roles, children, restrictedBehavior = "redirect" }: {
         }
       }
     }
-  }, [loading, pathname, restrictedBehavior, roles, router, user]);
+  }, [backendUnavailable, loading, pathname, restrictedBehavior, roles, router, user]);
+
+  if (!loading && backendUnavailable) {
+    return (
+      <div className="grid min-h-screen place-items-center px-6">
+        <div className="w-full max-w-md">
+          <ApiErrorState error={new Error(sessionError ?? "")} onRetry={() => void retrySession()} />
+        </div>
+      </div>
+    );
+  }
 
   if (loading || !user || user.debe_cambiar_password || !roles.includes(user.rol as Role)) {
     return <div className="grid min-h-screen place-items-center px-6"><div className="w-full max-w-sm"><LoadingState label="Validando tu acceso" rows={2} /></div></div>;

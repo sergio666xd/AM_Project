@@ -1,6 +1,7 @@
 """Procesos de abogados, acceso de clientes y colaboración documental."""
 
 import logging
+from collections import defaultdict
 import os
 import hashlib
 import json
@@ -13,7 +14,7 @@ from fastapi.responses import StreamingResponse
 from sqlalchemy import or_
 from sqlalchemy import func
 from botocore.exceptions import BotoCoreError, ClientError
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, selectinload
 from urllib.parse import quote
 
 from app import models, schemas, security, storage
@@ -424,7 +425,7 @@ def _timeline_cliente_visible(proceso: models.Proceso, db: Session, cliente_id: 
     ultimas_actuaciones = set()
     if radicado_ids:
         actuaciones = db.query(models.Actuacion).filter(models.Actuacion.radicado_id.in_(radicado_ids)).order_by(
-            models.Actuacion.radicado_id, models.Actuacion.orden.desc(), models.Actuacion.id.desc(),
+            models.Actuacion.radicado_id, models.Actuacion.orden.asc(), models.Actuacion.id.desc(),
         ).all()
         vistos = set()
         for actuacion in actuaciones:
@@ -1460,13 +1461,39 @@ def actualizar_proceso(proceso_id: int, datos: schemas.ProcesoUpdate, db: Sessio
     return {"id": proceso.id, "nombre": proceso.nombre, "descripcion": proceso.descripcion}
 
 
+_CARGA_LISTADO_PROCESOS = (
+    selectinload(models.Proceso.abogado),
+    selectinload(models.Proceso.colaboradores).selectinload(models.ProcesoColaborador.abogado),
+    selectinload(models.Proceso.clientes).selectinload(models.ProcesoCliente.cliente),
+    selectinload(models.Proceso.radicados)
+    .selectinload(models.ProcesoRadicado.radicado)
+    .selectinload(models.Radicado.actuaciones),
+)
+
+
+def _resumen_actividad_procesos(db: Session, proceso_ids: list[int]) -> dict[int, dict[str, list]]:
+    """Agrupa en tres consultas las tareas, solicitudes y documentos de varios procesos."""
+    resumen: dict[int, dict[str, list]] = defaultdict(lambda: {"tareas": [], "solicitudes": [], "documentos": []})
+    if not proceso_ids:
+        return resumen
+    fuentes = (
+        ("tareas", models.Tarea, models.Tarea.proceso_id),
+        ("solicitudes", models.SolicitudDocumento, models.SolicitudDocumento.proceso_id),
+        ("documentos", models.DocumentoProceso, models.DocumentoProceso.proceso_id),
+    )
+    for clave, modelo, columna in fuentes:
+        for item in db.query(modelo).filter(columna.in_(proceso_ids)).all():
+            resumen[item.proceso_id][clave].append(item)
+    return resumen
+
+
 @router.get("/procesos")
 def listar_procesos(db: Session = Depends(get_db), usuario: models.Usuario = Depends(security.obtener_usuario_actual)):
     if usuario.rol == models.RolUsuario.CLIENTE:
         procesos = db.query(models.Proceso).join(models.ProcesoCliente).filter(
             models.ProcesoCliente.cliente_id == usuario.id,
             models.Proceso.archivado_en.is_(None),
-        ).all()
+        ).options(*_CARGA_LISTADO_PROCESOS).all()
     else:
         _abogado(usuario); query = db.query(models.Proceso)
         query = query.filter(models.Proceso.archivado_en.is_(None))
@@ -1475,7 +1502,12 @@ def listar_procesos(db: Session = Depends(get_db), usuario: models.Usuario = Dep
             query
             if responsible_lawyer_id is None
             else query.filter(models.Proceso.id.in_(lawyer_process_ids(db, usuario)))
-        ).all()
+        ).options(*_CARGA_LISTADO_PROCESOS).all()
+    resumen_staff = (
+        _resumen_actividad_procesos(db, [proceso.id for proceso in procesos])
+        if usuario.rol != models.RolUsuario.CLIENTE
+        else {}
+    )
     result = []
     for proceso in procesos:
         item = {
@@ -1501,7 +1533,7 @@ def listar_procesos(db: Session = Depends(get_db), usuario: models.Usuario = Dep
                             ),
                         }
                         for actuacion in (
-                            sorted(enlace.radicado.actuaciones, key=lambda item: (item.orden, item.id))[-1:]
+                            sorted(enlace.radicado.actuaciones, key=lambda item: (item.orden, item.id))[:1]
                             if usuario.rol == models.RolUsuario.CLIENTE
                             else sorted(enlace.radicado.actuaciones, key=lambda item: (item.orden, item.id))
                         )
@@ -1552,9 +1584,10 @@ def listar_procesos(db: Session = Depends(get_db), usuario: models.Usuario = Dep
                 "proxima_actividad_titulo": proxima_titulo,
             })
         else:
-            tareas = db.query(models.Tarea).filter_by(proceso_id=proceso.id).all()
-            solicitudes = db.query(models.SolicitudDocumento).filter_by(proceso_id=proceso.id).all()
-            documentos = db.query(models.DocumentoProceso).filter_by(proceso_id=proceso.id).all()
+            actividad = resumen_staff.get(proceso.id, {})
+            tareas = actividad.get("tareas", [])
+            solicitudes = actividad.get("solicitudes", [])
+            documentos = actividad.get("documentos", [])
             pendientes = [task for task in tareas if task.estado in (models.EstadoTarea.PENDIENTE, models.EstadoTarea.EN_CURSO)]
             vencidas = [task for task in pendientes if task.fecha_limite and task.fecha_limite < datetime.utcnow()]
             solicitudes_pendientes = [request for request in solicitudes if request.atendida_en is None]
@@ -1754,7 +1787,7 @@ def detalle_proceso_cliente(proceso_id: int, db: Session = Depends(get_db), usua
             "id": link.radicado.id,
             "numero": link.radicado.numero,
             "estado_visible": "En seguimiento" if (link.radicado.estado_consulta or "").casefold() == "ok" else "En revisión",
-            "actuaciones": [{"id": a.id, "fecha": a.fecha_actuacion, "descripcion": a.actuacion} for a in sorted(link.radicado.actuaciones, key=lambda action: (action.orden, action.id))[-1:]],
+            "actuaciones": [{"id": a.id, "fecha": a.fecha_actuacion, "descripcion": a.actuacion} for a in sorted(link.radicado.actuaciones, key=lambda action: (action.orden, action.id))[:1]],
         } for link in proceso.radicados if link.radicado],
         "tareas": [{"id": task.id, "titulo": task.titulo, "descripcion": task.descripcion, "estado": task.estado.value, "prioridad": task.prioridad.value, "cliente_id": task.cliente_id if task.cliente_id == usuario.id else None, "asignada_a_cliente": task.cliente_id == usuario.id, "fecha_limite": task.fecha_limite, "radicado_id": task.radicado_id, "actuacion_id": task.actuacion_id, "subtareas": [{"id": subtask.id, "titulo": subtask.titulo, "completada": subtask.completada} for subtask in task.subtareas if subtask.asignada_cliente and subtask.cliente_id == usuario.id]} for task in tareas],
         "solicitudes_documento": [{"id": request.id, "titulo": request.titulo, "instrucciones": request.instrucciones, "fecha_limite": request.fecha_limite, "atendida_en": request.atendida_en, "created_at": request.created_at, **_resumen_solicitud_documento(request)} for request in solicitudes],

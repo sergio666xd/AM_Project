@@ -1,24 +1,18 @@
 "use client";
 
 import { apiRequest, iniciarWorkflowConsultaRadicado } from "@/lib/api";
-import { useSession } from "@/context/SessionContext";
 
-import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
-import Link from "next/link";
+import { FormEvent, useCallback, useEffect, useState } from "react";
 import { PageHeader } from "@/components/ui/PageHeader";
-import { StatCard } from "@/components/ui/StatCard";
+import { DataTable, type DataTableColumn, type RowAction } from "@/components/ui/DataTable";
+import { SummaryStrip } from "@/components/ui/SummaryStrip";
+import { consultaLabel } from "@/lib/labels";
 import { Button } from "@/components/ui/Button";
 import { Badge } from "@/components/ui/Badge";
 import {
-  ArrowDown,
-  ArrowUp,
-  Check,
   ChevronRight,
-  FileText,
   Plus,
   RefreshCw,
-  Search,
-  Square,
   Trash2,
   X,
 } from "lucide-react";
@@ -49,8 +43,6 @@ type Radicado = {
   actuaciones?: Actuacion[];
 };
 
-type SortDirection = "asc" | "desc";
-
 function getLatestActuacion(
   radicado: Radicado
 ): Actuacion | null {
@@ -71,7 +63,8 @@ function getLatestActuacion(
       return dateB - dateA;
     }
 
-    return (b.orden ?? 0) - (a.orden ?? 0);
+    // Orden 1 es la actuación más reciente en la Rama Judicial.
+    return (a.orden ?? 0) - (b.orden ?? 0);
   })[0];
 }
 
@@ -91,73 +84,14 @@ function formatDate(value?: string | null) {
   });
 }
 
-function getStatusLabel(status?: string | null) {
-  switch (status?.toUpperCase()) {
-    case "COMPLETADA":
-      return "Actualizado";
-
-    case "EJECUTANDO":
-      return "Consultando";
-
-    case "ENCOLADA":
-      return "En cola";
-
-    case "ERROR":
-      return "Error";
-
-    case "SIN CONSULTAR":
-      return "Sin consultar";
-
-    default:
-      return status || "Sin consultar";
-  }
-}
-
-function getStatusStyle(status?: string | null) {
-  switch (status?.toUpperCase()) {
-    case "COMPLETADA":
-      return {
-        background: "var(--success-light)",
-        color: "var(--success)",
-      };
-
-    case "EJECUTANDO":
-    case "ENCOLADA":
-      return {
-        background: "var(--info-light)",
-        color: "var(--info)",
-      };
-
-    case "ERROR":
-      return {
-        background: "var(--danger-light)",
-        color: "var(--danger)",
-      };
-
-    default:
-      return {
-        background: "var(--surface-muted)",
-        color: "var(--foreground-muted)",
-      };
-  }
-}
-
 export default function RadicadosPage() {
-  const { user } = useSession();
-  const isAdmin = user?.rol === "ADMIN";
   const [radicados, setRadicados] = useState<Radicado[]>([]);
 
-  const [search, setSearch] = useState("");
-
-  // La página inicia ordenada de más nueva a más antigua.
-  const [sortDirection, setSortDirection] =
-    useState<SortDirection>("desc");
-
-  const [selectedIds, setSelectedIds] = useState<number[]>([]);
+  const [quickFilter, setQuickFilter] = useState<string | null>(null);
 
   const [loading, setLoading] = useState(true);
   const [creating, setCreating] = useState(false);
-  const [refreshing, setRefreshing] = useState(false);
+  const [, setRefreshing] = useState(false);
 
   const [consultingId, setConsultingId] = useState<number | null>(
     null
@@ -167,7 +101,7 @@ export default function RadicadosPage() {
     null
   );
 
-  const [bulkLoading, setBulkLoading] = useState(false);
+  const [, setBulkLoading] = useState(false);
 
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
@@ -219,96 +153,6 @@ export default function RadicadosPage() {
 
     void initialLoad();
   }, [loadRadicados]);
-
-  const filteredAndSortedRadicados = useMemo(() => {
-    const query = search.trim().toLowerCase();
-
-    const filtered = radicados.filter((radicado) => {
-      if (!query) return true;
-
-      const latest = getLatestActuacion(radicado);
-
-      const searchableText = [
-        radicado.numero,
-        radicado.despacho_departamento,
-        radicado.demandante,
-        radicado.demandado,
-        radicado.estado_consulta,
-        latest?.actuacion,
-        latest?.anotacion,
-      ]
-        .filter(Boolean)
-        .join(" ")
-        .toLowerCase();
-
-      return searchableText.includes(query);
-    });
-
-    return [...filtered].sort((a, b) => {
-      const latestA = getLatestActuacion(a);
-      const latestB = getLatestActuacion(b);
-
-      const dateA = latestA?.fecha_actuacion
-        ? new Date(latestA.fecha_actuacion).getTime()
-        : null;
-
-      const dateB = latestB?.fecha_actuacion
-        ? new Date(latestB.fecha_actuacion).getTime()
-        : null;
-
-      // Los que no tienen actuaciones quedan al final.
-      if (dateA === null && dateB === null) {
-        return a.numero.localeCompare(b.numero);
-      }
-
-      if (dateA === null) return 1;
-      if (dateB === null) return -1;
-
-      return sortDirection === "desc"
-        ? dateB - dateA
-        : dateA - dateB;
-    });
-  }, [radicados, search, sortDirection]);
-
-  const allVisibleSelected =
-    filteredAndSortedRadicados.length > 0 &&
-    filteredAndSortedRadicados.every((radicado) =>
-      selectedIds.includes(radicado.id)
-    );
-
-  const someVisibleSelected =
-    filteredAndSortedRadicados.some((radicado) =>
-      selectedIds.includes(radicado.id)
-    );
-
-  function toggleSelected(id: number) {
-    setSelectedIds((current) =>
-      current.includes(id)
-        ? current.filter((item) => item !== id)
-        : [...current, id]
-    );
-  }
-
-  function toggleSelectAll() {
-    const visibleIds = filteredAndSortedRadicados.map(
-      (radicado) => radicado.id
-    );
-
-    if (visibleIds.every((id) => selectedIds.includes(id))) {
-      setSelectedIds((current) =>
-        current.filter((id) => !visibleIds.includes(id))
-      );
-      return;
-    }
-
-    setSelectedIds((current) =>
-      Array.from(new Set([...current, ...visibleIds]))
-    );
-  }
-
-  function clearSelection() {
-    setSelectedIds([]);
-  }
 
   async function refresh() {
     setRefreshing(true);
@@ -412,7 +256,7 @@ export default function RadicadosPage() {
 
   async function deleteRadicado(radicado: Radicado) {
     const confirmed = window.confirm(
-      `¿Deseas eliminar el radicado ${radicado.numero}? Esta acción no se puede deshacer.`
+      `¿Quitar el radicado ${radicado.numero} de tu lista? Dejarás de recibir sus actuaciones.`
     );
 
     if (!confirmed) return;
@@ -445,9 +289,6 @@ export default function RadicadosPage() {
         current.filter((item) => item.id !== radicado.id)
       );
 
-      setSelectedIds((current) =>
-        current.filter((id) => id !== radicado.id)
-      );
 
       setMessage(
         `El radicado ${radicado.numero} fue eliminado correctamente.`
@@ -463,7 +304,7 @@ export default function RadicadosPage() {
     }
   }
 
-  async function consultSelected() {
+  async function consultSelected(selectedIds: number[]) {
     if (!selectedIds.length) return;
 
     setBulkLoading(true);
@@ -476,8 +317,6 @@ export default function RadicadosPage() {
         radicado_ids: selectedIds,
       });
       setMessage(`${selectedIds.length} consulta(s) enviadas al Workflow.`);
-
-      clearSelection();
       await loadRadicados();
     } catch (cause) {
       setError(
@@ -490,11 +329,11 @@ export default function RadicadosPage() {
     }
   }
 
-  async function deleteSelected() {
+  async function deleteSelected(selectedIds: number[]) {
     if (!selectedIds.length) return;
 
     const confirmed = window.confirm(
-      `¿Deseas eliminar los ${selectedIds.length} radicados seleccionados? Esta acción no se puede deshacer.`
+      `¿Quitar los ${selectedIds.length} radicados seleccionados de tu lista?`
     );
 
     if (!confirmed) return;
@@ -547,11 +386,6 @@ export default function RadicadosPage() {
           )
         );
 
-        setSelectedIds((current) =>
-          current.filter(
-            (id) => !successfulIds.includes(id)
-          )
-        );
       }
 
       if (failed > 0) {
@@ -574,722 +408,145 @@ export default function RadicadosPage() {
     }
   }
 
-  function toggleSort() {
-    setSortDirection((current) =>
-      current === "desc" ? "asc" : "desc"
-    );
-  }
+
+  const consulta = (radicado: Radicado) => consultaLabel(radicado.estado_consulta);
+  const hasIssue = (radicado: Radicado) => ["risk", "attention"].includes(consulta(radicado).tone);
+  const visibleRadicados = radicados.filter((radicado) =>
+    !quickFilter ||
+    (quickFilter === "OK" && consulta(radicado).label === "Consultado") ||
+    (quickFilter === "INCIDENCIAS" && hasIssue(radicado)) ||
+    (quickFilter === "SIN_CONSULTAR" && consulta(radicado).label === "Sin consultar"),
+  );
+
+  const radicadoColumns: DataTableColumn<Radicado>[] = [
+    {
+      key: "numero",
+      header: "Radicado",
+      mobile: "title",
+      sortValue: (radicado) => radicado.numero,
+      searchValue: (radicado) => [radicado.numero, radicado.demandante, radicado.demandado, radicado.despacho_departamento, getLatestActuacion(radicado)?.actuacion].filter(Boolean).join(" "),
+      render: (radicado) => <span className="font-mono text-[13px] font-medium text-foreground">{radicado.numero}</span>,
+    },
+    {
+      key: "partes",
+      header: "Partes",
+      mobile: "subtitle",
+      sortValue: (radicado) => radicado.demandante,
+      render: (radicado) => (
+        <span className="block max-w-72">
+          <span className="line-clamp-2">{[radicado.demandante, radicado.demandado].filter(Boolean).join(" vs. ") || <span className="text-foreground-muted">Pendiente de consulta</span>}</span>
+          {radicado.despacho_departamento && <span className="block truncate text-xs text-foreground-muted">{radicado.despacho_departamento}</span>}
+        </span>
+      ),
+    },
+    {
+      key: "estado",
+      header: "Consulta",
+      mobile: "badge",
+      sortValue: (radicado) => consulta(radicado).label,
+      render: (radicado) => <Badge tone={consulta(radicado).tone}>{consultingId === radicado.id ? "Consultando…" : consulta(radicado).label}</Badge>,
+    },
+    {
+      key: "ultima_actuacion",
+      header: "Última actuación",
+      mobile: "meta",
+      sortValue: (radicado) => getLatestActuacion(radicado)?.fecha_actuacion,
+      exportValue: (radicado) => [getLatestActuacion(radicado)?.fecha_actuacion, getLatestActuacion(radicado)?.actuacion].filter(Boolean).join(" · "),
+      render: (radicado) => {
+        const latest = getLatestActuacion(radicado);
+        return latest ? (
+          <span className="block max-w-64">
+            <span className="block truncate">{latest.actuacion || "Actuación"}</span>
+            <span className="text-xs text-foreground-muted">{formatDate(latest.fecha_actuacion)}</span>
+          </span>
+        ) : <span className="text-foreground-muted">Sin actuaciones</span>;
+      },
+    },
+    {
+      key: "actuaciones",
+      header: "Actuaciones",
+      mobile: "hidden",
+      align: "right",
+      hideOnMobile: true,
+      sortValue: (radicado) => radicado.actuaciones?.length ?? 0,
+      render: (radicado) => <span className="tabular-nums">{radicado.actuaciones?.length ?? 0}</span>,
+    },
+    {
+      key: "consultado_en",
+      header: "Consultado",
+      mobile: "meta",
+      wideOnly: true,
+      className: "whitespace-nowrap",
+      sortValue: (radicado) => radicado.consultado_en,
+      render: (radicado) => radicado.consultado_en || <span className="text-foreground-muted">Nunca</span>,
+    },
+  ];
+
+  const radicadoActions: RowAction<Radicado>[] = [
+    { label: "Ver actuaciones", icon: <ChevronRight />, href: (radicado) => `/gestion-procesos/abogado/radicados/${radicado.id}` },
+    { label: "Consultar ahora", icon: <RefreshCw />, onSelect: (radicado) => consultarRadicado(radicado), disabled: (radicado) => consultingId === radicado.id },
+    { label: "Quitar de mi lista", icon: <Trash2 />, tone: "danger", separated: true, onSelect: (radicado) => deleteRadicado(radicado), disabled: (radicado) => deletingId === radicado.id },
+  ];
 
   return (
-    <section className="space-y-6">
-      {/* HEADER */}
+    <section className="mx-auto max-w-7xl space-y-5">
       <PageHeader
-        overline="Gestión judicial"
+        overline="Expedientes"
         title="Radicados"
-        description="Administra tus procesos judiciales y consulta sus actuaciones en tiempo real."
+        description="Radicados judiciales que sigues, con el estado de su consulta y la última actuación registrada."
         action={
-          <div className="flex items-center gap-2">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => void refresh()}
-              loading={refreshing}
-              icon={<RefreshCw className="size-4" />}
-            >
-              Actualizar
-            </Button>
-
-            <Button
-              variant="primary"
-              onClick={() => {
-                setError("");
-                setMessage("");
-                setShowCreateModal(true);
-              }}
-              icon={<Plus className="size-4" />}
-            >
-              Nuevo radicado
-            </Button>
-          </div>
+          <Button variant="primary" onClick={() => { setError(""); setMessage(""); setShowCreateModal(true); }} icon={<Plus className="size-4" />}>
+            Nuevo radicado
+          </Button>
         }
       />
 
-      {/* RESUMEN */}
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-        <StatCard
-          label="Total radicados"
-          value={radicados.length}
-          icon={FileText}
-        />
-        <StatCard
-          label="Al día"
-          value={radicados.filter((r) => r.estado_consulta === "COMPLETADA").length}
-          tone="success"
-          icon={Check}
-        />
-        <StatCard
-          label="En consulta"
-          value={radicados.filter((r) => ["ENCOLADA", "EJECUTANDO"].includes(r.estado_consulta || "")).length}
-          tone={radicados.some((r) => ["ENCOLADA", "EJECUTANDO"].includes(r.estado_consulta || "")) ? "warning" : "default"}
-          icon={RefreshCw}
-        />
-      </div>
+      <SummaryStrip
+        active={quickFilter}
+        onSelect={setQuickFilter}
+        items={[
+          { key: "TODOS", label: "Radicados", value: radicados.length },
+          { key: "OK", label: "Consultados", value: radicados.filter((radicado) => consulta(radicado).label === "Consultado").length, tone: "success" },
+          { key: "INCIDENCIAS", label: "Con incidencias", value: radicados.filter(hasIssue).length, tone: "danger" },
+          { key: "SIN_CONSULTAR", label: "Sin consultar", value: radicados.filter((radicado) => consulta(radicado).label === "Sin consultar").length, tone: "warning" },
+        ]}
+      />
 
-      {/* MENSAJES */}
       {error && (
-        <div
-          role="alert"
-          className="rounded-xl border px-4 py-3 text-sm"
-          style={{
-            background: "var(--danger-light)",
-            borderColor: "var(--danger)",
-            color: "var(--danger)",
-          }}
-        >
-          {error}
+        <div role="alert" className="flex items-center justify-between gap-3 rounded-[var(--radius-lg)] border border-danger/30 bg-danger-light px-4 py-3 text-sm text-danger">
+          <span>{error}</span>
+          <button type="button" onClick={() => setError("")} aria-label="Cerrar error"><X className="size-4" /></button>
         </div>
       )}
-
       {message && (
-        <div
-          role="status"
-          className="rounded-xl border px-4 py-3 text-sm"
-          style={{
-            background: "var(--success-light)",
-            borderColor: "var(--success)",
-            color: "var(--success)",
-          }}
-        >
-          {message}
+        <div role="status" className="flex items-center justify-between gap-3 rounded-[var(--radius-lg)] border border-success/30 bg-success-light px-4 py-3 text-sm text-success">
+          <span>{message}</span>
+          <button type="button" onClick={() => setMessage("")} aria-label="Cerrar aviso"><X className="size-4" /></button>
         </div>
       )}
 
-      {/* HERRAMIENTAS */}
-      <div
-        className="rounded-xl border p-4 shadow-sm"
-        style={{
-          background: "var(--surface)",
-          borderColor: "var(--border)",
-        }}
-      >
-        <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-          <div className="relative w-full lg:max-w-md">
-            <Search
-              size={17}
-              className="absolute left-3 top-1/2 -translate-y-1/2"
-              style={{
-                color: "var(--foreground-muted)",
-              }}
-            />
-
-            <input
-              type="search"
-              value={search}
-              onChange={(event) => setSearch(event.target.value)}
-              placeholder="Buscar radicado, despacho o partes..."
-              className="w-full rounded-lg border py-2.5 pl-10 pr-3 text-sm outline-none transition"
-              style={{
-                background: "var(--surface-muted)",
-                borderColor: "var(--border)",
-                color: "var(--foreground)",
-              }}
-            />
-          </div>
-
-          <div
-            className="text-sm"
-            style={{
-              color: "var(--foreground-muted)",
-            }}
-          >
-            {filteredAndSortedRadicados.length}{" "}
-            {filteredAndSortedRadicados.length === 1
-              ? "radicado"
-              : "radicados"}
-          </div>
-        </div>
-      </div>
-
-      {/* ACCIONES MASIVAS */}
-      {selectedIds.length > 0 && (
-        <div
-          className="flex flex-col gap-3 rounded-xl border px-4 py-3 shadow-sm sm:flex-row sm:items-center sm:justify-between"
-          style={{
-            background: "var(--primary-light)",
-            borderColor: "var(--primary)",
-          }}
-        >
-          <div className="flex items-center gap-2">
-            <div
-              className="flex size-7 items-center justify-center rounded-full"
-              style={{
-                background: "var(--primary)",
-                color: "var(--primary-foreground)",
-              }}
-            >
-              <Check size={15} />
-            </div>
-
-            <span
-              className="text-sm font-medium"
-              style={{ color: "var(--foreground)" }}
-            >
-              {selectedIds.length}{" "}
-              {selectedIds.length === 1
-                ? "radicado seleccionado"
-                : "radicados seleccionados"}
-            </span>
-          </div>
-
-          <div className="flex flex-wrap items-center gap-2">
-            {isAdmin && (
-              <button
-                type="button"
-                onClick={() => void consultSelected()}
-                disabled={bulkLoading}
-                className="inline-flex items-center gap-2 rounded-lg border px-3 py-2 text-sm font-medium transition disabled:opacity-50"
-                style={{
-                  background: "var(--surface)",
-                  borderColor: "var(--border)",
-                  color: "var(--foreground-secondary)",
-                }}
-              >
-                <RefreshCw
-                  size={15}
-                  className={bulkLoading ? "animate-spin" : ""}
-                />
-                Consultar seleccionados
-              </button>
-            )}
-
-            <button
-              type="button"
-              onClick={() => void deleteSelected()}
-              disabled={bulkLoading}
-              className="inline-flex items-center gap-2 rounded-lg border px-3 py-2 text-sm font-medium transition disabled:opacity-50"
-              style={{
-                background: "var(--danger-light)",
-                borderColor: "var(--danger)",
-                color: "var(--danger)",
-              }}
-            >
-              <Trash2 size={15} />
-              Eliminar seleccionados
-            </button>
-
-            <button
-              type="button"
-              onClick={clearSelection}
-              disabled={bulkLoading}
-              className="rounded-lg p-2 transition hover:bg-[var(--surface-hover)] disabled:opacity-50"
-              style={{
-                color: "var(--foreground-muted)",
-              }}
-              title="Cancelar selección"
-            >
-              <X size={17} />
-            </button>
-          </div>
-        </div>
-      )}
-
-      {/* TABLA */}
-      <div
-        className="overflow-hidden rounded-xl border shadow-sm"
-        style={{
-          background: "var(--surface)",
-          borderColor: "var(--border)",
-        }}
-      >
-        <div
-          className="flex items-center justify-between border-b px-5 py-4"
-          style={{
-            borderColor: "var(--border)",
-          }}
-        >
-          <div>
-            <h2
-              className="font-semibold"
-              style={{
-                color: "var(--foreground)",
-              }}
-            >
-              Procesos judiciales
-            </h2>
-
-            <p
-              className="mt-0.5 text-xs"
-              style={{
-                color: "var(--foreground-muted)",
-              }}
-            >
-              Ordenados por última actuación, de más reciente a
-              más antigua.
-            </p>
-          </div>
-        </div>
-
-        {loading ? (
-          <div className="flex min-h-60 items-center justify-center">
-            <RefreshCw
-              size={24}
-              className="animate-spin"
-              style={{
-                color: "var(--primary)",
-              }}
-            />
-          </div>
-        ) : filteredAndSortedRadicados.length === 0 ? (
-          <div className="flex min-h-60 flex-col items-center justify-center px-6 text-center">
-            <div
-              className="flex size-12 items-center justify-center rounded-full"
-              style={{
-                background: "var(--surface-muted)",
-                color: "var(--foreground-muted)",
-              }}
-            >
-              <FileText size={22} />
-            </div>
-
-            <p
-              className="mt-4 font-medium"
-              style={{
-                color: "var(--foreground)",
-              }}
-            >
-              {search
-                ? "No se encontraron radicados"
-                : "No hay radicados registrados"}
-            </p>
-
-            <p
-              className="mt-1 max-w-md text-sm"
-              style={{
-                color: "var(--foreground-muted)",
-              }}
-            >
-              {search
-                ? "Prueba con otro número de radicado, despacho o parte."
-                : "Agrega tu primer radicado para comenzar a realizar seguimiento."}
-            </p>
-
-            {!search && (
-              <button
-                type="button"
-                onClick={() => setShowCreateModal(true)}
-                className="mt-4 inline-flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium"
-                style={{
-                  background: "var(--primary)",
-                  color: "var(--primary-foreground)",
-                }}
-              >
-                <Plus size={16} />
-                Agregar radicado
-              </button>
-            )}
-          </div>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[1100px] text-left">
-              <thead>
-                <tr
-                  className="border-b"
-                  style={{
-                    borderColor: "var(--border)",
-                  }}
-                >
-                  {/* SELECCIONAR TODO */}
-                  <th className="w-12 px-5 py-3">
-                    <button
-                      type="button"
-                      onClick={toggleSelectAll}
-                      className="flex size-5 items-center justify-center rounded border transition"
-                      style={{
-                        background: allVisibleSelected
-                          ? "var(--primary)"
-                          : "var(--surface)",
-                        borderColor: allVisibleSelected
-                          ? "var(--primary)"
-                          : "var(--border-strong)",
-                        color: "var(--primary-foreground)",
-                      }}
-                      title={
-                        allVisibleSelected
-                          ? "Deseleccionar todos"
-                          : "Seleccionar todos"
-                      }
-                    >
-                      {allVisibleSelected ? (
-                        <Check size={13} />
-                      ) : someVisibleSelected ? (
-                        <span
-                          className="block h-0.5 w-2.5"
-                          style={{
-                            background:
-                              "var(--primary)",
-                          }}
-                        />
-                      ) : (
-                        <Square
-                          size={12}
-                          style={{
-                            color: "var(--foreground-muted)",
-                          }}
-                        />
-                      )}
-                    </button>
-                  </th>
-
-                  <th
-                    className="px-5 py-3 text-xs font-semibold uppercase tracking-wide"
-                    style={{
-                      color: "var(--foreground-muted)",
-                    }}
-                  >
-                    Radicado
-                  </th>
-
-                  <th
-                    className="px-5 py-3 text-xs font-semibold uppercase tracking-wide"
-                    style={{
-                      color: "var(--foreground-muted)",
-                    }}
-                  >
-                    Despacho
-                  </th>
-
-                  <th
-                    className="px-5 py-3 text-xs font-semibold uppercase tracking-wide"
-                    style={{
-                      color: "var(--foreground-muted)",
-                    }}
-                  >
-                    Partes
-                  </th>
-
-                  <th
-                    className="px-5 py-3 text-xs font-semibold uppercase tracking-wide"
-                    style={{
-                      color: "var(--foreground-muted)",
-                    }}
-                  >
-                    Actuaciones
-                  </th>
-
-                  <th
-                    className="px-5 py-3 text-xs font-semibold uppercase tracking-wide"
-                    style={{
-                      color: "var(--foreground-muted)",
-                    }}
-                  >
-                    <button
-                      type="button"
-                      onClick={toggleSort}
-                      className="inline-flex items-center gap-1.5 transition hover:opacity-80"
-                    >
-                      Última Actuación
-
-                      {sortDirection === "desc" ? (
-                        <ArrowDown size={14} />
-                      ) : (
-                        <ArrowUp size={14} />
-                      )}
-                    </button>
-                  </th>
-
-                  <th
-                    className="px-5 py-3 text-xs font-semibold uppercase tracking-wide"
-                    style={{
-                      color: "var(--foreground-muted)",
-                    }}
-                  >
-                    Estado
-                  </th>
-
-                  <th className="px-5 py-3" />
-                </tr>
-              </thead>
-
-              <tbody>
-                {filteredAndSortedRadicados.map((radicado) => {
-                  const latest = getLatestActuacion(radicado);
-                  const isSelected = selectedIds.includes(
-                    radicado.id
-                  );
-
-                  const statusStyle = getStatusStyle(
-                    radicado.estado_consulta
-                  );
-
-                  const isConsulting =
-                    consultingId === radicado.id;
-
-                  const isDeleting =
-                    deletingId === radicado.id;
-
-                  return (
-                    <tr
-                      key={radicado.id}
-                      className="border-b transition last:border-b-0 hover:bg-[var(--surface-hover)]"
-                      style={{
-                        borderColor: "var(--border)",
-                        background: isSelected
-                          ? "var(--primary-light)"
-                          : undefined,
-                      }}
-                    >
-                      {/* CHECKBOX */}
-                      <td className="px-5 py-4 align-top">
-                        <button
-                          type="button"
-                          onClick={() =>
-                            toggleSelected(radicado.id)
-                          }
-                          className="flex size-5 items-center justify-center rounded border transition"
-                          style={{
-                            background: isSelected
-                              ? "var(--primary)"
-                              : "var(--surface)",
-                            borderColor: isSelected
-                              ? "var(--primary)"
-                              : "var(--border-strong)",
-                            color: "var(--primary-foreground)",
-                          }}
-                          title={
-                            isSelected
-                              ? "Deseleccionar"
-                              : "Seleccionar"
-                          }
-                        >
-                          {isSelected && (
-                            <Check size={13} />
-                          )}
-                        </button>
-                      </td>
-
-                      {/* RADICADO */}
-                      <td className="px-5 py-4 align-top">
-                        <Link
-                          href={`/gestion-procesos/abogado/radicados/${radicado.id}`}
-                          className="group inline-flex items-center gap-2"
-                        >
-                          <span
-                            className="font-medium transition group-hover:underline"
-                            style={{
-                              color: "var(--primary)",
-                            }}
-                          >
-                            {radicado.numero}
-                          </span>
-
-                          <ChevronRight
-                            size={15}
-                            style={{
-                              color:
-                                "var(--foreground-muted)",
-                            }}
-                          />
-                        </Link>
-                      </td>
-
-                      {/* DESPACHO */}
-                      <td className="px-5 py-4 align-top">
-                        <p
-                          className="max-w-[200px] text-sm"
-                          style={{
-                            color:
-                              "var(--foreground-secondary)",
-                          }}
-                        >
-                          {radicado.despacho_departamento ||
-                            "—"}
-                        </p>
-                      </td>
-
-                      {/* PARTES */}
-                      <td className="px-5 py-4 align-top">
-                        <div className="max-w-[250px] space-y-1">
-                          <p
-                            className="truncate text-sm"
-                            title={
-                              radicado.demandante || ""
-                            }
-                            style={{
-                              color:
-                                "var(--foreground-secondary)",
-                            }}
-                          >
-                            <span
-                              className="text-xs"
-                              style={{
-                                color:
-                                  "var(--foreground-muted)",
-                              }}
-                            >
-                              Demandante:{" "}
-                            </span>
-                            {radicado.demandante || "—"}
-                          </p>
-
-                          <p
-                            className="truncate text-sm"
-                            title={
-                              radicado.demandado || ""
-                            }
-                            style={{
-                              color:
-                                "var(--foreground-secondary)",
-                            }}
-                          >
-                            <span
-                              className="text-xs"
-                              style={{
-                                color:
-                                  "var(--foreground-muted)",
-                              }}
-                            >
-                              Demandado:{" "}
-                            </span>
-                            {radicado.demandado || "—"}
-                          </p>
-                        </div>
-                      </td>
-
-                      {/* ACTUACIONES */}
-                      <td className="px-5 py-4 align-top">
-                        <span
-                          className="inline-flex rounded-full px-3 py-1 text-xs font-medium"
-                          style={{
-                            background:
-                              "var(--surface-muted)",
-                            color:
-                              "var(--foreground-secondary)",
-                          }}
-                        >
-                          {radicado.actuaciones?.length ?? 0}
-                        </span>
-                      </td>
-
-                      {/* ÚLTIMA ACTUACIÓN */}
-                      <td className="px-5 py-4 align-top">
-                        {latest ? (
-                          <div className="max-w-[280px]">
-                            <p
-                              className="text-sm font-medium"
-                              style={{
-                                color:
-                                  "var(--foreground)",
-                              }}
-                            >
-                              {formatDate(
-                                latest.fecha_actuacion
-                              )}
-                            </p>
-
-                            <p
-                              className="mt-1 line-clamp-2 text-sm"
-                              title={
-                                latest.actuacion ||
-                                latest.anotacion ||
-                                ""
-                              }
-                              style={{
-                                color:
-                                  "var(--foreground-secondary)",
-                              }}
-                            >
-                              {latest.actuacion ||
-                                latest.anotacion ||
-                                "Sin descripción"}
-                            </p>
-                          </div>
-                        ) : (
-                          <span
-                            className="text-sm"
-                            style={{
-                              color:
-                                "var(--foreground-muted)",
-                            }}
-                          >
-                            Sin actuaciones
-                          </span>
-                        )}
-                      </td>
-
-                      {/* ESTADO */}
-                      <td className="px-5 py-4 align-top">
-                        <span
-                          className="inline-flex rounded-full px-3 py-1 text-xs font-medium"
-                          style={statusStyle}
-                        >
-                          {getStatusLabel(
-                            radicado.estado_consulta
-                          )}
-                        </span>
-                      </td>
-
-                      {/* ACCIONES */}
-                      <td className="px-5 py-4 align-top">
-                        <div className="flex items-center justify-end gap-1">
-                          {/* Consultar */}
-                          {isAdmin && (
-                            <button
-                              type="button"
-                              onClick={() => void consultarRadicado(radicado)}
-                              disabled={isConsulting || isDeleting || bulkLoading}
-                              className="rounded-lg p-2 transition hover:bg-[var(--surface-muted)] disabled:cursor-not-allowed disabled:opacity-50"
-                              title="Consultar actuaciones"
-                              style={{ color: "var(--info)" }}
-                            >
-                              <RefreshCw
-                                size={17}
-                                className={isConsulting ? "animate-spin" : ""}
-                              />
-                            </button>
-                          )}
-
-                          {/* Ver detalle */}
-                          <Link
-                            href={`/gestion-procesos/abogado/radicados/${radicado.id}`}
-                            className="rounded-lg p-2 transition hover:bg-[var(--surface-muted)]"
-                            title="Ver detalle"
-                            style={{
-                              color:
-                                "var(--foreground-muted)",
-                            }}
-                          >
-                            <ChevronRight size={17} />
-                          </Link>
-
-                          {/* Eliminar */}
-                          <button
-                            type="button"
-                            onClick={() =>
-                              void deleteRadicado(
-                                radicado
-                              )
-                            }
-                            disabled={isDeleting || isConsulting || bulkLoading}
-                            className="rounded-lg p-2 transition hover:bg-[var(--danger-light)] disabled:cursor-not-allowed disabled:opacity-50"
-                            title="Eliminar radicado"
-                            style={{ color: "var(--danger)" }}
-                          >
-                            {isDeleting ? (
-                              <RefreshCw size={17} className="animate-spin" />
-                            ) : (
-                              <Trash2 size={17} />
-                            )}
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </div>
+      <DataTable
+        caption="Radicados"
+        rows={quickFilter === "TODOS" ? radicados : visibleRadicados}
+        columns={radicadoColumns}
+        rowKey={(radicado) => radicado.id}
+        rowHref={(radicado) => `/gestion-procesos/abogado/radicados/${radicado.id}`}
+        rowActions={radicadoActions}
+        bulkActions={[
+          { label: "Consultar", icon: <RefreshCw />, onRun: (rows) => consultSelected(rows.map((radicado) => radicado.id)) },
+          { label: "Quitar de mi lista", icon: <Trash2 />, tone: "danger", onRun: (rows) => deleteSelected(rows.map((radicado) => radicado.id)) },
+        ]}
+        rowTone={(radicado) => (consulta(radicado).tone === "risk" ? "danger" : undefined)}
+        searchPlaceholder="Buscar por número, partes, despacho o actuación"
+        initialSort={{ key: "ultima_actuacion", direction: "desc" }}
+        exportFilename="radicados"
+        storageKey="abogado-radicados"
+        loading={loading}
+        onRefresh={() => void refresh()}
+        emptyTitle={radicados.length === 0 ? "Aún no sigues ningún radicado" : "Ningún radicado coincide con este filtro"}
+        emptyDescription={radicados.length === 0 ? "Agrega el número de 23 dígitos para consultar sus actuaciones automáticamente." : "Toca el indicador de nuevo para ver todos."}
+        emptyAction={radicados.length === 0 ? <Button variant="primary" onClick={() => setShowCreateModal(true)} icon={<Plus className="size-4" />}>Nuevo radicado</Button> : undefined}
+      />
 
       {/* MODAL CREAR RADICADO */}
       {showCreateModal && (

@@ -277,6 +277,7 @@ def _agregar_actuaciones_a_grupo(
     radicado: models.Radicado,
     proceso: models.Proceso | None,
     actuaciones: list[dict],
+    db: Session,
 ) -> None:
     for canal in canales_habilitados(usuario, "ACTUACIONES", emisor=emisor, db=db):
         clave = (usuario.id, canal)
@@ -301,7 +302,8 @@ def _cuerpo_novedades(secciones: list[dict]) -> str:
     for seccion in secciones:
         actuaciones = list(seccion["actuaciones"].values())
         actuaciones.sort(key=lambda item: (item.get("orden", 0), item.get("id", 0)))
-        reciente = actuaciones[-1]
+        # Orden 1 corresponde a la actuación más reciente en la Rama Judicial.
+        reciente = actuaciones[0]
         encabezado = f"Proceso: {seccion['proceso']}\n" if seccion["proceso"] else ""
         bloque = (
             f"{encabezado}Radicado: {seccion['radicado']}\n"
@@ -467,6 +469,7 @@ def preparar_notificaciones_actuaciones(
                         radicado,
                         proceso,
                         nuevas,
+                        db=db,
                     )
             else:
                 for actuacion in nuevas:
@@ -478,6 +481,7 @@ def preparar_notificaciones_actuaciones(
                     radicado,
                     None,
                     nuevas,
+                    db=db,
                 )
 
         for cliente, proceso in clientes_notificables_para_radicado(radicado):
@@ -511,6 +515,7 @@ def preparar_notificaciones_actuaciones(
                     radicado,
                     proceso,
                     nuevas,
+                    db=db,
                 )
 
     for push_usuario, proceso, radicado, actuacion in push_targets.values():
@@ -758,6 +763,7 @@ def preparar_recordatorio_workflow(
         mensaje += f"\nActuación: {tarea.actuacion_rel.actuacion or 'Actuación judicial'}"
     if tarea.descripcion:
         mensaje += f"\nDetalle: {tarea.descripcion}"
+    programado_por = "en el momento programado"
     if tarea.fecha_limite:
         fecha_limite = normalizar_utc_naive(tarea.fecha_limite)
         anticipacion = recordatorio.anticipacion_minutos

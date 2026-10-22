@@ -49,3 +49,21 @@ export function upsertChat<T extends ChatListEntry>(current: T[], incoming: T): 
     .sort((left, right) => right.updated_at.localeCompare(left.updated_at));
   return preserveChatList(current, next);
 }
+
+/** Cada cuánto se pide a la API crear conversaciones nuevas (escritura). */
+const CHAT_SYNC_INTERVAL_MS = 60_000;
+let lastChatSyncAt = 0;
+
+/**
+ * Ruta del listado de conversaciones. Los sondeos frecuentes solo leen; la
+ * sincronización de conversaciones disponibles se pide como máximo una vez
+ * por minuto y por pestaña.
+ */
+export function chatListEndpoint(): string {
+  const now = Date.now();
+  if (now - lastChatSyncAt >= CHAT_SYNC_INTERVAL_MS) {
+    lastChatSyncAt = now;
+    return "/api/chat/conversaciones";
+  }
+  return "/api/chat/conversaciones?sincronizar=false";
+}

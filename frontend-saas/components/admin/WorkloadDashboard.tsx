@@ -59,7 +59,7 @@ export default function WorkloadDashboard() {
         title="Métricas y carga de trabajo"
         description="Procesos, tareas y próximos vencimientos por responsable."
       />
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      <div className="grid grid-cols-2 gap-2 sm:gap-4 xl:grid-cols-4">
         <StatCard label="Procesos activos" value={data.procesos_activos} icon={FolderOpen} />
         <StatCard label="Tareas abiertas" value={data.tareas_abiertas} icon={CheckSquare} />
         <StatCard label="Tareas vencidas" value={data.vencidas} icon={AlertTriangle} tone={data.vencidas > 0 ? "danger" : "default"} />

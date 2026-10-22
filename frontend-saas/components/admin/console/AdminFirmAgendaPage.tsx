@@ -5,6 +5,7 @@ import { CalendarDays, ChevronLeft, ChevronRight, List, RefreshCw } from "lucide
 import { fetchApi } from "@/lib/api";
 import { useSession } from "@/context/SessionContext";
 import { PageHeader } from "@/components/ui/PageHeader";
+import { toDateTimeLocalInput } from "@/lib/labels";
 import { Button } from "@/components/ui/Button";
 
 type FirmTask = {
@@ -222,7 +223,7 @@ export default function AdminFirmAgendaPage() {
 
   function openEditEvent(event: FirmEvent) {
     setEditingEventId(event.id);
-    setEventDraft({ titulo: event.titulo, descripcion: event.descripcion ?? "", tipo: event.tipo, estado: event.estado, fecha_inicio: new Date(event.fecha_inicio.endsWith("Z") ? event.fecha_inicio : `${event.fecha_inicio}Z`).toISOString().slice(0, 16), responsable_id: String(event.responsable_id ?? ""), proceso_id: String(event.proceso_id ?? ""), cliente_id: String(event.cliente_id ?? "") });
+    setEventDraft({ titulo: event.titulo, descripcion: event.descripcion ?? "", tipo: event.tipo, estado: event.estado, fecha_inicio: toDateTimeLocalInput(event.fecha_inicio.endsWith("Z") ? event.fecha_inicio : `${event.fecha_inicio}Z`), responsable_id: String(event.responsable_id ?? ""), proceso_id: String(event.proceso_id ?? ""), cliente_id: String(event.cliente_id ?? "") });
     setEventFormOpen(true);
   }
 

@@ -6,6 +6,10 @@ import Image from "next/image";
 import { usePathname } from "next/navigation";
 import {
   Activity,
+  BarChart3,
+  FileSignature,
+  Inbox,
+  Scale,
   Bell,
   BookOpenText,
   CalendarDays,
@@ -34,6 +38,7 @@ import {
   X,
 } from "lucide-react";
 import { useSession } from "@/context/SessionContext";
+import { MobileTabBar, OPEN_MOBILE_NAV_EVENT, type MobileTab } from "@/components/layout/MobileTabBar";
 import Breadcrumbs from "@/components/layout/Breadcrumbs";
 import { AdminAlertBell } from "@/components/admin/console/AdminAlertBell";
 import GlobalSearch from "@/components/layout/GlobalSearch";
@@ -62,72 +67,74 @@ const operationsChildren: NavItem[] = [
   { label: "Notificaciones", href: "/gestion-procesos/admin/operacion/notificaciones", icon: Bell },
   { label: "Mensajes del sistema", href: "/gestion-procesos/admin/operacion/mensajes", icon: FileText },
 ];
-const documentChildren: NavItem[] = [
-  { label: "Archivos recibidos", href: "/gestion-procesos/admin/documentos", icon: BookOpenText },
-  { label: "Contratos cargados", href: "/gestion-procesos/admin/documentos/contratos", icon: FileText },
-  { label: "Solicitudes documentales", href: "/gestion-procesos/admin/documentos/solicitudes", icon: FileText },
-];
-const auditChildren: NavItem[] = [
-  { label: "Actividad", href: "/gestion-procesos/admin/actividad", icon: Activity },
-  { label: "Auditoría técnica", href: "/gestion-procesos/admin/auditoria", icon: ScrollText },
-];
-
 const sections: NavSection[] = [
   {
-    title: "General",
+    title: "Inicio",
     defaultOpen: true,
     items: [
       { label: "Resumen", href: "/gestion-procesos/admin", icon: LayoutDashboard },
       { label: "Alertas", href: "/gestion-procesos/admin/alertas", icon: Bell },
-      { label: "Actividad", href: "/gestion-procesos/admin/actividad", icon: Activity },
-      { label: "Notificaciones", href: "/gestion-procesos/admin/notificaciones", icon: Bell },
+      { label: "Notificaciones", href: "/gestion-procesos/admin/notificaciones", icon: Inbox },
     ],
   },
   {
-    title: "Gestión",
+    title: "Expedientes",
     defaultOpen: true,
     items: [
-      { label: "Usuarios", href: "/gestion-procesos/admin/usuarios", icon: Users },
-      { label: "Solicitudes", href: "/gestion-procesos/admin/solicitudes", icon: UserCheck },
-      { label: "Solicitudes de perfil", href: "/gestion-procesos/admin/solicitudes-perfil", icon: UserRound },
       { label: "Procesos", href: "/gestion-procesos/admin/procesos", icon: FolderOpen },
-      { label: "Radicados", href: "/gestion-procesos/admin/radicados", icon: FileText },
+      { label: "Radicados", href: "/gestion-procesos/admin/radicados", icon: Scale },
       { label: "Tareas", href: "/gestion-procesos/admin/tareas", icon: ListChecks },
       { label: "Agenda", href: "/gestion-procesos/admin/agenda", icon: CalendarDays },
       { label: "Documentos", href: "/gestion-procesos/admin/documentos", icon: BookOpenText },
-      { label: "Contratos", href: "/gestion-procesos/admin/contratos", icon: FileText },
+      { label: "Contratos", href: "/gestion-procesos/admin/contratos", icon: FileSignature },
     ],
   },
   {
-    title: "Plataforma",
+    title: "Personas",
+    defaultOpen: true,
+    items: [
+      { label: "Usuarios", href: "/gestion-procesos/admin/usuarios", icon: Users },
+      { label: "Solicitudes de perfil", href: "/gestion-procesos/admin/solicitudes-perfil", icon: UserRound },
+      { label: "Registros pendientes", href: "/gestion-procesos/admin/solicitudes", icon: UserCheck },
+      { label: "Chat del equipo", href: "/gestion-procesos/admin/chat", icon: MessageCircle },
+    ],
+  },
+  {
+    title: "Supervisión",
+    items: [
+      { label: "Métricas", href: "/gestion-procesos/admin/metricas", icon: BarChart3 },
+      { label: "Actividad", href: "/gestion-procesos/admin/actividad", icon: Activity },
+      { label: "Auditoría técnica", href: "/gestion-procesos/admin/auditoria", icon: ScrollText },
+    ],
+  },
+  {
+    title: "Sistema",
+    items: [
+      { label: "Operación", href: "/gestion-procesos/admin/operacion", icon: ServerCog },
+      { label: "Datos de la firma", href: "/gestion-procesos/admin/firma", icon: Settings },
+      { label: "Contenido público", href: "/gestion-procesos/admin/contenido", icon: FileText },
+      { label: "Almacenamiento", href: "/gestion-procesos/admin/almacenamiento", icon: HardDrive },
+      { label: "Limpieza de chats", href: "/gestion-procesos/admin/chat/limpiar", icon: Eraser },
+    ],
+  },
+  {
+    title: "SaaS heredado",
     items: [
       { label: "Planes", href: "/gestion-procesos/admin/planes", icon: CreditCard },
-      { label: "Métricas", href: "/gestion-procesos/admin/metricas", icon: Activity },
-      { label: "Operación", href: "/gestion-procesos/admin/operacion", icon: ServerCog },
-      { label: "Auditoría", href: "/gestion-procesos/admin/auditoria", icon: ScrollText },
-      { label: "Almacenamiento", href: "/gestion-procesos/admin/almacenamiento", icon: HardDrive },
+      { label: "Procesos SaaS", href: "/gestion-procesos/admin/saas/procesos", icon: FolderOpen },
+      { label: "Radicados SaaS", href: "/gestion-procesos/admin/saas/radicados", icon: Scale },
+      { label: "Tareas SaaS", href: "/gestion-procesos/admin/saas/tareas", icon: ListChecks },
+      { label: "Documentos SaaS", href: "/gestion-procesos/admin/saas/documentos", icon: BookOpenText },
+      { label: "Radicados globales", href: "/gestion-procesos/admin/global/radicados", icon: Scale },
     ],
   },
-  {
-    title: "Cuenta",
-    items: [
-      { label: "Firma", href: "/gestion-procesos/admin/firma", icon: Settings },
-      { label: "Mi cuenta", href: "/gestion-procesos/admin/cuenta", icon: UserRound },
-      { label: "Chat del equipo", href: "/gestion-procesos/admin/chat", icon: MessageCircle },
-      { label: "Limpiar chats", href: "/gestion-procesos/admin/chat/limpiar", icon: Eraser },
-      { label: "Contenido público", href: "/gestion-procesos/admin/contenido", icon: FileText },
-    ],
-  },
-  {
-    title: "SaaS individual",
-    items: [
-      { label: "Procesos", href: "/gestion-procesos/admin/saas/procesos", icon: FolderOpen },
-      { label: "Radicados", href: "/gestion-procesos/admin/saas/radicados", icon: FileText },
-      { label: "Tareas", href: "/gestion-procesos/admin/saas/tareas", icon: ListChecks },
-      { label: "Documentos", href: "/gestion-procesos/admin/saas/documentos", icon: BookOpenText },
-      { label: "Radicados globales", href: "/gestion-procesos/admin/global/radicados", icon: FileText },
-    ],
-  },
+];
+
+const adminTabs: MobileTab[] = [
+  { label: "Resumen", href: "/gestion-procesos/admin", icon: LayoutDashboard },
+  { label: "Procesos", href: "/gestion-procesos/admin/procesos", icon: FolderOpen },
+  { label: "Tareas", href: "/gestion-procesos/admin/tareas", icon: ListChecks },
+  { label: "Usuarios", href: "/gestion-procesos/admin/usuarios", icon: Users },
 ];
 
 function normalizePath(path: string): string {
@@ -154,6 +161,7 @@ function isActive(pathname: string, href: string): boolean {
   }
 
   if (current === target) return true;
+  if (target === "/gestion-procesos/admin/chat" && current.startsWith("/gestion-procesos/admin/chat/limpiar")) return false;
   return current.startsWith(`${target}/`);
 }
 
@@ -164,13 +172,10 @@ function hasChildActive(items: NavItem[], pathname: string) {
 /* ─── Collapsible section ─── */
 function NavSection({ section, pathname, onNavigate }: { section: NavSection; pathname: string; onNavigate: () => void }) {
   const childActive = hasChildActive(section.items, pathname);
-  const [open, setOpen] = useState(section.defaultOpen || childActive);
-
-  useEffect(() => {
-    if (childActive) {
-      setOpen(true);
-    }
-  }, [childActive]);
+  // La sección con la página activa siempre se muestra abierta.
+  const [manualOpen, setManualOpen] = useState<boolean | null>(null);
+  const open = childActive || (manualOpen ?? Boolean(section.defaultOpen));
+  const setOpen = (update: (previous: boolean) => boolean) => setManualOpen(update(open));
 
   return (
     <section aria-label={section.title}>
@@ -243,49 +248,6 @@ function NavSection({ section, pathname, onNavigate }: { section: NavSection; pa
                   </div>
                 )}
 
-                {/* Sub-navigation for Documents */}
-                {item.href === "/gestion-procesos/admin/documentos" && active && (
-                  <div className="ml-5 space-y-0.5 border-l-2 border-brand-200 dark:border-brand-800 py-1 pl-3">
-                    {documentChildren.map(({ label, href: childHref, icon: ChildIcon }) => {
-                      const childActive2 = normalizePath(pathname) === normalizePath(childHref);
-                      return (
-                        <Link key={childHref} href={childHref} onClick={onNavigate}
-                          aria-current={childActive2 ? "page" : undefined}
-                          className={`group flex items-center gap-2 rounded-[var(--radius-sm)] px-2.5 py-1.5 text-xs font-medium transition-all ${
-                            childActive2
-                              ? "bg-brand-900 text-white font-semibold shadow-xs dark:bg-brand-800 dark:text-white"
-                              : "text-foreground-muted hover:bg-surface-hover hover:text-foreground-secondary"
-                          }`}
-                        >
-                          <ChildIcon className={`size-3.5 shrink-0 ${childActive2 ? "text-gold-400 dark:text-gold-300" : "text-foreground-muted group-hover:text-foreground-secondary"}`} />
-                          <span className="truncate">{label}</span>
-                        </Link>
-                      );
-                    })}
-                  </div>
-                )}
-
-                {/* Sub-navigation for Audit */}
-                {item.href === "/gestion-procesos/admin/auditoria" && (pathname.startsWith("/gestion-procesos/admin/auditoria") || pathname.startsWith("/gestion-procesos/admin/actividad")) && (
-                  <div className="ml-5 space-y-0.5 border-l-2 border-brand-200 dark:border-brand-800 py-1 pl-3">
-                    {auditChildren.map(({ label, href: childHref, icon: ChildIcon }) => {
-                      const childActive2 = normalizePath(pathname) === normalizePath(childHref);
-                      return (
-                        <Link key={childHref} href={childHref} onClick={onNavigate}
-                          aria-current={childActive2 ? "page" : undefined}
-                          className={`group flex items-center gap-2 rounded-[var(--radius-sm)] px-2.5 py-1.5 text-xs font-medium transition-all ${
-                            childActive2
-                              ? "bg-brand-900 text-white font-semibold shadow-xs dark:bg-brand-800 dark:text-white"
-                              : "text-foreground-muted hover:bg-surface-hover hover:text-foreground-secondary"
-                          }`}
-                        >
-                          <ChildIcon className={`size-3.5 shrink-0 ${childActive2 ? "text-gold-400 dark:text-gold-300" : "text-foreground-muted group-hover:text-foreground-secondary"}`} />
-                          <span className="truncate">{label}</span>
-                        </Link>
-                      );
-                    })}
-                  </div>
-                )}
               </div>
             );
           })}
@@ -309,6 +271,12 @@ export default function AdminConsoleShell({ children }: { children: ReactNode })
   const logoSrc = darkMode ? "/AM_logo_Full_White.svg" : "/AM_logo_Full_Black.svg";
 
   useEffect(() => { document.documentElement.classList.toggle("dark", darkMode); }, [darkMode]);
+
+  useEffect(() => {
+    const open = () => setMobileOpen(true);
+    window.addEventListener(OPEN_MOBILE_NAV_EVENT, open);
+    return () => window.removeEventListener(OPEN_MOBILE_NAV_EVENT, open);
+  }, []);
 
   // Close user menu on click outside
   useEffect(() => {
@@ -491,7 +459,7 @@ export default function AdminConsoleShell({ children }: { children: ReactNode })
       {/* Main content */}
       <main className={`${isChatRoute ? "h-dvh overflow-hidden" : "min-h-screen"} pt-[var(--header-height)] ${mainMargin} md:pt-0 transition-[margin] duration-200`}>
         {!isChatRoute && (
-          <header className="sticky top-0 z-30 border-b border-border bg-surface/95 px-5 py-3 backdrop-blur md:px-8">
+          <header className="sticky top-0 z-30 hidden border-b border-border bg-surface/95 px-5 py-3 backdrop-blur md:block md:px-8">
             <div className="flex items-center justify-between gap-4">
               <div className="min-w-0">
                 <Breadcrumbs />
@@ -503,12 +471,13 @@ export default function AdminConsoleShell({ children }: { children: ReactNode })
             </div>
           </header>
         )}
-        <div className={isChatRoute ? "h-[calc(100dvh-var(--header-height))] min-h-0 md:h-dvh" : "p-5 md:p-8"}>
+        <div className={isChatRoute ? "h-[calc(100dvh-var(--header-height))] min-h-0 md:h-dvh" : "p-4 pb-24 sm:p-6 sm:pb-24 md:p-8"}>
           {children}
         </div>
       </main>
 
       {!isChatRoute && <ChatFloatingButton />}
+      {!isChatRoute && <MobileTabBar tabs={adminTabs} homeHref="/gestion-procesos/admin" />}
     </div>
   );
 }

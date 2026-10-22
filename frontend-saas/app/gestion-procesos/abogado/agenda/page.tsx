@@ -36,7 +36,7 @@ async function cargarAgenda(token: string): Promise<AgendaData> {
     fetchApi("/api/tareas", { method: "GET", token }),
     fetchApi("/api/expedientes/procesos", { method: "GET", token }),
     fetchApi("/api/expedientes/clientes", { method: "GET", token }),
-    fetchApi("/api/radicados", { method: "GET", token }),
+    fetchApi("/api/radicados?resumen=true", { method: "GET", token }),
     fetchApi("/api/expedientes/agenda/eventos", { method: "GET", token }),
     fetchApi("/api/expedientes/agenda/actuaciones", { method: "GET", token }),
   ]);

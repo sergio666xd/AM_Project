@@ -38,8 +38,27 @@ self.addEventListener("push", (event) => {
     renotify: true,
   };
 
-  event.waitUntil(self.registration.showNotification(title, options));
+  event.waitUntil(Promise.all([
+    self.registration.showNotification(title, options),
+    confirmDelivery(payload.ack),
+  ]));
 });
+
+// Avisa a la API que el mensaje llegó al dispositivo; así el remitente lo ve como entregado.
+async function confirmDelivery(ack) {
+  if (!ack || !ack.url || !ack.firma) return;
+  const apiBase = new URL(self.location.href).searchParams.get("api") || self.location.origin;
+  try {
+    await fetch(new URL(ack.url, apiBase).href, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ usuario_id: ack.usuario_id, mensaje_id: ack.mensaje_id, firma: ack.firma }),
+      keepalive: true,
+    });
+  } catch {
+    // Sin red: el mensaje se marcará como entregado cuando el usuario abra el chat.
+  }
+}
 
 self.addEventListener("notificationclick", (event) => {
   event.notification.close();

@@ -3,7 +3,10 @@
 import { useCallback, useEffect, useState } from "react";
 import { BellRing, Loader2, X } from "lucide-react";
 import { useSession } from "@/context/SessionContext";
-import { apiRequest } from "@/lib/api";
+import { API_URL, apiRequest } from "@/lib/api";
+
+// El service worker confirma la entrega de los push contra la API, que puede vivir en otro origen.
+const SERVICE_WORKER_URL = API_URL ? `/chat-sw.js?api=${encodeURIComponent(API_URL)}` : "/chat-sw.js";
 
 function decodeApplicationServerKey(value: string) {
   const padding = "=".repeat((4 - (value.length % 4)) % 4);
@@ -133,7 +136,7 @@ export default function PushNotificationPrompt() {
           const keyResponse = await apiRequest("/api/chat/push/clave-publica", { token });
           const { public_key: publicKey } = await keyResponse.json() as { public_key: string };
           stage = "registrar_service_worker";
-          await navigator.serviceWorker.register("/chat-sw.js", { scope: "/" });
+          await navigator.serviceWorker.register(SERVICE_WORKER_URL, { scope: "/" });
           stage = "esperar_service_worker";
           const registration = await navigator.serviceWorker.ready;
           const subscription = await getOrCreateSubscription(registration, publicKey, (value) => { stage = value; });
@@ -170,7 +173,7 @@ export default function PushNotificationPrompt() {
       const keyResponse = await apiRequest("/api/chat/push/clave-publica", { token });
       const { public_key: publicKey } = await keyResponse.json() as { public_key: string };
       stage = "registrar_service_worker";
-      await navigator.serviceWorker.register("/chat-sw.js", { scope: "/" });
+      await navigator.serviceWorker.register(SERVICE_WORKER_URL, { scope: "/" });
       stage = "esperar_service_worker";
       const registration = await navigator.serviceWorker.ready;
       const subscription = await getOrCreateSubscription(registration, publicKey, (value) => { stage = value; });

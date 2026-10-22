@@ -3,10 +3,10 @@
 import { apiRequest } from "@/lib/api";
 import { iniciarWorkflowConsultaRadicado } from "@/lib/api";
 import ProcessContracts from "@/components/contracts/ProcessContracts";
-import { PageHeader } from "@/components/ui/PageHeader";
-import { StatCard } from "@/components/ui/StatCard";
+import { SummaryStrip } from "@/components/ui/SummaryStrip";
+import { formatDate, formatRelative, isOverdue, toDate } from "@/lib/labels";
+import { useNow } from "@/lib/useNow";
 import { Button } from "@/components/ui/Button";
-import { Badge } from "@/components/ui/Badge";
 
 import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
@@ -14,6 +14,12 @@ import { useParams } from "next/navigation";
 
 import {
   ArrowLeft,
+  CalendarDays,
+  ListChecks,
+  Mail,
+  MessageCircle,
+  Pencil,
+  Phone,
   Bell,
   BriefcaseBusiness,
   CheckCircle2,
@@ -122,7 +128,7 @@ async function requestProcessDetail(id: string, token: string) {
   const [detail, clients, radicados] = await Promise.all([
     apiRequest(`/api/expedientes/procesos/${id}`, { headers: authHeaders }),
     apiRequest(`/api/expedientes/clientes`, { headers: authHeaders }),
-    apiRequest(`/api/radicados`, { headers: authHeaders }),
+    apiRequest(`/api/radicados?resumen=true`, { headers: authHeaders }),
   ]);
   const [processData, clientData, radicadoData] = await Promise.all([
     detail.json(), clients.json(), radicados.json(),
@@ -140,6 +146,8 @@ export default function ProcesoDetallePage({ section }: { section?: string }) {
   const [allClients, setAllClients] = useState<Client[]>([]);
   const [allRadicados, setAllRadicados] = useState<SimpleRadicado[]>([]);
 
+  const [editingInfo, setEditingInfo] = useState(false);
+  const now = useNow();
   const [nombre, setNombre] = useState("");
   const [descripcion, setDescripcion] = useState("");
 
@@ -540,15 +548,6 @@ export default function ProcesoDetallePage({ section }: { section?: string }) {
       );
   }, [allRadicados, process, radicadoQuery]);
 
-  const totalActuaciones = useMemo(
-    () =>
-      process?.radicados.reduce(
-        (total, radicado) => total + radicado.actuaciones.length,
-        0
-      ) || 0,
-    [process]
-  );
-
   const availableActuations = useMemo(
     () => process?.radicados.flatMap((radicado) => radicado.actuaciones.map((actuacion) => ({
       id: actuacion.id,
@@ -559,6 +558,50 @@ export default function ProcesoDetallePage({ section }: { section?: string }) {
     }))) ?? [],
     [process]
   );
+
+  const overview = useMemo(() => {
+    const tasks = process?.tareas ?? [];
+    const openTasks = tasks.filter((task) => task.estado === "PENDIENTE" || task.estado === "EN_CURSO");
+    const agenda = [
+      ...openTasks
+        .filter((task) => task.fecha_limite)
+        .map((task) => ({
+          key: `tarea-${task.id}`,
+          kind: "tarea" as const,
+          title: task.titulo,
+          detail: [task.responsable, task.prioridad === "URGENTE" || task.prioridad === "ALTA" ? `Prioridad ${task.prioridad.toLowerCase()}` : null].filter(Boolean).join(" · ") || "Tarea",
+          date: task.fecha_limite as string,
+          overdue: isOverdue(task.fecha_limite, task.estado, now),
+          href: `/gestion-procesos/abogado/tareas/${task.id}`,
+        })),
+      ...(process?.eventos ?? [])
+        .filter((event) => event.estado === "PROGRAMADO" && (toDate(event.fecha_inicio)?.getTime() ?? 0) >= now)
+        .map((event) => ({
+          key: `evento-${event.id}`,
+          kind: "evento" as const,
+          title: event.titulo,
+          detail: [event.tipo === "AUDIENCIA" ? "Audiencia" : event.tipo === "REUNION" ? "Reunión" : "Evento", event.cliente].filter(Boolean).join(" · "),
+          date: event.fecha_inicio,
+          overdue: false,
+          href: `/gestion-procesos/abogado/procesos/${id}/agenda`,
+        })),
+    ]
+      .sort((left, right) => (toDate(left.date)?.getTime() ?? 0) - (toDate(right.date)?.getTime() ?? 0))
+      .slice(0, 6);
+    const actuations = (process?.radicados ?? [])
+      .flatMap((radicado) => radicado.actuaciones.map((actuacion, position) => ({ ...actuacion, position, radicadoId: radicado.id, radicado: radicado.numero, fecha: actuacion.fecha_actuacion })))
+      // La API las entrega de la más reciente a la más antigua; la posición desempata fechas iguales.
+      .sort((left, right) => String(right.fecha ?? "").localeCompare(String(left.fecha ?? "")) || left.position - right.position)
+      .slice(0, 5);
+    return {
+      openTasks,
+      overdueTasks: openTasks.filter((task) => isOverdue(task.fecha_limite, task.estado, now)).length,
+      toReview: (process?.documentos ?? []).filter((document) => !document.contrato_id && ["RECIBIDO", "EN_REVISION"].includes(document.estado_revision)).length,
+      pendingRequests: (process?.solicitudes_documento ?? []).filter((request) => !request.atendida_en),
+      agenda,
+      actuations,
+    };
+  }, [id, now, process]);
 
   const processSections: { id: string; label: string }[] = [
     { id: "resumen", label: "Resumen" },
@@ -646,7 +689,7 @@ export default function ProcesoDetallePage({ section }: { section?: string }) {
             </div>
 
             <div className="min-w-0">
-              <h1 className="truncate text-2xl font-semibold tracking-tight text-foreground sm:text-3xl">
+              <h1 className="break-words text-2xl font-semibold tracking-tight text-foreground sm:text-3xl">
                 {process.nombre}
               </h1>
 
@@ -657,24 +700,6 @@ export default function ProcesoDetallePage({ section }: { section?: string }) {
           </div>
         </div>
 
-        {/* RESUMEN */}
-        <div className="grid grid-cols-3 gap-2">
-          <StatCard
-            label="Clientes"
-            value={process.clientes.length}
-            icon={Users}
-          />
-          <StatCard
-            label="Radicados"
-            value={process.radicados.length}
-            icon={FileText}
-          />
-          <StatCard
-            label="Actuaciones"
-            value={totalActuaciones}
-            icon={BriefcaseBusiness}
-          />
-        </div>
       </header>
 
       <div className="grid gap-4 lg:grid-cols-[14rem_minmax(0,1fr)] lg:items-start">
@@ -692,7 +717,7 @@ export default function ProcesoDetallePage({ section }: { section?: string }) {
                   className={`flex min-h-10 shrink-0 snap-start items-center gap-2 rounded-lg px-3 py-2 text-left text-sm font-medium transition-colors lg:w-full ${
                     activeTab === item.id
                       ? "bg-brand-900 text-white shadow-xs font-semibold"
-                      : "text-muted hover:bg-surface-hover hover:text-foreground"
+                      : "text-foreground-secondary hover:bg-surface-hover hover:text-foreground"
                   }`}
                 >
                   <span
@@ -775,83 +800,192 @@ export default function ProcesoDetallePage({ section }: { section?: string }) {
         </div>
       )}
 
-      {/* INFORMACIÓN GENERAL */}
-      <section id="panel-resumen" role="region" aria-label="Resumen del proceso" style={{ display: activeTab === "resumen" ? undefined : "none" }} className="scroll-mt-20 rounded-2xl border border-[var(--border)] bg-[var(--surface)]">
-        <div className="border-b border-[var(--border)] px-5 py-4">
-          <h2 className="text-sm font-semibold text-[var(--foreground)]">
-            Información general
-          </h2>
+      {/* RESUMEN */}
+      <div id="panel-resumen" role="region" aria-label="Resumen del proceso" style={{ display: activeTab === "resumen" ? undefined : "none" }} className="scroll-mt-20 space-y-4">
+        <SummaryStrip
+          items={[
+            { key: "abiertas", label: "Tareas abiertas", value: overview.openTasks.length },
+            { key: "vencidas", label: "Tareas vencidas", value: overview.overdueTasks, tone: overview.overdueTasks ? "danger" : "default" },
+            { key: "documentos", label: "Documentos por revisar", value: overview.toReview, tone: overview.toReview ? "warning" : "default" },
+            { key: "cliente", label: "Pendiente del cliente", value: overview.pendingRequests.length, tone: overview.pendingRequests.length ? "warning" : "default" },
+          ]}
+        />
 
-          <p className="mt-0.5 text-xs text-[var(--foreground-muted)]">
-            Actualiza los datos básicos del proceso.
-          </p>
+        <div className="grid gap-4 xl:grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)]">
+          <div className="min-w-0 space-y-4">
+            <OverviewCard
+              title="Próximos vencimientos"
+              action={<Link href={`/gestion-procesos/abogado/procesos/${id}/tareas`} className="text-xs font-semibold text-primary hover:underline">Ver tareas</Link>}
+            >
+              {overview.agenda.length ? (
+                <ul className="divide-y divide-border">
+                  {overview.agenda.map((item) => (
+                    <li key={item.key}>
+                      <Link href={item.href} className="flex items-center gap-3 py-2.5 hover:text-primary">
+                        <span className={`grid size-8 shrink-0 place-items-center rounded-[var(--radius-md)] ${item.overdue ? "bg-danger-light text-danger" : "bg-primary-light text-primary"}`}>
+                          {item.kind === "evento" ? <CalendarDays aria-hidden="true" className="size-4" /> : <ListChecks aria-hidden="true" className="size-4" />}
+                        </span>
+                        <span className="min-w-0 flex-1">
+                          <span className="block truncate text-sm font-medium text-foreground">{item.title}</span>
+                          <span className="block truncate text-xs text-foreground-muted">{item.detail}</span>
+                        </span>
+                        <span className={`shrink-0 text-right text-xs ${item.overdue ? "font-semibold text-danger" : "text-foreground-secondary"}`}>
+                          {item.overdue ? "Venció " : ""}{formatDate(item.date)}
+                        </span>
+                      </Link>
+                    </li>
+                  ))}
+                </ul>
+              ) : <p className="text-sm text-foreground-muted">No hay tareas abiertas con fecha ni audiencias programadas.</p>}
+            </OverviewCard>
+
+            <OverviewCard
+              title="Últimas actuaciones judiciales"
+              action={process.radicados.length > 0 ? <Link href={`/gestion-procesos/abogado/procesos/${id}/relaciones`} className="text-xs font-semibold text-primary hover:underline">Ver radicados</Link> : undefined}
+            >
+              {overview.actuations.length ? (
+                <ul className="divide-y divide-border">
+                  {overview.actuations.map((item) => (
+                    <li key={item.id}>
+                      <Link href={`/gestion-procesos/abogado/radicados/${item.radicadoId}`} className="block py-2.5 hover:text-primary">
+                        <span className="flex items-center justify-between gap-3">
+                          <span className="truncate text-sm font-medium text-foreground">{item.actuacion || "Actuación judicial"}</span>
+                          <span className="shrink-0 text-xs text-foreground-muted">{item.fecha || "Sin fecha"}</span>
+                        </span>
+                        <span className="block truncate font-mono text-xs text-foreground-muted">{item.radicado}</span>
+                      </Link>
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <p className="text-sm text-foreground-muted">
+                  {process.radicados.length ? "Aún no hay actuaciones registradas." : "Este proceso no tiene radicados. Asócialos en Clientes y radicados."}
+                </p>
+              )}
+            </OverviewCard>
+
+            <OverviewCard
+              title="Actividad reciente"
+              action={<Link href={`/gestion-procesos/abogado/procesos/${id}/actividad`} className="text-xs font-semibold text-primary hover:underline">Ver todo</Link>}
+            >
+              {process.timeline.length ? (
+                <ol className="space-y-3">
+                  {process.timeline.slice(0, 5).map((item) => (
+                    <li key={item.id} className="flex gap-3">
+                      <span aria-hidden="true" className={`mt-1.5 size-2 shrink-0 rounded-full ${item.visibilidad === "CLIENTE" ? "bg-success" : "bg-border-strong"}`} />
+                      <Link href={timelineResourceHref(item)} className="min-w-0 flex-1 hover:text-primary">
+                        <span className="block truncate text-sm font-medium text-foreground">{item.titulo}</span>
+                        <span className="block truncate text-xs text-foreground-muted">{[item.actor, item.fecha ? formatRelative(item.fecha, now) : null].filter(Boolean).join(" · ")}</span>
+                      </Link>
+                    </li>
+                  ))}
+                </ol>
+              ) : <p className="text-sm text-foreground-muted">Aún no hay actividad registrada.</p>}
+            </OverviewCard>
+          </div>
+
+          <div className="min-w-0 space-y-4">
+            <OverviewCard
+              title="Datos del proceso"
+              action={!editingInfo && (
+                <button type="button" onClick={() => setEditingInfo(true)} className="inline-flex items-center gap-1.5 text-xs font-semibold text-primary hover:underline">
+                  <Pencil aria-hidden="true" className="size-3.5" />Editar
+                </button>
+              )}
+            >
+              {editingInfo ? (
+                <form
+                  onSubmit={(event: FormEvent<HTMLFormElement>) => {
+                    event.preventDefault();
+                    void action(`/api/expedientes/procesos/${id}`, "PUT", { nombre, descripcion }).then((saved) => { if (saved) setEditingInfo(false); });
+                  }}
+                  className="space-y-3"
+                >
+                  <label className="block text-xs font-medium text-foreground-muted">
+                    Nombre del proceso
+                    <input value={nombre} onChange={(event) => setNombre(event.target.value)} required className="mt-1 h-10 w-full rounded-[var(--radius-md)] border border-border bg-background px-3 text-sm text-foreground focus:border-primary focus:outline-none" />
+                  </label>
+                  <label className="block text-xs font-medium text-foreground-muted">
+                    Descripción
+                    <textarea rows={4} maxLength={4000} value={descripcion} onChange={(event) => setDescripcion(event.target.value)} className="mt-1 w-full resize-y rounded-[var(--radius-md)] border border-border bg-background px-3 py-2 text-sm text-foreground focus:border-primary focus:outline-none" />
+                  </label>
+                  <div className="flex justify-end gap-2">
+                    <Button variant="outline" size="sm" onClick={() => { setNombre(process.nombre); setDescripcion(process.descripcion || ""); setEditingInfo(false); }}>Cancelar</Button>
+                    <Button type="submit" size="sm" loading={working} icon={<Save className="size-4" />}>Guardar</Button>
+                  </div>
+                </form>
+              ) : (
+                <dl className="space-y-3 text-sm">
+                  <div>
+                    <dt className="text-xs text-foreground-muted">Descripción</dt>
+                    <dd className="mt-0.5 whitespace-pre-wrap text-foreground-secondary">{process.descripcion || "Sin descripción."}</dd>
+                  </div>
+                  <div>
+                    <dt className="text-xs text-foreground-muted">Responsable</dt>
+                    <dd className="mt-0.5 font-medium text-foreground">{process.responsable.nombre_completo}</dd>
+                  </div>
+                  {process.colaboradores.length > 0 && (
+                    <div>
+                      <dt className="text-xs text-foreground-muted">Equipo</dt>
+                      <dd className="mt-0.5 text-foreground-secondary">{process.colaboradores.map((member) => member.nombre_completo).join(", ")}</dd>
+                    </div>
+                  )}
+                </dl>
+              )}
+            </OverviewCard>
+
+            <OverviewCard
+              title="Clientes"
+              action={<Link href={`/gestion-procesos/abogado/procesos/${id}/relaciones`} className="text-xs font-semibold text-primary hover:underline">Gestionar</Link>}
+            >
+              {process.clientes.length ? (
+                <ul className="space-y-3">
+                  {process.clientes.map((client) => (
+                    <li key={client.id} className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <Link href={`/gestion-procesos/abogado/clientes/${client.id}`} className="block truncate text-sm font-semibold text-foreground hover:text-primary">{client.nombre_completo}</Link>
+                        <p className="truncate text-xs text-foreground-muted">{client.email}</p>
+                      </div>
+                      <div className="flex shrink-0 gap-1">
+                        <Link href={`/gestion-procesos/abogado/chat/${process.id}/${client.id}`} aria-label={`Chat con ${client.nombre_completo}`} title="Chat" className="grid size-8 place-items-center rounded-[var(--radius-md)] border border-border text-foreground-secondary hover:bg-surface-hover"><MessageCircle aria-hidden="true" className="size-4" /></Link>
+                        <a href={`mailto:${client.email}`} aria-label={`Escribir a ${client.nombre_completo}`} title="Correo" className="grid size-8 place-items-center rounded-[var(--radius-md)] border border-border text-foreground-secondary hover:bg-surface-hover"><Mail aria-hidden="true" className="size-4" /></a>
+                        {client.whatsapp_numero && <a href={`tel:${client.whatsapp_numero}`} aria-label={`Llamar a ${client.nombre_completo}`} title="Llamar" className="grid size-8 place-items-center rounded-[var(--radius-md)] border border-border text-foreground-secondary hover:bg-surface-hover"><Phone aria-hidden="true" className="size-4" /></a>}
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              ) : <p className="text-sm text-foreground-muted">Sin clientes vinculados.</p>}
+            </OverviewCard>
+
+            <OverviewCard
+              title="Pendiente del cliente"
+              action={<Link href={`/gestion-procesos/abogado/documentos?proceso=${id}`} className="text-xs font-semibold text-primary hover:underline">Documentos</Link>}
+            >
+              {overview.pendingRequests.length ? (
+                <ul className="space-y-2.5">
+                  {overview.pendingRequests.map((request) => {
+                    const delivered = request.documentos_requeridos.filter((item) => item.documento).length;
+                    return (
+                      <li key={request.id}>
+                        <Link href={`/gestion-procesos/abogado/documentos?proceso=${id}#solicitud-${request.id}`} className="block hover:text-primary">
+                          <span className="flex items-center justify-between gap-2">
+                            <span className="truncate text-sm font-medium text-foreground">{request.titulo}</span>
+                            <span className="shrink-0 text-xs tabular-nums text-foreground-muted">{delivered}/{request.documentos_requeridos.length}</span>
+                          </span>
+                          <span className="mt-1 block h-1.5 overflow-hidden rounded-full bg-surface-hover">
+                            <span className="block h-full rounded-full bg-warning" style={{ width: `${(delivered / Math.max(1, request.documentos_requeridos.length)) * 100}%` }} />
+                          </span>
+                          <span className="mt-1 block text-xs text-foreground-muted">{request.cliente}</span>
+                        </Link>
+                      </li>
+                    );
+                  })}
+                </ul>
+              ) : <p className="text-sm text-foreground-muted">El cliente no tiene documentos pendientes.</p>}
+            </OverviewCard>
+          </div>
         </div>
-
-        <form
-          onSubmit={(event: FormEvent<HTMLFormElement>) => {
-            event.preventDefault();
-
-            void action(
-              `/api/expedientes/procesos/${id}`,
-              "PUT",
-              {
-                nombre,
-                descripcion,
-              }
-            );
-          }}
-          className="grid gap-4 p-5 lg:grid-cols-[1fr_2fr_auto] lg:items-end"
-        >
-          <div>
-            <label
-              htmlFor="process-name"
-              className="mb-1.5 block text-xs font-medium text-[var(--foreground-muted)]"
-            >
-              Nombre del proceso
-            </label>
-
-            <input
-              id="process-name"
-              value={nombre}
-              onChange={(event) => setNombre(event.target.value)}
-              className="w-full rounded-lg border border-[var(--border)] bg-[var(--surface-secondary)] px-3 py-2.5 text-sm text-[var(--foreground)] outline-none focus:border-[var(--primary)]"
-            />
-          </div>
-
-          <div>
-            <label
-              htmlFor="process-description"
-              className="mb-1.5 block text-xs font-medium text-[var(--foreground-muted)]"
-            >
-              Descripción
-            </label>
-
-            <textarea
-              id="process-description"
-              rows={3}
-              maxLength={4000}
-              value={descripcion}
-              onChange={(event) =>
-                setDescripcion(event.target.value)
-              }
-              placeholder="Descripción del proceso"
-              className="w-full resize-y rounded-lg border border-[var(--border)] bg-[var(--surface-secondary)] px-3 py-2.5 text-sm text-[var(--foreground)] outline-none placeholder:text-[var(--foreground-muted)] focus:border-[var(--primary)]"
-            />
-          </div>
-
-          <button
-            disabled={working}
-            className="inline-flex items-center justify-center gap-2 rounded-lg bg-[var(--primary)] px-4 py-2.5 text-sm font-medium !text-white disabled:opacity-50"
-          >
-            {working ? (
-              <Loader2 className="size-4 animate-spin" />
-            ) : (
-              <Save className="size-4" />
-            )}
-            Guardar
-          </button>
-        </form>
-      </section>
+      </div>
 
       {/* CLIENTES + RADICADOS */}
       <div id="panel-relaciones" role="region" aria-label="Clientes y radicados" style={{ display: activeTab === "relaciones" ? undefined : "none" }} className="grid gap-5 xl:grid-cols-2">
@@ -1624,5 +1758,17 @@ export default function ProcesoDetallePage({ section }: { section?: string }) {
         </div>
       )}
     </div>
+  );
+}
+
+function OverviewCard({ title, action, children }: { title: string; action?: React.ReactNode; children: React.ReactNode }) {
+  return (
+    <section className="rounded-[var(--radius-lg)] border border-border bg-surface shadow-[var(--shadow-xs)]">
+      <header className="flex items-center justify-between gap-3 border-b border-border px-4 py-3">
+        <h2 className="text-sm font-semibold text-foreground">{title}</h2>
+        {action}
+      </header>
+      <div className="px-4 py-3">{children}</div>
+    </section>
   );
 }

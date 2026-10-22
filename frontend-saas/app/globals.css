@@ -1,5 +1,8 @@
 @import "tailwindcss";
 
+/* Las utilidades dark: siguen el tema elegido en la app (clase .dark), no el del sistema. */
+@custom-variant dark (&:where(.dark, .dark *));
+
 :root {
   /* ── Brand ── */
   --brand-950: #00143D;
@@ -174,40 +177,44 @@
   --shadow-lg: var(--shadow-lg);
 }
 
-* {
-  box-sizing: border-box;
-}
+/* Estilos de elementos en la capa base: fuera de una capa ganarían a las
+   utilidades de Tailwind (text-*, font-*) y obligarían a usar !important. */
+@layer base {
+  * {
+    box-sizing: border-box;
+  }
 
-html {
-  background: var(--background);
-}
+  html {
+    background: var(--background);
+  }
 
-body {
-  margin: 0;
-  background: var(--background);
-  color: var(--foreground);
-  font-family: var(--font-sans);
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
-  transition:
-    background-color 0.2s ease,
-    color 0.2s ease;
-}
+  body {
+    margin: 0;
+    background: var(--background);
+    color: var(--foreground);
+    font-family: var(--font-sans);
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    transition:
+      background-color 0.2s ease,
+      color 0.2s ease;
+  }
 
-button,
-input,
-textarea,
-select {
-  font: inherit;
-}
+  button,
+  input,
+  textarea,
+  select {
+    font: inherit;
+  }
 
-button {
-  cursor: pointer;
-}
+  button {
+    cursor: pointer;
+  }
 
-a {
-  color: inherit;
-  text-decoration: none;
+  a {
+    color: inherit;
+    text-decoration: none;
+  }
 }
 
 @keyframes marketing-fade-up {
