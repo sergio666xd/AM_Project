@@ -4,7 +4,8 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
 from app import models
-from app.routers.admin import cambiar_estado_usuario, eliminar_usuario_admin, router
+from app.routers.admin import router
+from app.routers.admin.usuarios import cambiar_estado_usuario, eliminar_usuario_admin
 
 
 def test_static_mass_status_route_precedes_dynamic_user_route():

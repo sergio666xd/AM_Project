@@ -10,7 +10,7 @@ from app.audit import (
     limpiar_contexto_solicitud_auditoria,
     registrar_evento_auditoria,
 )
-from app.routers.admin import listar_eventos_auditoria
+from app.routers.admin.auditoria import listar_eventos_auditoria
 
 
 def test_admin_audit_has_human_summary_technical_detail_and_filters():

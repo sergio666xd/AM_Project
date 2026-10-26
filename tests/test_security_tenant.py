@@ -38,6 +38,7 @@ from app.radicados import (
 from app.reminder_workflow import momento_programado
 from app.migrate_radicados_canonicos import migrar as migrar_radicados_canonicos, previsualizar as previsualizar_migracion_radicados
 from app.routers import admin as admin_router
+from app.routers.admin import integraciones as admin_integraciones
 from app.routers.workflows import (
     DETALLE_RECONCILIACION_COMPLETA,
     _aplicar_delta_contadores_barrido,
@@ -51,26 +52,30 @@ from app.routers.workflows import (
     reclamar_barrido,
     verificar_token_workflow,
 )
-from app.routers.admin import (
+from app.routers.admin.agenda import obtener_agenda_tareas_firma
+from app.routers.admin.consultas import (
     actualizar_configuracion_consultas,
     buscar_radicados_consulta_manual,
+    obtener_configuracion_consultas,
+    consultar_radicado_admin,
+    consultar_todos_radicados_admin,
+    detalle_ejecucion_consultas,
+)
+from app.routers.admin.integraciones import (
     enviar_mensaje_prueba_integracion,
-    obtener_agenda_tareas_firma,
     obtener_estado_configuracion_integraciones,
     probar_conexion_integracion,
+)
+from app.routers.admin.inventario import (
     actualizar_recurso_admin,
     crear_recurso_admin,
     eliminar_recurso_admin,
     listar_inventario_global,
     cargar_documento_admin,
     emitir_url_temporal_documento_admin,
-    obtener_configuracion_consultas,
-    consultar_radicado_admin,
-    consultar_todos_radicados_admin,
-    detalle_ejecucion_consultas,
     restaurar_proceso_admin,
-    aplicar_migracion_radicados_admin,
 )
+from app.routers.admin.migraciones import aplicar_migracion_radicados_admin
 from app.routers.expedientes import (
     _cliente_asignado,
     _document_content_matches_type,
@@ -1990,7 +1995,7 @@ def test_admin_real_integration_send_requires_confirmation_and_is_audited(monkey
     models.Base.metadata.create_all(engine)
     sent = []
     monkeypatch.setattr(
-        "app.routers.admin.enviar_correo",
+        "app.routers.admin.integraciones.enviar_correo",
         lambda recipient, subject, body: sent.append((recipient, subject, body)) or True,
     )
 
@@ -2046,7 +2051,7 @@ def test_integration_connection_diagnostics_do_not_send_or_expose_secrets(monkey
 
     monkeypatch.setenv("WORKFLOW_FRONTEND_URL", "https://frontend.example.test")
     monkeypatch.setenv("WORKFLOW_SERVICE_TOKEN", "unit-test-private-token")
-    monkeypatch.setattr(admin_router, "get_integration_settings", lambda: {
+    monkeypatch.setattr(admin_integraciones, "get_integration_settings", lambda: {
         "smtp_host": "smtp.example.test",
         "smtp_port": 587,
         "smtp_from": "sender@example.com",
@@ -2085,7 +2090,7 @@ def test_integration_connection_diagnostics_do_not_send_or_expose_secrets(monkey
     workflow_requests = []
     workflow_responses = iter([WorkflowResponse(), WorkflowAuthFailure(), WorkflowGenericAuthFailure()])
     monkeypatch.setattr(
-        admin_router.requests,
+        admin_integraciones.requests,
         "post",
         lambda url, **kwargs: workflow_requests.append((url, kwargs)) or next(workflow_responses),
     )
@@ -2115,7 +2120,7 @@ def test_integration_connection_diagnostics_do_not_send_or_expose_secrets(monkey
         smtp_instances.append(instance)
         return instance
 
-    monkeypatch.setattr(admin_router.smtplib, "SMTP", create_smtp)
+    monkeypatch.setattr(admin_integraciones.smtplib, "SMTP", create_smtp)
     admin = models.Usuario(id=1, rol=models.RolUsuario.ADMIN)
     status = obtener_estado_configuracion_integraciones(admin=admin)
     assert status["integraciones"]["SMTP"]["configurada"] is True
@@ -2125,7 +2130,7 @@ def test_integration_connection_diagnostics_do_not_send_or_expose_secrets(monkey
     def rama_base_no_es_endpoint(*args, **kwargs):
         raise HTTPError(rama_judicial_api.API_BASE_URL, 404, "Not Found", {}, None)
 
-    monkeypatch.setattr(admin_router, "urlopen", rama_base_no_es_endpoint)
+    monkeypatch.setattr(admin_integraciones, "urlopen", rama_base_no_es_endpoint)
     rama_result = probar_conexion_integracion(
         schemas.DiagnosticoIntegracion(integracion="RAMA"),
         admin=admin,
@@ -3689,8 +3694,8 @@ def test_admin_document_upload_is_sector_scoped_and_audited(monkeypatch):
             self.upload = kwargs
 
     fake_r2 = FakeR2Client()
-    monkeypatch.setattr("app.routers.admin.storage.get_r2_client", lambda: fake_r2)
-    monkeypatch.setattr("app.routers.admin.storage.get_r2_bucket", lambda: "test-bucket")
+    monkeypatch.setattr("app.storage.get_r2_client", lambda: fake_r2)
+    monkeypatch.setattr("app.storage.get_r2_bucket", lambda: "test-bucket")
 
     with Session(engine) as db:
         admin = models.Usuario(
@@ -3773,8 +3778,8 @@ def test_admin_temporary_document_url_is_short_lived_scoped_and_audited(monkeypa
             return "https://r2.example.test/object?signature=temporary"
 
     fake_r2 = FakeR2Client()
-    monkeypatch.setattr("app.routers.admin.storage.get_r2_client", lambda: fake_r2)
-    monkeypatch.setattr("app.routers.admin.storage.get_r2_bucket", lambda: "test-bucket")
+    monkeypatch.setattr("app.storage.get_r2_client", lambda: fake_r2)
+    monkeypatch.setattr("app.storage.get_r2_bucket", lambda: "test-bucket")
 
     with Session(engine) as db:
         admin = models.Usuario(

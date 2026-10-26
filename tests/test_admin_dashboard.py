@@ -4,7 +4,7 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
 from app import models
-from app.routers.admin import obtener_dashboard_admin
+from app.routers.admin.dashboard import obtener_dashboard_admin
 
 
 def test_admin_dashboard_returns_scoped_attention_and_human_activity():

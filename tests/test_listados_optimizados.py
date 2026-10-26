@@ -151,7 +151,7 @@ def test_listar_conversaciones_respeta_alcance_y_cuenta_no_leidos(firma, monkeyp
 
 
 def test_inventario_admin_devuelve_todo_con_campos_legibles(firma):
-    from app.routers.admin import listar_inventario_global
+    from app.routers.admin.inventario import listar_inventario_global
 
     db, admin = firma["db"], firma["admin"]
     db.expire_all()
