@@ -1,6 +1,11 @@
 """Configuración compartida de las pruebas."""
 
+import os
 from pathlib import Path
+
+# app.security exige una clave JWT al importarse; en CI no existe el .env local.
+os.environ.setdefault("JWT_SECRET_KEY", "clave-solo-para-pruebas")
+
 
 from sqlalchemy import event
 
