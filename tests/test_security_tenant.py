@@ -1,34 +1,56 @@
 import importlib
-from io import BytesIO
-from datetime import datetime, timedelta, timezone
 import zipfile
+from datetime import datetime, timedelta, timezone
+from io import BytesIO
 
 import pytest
 from fastapi import HTTPException, UploadFile
-from starlette.datastructures import Headers
-from sqlalchemy import Boolean, Column, ForeignKey, Integer, MetaData, String, Table, create_engine, delete, insert, inspect, select
+from sqlalchemy import (
+    Boolean,
+    Column,
+    ForeignKey,
+    Integer,
+    MetaData,
+    String,
+    Table,
+    create_engine,
+    delete,
+    insert,
+    inspect,
+    select,
+)
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, sessionmaker
+from starlette.datastructures import Headers
 
-from app.timezone import utc_ahora
-from app import security
-from app import models, schemas
-from app import whatsapp
-from app import rama_judicial_api
-from app import reminder_workflow
-from app import monthly_summary
+from app import (
+    models,
+    monthly_summary,
+    rama_judicial_api,
+    reminder_workflow,
+    schemas,
+    security,
+    whatsapp,
+)
 from app.audit import registrar_evento_auditoria
-from app.firm_access import has_firm_wide_access, lawyer_scope_id, require_process_access
+from app.document_validation import (
+    document_content_matches_type as _document_content_matches_type,
+)
+from app.firm_access import (
+    has_firm_wide_access,
+    lawyer_scope_id,
+    require_process_access,
+    require_roles,
+)
+from app.migrate_radicados_canonicos import migrar as migrar_radicados_canonicos
+from app.migrate_radicados_canonicos import (
+    previsualizar as previsualizar_migracion_radicados,
+)
 from app.notification_policy import (
     abogados_notificables_para_radicado,
     canales_habilitados,
     plan_whatsapp_habilitado,
     whatsapp_habilitado,
-)
-from app.workflow_service import (
-    workflow_401_reason,
-    workflow_frontend_url,
-    workflow_service_headers,
 )
 from app.radicados import (
     iniciar_consulta_nuevo_radicado,
@@ -36,30 +58,16 @@ from app.radicados import (
     radicado_vinculado_a_usuario,
 )
 from app.reminder_workflow import momento_programado
-from app.migrate_radicados_canonicos import migrar as migrar_radicados_canonicos, previsualizar as previsualizar_migracion_radicados
 from app.routers import admin as admin_router
 from app.routers.admin import integraciones as admin_integraciones
-from app.routers.workflows import (
-    DETALLE_RECONCILIACION_COMPLETA,
-    _aplicar_delta_contadores_barrido,
-    _reconciliacion_completa_vencida,
-    ejecutar_consulta_barrido_radicado,
-    enviar_entrega_notificacion_workflow,
-    finalizar_barrido,
-    listar_radicados_barrido,
-    preparar_recordatorio_workflow,
-    preparar_notificaciones_actuaciones,
-    reclamar_barrido,
-    verificar_token_workflow,
-)
 from app.routers.admin.agenda import obtener_agenda_tareas_firma
 from app.routers.admin.consultas import (
     actualizar_configuracion_consultas,
     buscar_radicados_consulta_manual,
-    obtener_configuracion_consultas,
     consultar_radicado_admin,
     consultar_todos_radicados_admin,
     detalle_ejecucion_consultas,
+    obtener_configuracion_consultas,
 )
 from app.routers.admin.integraciones import (
     enviar_mensaje_prueba_integracion,
@@ -68,34 +76,37 @@ from app.routers.admin.integraciones import (
 )
 from app.routers.admin.inventario import (
     actualizar_recurso_admin,
+    cargar_documento_admin,
     crear_recurso_admin,
     eliminar_recurso_admin,
-    listar_inventario_global,
-    cargar_documento_admin,
     emitir_url_temporal_documento_admin,
+    listar_inventario_global,
     restaurar_proceso_admin,
 )
 from app.routers.admin.migraciones import aplicar_migracion_radicados_admin
-from app.routers.expedientes import (
-    _cliente_asignado,
-    _document_content_matches_type,
-    asignar_cliente,
-    asignar_colaborador_proceso,
-    asignar_radicado,
-    cargar_documento_cliente,
-    descargar_documento,
-    eliminar_proceso,
-    listar_procesos,
-    listar_procesos_archivados,
-    listar_documentos_despacho,
+from app.routers.expedientes.clientes import (
     listar_mis_solicitudes_edicion_perfil,
     listar_solicitudes_edicion_perfil_pendientes,
     obtener_cliente,
-    obtener_proceso_detalle,
     revisar_solicitud_edicion_perfil,
+    solicitar_edicion_perfil_cliente,
+)
+from app.routers.expedientes.comun import _cliente_asignado
+from app.routers.expedientes.documentos import (
+    cargar_documento_cliente,
+    descargar_documento,
+    listar_documentos_despacho,
+)
+from app.routers.expedientes.procesos import (
+    asignar_cliente,
+    asignar_colaborador_proceso,
+    asignar_radicado,
+    eliminar_proceso,
+    listar_procesos,
+    listar_procesos_archivados,
+    obtener_proceso_detalle,
     restaurar_proceso,
     retirar_colaborador_proceso,
-    solicitar_edicion_perfil_cliente,
 )
 from app.routers.tareas import (
     actualizar_recordatorio,
@@ -111,7 +122,25 @@ from app.routers.tareas import (
     require_task_manager,
     validar_actualizacion_tarea,
 )
-from app.firm_access import require_roles
+from app.routers.workflows import (
+    DETALLE_RECONCILIACION_COMPLETA,
+    _aplicar_delta_contadores_barrido,
+    _reconciliacion_completa_vencida,
+    ejecutar_consulta_barrido_radicado,
+    enviar_entrega_notificacion_workflow,
+    finalizar_barrido,
+    listar_radicados_barrido,
+    preparar_notificaciones_actuaciones,
+    preparar_recordatorio_workflow,
+    reclamar_barrido,
+    verificar_token_workflow,
+)
+from app.timezone import utc_ahora
+from app.workflow_service import (
+    workflow_401_reason,
+    workflow_frontend_url,
+    workflow_service_headers,
+)
 
 
 def test_database_engine_does_not_retain_connections_on_vercel(monkeypatch):
@@ -2657,8 +2686,8 @@ def test_document_download_is_limited_to_assigned_active_processes(monkeypatch):
                 requested_keys.append(Key)
                 return {"Body": BytesIO(b"document bytes")}
 
-        monkeypatch.setattr("app.routers.expedientes.storage.get_r2_client", lambda: FakeR2Client())
-        monkeypatch.setattr("app.routers.expedientes.storage.get_r2_bucket", lambda: "test-bucket")
+        monkeypatch.setattr("app.storage.get_r2_client", lambda: FakeR2Client())
+        monkeypatch.setattr("app.storage.get_r2_bucket", lambda: "test-bucket")
 
         response = descargar_documento(assigned_document.id, db=db, usuario=client)
         assert response.media_type == "application/pdf"
@@ -2752,11 +2781,11 @@ def test_document_upload_compensates_only_when_database_commit_fails(
                     raise RuntimeError("storage unavailable")
 
         monkeypatch.setattr(
-            "app.routers.expedientes.storage.get_r2_client",
+            "app.storage.get_r2_client",
             lambda: FakeR2Client(),
         )
         monkeypatch.setattr(
-            "app.routers.expedientes.storage.get_r2_bucket",
+            "app.storage.get_r2_bucket",
             lambda: "test-bucket",
         )
 

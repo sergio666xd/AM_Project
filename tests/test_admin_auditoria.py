@@ -3,7 +3,6 @@ from datetime import timedelta
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
-from app.timezone import utc_ahora
 from app import models
 from app.audit import (
     establecer_contexto_solicitud_auditoria,
@@ -11,6 +10,7 @@ from app.audit import (
     registrar_evento_auditoria,
 )
 from app.routers.admin.auditoria import listar_eventos_auditoria
+from app.timezone import utc_ahora
 
 
 def test_admin_audit_has_human_summary_technical_detail_and_filters():

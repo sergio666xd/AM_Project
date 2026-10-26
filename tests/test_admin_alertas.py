@@ -5,9 +5,12 @@ from fastapi import HTTPException
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
-from app.timezone import utc_ahora
 from app import models
-from app.routers.admin.alertas import actualizar_estado_alerta_admin, listar_alertas_admin
+from app.routers.admin.alertas import (
+    actualizar_estado_alerta_admin,
+    listar_alertas_admin,
+)
+from app.timezone import utc_ahora
 
 
 def test_admin_alerts_are_real_actionable_and_keep_dispositions():

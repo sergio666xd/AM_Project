@@ -6,7 +6,11 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
 from app import models, schemas
-from app.routers.admin.usuarios import actualizar_usuario_admin, listar_usuarios, obtener_usuario_admin
+from app.routers.admin.usuarios import (
+    actualizar_usuario_admin,
+    listar_usuarios,
+    obtener_usuario_admin,
+)
 
 
 def test_admin_user_list_separates_platform_admins_and_detail_shows_related_data():

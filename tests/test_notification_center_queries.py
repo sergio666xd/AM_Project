@@ -58,7 +58,10 @@ def seed_notification_center(db, total_processes):
 
 
 def run_center(total_processes):
-    from app.routers.expedientes import _notificaciones_abogado, listar_notificaciones_despacho
+    from app.routers.expedientes.notificaciones import (
+        _notificaciones_abogado,
+        listar_notificaciones_despacho,
+    )
 
     engine = create_engine("sqlite:///:memory:")
     models.Base.metadata.create_all(engine)
