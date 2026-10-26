@@ -1,12 +1,8 @@
-from pydantic import BaseModel, EmailStr, Field, field_serializer, field_validator
+from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_serializer, field_validator
 from typing import Any, Literal, Optional
 from datetime import datetime, timezone
 from app.models import EstadoUsuario, RolUsuario
-from typing import Optional
-from datetime import datetime
 from app.models import (
-    EstadoUsuario,
-    RolUsuario,
     EstadoTarea,
     PrioridadTarea,
     CanalRecordatorio,
@@ -24,8 +20,7 @@ class PlanOut(BaseModel):
     notificaciones_whatsapp_procesos: bool = False
     notificaciones_whatsapp_tareas: bool = False
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 class PlanCreate(BaseModel):
     nombre: str
@@ -50,8 +45,7 @@ class PlanUpdate(BaseModel):
 class ConfiguracionSaasOut(BaseModel):
     mostrar_planes: bool
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class ConfiguracionSaasUpdate(BaseModel):
@@ -334,8 +328,7 @@ class UsuarioOut(BaseModel):
             }
         return normalized
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class SolicitudRegistroOut(BaseModel):
@@ -345,8 +338,7 @@ class SolicitudRegistroOut(BaseModel):
     fecha_solicitud: datetime
     usuario: UsuarioOut
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class Token(BaseModel):
@@ -507,8 +499,7 @@ class ActuacionOut(BaseModel):
     fecha_registro: str
     es_fijacion: bool
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class RadicadoOut(BaseModel):
@@ -525,8 +516,7 @@ class RadicadoOut(BaseModel):
     detalle_pendiente: str
     actuaciones: list[ActuacionOut] = []
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 class SubtareaCreate(BaseModel):
     titulo: str
@@ -583,8 +573,7 @@ class SubtareaOut(BaseModel):
     notificar_email: bool = True
     notificar_whatsapp: bool = True
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class RecordatorioTareaCreate(BaseModel):
@@ -620,8 +609,7 @@ class RecordatorioTareaOut(BaseModel):
             return value.replace(tzinfo=timezone.utc)
         return value
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class TareaCreate(BaseModel):
@@ -754,5 +742,4 @@ class TareaOut(BaseModel):
     def ocultar_recordatorios_internos(cls, value):
         return [item for item in (value or []) if not getattr(item, "interno_sistema", False)]
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)

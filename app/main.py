@@ -4,6 +4,7 @@ import hmac
 import inspect
 import logging
 import secrets
+from contextlib import asynccontextmanager
 from uuid import uuid4
 from fastapi import FastAPI, BackgroundTasks, Depends, HTTPException, Request, status, UploadFile, File, Form
 from starlette.background import BackgroundTask
@@ -13,10 +14,11 @@ from sqlalchemy import or_, text
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session, selectinload
 from fastapi.middleware.cors import CORSMiddleware
-from datetime import datetime, timedelta
+from datetime import timedelta
+from app.timezone import utc_ahora
 from pathlib import Path
 from botocore.exceptions import BotoCoreError, ClientError
-from app.database import engine, Base, get_db
+from app.database import engine, get_db
 from app import models, schemas, security, storage
 from app.email_service import enviar_correo
 from app.site_content import PUBLIC_CONTENT_PAGES, PUBLIC_PAGE_ROUTES
@@ -35,7 +37,6 @@ from app.audit import (
     registrar_evento_auditoria,
 )
 from app.firm_access import has_firm_wide_access, lawyer_process_ids, lawyer_scope_id
-from app.workflow_service import public_site_url
 from app.message_templates import render_message
 from app.password_reset import password_reset_url, send_password_reset_email
 from app.security_notifications import send_security_change_confirmation
@@ -199,7 +200,14 @@ CARD_TYPE_BY_EXTENSION = {
 }
 MAX_CARD_SIZE_BYTES = 10 * 1024 * 1024
 
+@asynccontextmanager
+async def lifespan(_app: FastAPI):
+    crear_datos_iniciales()
+    yield
+
+
 app = FastAPI(
+    lifespan=lifespan,
     title="Plataforma SaaS de Seguimiento Judicial",
     description="API Multi-Tenant para gestión de radicados y alertas de WhatsApp",
     version="1.0.0",
@@ -248,7 +256,6 @@ VENTANA_INTENTOS = timedelta(hours=1)
 VENTANA_LOGIN = timedelta(minutes=15)
 
 
-@app.on_event("startup")
 def crear_datos_iniciales():
     """Aplica compatibilidad y siembra planes SaaS solo si aún no existen."""
     preparar_esquema()
@@ -465,7 +472,7 @@ def login(
     if usuario.estado == models.EstadoUsuario.RECHAZADO:
         raise HTTPException(status_code=403, detail="Tu solicitud de registro fue rechazada.")
 
-    usuario.ultimo_acceso = datetime.utcnow()
+    usuario.ultimo_acceso = utc_ahora()
     db.commit()
     access_token = security.create_access_token(
         data={"sub": str(usuario.id)}, persistent=remember_me,
@@ -488,7 +495,7 @@ def refresh_token(
     """
     payload = security.decode_token_payload(token)
     persistent = bool(payload.get("persistent")) if payload else False
-    usuario_actual.ultimo_acceso = datetime.utcnow()
+    usuario_actual.ultimo_acceso = utc_ahora()
     db.commit()
     new_token = security.create_access_token(
         data={"sub": str(usuario_actual.id)}, persistent=persistent,
@@ -511,7 +518,7 @@ def cambiar_password(
         raise HTTPException(status_code=400, detail="La nueva contraseña debe tener al menos 8 caracteres.")
     usuario_actual.password_hash = security.hash_password(datos.password_nueva)
     usuario_actual.debe_cambiar_password = False
-    usuario_actual.ultimo_acceso = datetime.utcnow()
+    usuario_actual.ultimo_acceso = utc_ahora()
     registrar_evento_auditoria(db, usuario_actual, "auth.password.cambiar", "usuario", usuario_actual.id)
     db.commit()
 
@@ -692,7 +699,7 @@ def solicitar_codigo_seguridad(
     if datos.canal == "WHATSAPP" and not (usuario.whatsapp_numero or "").strip():
         raise HTTPException(status_code=400, detail="Tu cuenta no tiene un número de WhatsApp configurado.")
 
-    ahora = datetime.utcnow()
+    ahora = utc_ahora()
     anterior = db.query(models.CodigoSeguridadUsuario).filter_by(
         usuario_id=usuario.id, accion=datos.accion, consumido_en=None
     ).order_by(models.CodigoSeguridadUsuario.creado_en.desc()).first()
@@ -729,15 +736,15 @@ def obtener_codigo_seguridad_activo(
         models.CodigoSeguridadUsuario.usuario_id == usuario.id,
         models.CodigoSeguridadUsuario.accion == accion,
         models.CodigoSeguridadUsuario.consumido_en.is_(None),
-        models.CodigoSeguridadUsuario.expira_en > datetime.utcnow(),
+        models.CodigoSeguridadUsuario.expira_en > utc_ahora(),
     ).order_by(models.CodigoSeguridadUsuario.creado_en.desc()).first()
     db.query(models.CodigoSeguridadUsuario).filter(
         models.CodigoSeguridadUsuario.usuario_id == usuario.id,
-        models.CodigoSeguridadUsuario.expira_en <= datetime.utcnow(),
+        models.CodigoSeguridadUsuario.expira_en <= utc_ahora(),
         models.CodigoSeguridadUsuario.consumido_en.is_(None),
     ).update({
         models.CodigoSeguridadUsuario.valor_pendiente: None,
-        models.CodigoSeguridadUsuario.consumido_en: datetime.utcnow(),
+        models.CodigoSeguridadUsuario.consumido_en: utc_ahora(),
     }, synchronize_session=False)
     db.commit()
     return _datos_codigo(challenge) if challenge else None
@@ -753,7 +760,7 @@ def reenviar_codigo_seguridad(
     challenge = db.query(models.CodigoSeguridadUsuario).filter_by(
         id=challenge_id, usuario_id=usuario.id, consumido_en=None
     ).with_for_update().first()
-    ahora = datetime.utcnow()
+    ahora = utc_ahora()
     if not challenge or challenge.expira_en <= ahora:
         raise HTTPException(status_code=410, detail="El código venció. Solicita uno nuevo.")
     if challenge.reenviar_desde > ahora:
@@ -785,7 +792,7 @@ def verificar_codigo_seguridad(
     challenge = db.query(models.CodigoSeguridadUsuario).filter_by(
         id=challenge_id, usuario_id=usuario.id, consumido_en=None
     ).with_for_update().first()
-    ahora = datetime.utcnow()
+    ahora = utc_ahora()
     if not challenge or challenge.expira_en <= ahora:
         raise HTTPException(status_code=410, detail="El código venció. Solicita uno nuevo.")
     if challenge.intentos >= 5:
@@ -814,7 +821,7 @@ def aplicar_cambio_seguridad(
     challenge = db.query(models.CodigoSeguridadUsuario).filter_by(
         id=challenge_id, usuario_id=usuario.id, consumido_en=None
     ).with_for_update().first()
-    ahora = datetime.utcnow()
+    ahora = utc_ahora()
     if not challenge or challenge.expira_en <= ahora:
         raise HTTPException(status_code=410, detail="El código venció. Solicita uno nuevo.")
     if challenge.valor_pendiente != "__OTP_VERIFICADO__":
@@ -884,7 +891,7 @@ def cancelar_codigo_seguridad(
         id=challenge_id, usuario_id=usuario.id, consumido_en=None
     ).with_for_update().first()
     if challenge:
-        challenge.consumido_en = datetime.utcnow()
+        challenge.consumido_en = utc_ahora()
         challenge.valor_pendiente = None
         db.commit()
     return None
@@ -903,7 +910,7 @@ def cancelar_codigos_seguridad_activos(
         models.CodigoSeguridadUsuario.consumido_en.is_(None),
     ).update({
         models.CodigoSeguridadUsuario.valor_pendiente: None,
-        models.CodigoSeguridadUsuario.consumido_en: datetime.utcnow(),
+        models.CodigoSeguridadUsuario.consumido_en: utc_ahora(),
     }, synchronize_session=False)
     db.commit()
     return None

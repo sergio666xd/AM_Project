@@ -6,6 +6,7 @@ import os
 import hashlib
 import json
 from datetime import datetime, timedelta, timezone
+from app.timezone import utc_ahora
 from uuid import uuid4
 from zoneinfo import ZoneInfo
 
@@ -36,7 +37,6 @@ from app.radicados import (
     radicado_vinculado_a_usuario,
 )
 from app.firm_access import (
-    has_firm_wide_access,
     is_process_manager,
     lawyer_process_ids,
     lawyer_scope_id,
@@ -354,7 +354,7 @@ def _notificar_clientes_proceso(
                    plantilla_clave="PROCESO_ACTUALIZACION",
                    variables={"nombre": destinatario.nombre_completo, "actor": actor.nombre_completo,
                               "accion": accion, "proceso": proceso.nombre,
-                              "fecha": format_colombia_datetime(datetime.utcnow()), "detalle": detalle},
+                              "fecha": format_colombia_datetime(utc_ahora()), "detalle": detalle},
                    enlace_texto="Ver proceso",
                    enlace_url=user_portal_url(destinatario, f"/gestion-procesos/cliente/procesos/{proceso.id}"))
 
@@ -700,7 +700,7 @@ def revisar_solicitud_edicion_perfil(
         solicitud.estado = "RECHAZADA"
         accion = "cliente.solicitud_perfil.rechazar"
     solicitud.revisada_por_id = usuario.id
-    solicitud.revisada_en = datetime.utcnow()
+    solicitud.revisada_en = utc_ahora()
     solicitud.comentario_revision = (datos.comentario or "").strip() or None
     registrar_evento_auditoria(
         db, usuario, accion, "solicitud_edicion_perfil", solicitud.id
@@ -1038,7 +1038,7 @@ def revisar_documento(documento_id: int, datos: schemas.DocumentoRevisionUpdate,
     documento.estado_revision = datos.estado_revision
     documento.comentario_revision = datos.comentario_revision.strip() or None
     documento.revisado_por_id = usuario.id
-    documento.revisado_en = datetime.utcnow()
+    documento.revisado_en = utc_ahora()
     if documento.solicitud:
         required_items = _documentos_requeridos(documento.solicitud)
         latest_by_item = _documento_actual_por_item(documento.solicitud, required_items)
@@ -1047,7 +1047,7 @@ def revisar_documento(documento_id: int, datos: schemas.DocumentoRevisionUpdate,
             and latest_by_item[item["id"]].estado_revision != "REQUIERE_CORRECCION"
             for item in required_items
         )
-        documento.solicitud.atendida_en = datetime.utcnow() if fully_supplied else None
+        documento.solicitud.atendida_en = utc_ahora() if fully_supplied else None
     registrar_evento_auditoria(db, usuario, "documento.revisar", "documento_proceso", documento.id)
     db.commit()
     cliente = documento.cliente
@@ -1104,7 +1104,7 @@ def _notificaciones_abogado(db: Session, usuario: models.Usuario) -> list[dict]:
             if process:
                 recent = db.query(models.EventoAuditoria.created_at).filter_by(tipo_recurso="proceso", recurso_id=str(process_id)).order_by(models.EventoAuditoria.created_at.desc()).first()
                 last_activity = recent[0] if recent else process.created_at
-                if last_activity and last_activity < datetime.utcnow() - timedelta(days=30):
+                if last_activity and last_activity < utc_ahora() - timedelta(days=30):
                     items.append({"id": f"proceso-inactivo:{process_id}", "categoria": "proceso", "tipo": "SIN_ACTIVIDAD",
                                   "titulo": process.nombre, "descripcion": "El proceso no registra actividad reciente",
                                   "fecha": last_activity, "href": f"/gestion-procesos/abogado/procesos/{process_id}/actividad",
@@ -1116,7 +1116,7 @@ def _notificaciones_abogado(db: Session, usuario: models.Usuario) -> list[dict]:
         ).all()
         for task in tasks:
             due = task.fecha_limite
-            overdue = due < datetime.utcnow()
+            overdue = due < utc_ahora()
             items.append({"id": f"tarea:{task.id}", "categoria": "tarea", "tipo": "VENCIMIENTO" if overdue else "TAREA",
                           "titulo": task.titulo, "descripcion": "La tarea está vencida" if overdue else "Tarea próxima a vencer",
                           "fecha": due, "href": f"/gestion-procesos/abogado/procesos/{task.proceso_id}/tareas",
@@ -1140,8 +1140,8 @@ def _notificaciones_abogado(db: Session, usuario: models.Usuario) -> list[dict]:
                           "proceso_id": document.proceso_id, "leida": False})
         upcoming_events = db.query(models.EventoAgenda).filter(
             models.EventoAgenda.proceso_id.in_(process_ids), models.EventoAgenda.estado == "PROGRAMADO",
-            models.EventoAgenda.fecha_inicio >= datetime.utcnow(),
-            models.EventoAgenda.fecha_inicio <= datetime.utcnow() + timedelta(days=7),
+            models.EventoAgenda.fecha_inicio >= utc_ahora(),
+            models.EventoAgenda.fecha_inicio <= utc_ahora() + timedelta(days=7),
         ).all()
         for event in upcoming_events:
             items.append({"id": f"evento:{event.id}", "categoria": "proceso", "tipo": "EVENTO_PROXIMO",
@@ -1161,7 +1161,7 @@ def _notificaciones_abogado(db: Session, usuario: models.Usuario) -> list[dict]:
                 process_id = next((row.proceso_id for row in db.query(models.ProcesoRadicado).filter_by(radicado_id=radicado.id).all() if row.proceso_id in process_ids), None)
                 items.append({"id": f"radicado:{radicado.id}", "categoria": "radicado", "tipo": "ERROR_CONSULTA",
                               "titulo": radicado.numero, "descripcion": "La última consulta judicial del radicado reportó un error",
-                              "fecha": datetime.utcnow(), "href": f"/gestion-procesos/abogado/procesos/{process_id}/relaciones",
+                              "fecha": utc_ahora(), "href": f"/gestion-procesos/abogado/procesos/{process_id}/relaciones",
                               "proceso_id": process_id, "leida": False})
         allowed_clients = db.query(models.ProcesoCliente.cliente_id).filter(models.ProcesoCliente.proceso_id.in_(process_ids))
         profile_requests = db.query(models.SolicitudEdicionPerfilCliente).filter(
@@ -1217,7 +1217,7 @@ def dashboard_abogado(db: Session = Depends(get_db), usuario: models.Usuario = D
     if usuario.rol != models.RolUsuario.ADMIN:
         tasks_query = tasks_query.filter(models.Tarea.proceso_id.in_(lawyer_process_ids(db, usuario)))
     tasks = tasks_query.all()
-    today = datetime.utcnow()
+    today = utc_ahora()
     active_tasks = [task for task in tasks if task.estado in (models.EstadoTarea.PENDIENTE, models.EstadoTarea.EN_CURSO)]
     overdue = [task for task in active_tasks if task.fecha_limite and task.fecha_limite < today]
     upcoming = [task for task in active_tasks if task.fecha_limite and today <= task.fecha_limite <= today + timedelta(days=7)]
@@ -1561,7 +1561,7 @@ def listar_procesos(db: Session = Depends(get_db), usuario: models.Usuario = Dep
                 models.EventoAgenda.proceso_id == proceso.id,
                 models.EventoAgenda.cliente_id == usuario.id,
                 models.EventoAgenda.estado == "PROGRAMADO",
-                models.EventoAgenda.fecha_inicio >= datetime.utcnow(),
+                models.EventoAgenda.fecha_inicio >= utc_ahora(),
             ).order_by(models.EventoAgenda.fecha_inicio.asc()).all()
             estado_visible, explicacion_estado = _estado_proceso_cliente(proceso)
             timeline_cliente = _timeline_cliente_visible(proceso, db, usuario.id)
@@ -1570,7 +1570,7 @@ def listar_procesos(db: Session = Depends(get_db), usuario: models.Usuario = Dep
             ] + [
                 (task.fecha_limite, task.titulo)
                 for task in pendientes_cliente
-                if task.fecha_limite and task.fecha_limite >= datetime.utcnow()
+                if task.fecha_limite and task.fecha_limite >= utc_ahora()
             ]
             proxima_fecha, proxima_titulo = min(proximas_fechas, key=lambda item: item[0]) if proximas_fechas else (None, None)
             item.update({
@@ -1589,7 +1589,7 @@ def listar_procesos(db: Session = Depends(get_db), usuario: models.Usuario = Dep
             solicitudes = actividad.get("solicitudes", [])
             documentos = actividad.get("documentos", [])
             pendientes = [task for task in tareas if task.estado in (models.EstadoTarea.PENDIENTE, models.EstadoTarea.EN_CURSO)]
-            vencidas = [task for task in pendientes if task.fecha_limite and task.fecha_limite < datetime.utcnow()]
+            vencidas = [task for task in pendientes if task.fecha_limite and task.fecha_limite < utc_ahora()]
             solicitudes_pendientes = [request for request in solicitudes if request.atendida_en is None]
             fechas = [proceso.created_at]
             fechas.extend(item.updated_at for item in tareas if item.updated_at)
@@ -1597,7 +1597,7 @@ def listar_procesos(db: Session = Depends(get_db), usuario: models.Usuario = Dep
             fechas.extend(item.created_at for item in documentos if item.created_at)
             fechas.extend(item.created_at for item in proceso.colaboradores if item.created_at)
             ultima_actividad = max(fechas) if fechas else None
-            proxima = min((task.fecha_limite for task in pendientes if task.fecha_limite and task.fecha_limite >= datetime.utcnow()), default=None)
+            proxima = min((task.fecha_limite for task in pendientes if task.fecha_limite and task.fecha_limite >= utc_ahora()), default=None)
             item.update({
                 "responsable": {"id": proceso.abogado.id, "nombre_completo": proceso.abogado.nombre_completo},
                 "clientes": [{"id": link.cliente.id, "nombre_completo": link.cliente.nombre_completo} for link in proceso.clientes if link.cliente],
@@ -1609,7 +1609,7 @@ def listar_procesos(db: Session = Depends(get_db), usuario: models.Usuario = Dep
                 "estado_atencion": "ATENCION" if vencidas or solicitudes_pendientes else "ACTIVO",
                 "riesgo": bool(vencidas or solicitudes_pendientes),
                 "responsable_asignado": proceso.abogado_id is not None,
-                "inactivo": bool(ultima_actividad and ultima_actividad < datetime.utcnow() - timedelta(days=30)),
+                "inactivo": bool(ultima_actividad and ultima_actividad < utc_ahora() - timedelta(days=30)),
             })
         result.append(item)
     return result
@@ -1756,7 +1756,7 @@ def detalle_proceso_cliente(proceso_id: int, db: Session = Depends(get_db), usua
         proceso_id=proceso.id, cliente_id=usuario.id, visibilidad="CLIENTE",
     ).order_by(models.ComunicacionProceso.created_at.desc()).limit(300).all()
     comunicaciones.reverse()
-    ahora = datetime.utcnow()
+    ahora = utc_ahora()
     for mensaje in comunicaciones:
         if mensaje.actor_id != usuario.id and mensaje.leido_en is None:
             mensaje.leido_en = ahora
@@ -1805,8 +1805,8 @@ def agenda_cliente(dias: int = 90, db: Session = Depends(get_db), usuario: model
     require_roles(usuario, ["CLIENTE"], action="consultar su calendario")
     if dias < 1 or dias > 365:
         raise HTTPException(status_code=400, detail="El rango del calendario debe estar entre 1 y 365 días.")
-    desde = datetime.utcnow() - timedelta(days=30)
-    hasta = datetime.utcnow() + timedelta(days=dias)
+    desde = utc_ahora() - timedelta(days=30)
+    hasta = utc_ahora() + timedelta(days=dias)
     eventos = db.query(models.EventoAgenda).join(models.ProcesoCliente, models.ProcesoCliente.proceso_id == models.EventoAgenda.proceso_id).join(
         models.Proceso, models.Proceso.id == models.EventoAgenda.proceso_id,
     ).filter(
@@ -1989,7 +1989,7 @@ def listar_comunicaciones_proceso(proceso_id: int, db: Session = Depends(get_db)
         models.ComunicacionProceso.leido_en.is_(None),
     ).all()
     for message in incoming:
-        message.leido_en = datetime.utcnow()
+        message.leido_en = utc_ahora()
     if incoming:
         db.commit()
     return [{"id": item.id, "asunto": item.asunto, "contenido": item.contenido, "visibilidad": item.visibilidad,
@@ -2481,7 +2481,7 @@ def cargar_documento_cliente(solicitud_id: int, archivo: UploadFile = File(...),
             and latest_by_item[item["id"]].estado_revision != "REQUIERE_CORRECCION"
             for item in required_items
         )
-        solicitud.atendida_en = datetime.utcnow() if fully_supplied else None
+        solicitud.atendida_en = utc_ahora() if fully_supplied else None
         registrar_evento_auditoria(db, usuario, "documento.cargar", "documento_proceso", documento.id)
         db.commit()
     except Exception:
@@ -2586,7 +2586,7 @@ def busqueda_global(q: str, usuario: models.Usuario = Depends(security.obtener_u
 def metricas_carga(usuario: models.Usuario = Depends(security.obtener_usuario_actual), db: Session = Depends(get_db)):
     """Workload view for platform admins and firm administrators."""
     process_ids = _staff_scope(usuario, db)
-    now = datetime.utcnow()
+    now = utc_ahora()
     process_query = db.query(models.Proceso).filter(models.Proceso.archivado_en.is_(None))
     task_query = db.query(models.Tarea).filter(models.Tarea.estado.in_([models.EstadoTarea.PENDIENTE, models.EstadoTarea.EN_CURSO]))
     if process_ids is not None:

@@ -8,7 +8,8 @@ correos ni direcciones IP en claro.
 
 import hashlib
 import os
-from datetime import datetime, timedelta
+from datetime import timedelta
+from app.timezone import utc_ahora
 
 from fastapi import Request
 from sqlalchemy.orm import Session
@@ -34,7 +35,7 @@ def ip_cliente(request: Request) -> str:
 
 def limite_excedido(db: Session, limites: list[tuple[str, int]], ventana: timedelta) -> bool:
     """Indica si alguna clave alcanzó su máximo de intentos dentro de la ventana."""
-    desde = datetime.utcnow() - ventana
+    desde = utc_ahora() - ventana
     for clave, maximo in limites:
         usados = (
             db.query(models.IntentoLimitado)
@@ -48,7 +49,7 @@ def limite_excedido(db: Session, limites: list[tuple[str, int]], ventana: timede
 
 def registrar_intentos(db: Session, claves: list[str]) -> None:
     """Guarda un intento por clave y descarta los que ya no cuentan para ninguna ventana."""
-    ahora = datetime.utcnow()
+    ahora = utc_ahora()
     db.query(models.IntentoLimitado).filter(
         models.IntentoLimitado.creado_en < ahora - RETENCION
     ).delete(synchronize_session=False)

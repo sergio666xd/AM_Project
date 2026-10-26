@@ -5,7 +5,8 @@ import hmac
 import logging
 import json
 import os
-from datetime import datetime, timedelta
+from datetime import timedelta
+from app.timezone import utc_ahora
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -48,7 +49,7 @@ def actualizar_presencia_panel(
 ):
     if not _supports_firm_panel_presence(user):
         return {"activo": False}
-    now = datetime.utcnow()
+    now = utc_ahora()
     db.query(models.ChatPresenciaPanel).filter(
         models.ChatPresenciaPanel.last_seen_at < now - PANEL_PRESENCE_TTL
     ).delete(synchronize_session=False)
@@ -111,7 +112,7 @@ def guardar_suscripcion_push(
         subscription.auth = data.keys["auth"]
         subscription.user_agent = data.user_agent
         subscription.device_label = data.device_label
-        subscription.updated_at = datetime.utcnow()
+        subscription.updated_at = utc_ahora()
     db.commit()
     return {"registrada": True}
 
@@ -409,7 +410,7 @@ def _upsert_conversation(
     if conversation is None:
         conversation = models.ChatConversacion(
             clave=key, tipo=kind, proceso_id=process_id, cliente_id=client_id,
-            creado_por_id=actor.id, updated_at=datetime.utcnow(),
+            creado_por_id=actor.id, updated_at=utc_ahora(),
         )
         db.add(conversation)
         db.flush()
@@ -459,7 +460,7 @@ def _display_conversations(db: Session, conversations: list[models.ChatConversac
     }
     online_ids = {row[0] for row in db.query(models.ChatPresenciaPanel.usuario_id).filter(
         models.ChatPresenciaPanel.usuario_id.in_(other_ids or [-1]),
-        models.ChatPresenciaPanel.last_seen_at >= datetime.utcnow() - PANEL_PRESENCE_TTL,
+        models.ChatPresenciaPanel.last_seen_at >= utc_ahora() - PANEL_PRESENCE_TTL,
     ).distinct().all()}
     last_ids = (
         db.query(func.max(models.ChatMensaje.id))
@@ -855,7 +856,7 @@ def marcar_conversacion_leida(
         raise HTTPException(status_code=404, detail="No se encontró el mensaje de esta conversación.")
     participant.ultimo_entregado_mensaje_id = max(participant.ultimo_entregado_mensaje_id, message.id)
     participant.ultimo_leido_mensaje_id = max(participant.ultimo_leido_mensaje_id, message.id)
-    participant.ultimo_leido_en = datetime.utcnow()
+    participant.ultimo_leido_en = utc_ahora()
     db.commit()
     return {"leido_hasta": participant.ultimo_leido_mensaje_id}
 
@@ -1024,10 +1025,10 @@ def enviar_mensaje(conversation_id: int, data: schemas.ChatMensajeCreate, db: Se
         referencia_titulo=reference["titulo"] if reference else None,
         referencia_url=reference["href"] if reference else None,
     )
-    conversation.updated_at = datetime.utcnow()
+    conversation.updated_at = utc_ahora()
     participant = next((item for item in conversation.participantes if item.usuario_id == user.id), None)
     if participant:
-        participant.ultimo_leido_en = datetime.utcnow()
+        participant.ultimo_leido_en = utc_ahora()
     db.add(message)
     db.flush()
     registrar_evento_auditoria(db, user, "chat.mensaje.enviar", "chat_conversacion", conversation.id)
@@ -1035,7 +1036,7 @@ def enviar_mensaje(conversation_id: int, data: schemas.ChatMensajeCreate, db: Se
     db.refresh(message)
     process = conversation.proceso
     recipients = [item.usuario for item in conversation.participantes if item.usuario and item.usuario_id != user.id and item.usuario.estado == models.EstadoUsuario.ACTIVO]
-    now = datetime.utcnow()
+    now = utc_ahora()
     db.query(models.ChatPresenciaPanel).filter(models.ChatPresenciaPanel.last_seen_at < now - PANEL_PRESENCE_TTL).delete(synchronize_session=False)
     for recipient in recipients:
         display = _display_conversation(db, conversation, recipient)

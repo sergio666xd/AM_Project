@@ -11,9 +11,10 @@ from urllib.request import Request as UrlRequest, urlopen
 
 import requests
 from email_validator import EmailNotValidError, validate_email
-from fastapi import APIRouter, BackgroundTasks, Body, Depends, File, Form, HTTPException, Query, Request, UploadFile, status
+from fastapi import APIRouter, BackgroundTasks, Body, Depends, File, Form, HTTPException, Query, UploadFile, status
 from botocore.exceptions import BotoCoreError, ClientError
 from datetime import date, datetime, timedelta, timezone
+from app.timezone import utc_ahora
 from zoneinfo import ZoneInfo
 from sqlalchemy import and_, func, or_
 from sqlalchemy.exc import IntegrityError
@@ -603,7 +604,6 @@ def obtener_dashboard_admin(
     cuentas = db.query(models.Usuario).filter(models.Usuario.rol != models.RolUsuario.ADMIN)
     usuarios_activos = cuentas.filter(models.Usuario.estado == models.EstadoUsuario.ACTIVO).count()
     usuarios_pendientes = cuentas.filter(models.Usuario.estado == models.EstadoUsuario.PENDIENTE_APROBACION).count()
-    usuarios_rechazados = cuentas.filter(models.Usuario.estado == models.EstadoUsuario.RECHAZADO).count()
     solicitudes_registro = db.query(models.SolicitudRegistro).count()
     solicitudes_perfil = db.query(models.SolicitudEdicionPerfilCliente).filter(
         models.SolicitudEdicionPerfilCliente.estado == "PENDIENTE"
@@ -908,7 +908,7 @@ def _alertas_admin(db: Session) -> list[dict]:
     for tarea in tasks:
         agregar(f"tarea_vencida:{tarea.id}", "Riesgo", "Alta", tarea.fecha_limite,
                 f"Tarea vencida: {tarea.titulo}", tarea.proceso.nombre if tarea.proceso else "Tarea",
-                f"/gestion-procesos/admin/tareas", "Revisar tarea")
+                "/gestion-procesos/admin/tareas", "Revisar tarea")
 
     tareas_urgentes = db.query(models.Tarea).join(models.Usuario, models.Usuario.id == models.Tarea.usuario_id).filter(
         models.Usuario.rol.in_(roles_firma),
@@ -1638,7 +1638,7 @@ def cargar_documento_admin(
         cliente_id=client.id,
         titulo=f"Carga administrativa: {filename}"[:255],
         instrucciones="Documento asociado por administración.",
-        atendida_en=datetime.utcnow(),
+        atendida_en=utc_ahora(),
     )
     db.add(solicitud)
     db.flush()
@@ -1734,7 +1734,7 @@ def actualizar_recurso_admin(
         if "estado_revision" in values:
             item.estado_revision = values["estado_revision"]
             item.revisado_por_id = admin.id
-            item.revisado_en = datetime.utcnow()
+            item.revisado_en = utc_ahora()
             if item.solicitud:
                 required_items = item.solicitud.documentos_requeridos or [{"id": "legacy", "nombre": item.solicitud.titulo}]
                 latest_by_item = {}
@@ -1742,7 +1742,7 @@ def actualizar_recurso_admin(
                     item_id = uploaded.solicitud_item_id or (required_items[0].get("id", "legacy") if len(required_items) == 1 else None)
                     if item_id:
                         latest_by_item[item_id] = uploaded
-                item.solicitud.atendida_en = datetime.utcnow() if all(
+                item.solicitud.atendida_en = utc_ahora() if all(
                     str(required.get("id", "legacy")) in latest_by_item
                     and latest_by_item[str(required.get("id", "legacy"))].estado_revision != "REQUIERE_CORRECCION"
                     for required in required_items
@@ -2494,7 +2494,7 @@ def _notificar_evento_agenda_admin(db: Session, evento: models.EventoAgenda, adm
 
 def _notificar_agenda_tras_reactivacion(db: Session, usuario: models.Usuario, actor: models.Usuario) -> None:
     """Deliver catch-up notices for pending and unread agenda items after reactivation."""
-    ahora = datetime.utcnow()
+    ahora = utc_ahora()
     marca_reactivacion = ahora.isoformat()
     if usuario.rol == models.RolUsuario.CLIENTE:
         process_ids = [row[0] for row in db.query(models.ProcesoCliente.proceso_id).filter_by(cliente_id=usuario.id).all()]
@@ -2591,7 +2591,7 @@ def _notificar_agenda_tras_reactivacion(db: Session, usuario: models.Usuario, ac
             recipient_url = user_portal_url(usuario, f"/gestion-procesos/abogado/procesos/{process.id}/agenda")
             recipient_label = "Ver agenda"
         elif usuario.rol == models.RolUsuario.ADMIN:
-            recipient_url = user_portal_url(usuario, f"/gestion-procesos/admin/agenda")
+            recipient_url = user_portal_url(usuario, "/gestion-procesos/admin/agenda")
             recipient_label = "Ver agenda"
         else:
             # The SaaS dashboard has no process agenda detail route yet.
@@ -2789,7 +2789,7 @@ def listar_solicitudes_documento_admin(
             estado = "APROBADO"
         else:
             estado = "DOCUMENTOS_SUMINISTRADOS"
-        vencida = bool(solicitud.fecha_limite and solicitud.fecha_limite < datetime.utcnow() and estado == "FALTAN_DOCUMENTOS")
+        vencida = bool(solicitud.fecha_limite and solicitud.fecha_limite < utc_ahora() and estado == "FALTAN_DOCUMENTOS")
         if vencida:
             estado = "VENCIDO"
         resultado.append({

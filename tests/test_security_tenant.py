@@ -10,6 +10,7 @@ from sqlalchemy import Boolean, Column, ForeignKey, Integer, MetaData, String, T
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, sessionmaker
 
+from app.timezone import utc_ahora
 from app import security
 from app import models, schemas
 from app import whatsapp
@@ -50,7 +51,6 @@ from app.routers.workflows import (
     reclamar_barrido,
     verificar_token_workflow,
 )
-from app.routers.workflows import reclamar_barrido
 from app.routers.admin import (
     actualizar_configuracion_consultas,
     buscar_radicados_consulta_manual,
@@ -62,7 +62,6 @@ from app.routers.admin import (
     crear_recurso_admin,
     eliminar_recurso_admin,
     listar_inventario_global,
-    listar_contenido_publico_admin,
     cargar_documento_admin,
     emitir_url_temporal_documento_admin,
     obtener_configuracion_consultas,
@@ -70,7 +69,6 @@ from app.routers.admin import (
     consultar_todos_radicados_admin,
     detalle_ejecucion_consultas,
     restaurar_proceso_admin,
-    restaurar_contenido_publico_admin,
     aplicar_migracion_radicados_admin,
 )
 from app.routers.expedientes import (
@@ -506,7 +504,7 @@ def test_workflow_radicado_step_persists_result_and_retries_without_duplicate_ap
             token_lanzamiento="launch-step-1",
             tipo="MANUAL",
             estado="EN_PROCESO",
-            inicio=datetime.utcnow(),
+            inicio=utc_ahora(),
             total_radicados=1,
         )
         db.add(ejecucion)
@@ -555,7 +553,7 @@ def test_sweep_counters_apply_deltas_after_stale_parallel_reads(tmp_path):
             clave_idempotencia="MANUAL:parallel-counters",
             token_lanzamiento="launch-parallel-counters",
             tipo="MANUAL",
-            inicio=datetime.utcnow(),
+            inicio=utc_ahora(),
             total_radicados=2,
         )
         first_session.add(execution)
@@ -575,7 +573,7 @@ def test_sweep_counters_apply_deltas_after_stale_parallel_reads(tmp_path):
             procesados_delta=1,
             errores_delta=0,
             actuaciones_delta=0,
-            lease_hasta=datetime.utcnow(),
+            lease_hasta=utc_ahora(),
         )
         first_session.commit()
         _aplicar_delta_contadores_barrido(
@@ -584,7 +582,7 @@ def test_sweep_counters_apply_deltas_after_stale_parallel_reads(tmp_path):
             procesados_delta=1,
             errores_delta=0,
             actuaciones_delta=0,
-            lease_hasta=datetime.utcnow(),
+            lease_hasta=utc_ahora(),
         )
         second_session.commit()
 
@@ -1072,7 +1070,7 @@ def test_workflow_actuation_notifications_consolidate_by_user_channel_and_scope(
             token_lanzamiento="notification-aggregation-token",
             tipo="AUTOMATICA",
             estado="EN_PROCESO",
-            inicio=datetime.utcnow(),
+            inicio=utc_ahora(),
             total_radicados=1,
         )
         db.add_all([

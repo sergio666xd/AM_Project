@@ -1,8 +1,9 @@
-from datetime import date, datetime, timedelta
+from datetime import timedelta
 
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
+from app.timezone import utc_ahora
 from app import models
 from app.audit import (
     establecer_contexto_solicitud_auditoria,
@@ -29,7 +30,7 @@ def test_admin_audit_has_human_summary_technical_detail_and_filters():
         )
         db.add_all([admin, lawyer])
         db.flush()
-        now = datetime.utcnow()
+        now = utc_ahora()
         db.add_all([
             models.EventoAuditoria(
                 actor_id=lawyer.id, accion="proceso.crear", tipo_recurso="proceso",

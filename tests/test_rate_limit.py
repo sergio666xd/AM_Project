@@ -1,4 +1,4 @@
-from datetime import datetime, timedelta
+from datetime import timedelta
 
 import pytest
 from fastapi import HTTPException
@@ -7,6 +7,7 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import Session
 from starlette.requests import Request
 
+from app.timezone import utc_ahora
 from app import models, schemas
 from app.rate_limit import clave_intento, ip_cliente, limite_excedido, registrar_intentos
 
@@ -31,7 +32,7 @@ def test_limit_counts_only_attempts_inside_the_window():
     with _db() as db:
         clave = clave_intento("prueba", "Persona@Example.test")
         assert clave == clave_intento("prueba", "persona@example.test")
-        db.add(models.IntentoLimitado(clave=clave, creado_en=datetime.utcnow() - timedelta(hours=2)))
+        db.add(models.IntentoLimitado(clave=clave, creado_en=utc_ahora() - timedelta(hours=2)))
         db.commit()
 
         registrar_intentos(db, [clave, clave])
@@ -42,7 +43,7 @@ def test_limit_counts_only_attempts_inside_the_window():
 
 def test_old_attempts_are_purged_when_registering():
     with _db() as db:
-        db.add(models.IntentoLimitado(clave="vieja", creado_en=datetime.utcnow() - timedelta(days=2)))
+        db.add(models.IntentoLimitado(clave="vieja", creado_en=utc_ahora() - timedelta(days=2)))
         db.commit()
         registrar_intentos(db, ["nueva"])
         assert [row.clave for row in db.query(models.IntentoLimitado).all()] == ["nueva"]

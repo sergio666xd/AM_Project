@@ -1,10 +1,11 @@
-from datetime import datetime, timedelta
+from datetime import timedelta
 
 import pytest
 from fastapi import HTTPException
 from sqlalchemy import create_engine, event
 from sqlalchemy.orm import Session
 
+from app.timezone import utc_ahora
 from app import models
 from app.main import listar_mis_radicados, obtener_radicado
 from app.routers.chat import _ack_entrega_push, confirmar_entrega_push, enviar_mensaje, listar_conversaciones, resolver_conversacion
@@ -53,7 +54,7 @@ def firma():
                 titulo=f"Tarea {indice}",
                 usuario_id=socia.id,
                 proceso_id=proceso.id,
-                fecha_limite=datetime.utcnow() - timedelta(days=1),
+                fecha_limite=utc_ahora() - timedelta(days=1),
             ))
             procesos.append(proceso)
         ajeno = models.Proceso(abogado_id=otra.id, nombre="Proceso ajeno")
@@ -139,7 +140,7 @@ def test_listar_conversaciones_respeta_alcance_y_cuenta_no_leidos(firma, monkeyp
     assert contador["total"] <= 10
 
     # El proceso archivado deja de aparecer en el chat del cliente.
-    firma["procesos"][1].archivado_en = datetime.utcnow()
+    firma["procesos"][1].archivado_en = utc_ahora()
     db.commit()
     tras_archivar = listar_conversaciones(sincronizar=False, db=db, user=cliente)
     assert len([item for item in tras_archivar if item["tipo"] == "PROCESO_DIRECTO"]) == 2
