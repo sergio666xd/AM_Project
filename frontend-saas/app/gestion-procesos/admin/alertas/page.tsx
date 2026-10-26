@@ -6,7 +6,6 @@ import { Bell, Check, ExternalLink, RefreshCw, Trash2, X } from "lucide-react";
 import { fetchApi } from "@/lib/api";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
-import { Card } from "@/components/ui/Card";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { LoadingState } from "@/components/ui/LoadingState";
 import { FilterBar } from "@/components/ui/FilterBar";

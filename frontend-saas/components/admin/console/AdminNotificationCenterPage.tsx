@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { Bell, Check, ExternalLink, Mail, RefreshCw } from "lucide-react";
+import { Check, ExternalLink, Mail, RefreshCw } from "lucide-react";
 import { fetchApi } from "@/lib/api";
 import { useSession } from "@/context/SessionContext";
 import { PageHeader } from "@/components/ui/PageHeader";

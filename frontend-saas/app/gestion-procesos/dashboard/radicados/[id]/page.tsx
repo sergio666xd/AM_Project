@@ -324,12 +324,14 @@ export default function DetalleRadicadoPage() {
    * Por defecto se muestran las más recientes primero.
    */
 
+  const actuacionesRadicado = radicado?.actuaciones;
+
   const actuacionesOrdenadas = useMemo(() => {
-    if (!radicado?.actuaciones) {
+    if (!actuacionesRadicado) {
       return [];
     }
 
-    const actuaciones = [...radicado.actuaciones];
+    const actuaciones = [...actuacionesRadicado];
 
     actuaciones.sort((a, b) => {
       const fechaA = obtenerTimestamp(a.fecha_actuacion);
@@ -351,7 +353,7 @@ export default function DetalleRadicadoPage() {
     });
 
     return actuaciones;
-  }, [radicado?.actuaciones, ordenActuaciones]);
+  }, [actuacionesRadicado, ordenActuaciones]);
 
   /*
    * ============================================================
@@ -363,16 +365,16 @@ export default function DetalleRadicadoPage() {
    */
 
   const actuacionActual = useMemo(() => {
-    if (!radicado?.actuaciones?.length) {
+    if (!actuacionesRadicado?.length) {
       return null;
     }
 
-    return [...radicado.actuaciones].sort(
+    return [...actuacionesRadicado].sort(
       (a, b) =>
         obtenerTimestamp(b.fecha_actuacion) -
         obtenerTimestamp(a.fecha_actuacion)
     )[0];
-  }, [radicado?.actuaciones]);
+  }, [actuacionesRadicado]);
 
   /*
    * ============================================================

@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { AlertCircle, FileSignature, RefreshCw, Search } from "lucide-react";
+import { AlertCircle, RefreshCw, Search } from "lucide-react";
 import { useSession } from "@/context/SessionContext";
 import { fetchApi } from "@/lib/api";
 import ProcessContracts from "@/components/contracts/ProcessContracts";

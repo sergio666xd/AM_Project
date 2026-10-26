@@ -101,26 +101,6 @@ function sweepStatusPresentation(status: string) {
   return { label: status.replaceAll("_", " "), className: "bg-surface-secondary text-foreground-muted", description: status };
 }
 
-function Metric({
-  icon: Icon,
-  label,
-  value,
-  tone = "text-foreground",
-}: {
-  icon: typeof Activity;
-  label: string;
-  value: string | number;
-  tone?: string;
-}) {
-  return (
-    <div className="rounded-lg border border-border bg-surface p-4">
-      <Icon className={`size-4 ${tone}`} />
-      <p className="mt-3 text-xs text-foreground-muted">{label}</p>
-      <p className={`mt-1 text-lg font-semibold ${tone}`}>{value}</p>
-    </div>
-  );
-}
-
 type OperationsSection = "resumen" | "consultas" | "integraciones" | "notificaciones";
 const SECTION_COPY: Record<OperationsSection, { title: string; description: string }> = {
   resumen: { title: "Operación", description: "Estado general de servicios y colas." },

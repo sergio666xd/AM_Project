@@ -8,11 +8,9 @@ import {
   ArrowLeft,
   ArrowUp,
   Bell,
-  Building2,
   CheckCircle2,
   Clock,
   FileText,
-  Loader2,
   RefreshCw,
   UserCheck,
   X,
@@ -21,9 +19,7 @@ import {
 import { fetchApi, iniciarWorkflowConsultaRadicado } from "@/lib/api";
 import { useSession } from "@/context/SessionContext";
 import { PageHeader } from "@/components/ui/PageHeader";
-import { StatCard } from "@/components/ui/StatCard";
 import { Button } from "@/components/ui/Button";
-import { Badge } from "@/components/ui/Badge";
 
 interface Actuacion {
   id: number;
@@ -356,13 +352,15 @@ export default function DetalleRadicadoPage() {
    *     N → ... → 3 → 2 → 1
    */
 
+  const actuacionesRadicado = radicado?.actuaciones;
+
   const actuacionesOrdenadas = useMemo(() => {
-    if (!radicado?.actuaciones) {
+    if (!actuacionesRadicado) {
       return [];
     }
 
     const actuaciones = [
-      ...radicado.actuaciones,
+      ...actuacionesRadicado,
     ];
 
     actuaciones.sort((a, b) => {
@@ -375,7 +373,7 @@ export default function DetalleRadicadoPage() {
 
     return actuaciones;
   }, [
-    radicado?.actuaciones,
+    actuacionesRadicado,
     ordenActuaciones,
   ]);
 
@@ -395,14 +393,14 @@ export default function DetalleRadicadoPage() {
    */
 
   const actuacionActual = useMemo(() => {
-    if (!radicado?.actuaciones?.length) {
+    if (!actuacionesRadicado?.length) {
       return null;
     }
 
-    return [...radicado.actuaciones].sort(
+    return [...actuacionesRadicado].sort(
       (a, b) => a.orden - b.orden
     )[0];
-  }, [radicado?.actuaciones]);
+  }, [actuacionesRadicado]);
 
   /*
    * ============================================================

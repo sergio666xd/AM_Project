@@ -8,7 +8,6 @@ import { fetchApi } from "@/lib/api";
 import TaskMonthCalendar, { type CalendarTask } from "@/components/calendar/TaskMonthCalendar";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { Badge } from "@/components/ui/Badge";
-import { Button } from "@/components/ui/Button";
 
 type AgendaData = {
   eventos: {

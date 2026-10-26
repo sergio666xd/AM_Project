@@ -75,16 +75,6 @@ type Radicado = {
   asunto?: string;
 };
 
-function formatDate(value?: string | null) {
-  if (!value) return "Sin fecha";
-
-  return new Date(value).toLocaleDateString("es-CO", { timeZone: "America/Bogota",
-    day: "2-digit",
-    month: "2-digit",
-    year: "numeric",
-  });
-}
-
 function formatDateTime(value?: string | null) {
   if (!value) return "Sin fecha";
 

@@ -23,8 +23,6 @@ import { useParams, useRouter } from "next/navigation";
 import { fetchApi } from "@/lib/api";
 import { useSession } from "@/context/SessionContext";
 import { Button } from "@/components/ui/Button";
-import { Badge } from "@/components/ui/Badge";
-import { PageHeader } from "@/components/ui/PageHeader";
 
 type EstadoTarea = "PENDIENTE" | "EN_CURSO" | "COMPLETADA" | "CANCELADA";
 

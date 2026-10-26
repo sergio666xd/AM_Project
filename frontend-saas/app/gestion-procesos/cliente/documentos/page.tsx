@@ -1,14 +1,12 @@
 "use client";
 
 import { apiRequest } from "@/lib/api";
-import Link from "next/link";
 
 import { ChangeEvent, useEffect, useState } from "react";
 import { AlertCircle, CheckCircle2, Download, FileText, FileUp, FolderOpen, Loader2, RefreshCw, Upload } from "lucide-react";
 import { useSession } from "@/context/SessionContext";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { Button } from "@/components/ui/Button";
-import { Badge } from "@/components/ui/Badge";
 
 const MAX_FILE_SIZE = 15 * 1024 * 1024;
 const ALLOWED_TYPES = new Set([
@@ -207,15 +205,7 @@ export default function DocumentosClientePage() {
 		}
 	}
 
-	const documentGroups = [
-		{ key: "EN_REVISION", title: "En revisión" },
-		{ key: "RECIBIDO", title: "Recibidos" },
-		{ key: "APROBADO", title: "Aprobados" },
-		{ key: "REQUIERE_CORRECCION", title: "Requieren corrección" },
-		{ key: "RECHAZADO", title: "No aprobados" },
-	];
 	const contractDocuments = data.documentos.filter((document) => Boolean(document.contrato_id));
-	const uploadedDocuments = data.documentos.filter((document) => !document.contrato_id);
 	const requestStatusLabel: Record<string, string> = { FALTAN_DOCUMENTOS: "Faltan documentos", DOCUMENTOS_SUMINISTRADOS: "Documentos suministrados", EN_REVISION: "En revisión", RECHAZADO: "Rechazado", APROBADO: "Aprobado" };
 	const itemStatusLabel: Record<string, string> = { FALTANTE: "Pendiente", RECIBIDO: "Recibido", EN_REVISION: "En revisión", REQUIERE_CORRECCION: "Rechazado · requiere reemplazo", RECHAZADO: "Rechazado", APROBADO: "Aprobado" };
 
