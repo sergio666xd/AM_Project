@@ -36,3 +36,5 @@ select = ["F"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+# Permite ejecutar `pytest` directamente (no solo `python -m pytest`) e importar `app`.
+pythonpath = ["."]
