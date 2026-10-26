@@ -256,6 +256,23 @@ uvicorn app.main:app --reload
 
 La aplicación crea tablas y, al iniciar, aplica DDL de compatibilidad para instalaciones PostgreSQL existentes. Ya no crea planes comerciales automáticamente. Solo crea una cuenta ADMIN si `ADMIN_PASSWORD` está configurada y aún no existe ninguna cuenta ADMIN.
 
+### Migraciones de esquema (Alembic)
+
+Los cambios de esquema se versionan con Alembic en `alembic_migrations/versions/`. Al arrancar, la API aplica las revisiones pendientes con un bloqueo de PostgreSQL, así que dos instancias de Vercel no migran a la vez:
+
+- Base vacía: crea las tablas desde los modelos y la marca en la última revisión.
+- Base anterior a Alembic: la marca en la revisión base `0001` (no modifica nada) y aplica las siguientes.
+- Base ya versionada: aplica solo las revisiones nuevas.
+
+Para un cambio de esquema, edita el modelo en `app/models.py` y genera la revisión contra una base local que esté al día:
+
+```powershell
+alembic upgrade head
+alembic revision --autogenerate -m "describe el cambio"
+```
+
+Revisa el archivo generado antes de confirmarlo: el autogenerado no detecta renombres y puede proponer borrar columnas. `alembic upgrade head --sql` muestra el SQL sin ejecutarlo. No agregues sentencias nuevas a `actualizar_esquema_planes()` ni a `migrations/*.sql`; quedan como esquema heredado.
+
 ### Frontend
 
 ```powershell

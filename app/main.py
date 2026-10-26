@@ -41,6 +41,7 @@ from app.message_templates import render_message
 from app.password_reset import password_reset_url, send_password_reset_email
 from app.security_notifications import send_security_change_confirmation
 from app.rate_limit import clave_intento, ip_cliente, limite_excedido, registrar_intentos
+from app.migraciones import aplicar_migraciones, huella_versiones
 
 RUTA_MIGRACION_PLANTILLAS = Path(__file__).resolve().parents[1] / "migrations" / "2026_10_10_mensajes_configurables.sql"
 
@@ -139,6 +140,7 @@ def huella_esquema() -> str:
     huella.update(inspect.getsource(actualizar_esquema_planes).encode())
     if RUTA_MIGRACION_PLANTILLAS.is_file():
         huella.update(RUTA_MIGRACION_PLANTILLAS.read_bytes())
+    huella.update(huella_versiones())
     return huella.hexdigest()
 
 
@@ -155,15 +157,28 @@ def preparar_esquema() -> None:
 
     En Vercel cada arranque en frío ejecutaba ~70 sentencias DDL con bloqueos
     exclusivos; la huella guardada permite omitirlas cuando ya están aplicadas.
+
+    Los cambios de esquema nuevos van como revisiones de Alembic
+    (alembic_migrations/versions); actualizar_esquema_planes() y la migración de
+    plantillas quedan como el esquema heredado y no deben crecer.
     """
     if engine.dialect.name != "postgresql":
         # Las sentencias de compatibilidad son específicas de PostgreSQL; en
         # bases locales de desarrollo basta con crear las tablas.
+        aplicar_migraciones(engine)
         models.Base.metadata.create_all(bind=engine)
         return
     huella = huella_esquema()
     if _huella_esquema_aplicada() == huella:
         return
+    migraciones_ok = True
+    try:
+        aplicar_migraciones(engine)
+    except Exception:
+        # El esquema heredado se aplica igual; sin guardar la huella, el
+        # próximo arranque vuelve a intentar las migraciones.
+        migraciones_ok = False
+        logging.getLogger(__name__).exception("No se pudieron aplicar las migraciones de Alembic.")
     models.Base.metadata.create_all(bind=engine)
     actualizar_esquema_planes()
     try:
@@ -179,6 +194,8 @@ def preparar_esquema() -> None:
         logging.getLogger(__name__).exception(
             "No se pudieron preparar las plantillas de mensajes; la API continuará iniciando."
         )
+        return
+    if not migraciones_ok:
         return
     with engine.begin() as conexion:
         conexion.execute(text(
