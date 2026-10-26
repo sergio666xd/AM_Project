@@ -1020,6 +1020,8 @@ def test_workflow_actuation_notifications_consolidate_by_user_channel_and_scope(
             rol=models.RolUsuario.CLIENTE,
             estado=models.EstadoUsuario.ACTIVO,
             canal_notificacion_cliente="WHATSAPP",
+            notificaciones_email=False,
+            notificaciones_whatsapp=True,
         )
         unassigned_client = models.Usuario(
             email="actuation-unassigned@example.test",
@@ -2037,10 +2039,16 @@ def test_integration_connection_diagnostics_do_not_send_or_expose_secrets(monkey
 
     monkeypatch.setenv("WORKFLOW_FRONTEND_URL", "https://frontend.example.test")
     monkeypatch.setenv("WORKFLOW_SERVICE_TOKEN", "unit-test-private-token")
-    monkeypatch.setenv("SMTP_HOST", "smtp.example.test")
-    monkeypatch.setenv("SMTP_FROM", "sender@example.com")
-    monkeypatch.setenv("SMTP_USER", "smtp-user")
-    monkeypatch.setenv("SMTP_PASSWORD", "unit-test-private-password")
+    monkeypatch.setattr(admin_router, "get_integration_settings", lambda: {
+        "smtp_host": "smtp.example.test",
+        "smtp_port": 587,
+        "smtp_from": "sender@example.com",
+        "smtp_starttls": True,
+        "smtp_user": "smtp-user",
+        "smtp_password": "unit-test-private-password",
+        "whatsapp_api_url": "",
+        "whatsapp_token": "",
+    })
 
     class WorkflowResponse:
         ok = True
@@ -2163,6 +2171,7 @@ def test_saas_notification_features_require_plan_but_internal_staff_do_not():
             self.plan = plan
             self.estado = models.EstadoUsuario.ACTIVO
             self.email = "notification@example.test"
+            self.notificaciones_email = False
             self.notificaciones_whatsapp = True
             self.whatsapp_numero = "573000000000"
             self.canal_notificacion_cliente = "WHATSAPP" if role == models.RolUsuario.CLIENTE else None
@@ -2192,7 +2201,9 @@ def test_client_notification_preferences_require_one_available_channel():
             whatsapp_numero="",
             rol=models.RolUsuario.CLIENTE,
             estado=models.EstadoUsuario.ACTIVO,
-            canal_notificacion_cliente="EMAIL",
+            canal_notificacion_cliente=None,
+            notificaciones_email=False,
+            notificaciones_whatsapp=False,
         )
         db.add(client)
         db.flush()
@@ -2753,6 +2764,7 @@ def test_document_upload_compensates_only_when_database_commit_fails(
                 cargar_documento_cliente(
                     request.id,
                     archivo=upload,
+                    item_id=None,
                     db=db,
                     usuario=client,
                 )
@@ -2762,6 +2774,7 @@ def test_document_upload_compensates_only_when_database_commit_fails(
             result = cargar_documento_cliente(
                 request.id,
                 archivo=upload,
+                item_id=None,
                 db=db,
                 usuario=client,
             )
@@ -3194,7 +3207,7 @@ def test_due_reminders_use_workflow_delivery_and_complete_after_send(monkeypatch
     sent = []
     monkeypatch.setattr(
         "app.routers.workflows.enviar_mensaje_whatsapp",
-        lambda numero, mensaje: sent.append((numero, mensaje)) or True,
+        lambda numero, mensaje, **kwargs: sent.append((numero, mensaje)) or True,
     )
 
     with Session(engine) as db:
@@ -3399,6 +3412,8 @@ def test_reminder_versions_follow_schedule_and_task_mutations(monkeypatch):
             task.id,
             schemas.RecordatorioTareaCreate(
                 fecha_hora=datetime(2026, 11, 1, 12, 0, tzinfo=timezone.utc),
+                notificar_email=True,
+                notificar_whatsapp=False,
             ),
             db=db,
             usuario_actual=lawyer,
@@ -3446,15 +3461,17 @@ def test_reminder_versions_follow_schedule_and_task_mutations(monkeypatch):
             usuario_actual=lawyer,
         )
         assert db.query(models.RecordatorioTarea).filter_by(id=reminder.id).one().version == 5
-        assert len(launches) == 4
+        assert launches.count(reminder.id) == 4
+
+        # Completar la tarea descarta sus recordatorios; reabrirla crea de nuevo los del sistema.
+        completar_tarea(task.id, db=db, usuario_actual=lawyer)
+        assert db.query(models.RecordatorioTarea).filter_by(tarea_id=task.id).count() == 0
+        launches_before_reopen = len(launches)
 
         completar_tarea(task.id, db=db, usuario_actual=lawyer)
-        assert db.query(models.RecordatorioTarea).filter_by(id=reminder.id).one().version == 6
-        assert len(launches) == 4
-
-        completar_tarea(task.id, db=db, usuario_actual=lawyer)
-        assert db.query(models.RecordatorioTarea).filter_by(id=reminder.id).one().version == 7
-        assert len(launches) == 5
+        system_reminders = db.query(models.RecordatorioTarea).filter_by(tarea_id=task.id, interno_sistema=True).all()
+        assert len(system_reminders) == 2
+        assert launches[launches_before_reopen:] == [item.id for item in system_reminders]
 
         anticipation_task = models.Tarea(
             usuario_id=lawyer.id,
@@ -3463,14 +3480,15 @@ def test_reminder_versions_follow_schedule_and_task_mutations(monkeypatch):
         )
         db.add(anticipation_task)
         db.commit()
+        launches_before_anticipation = len(launches)
         anticipation_reminder = crear_recordatorio(
             anticipation_task.id,
-            schemas.RecordatorioTareaCreate(anticipacion_minutos=60),
+            schemas.RecordatorioTareaCreate(anticipacion_minutos=60, notificar_email=True, notificar_whatsapp=False),
             db=db,
             usuario_actual=lawyer,
         )
         assert momento_programado(anticipation_reminder, anticipation_task) == datetime(2026, 12, 1, 11, 0)
-        assert len(launches) == 6
+        assert launches[launches_before_anticipation:] == [anticipation_reminder.id]
 
         deleted_id = anticipation_reminder.id
         eliminar_recordatorio(
@@ -3822,12 +3840,15 @@ def test_transactional_email_preserves_utf8_accents(monkeypatch):
 
     from app import email_service
 
-    monkeypatch.setenv("SMTP_HOST", "smtp.example.test")
-    monkeypatch.setenv("SMTP_FROM", "sender@example.test")
-    monkeypatch.setenv("SMTP_PORT", "587")
-    monkeypatch.setenv("SMTP_USER", "sender@example.test")
-    monkeypatch.setenv("SMTP_PASSWORD", "test-password")
-    monkeypatch.setenv("SMTP_STARTTLS", "true")
+    monkeypatch.setattr(email_service, "get_integration_settings", lambda: {
+        "smtp_host": "smtp.example.test",
+        "smtp_from": "sender@example.test",
+        "smtp_port": 587,
+        "smtp_user": "sender@example.test",
+        "smtp_password": "test-password",
+        "smtp_starttls": True,
+    })
+    monkeypatch.setattr(email_service, "get_firm_settings", lambda: {})
     captured = {}
 
     class FakeSMTP:
@@ -3859,8 +3880,10 @@ def test_transactional_email_preserves_utf8_accents(monkeypatch):
     )
 
     parsed = BytesParser(policy=policy.default).parsebytes(captured["wire"])
-    assert parsed.get_content_charset() == "utf-8"
-    assert parsed.get_content().rstrip("\r\n") == body
+    # El correo lleva versión de texto y HTML; el texto plano conserva el cuerpo exacto.
+    plain = parsed.get_body(preferencelist=("plain",))
+    assert plain.get_content_charset() == "utf-8"
+    assert plain.get_content().rstrip("\r\n") == body
     assert str(parsed["Subject"]) == "Prueba UTF-8: revisión"
 
 
@@ -3906,8 +3929,7 @@ def test_process_can_use_an_assigned_client_created_by_another_lawyer():
 
 
 def test_whatsapp_api_skips_unconfigured_transport_without_printing_message(monkeypatch, capsys):
-    monkeypatch.setattr(whatsapp, "WHATSAPP_API_URL", "")
-    monkeypatch.setattr(whatsapp, "WHATSAPP_TOKEN", "")
+    monkeypatch.setattr(whatsapp, "get_integration_settings", lambda: {"whatsapp_api_url": "", "whatsapp_token": ""})
 
     assert whatsapp.enviar_mensaje_whatsapp("3001234567", "private message") is False
     assert "private message" not in capsys.readouterr().out
@@ -3918,8 +3940,11 @@ def test_whatsapp_api_uses_configured_http_transport(monkeypatch):
         status_code = 200
 
     calls = []
-    monkeypatch.setattr(whatsapp, "WHATSAPP_API_URL", "https://whatsapp.example.test/send")
-    monkeypatch.setattr(whatsapp, "WHATSAPP_TOKEN", "test-token")
+    monkeypatch.setattr(
+        whatsapp,
+        "get_integration_settings",
+        lambda: {"whatsapp_api_url": "https://whatsapp.example.test/send", "whatsapp_token": "test-token"},
+    )
     monkeypatch.setattr(
         whatsapp.requests,
         "post",

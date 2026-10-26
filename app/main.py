@@ -347,7 +347,7 @@ def resolver_ruta_contenido_publico(ruta: str, db: Session = Depends(get_db)):
         current_route = saved_route or default_route
         if normalized == current_route:
             return {"slug": slug, "ruta": current_route}
-    raise HTTPException(status_code=404, detail="Ruta de contenido pÃºblico no encontrada.")
+    raise HTTPException(status_code=404, detail="Ruta de contenido público no encontrada.")
 
 
 @app.get("/api/planes-publicos", response_model=list[schemas.PlanOut])

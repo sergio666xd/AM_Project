@@ -7,7 +7,7 @@ import hashlib
 from uuid import uuid4
 from urllib.error import HTTPError, URLError
 from urllib.parse import quote, urljoin, urlsplit
-from urllib.request import Request, urlopen
+from urllib.request import Request as UrlRequest, urlopen
 
 import requests
 from email_validator import EmailNotValidError, validate_email
@@ -235,14 +235,14 @@ def guardar_contenido_publico_admin(
     admin: models.Usuario = Depends(verificar_admin),
 ):
     if slug not in PUBLIC_CONTENT_PAGES:
-        raise HTTPException(status_code=404, detail="PÃ¡gina pÃºblica no disponible para ediciÃ³n.")
+        raise HTTPException(status_code=404, detail="Página pública no disponible para edición.")
     if not isinstance(datos.contenido, dict):
         raise HTTPException(status_code=400, detail="El contenido debe ser un objeto.")
     route = datos.contenido.get("route")
     if not isinstance(route, str) or not re.fullmatch(r"/(?:[a-z0-9]+(?:-[a-z0-9]+)*)(?:/[a-z0-9]+(?:-[a-z0-9]+)*)*|/", route):
-        raise HTTPException(status_code=400, detail="La ruta debe comenzar con / y usar minÃºsculas, nÃºmeros y guiones.")
+        raise HTTPException(status_code=400, detail="La ruta debe comenzar con / y usar minúsculas, números y guiones.")
     if route != "/" and any(route == reserved or route.startswith(f"{reserved}/") for reserved in ("/api", "/gestion-procesos", "/_next", "/robots.txt", "/sitemap.xml", "/favicon.ico")):
-        raise HTTPException(status_code=400, detail="La ruta elegida estÃ¡ reservada para el sistema.")
+        raise HTTPException(status_code=400, detail="La ruta elegida está reservada para el sistema.")
     for other_slug in PUBLIC_CONTENT_PAGES:
         if other_slug == slug:
             continue
@@ -250,7 +250,7 @@ def guardar_contenido_publico_admin(
         other_content = other_page.contenido if other_page else None
         other_route = other_content.get("route", PUBLIC_PAGE_ROUTES[other_slug]) if isinstance(other_content, dict) else PUBLIC_PAGE_ROUTES[other_slug]
         if route == other_route or route == PUBLIC_PAGE_ROUTES[other_slug]:
-            raise HTTPException(status_code=409, detail="Esa ruta ya estÃ¡ asignada a otra pÃ¡gina.")
+            raise HTTPException(status_code=409, detail="Esa ruta ya está asignada a otra página.")
     if len(json.dumps(datos.contenido, ensure_ascii=False)) > 250_000:
         raise HTTPException(status_code=413, detail="El contenido de la página supera el tamaño permitido.")
     page = db.query(models.ContenidoPagina).filter_by(slug=slug).first()
@@ -2958,7 +2958,7 @@ def probar_conexion_integracion(
 ):
     if datos.integracion == "RAMA":
         try:
-            with urlopen(Request(API_BASE_URL), timeout=8) as response:
+            with urlopen(UrlRequest(API_BASE_URL), timeout=8) as response:
                 codigo = response.status
         except HTTPError as exc:
             codigo = exc.code

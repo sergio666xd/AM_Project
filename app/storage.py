@@ -49,7 +49,7 @@ def get_r2_tp_registros_bucket() -> str:
     if not bucket:
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail="El almacenamiento de registros profesionales no estÃ¡ configurado.",
+            detail="El almacenamiento de registros profesionales no está configurado.",
         )
     return bucket
 

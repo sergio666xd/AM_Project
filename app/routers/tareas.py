@@ -798,8 +798,9 @@ def completar_tarea(
         _descartar_recordatorios_tarea(db, tarea)
         recordatorio_ids = []
     elif estado_anterior in (models.EstadoTarea.COMPLETADA, models.EstadoTarea.CANCELADA):
-        recordatorio_ids = _crear_recordatorios_sistema(db, tarea)
-        recordatorio_ids.extend(_versionar_recordatorios_pendientes(tarea))
+        # Versionar antes de crear: los recordatorios nuevos ya nacen en la version 1.
+        recordatorio_ids = _versionar_recordatorios_pendientes(tarea)
+        recordatorio_ids.extend(_crear_recordatorios_sistema(db, tarea))
     else:
         recordatorio_ids = _versionar_recordatorios_pendientes(tarea)
     registrar_evento_auditoria(db, usuario_actual, "tarea.completar", "tarea", tarea.id)
