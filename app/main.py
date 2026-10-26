@@ -1,12 +1,10 @@
 import os
-import time
 import hashlib
 import hmac
 import inspect
 import logging
 import secrets
 from uuid import uuid4
-from collections import defaultdict, deque
 from fastapi import FastAPI, BackgroundTasks, Depends, HTTPException, Request, status, UploadFile, File, Form
 from starlette.background import BackgroundTask
 from fastapi.security import OAuth2PasswordRequestForm
@@ -41,6 +39,7 @@ from app.workflow_service import public_site_url
 from app.message_templates import render_message
 from app.password_reset import password_reset_url, send_password_reset_email
 from app.security_notifications import send_security_change_confirmation
+from app.rate_limit import clave_intento, ip_cliente, limite_excedido, registrar_intentos
 
 RUTA_MIGRACION_PLANTILLAS = Path(__file__).resolve().parents[1] / "migrations" / "2026_10_10_mensajes_configurables.sql"
 
@@ -244,46 +243,9 @@ def get_cors_origins() -> list[str]:
 
 
 
-# Protección ligera para el único endpoint público de captación. Para una
-# instalación con varias réplicas, conviene mover este contador a una capa WAF.
-_interest_attempts: dict[str, deque[float]] = defaultdict(deque)
-
-
-def _check_interest_rate_limit(client_ip: str) -> None:
-    now = time.monotonic()
-    attempts = _interest_attempts[client_ip]
-    while attempts and now - attempts[0] > 3600:
-        attempts.popleft()
-    if len(attempts) >= 5:
-        raise HTTPException(status_code=429, detail="Demasiados intentos. Intenta nuevamente más tarde.")
-    attempts.append(now)
-
-
-_password_reset_attempts: dict[str, deque[float]] = defaultdict(deque)
 PASSWORD_RESET_MESSAGE = "Si existe una cuenta activa con ese correo, enviaremos un enlace para restablecer la contraseña."
-
-
-def _allow_password_reset_request(client_ip: str, email: str) -> bool:
-    now = time.monotonic()
-    email_key = hashlib.sha256(email.encode("utf-8")).hexdigest()
-    limits = ((f"ip:{client_ip}", 8), (f"email:{email_key}", 3))
-
-    for key, limit in limits:
-        attempts = _password_reset_attempts[key]
-        while attempts and now - attempts[0] > 3600:
-            attempts.popleft()
-        if len(attempts) >= limit:
-            return False
-
-    for key, _ in limits:
-        _password_reset_attempts[key].append(now)
-    if len(_password_reset_attempts) > 10000:
-        for key, attempts in list(_password_reset_attempts.items()):
-            if not attempts or now - attempts[-1] > 3600:
-                _password_reset_attempts.pop(key, None)
-                if len(_password_reset_attempts) <= 8000:
-                    break
-    return True
+VENTANA_INTENTOS = timedelta(hours=1)
+VENTANA_LOGIN = timedelta(minutes=15)
 
 
 @app.on_event("startup")
@@ -362,8 +324,10 @@ def registrar_interes_saas(
     request: Request,
     db: Session = Depends(get_db),
 ):
-    client_ip = request.client.host if request.client else "unknown"
-    _check_interest_rate_limit(client_ip)
+    clave_ip = clave_intento("interes:ip", ip_cliente(request))
+    if limite_excedido(db, [(clave_ip, 5)], VENTANA_INTENTOS):
+        raise HTTPException(status_code=429, detail="Demasiados intentos. Intenta nuevamente más tarde.")
+    registrar_intentos(db, [clave_ip])
     if interes.website.strip():
         raise HTTPException(status_code=400, detail="No fue posible procesar la solicitud.")
     if not interes.autorizacion_datos:
@@ -473,14 +437,20 @@ def registrar_abogado(
 
 @app.post("/api/auth/login", response_model=schemas.Token)
 def login(
+    request: Request,
     form_data: OAuth2PasswordRequestForm = Depends(),
     remember_me: bool = Form(True),
     db: Session = Depends(get_db),
 ):
     """Inicia sesión y genera el token JWT. Valida que la cuenta esté activa."""
+    claves_fallo = [clave_intento("login:email", form_data.username), clave_intento("login:ip", ip_cliente(request))]
+    if limite_excedido(db, list(zip(claves_fallo, (10, 50))), VENTANA_LOGIN):
+        raise HTTPException(status_code=429, detail="Demasiados intentos fallidos. Espera unos minutos e intenta de nuevo.")
+
     usuario = db.query(models.Usuario).filter(models.Usuario.email == form_data.username).first()
 
     if not usuario or not security.verify_password(form_data.password, usuario.password_hash):
+        registrar_intentos(db, claves_fallo)
         raise HTTPException(status_code=400, detail="Correo o contraseña incorrectos.")
 
     if usuario.estado == models.EstadoUsuario.PENDIENTE_APROBACION:
@@ -575,9 +545,10 @@ def solicitar_recuperacion_password(
     db: Session = Depends(get_db),
 ):
     email = str(datos.email).strip().lower()
-    client_ip = request.client.host if request.client else "unknown"
-    if not _allow_password_reset_request(client_ip, email):
+    claves = [clave_intento("recuperar:ip", ip_cliente(request)), clave_intento("recuperar:email", email)]
+    if limite_excedido(db, list(zip(claves, (8, 3))), VENTANA_INTENTOS):
         return {"mensaje": PASSWORD_RESET_MESSAGE}
+    registrar_intentos(db, claves)
 
     usuario = db.query(models.Usuario).filter(models.Usuario.email == email).first()
     if usuario and usuario.estado == models.EstadoUsuario.ACTIVO:

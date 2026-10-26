@@ -1248,3 +1248,14 @@ class EntregaCorreoFinanciero(Base):
     error = Column(Text, nullable=True)
     creado_por_id = Column(Integer, ForeignKey("usuarios.id", ondelete="SET NULL"), nullable=True)
     created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
+
+class IntentoLimitado(Base):
+    """Intentos recientes de endpoints públicos, compartidos entre todas las instancias."""
+    __tablename__ = "intentos_limitados"
+    __table_args__ = (
+        Index("ix_intentos_limitados_clave_fecha", "clave", "creado_en"),
+    )
+
+    id = Column(Integer, primary_key=True)
+    clave = Column(String(80), nullable=False)
+    creado_en = Column(DateTime, nullable=False, default=datetime.utcnow, index=True)
