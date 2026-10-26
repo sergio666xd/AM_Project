@@ -127,6 +127,15 @@ def test_database_engine_does_not_retain_connections_on_vercel(monkeypatch):
     local_engine.dispose()
 
 
+def test_database_url_uses_declared_psycopg_driver():
+    from app.database import _normalizar_url
+
+    assert _normalizar_url("postgresql://u:p@host/db") == "postgresql+psycopg://u:p@host/db"
+    assert _normalizar_url("postgres://u:p@host/db") == "postgresql+psycopg://u:p@host/db"
+    assert _normalizar_url("postgresql+psycopg://u:p@host/db") == "postgresql+psycopg://u:p@host/db"
+    assert _normalizar_url("sqlite://") == "sqlite://"
+
+
 def test_radicados_migration_api_routes_are_registered_in_admin_router():
     route_methods = {
         (route.path, method)
