@@ -112,6 +112,7 @@ export default function PushNotificationPrompt() {
 
   useEffect(() => {
     if (typeof window === "undefined" || !("Notification" in window) || !("serviceWorker" in navigator) || !("PushManager" in window)) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- detecta las APIs de notificaciones del navegador, que no existen al prerenderizar.
       setPermission("unsupported");
       setSupported(false);
       setChecking(false);

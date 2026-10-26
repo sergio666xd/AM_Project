@@ -1,12 +1,13 @@
 "use client";
 
-import { useCallback, useEffect, useState, type ChangeEvent, type FormEvent } from "react";
+import { useCallback, useState, type ChangeEvent, type FormEvent } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { LoaderCircle, RefreshCw } from "lucide-react";
 import { MarketingLayout } from "@/components/marketing/MarketingLayout";
 import GuestOnly from "@/components/auth/GuestOnly";
 import { API_URL } from "@/lib/api";
+import { useLoadEffect } from "@/lib/useLoadEffect";
 
 const MAX_FILE_SIZE = 10 * 1024 * 1024;
 const ALLOWED_FILE_TYPES = new Set(["application/pdf", "image/jpeg", "image/png"]);
@@ -48,7 +49,7 @@ function RegistroForm() {
     }
   }, []);
 
-  useEffect(() => { void loadPlans(); }, [loadPlans]);
+  useLoadEffect(loadPlans);
 
   function selectCard(event: ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0] ?? null;

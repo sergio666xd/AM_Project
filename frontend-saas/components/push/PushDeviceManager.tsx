@@ -1,9 +1,10 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useState } from "react";
 import { BellRing, Loader2, Monitor, Smartphone, Tablet, Trash2 } from "lucide-react";
 import { useSession } from "@/context/SessionContext";
 import { fetchApi, apiRequest } from "@/lib/api";
+import { useLoadEffect } from "@/lib/useLoadEffect";
 
 interface PushDevice {
   id: number;
@@ -64,9 +65,7 @@ export default function PushDeviceManager({ showSilencingOptions = true }: PushD
     }
   }, [token]);
 
-  useEffect(() => {
-    void loadDevices();
-  }, [loadDevices]);
+  useLoadEffect(loadDevices);
 
   // Reinicia los interruptores cuando cambian los valores guardados del usuario,
   // durante el render y sin el render extra de un efecto.

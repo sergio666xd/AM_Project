@@ -16,6 +16,7 @@ import {
   apiErrorStatus,
   SESSION_EXPIRED_EVENT,
 } from "@/lib/api";
+import { useLoadEffect } from "@/lib/useLoadEffect";
 
 /** Intervalo de renovación del token: cada 12 horas (en ms). */
 const TOKEN_REFRESH_INTERVAL_MS = 12 * 60 * 60 * 1000;
@@ -189,9 +190,7 @@ export function SessionProvider({
     await loadSession();
   }, [loadSession]);
 
-  useEffect(() => {
-    void loadSession();
-  }, [loadSession]);
+  useLoadEffect(loadSession);
 
   // La API avisa cuando rechaza el token; limpiar la sesión hace que RoleGate
   // lleve al usuario al inicio de sesión conservando la ruta actual.
@@ -241,6 +240,7 @@ export function SessionProvider({
 
   function logout() {
     clearSession();
+    // eslint-disable-next-line @next/next/no-location-assign-relative-destination -- recarga completa al cerrar sesión para descartar todo el estado en memoria.
     window.location.assign("/");
   }
 

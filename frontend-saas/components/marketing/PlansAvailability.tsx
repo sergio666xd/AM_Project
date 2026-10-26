@@ -1,10 +1,11 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useState } from "react";
 import Link from "next/link";
 import { RefreshCw } from "lucide-react";
 import { InterestForm } from "./InterestForm";
 import { API_URL } from "@/lib/api";
+import { useLoadEffect } from "@/lib/useLoadEffect";
 
 type Plan = {
   id: number;
@@ -58,7 +59,7 @@ export function PlansAvailability() {
     }
   }, []);
 
-  useEffect(() => { void loadOffer(); }, [loadOffer]);
+  useLoadEffect(loadOffer);
 
   if (offer.status === "loading") {
     return <p role="status" aria-live="polite" className="mt-6 text-sm text-white/80">Consultando disponibilidad del servicio…</p>;

@@ -336,6 +336,7 @@ export default function ChatWorkspace() {
 
   useEffect(() => {
     if (!token) return;
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- primera carga de la suscripción de sondeo; los datos llegan tras el await.
     void loadChats();
     const refresh = () => { if (document.visibilityState === "visible") { void loadChats(); void loadMessages(); } };
     const timer = window.setInterval(refresh, 5000);
@@ -344,6 +345,7 @@ export default function ChatWorkspace() {
   }, [token, loadChats, loadMessages]);
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- reinicia el estado de la conversación al cambiar de chat.
     setMessages([]); messageIdRef.current = 0; setResolvedConversationId(null); setLoading(!!activeKey); setError(""); setReferenceId(""); setIncomingAnnouncement(""); setNewMessagesStartId(null); setHasOlderMessages(false);
     followLatestRef.current = true; setShowLatestMessage(false);
     readAckRef.current = { key: activeKey, messageId: 0 };
@@ -353,6 +355,7 @@ export default function ChatWorkspace() {
   useEffect(() => {
     if (!canAttachReference || !token || !processId || !activeChat?.id) return;
     let cancelled = false;
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- marca la carga de referencias antes de pedirlas; el resultado llega en el then.
     setReferenceLoadingConversationId(activeChat.id);
     setReferenceError("");
     apiRequest(`/api/chat/referencias/${processId}?conversation_id=${activeChat.id}`, { token })

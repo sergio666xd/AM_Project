@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useEffect, useMemo, useState } from "react";
+import { FormEvent, useCallback, useMemo, useState } from "react";
 import {
   ArrowLeft,
   Bell,
@@ -23,6 +23,7 @@ import { useParams, useRouter } from "next/navigation";
 import { fetchApi } from "@/lib/api";
 import { useSession } from "@/context/SessionContext";
 import { Button } from "@/components/ui/Button";
+import { useLoadEffect } from "@/lib/useLoadEffect";
 
 type EstadoTarea = "PENDIENTE" | "EN_CURSO" | "COMPLETADA" | "CANCELADA";
 
@@ -350,7 +351,7 @@ export default function TareaDetalleAbogadoPage() {
     subtaskRadicadoOptions.find((item) => item.id === Number(subtaskRadicadoId))
       ?.actuaciones ?? [];
 
-  async function loadData() {
+  const loadData = useCallback(async () => {
     if (!token) return;
 
     try {
@@ -430,15 +431,17 @@ export default function TareaDetalleAbogadoPage() {
     } finally {
       setLoading(false);
     }
-  }
+  }, [tareaId, token]);
 
-  useEffect(() => {
+  const loadDataAlAbrir = useCallback(() => {
     if (sessionLoading || !tareaId || Number.isNaN(tareaId) || !token) {
       return;
     }
 
-    loadData();
-  }, [tareaId, token, sessionLoading]);
+    return loadData();
+  }, [sessionLoading, tareaId, token, loadData]);
+
+  useLoadEffect(loadDataAlAbrir);
 
   async function toggleCompleted() {
     if (!tarea || !token) return;

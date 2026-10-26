@@ -4,6 +4,7 @@ import { ChangeEvent, useCallback, useEffect, useRef, useState } from "react";
 import { Download, Eye, FileText, Loader2, Mail, Printer, Save, ShieldCheck, Trash2, X } from "lucide-react";
 import { apiRequest } from "@/lib/api";
 import { useSession } from "@/context/SessionContext";
+import { useLoadEffect } from "@/lib/useLoadEffect";
 
 type ClientOption = { id: number; nombre_completo: string; email: string; whatsapp_numero?: string; genero?: string | null; numero_documento?: string | null; domicilio?: string | null; direccion?: string | null };
 type ContractFields = Record<string, string>;
@@ -100,9 +101,7 @@ export default function ProcessContracts({ processId, clients, onChange, initial
     }
   }, [processId, selectedId, token]);
 
-  // The effect starts an asynchronous request; state updates occur after the response.
-  // eslint-disable-next-line react-hooks/set-state-in-effect
-  useEffect(() => { void load(); }, [load]);
+  useLoadEffect(load);
 
   useEffect(() => {
     if (initialContractId === null) {
@@ -113,6 +112,7 @@ export default function ProcessContracts({ processId, clients, onChange, initial
     const item = contracts.find((contract) => contract.id === initialContractId);
     if (!item) return;
     appliedInitialId.current = initialContractId;
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- aplica el contrato indicado en la URL cuando llega la lista de contratos.
     setSelectedId(item.id);
     setFields(normalizeContractFields(item.campos || EMPTY_FIELDS));
     setClientId(String(item.cliente_id));
