@@ -24,3 +24,15 @@ dependencies = [
     "pypdfium2>=4.30,<5",
     "reportlab>=4.3,<5",
 ]
+
+[tool.ruff]
+target-version = "py312"
+extend-exclude = ["frontend-saas", "graphify-out", "venv"]
+
+[tool.ruff.lint]
+# Solo errores reales: nombres sin definir, imports y variables sin uso.
+# El estilo del código no se impone.
+select = ["F"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

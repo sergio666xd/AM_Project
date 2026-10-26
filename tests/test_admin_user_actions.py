@@ -9,11 +9,19 @@ from app.routers.admin.usuarios import cambiar_estado_usuario, eliminar_usuario_
 
 
 def test_static_mass_status_route_precedes_dynamic_user_route():
-    patch_paths = [
-        route.path for route in router.routes
-        if "PATCH" in getattr(route, "methods", set()) and route.path.startswith("/api/admin/usuarios")
-    ]
-    assert patch_paths.index("/api/admin/usuarios/estado-masivo") < patch_paths.index("/api/admin/usuarios/{usuario_id}")
+    from fastapi import FastAPI
+    from fastapi.testclient import TestClient
+
+    from app.routers.admin.comun import verificar_admin
+
+    app = FastAPI()
+    app.include_router(router)
+    app.dependency_overrides[verificar_admin] = lambda: models.Usuario(id=1, rol=models.RolUsuario.ADMIN)
+    response = TestClient(app).patch("/api/admin/usuarios/estado-masivo", json={})
+
+    # Si la ruta con {usuario_id} atendiera la petición, el error sería por el parámetro de ruta.
+    assert response.status_code == 422
+    assert all(error["loc"][0] != "path" for error in response.json()["detail"])
 
 
 def test_admin_can_suspend_reactivate_and_safely_delete_users():

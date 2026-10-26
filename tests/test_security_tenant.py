@@ -169,14 +169,14 @@ def test_database_url_uses_declared_psycopg_driver():
 
 
 def test_radicados_migration_api_routes_are_registered_in_admin_router():
-    route_methods = {
-        (route.path, method)
-        for route in admin_router.router.routes
-        for method in getattr(route, "methods", set())
-    }
+    from fastapi import FastAPI
 
-    assert ("/api/admin/migraciones/radicados/preview", "GET") in route_methods
-    assert ("/api/admin/migraciones/radicados/aplicar", "POST") in route_methods
+    app = FastAPI()
+    app.include_router(admin_router.router)
+    paths = app.openapi()["paths"]
+
+    assert "get" in paths["/api/admin/migraciones/radicados/preview"]
+    assert "post" in paths["/api/admin/migraciones/radicados/aplicar"]
 
 
 def test_radicados_migration_api_apply_is_disabled_unless_explicitly_enabled(monkeypatch):
@@ -2904,7 +2904,7 @@ def test_admin_resource_crud_respects_sector_and_archives_processes():
             schemas.AdminResourceCreate(owner_id=firm_owner.id, nombre="Firm process"),
             sector="FIRMA", db=db, admin=admin,
         )
-        saas_result = crear_recurso_admin(
+        crear_recurso_admin(
             "procesos",
             schemas.AdminResourceCreate(owner_id=saas_owner.id, nombre="SaaS process"),
             sector="SAAS", db=db, admin=admin,
