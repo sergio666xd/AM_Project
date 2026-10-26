@@ -46,11 +46,9 @@ def test_admin_can_suspend_reactivate_and_safely_delete_users():
         )
         assert reactivated["estado"] == "ACTIVO"
 
-        with pytest.raises(HTTPException) as blocked:
-            eliminar_usuario_admin(linked.id, admin, db)
-        assert blocked.value.status_code == 409
-        assert "Suspéndela" in blocked.value.detail
-        assert db.query(models.Usuario).filter_by(id=linked.id).first() is not None
+        deleted_linked = eliminar_usuario_admin(linked.id, admin, db)
+        assert "eliminada" in deleted_linked["mensaje"]
+        assert db.query(models.Usuario).filter_by(id=linked.id).first() is None
 
         deleted = eliminar_usuario_admin(suspendable.id, admin, db)
         assert "eliminada" in deleted["mensaje"]

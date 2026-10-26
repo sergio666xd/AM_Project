@@ -5,6 +5,7 @@ import { RotateCcw, Save } from "lucide-react";
 import { SITE_PAGE_DEFAULTS, SITE_PAGE_LABELS, type PublicPageSlug } from "@/lib/sitePageDefaults";
 import { fetchApi } from "@/lib/api";
 import { RichTextInput } from "@/components/marketing/RichTextInput";
+import { useSession } from "@/context/SessionContext";
 type JsonValue = string | number | boolean | null | JsonValue[] | { [key: string]: JsonValue };
 type ContentPage = { slug: PublicPageSlug; nombre: string; ruta: string; contenido: JsonValue | null; updated_at: string | null };
 
@@ -139,7 +140,7 @@ function ContentField({
 }
 
 export default function ContenidoPublicoAdminPage() {
-  const token = typeof window === "undefined" ? "" : localStorage.getItem("token") || "";
+  const { token } = useSession();
   const [pages, setPages] = useState<ContentPage[]>([]);
   const [selectedSlug, setSelectedSlug] = useState<PublicPageSlug>("inicio");
   const [draft, setDraft] = useState<JsonValue>(cloneValue(SITE_PAGE_DEFAULTS.inicio));
@@ -152,6 +153,7 @@ export default function ContenidoPublicoAdminPage() {
   const [notice, setNotice] = useState("");
 
   useEffect(() => {
+    if (!token) return;
     let active = true;
     fetchPages(token)
       .then((result) => {

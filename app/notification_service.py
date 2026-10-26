@@ -100,6 +100,7 @@ def emitir_notificacion_workflow(
     variables: dict | None = None,
     enlace_texto: str | None = None,
     enlace_url: str | None = None,
+    excluir_canales: tuple[str, ...] = (),
 ) -> list[int]:
     if not plantilla_clave:
         raise ValueError("Toda notificación debe usar una plantilla persistida en la base de datos.")
@@ -111,10 +112,13 @@ def emitir_notificacion_workflow(
     canales = (
         canales_recordatorio_seleccionados(usuario, recordatorio)
         if tipo == "RECORDATORIOS" and recordatorio_id is not None
-        else canales_habilitados(usuario, tipo, emisor=emisor)
+        else canales_habilitados(usuario, tipo, emisor=emisor, db=db)
     )
     if incluir_email and usuario.estado == models.EstadoUsuario.ACTIVO and usuario.email:
         canales = tuple(dict.fromkeys((*canales, "EMAIL")))
+    if excluir_canales:
+        excluded = {canal.upper() for canal in excluir_canales}
+        canales = tuple(canal for canal in canales if canal.upper() not in excluded)
     if not canales:
         if usuario.rol == models.RolUsuario.CLIENTE:
             asunto_guardado, cuerpo_guardado = render_message(

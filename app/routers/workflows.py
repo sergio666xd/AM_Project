@@ -1,6 +1,8 @@
 import hmac
 import hashlib
+import logging
 import os
+import smtplib
 from datetime import date, datetime, timedelta
 from uuid import uuid4
 
@@ -19,7 +21,7 @@ from app.notification_policy import (
     clientes_notificables_para_radicado,
 )
 from app.notification_service import emitir_notificacion_workflow
-from app.message_templates import render_message
+from app.message_templates import render_message, render_push_message
 from app.timezone import format_colombia_datetime
 from app.rama_judicial_api import ejecutar_consulta_api_radicado
 from app.reminder_workflow import (
@@ -29,17 +31,37 @@ from app.reminder_workflow import (
 )
 from app.monthly_summary import enviar_resumen_mensual
 from app.whatsapp import enviar_mensaje_whatsapp
-from app.workflow_service import public_site_url
+from app.workflow_service import user_portal_url
+from app.web_push import send_web_push
 
 
 router = APIRouter(
     prefix="/api/internal/workflows",
     tags=["Workflows internos"],
 )
+logger = logging.getLogger(__name__)
 
 RECONCILIACION_INTERVALO_DIAS = 30
 DETALLE_RECONCILIACION_COMPLETA = "ok|RECONCILIACION_COMPLETA_V1"
 MAX_INTENTOS_NOTIFICACION = 3
+
+
+def _diagnostico_entrega(canal: str, error: Exception) -> str:
+    """Describe fallos del proveedor sin exponer credenciales ni respuestas privadas."""
+    if canal == "EMAIL":
+        if isinstance(error, smtplib.SMTPAuthenticationError):
+            return "SMTP rechazó la autenticación; verifica usuario y contraseña en Operación > Integraciones."
+        if isinstance(error, smtplib.SMTPRecipientsRefused):
+            return "El servidor SMTP rechazó el correo del destinatario."
+        if isinstance(error, (smtplib.SMTPConnectError, OSError)):
+            return "No fue posible conectar con el servidor SMTP; verifica host, puerto y TLS."
+        if isinstance(error, smtplib.SMTPResponseException):
+            return f"El servidor SMTP rechazó el envío (código {error.smtp_code})."
+        return f"Falló el envío SMTP ({type(error).__name__}); revisa la configuración de correo."
+    message = str(error)
+    if message.startswith(("WhatsApp no está configurado", "WhatsApp API respondió", "No fue posible conectar con la API de WhatsApp")):
+        return message
+    return f"Falló el proveedor de WhatsApp ({type(error).__name__}); revisa Operación > Integraciones."
 
 
 def _aplicar_delta_contadores_barrido(
@@ -255,8 +277,9 @@ def _agregar_actuaciones_a_grupo(
     radicado: models.Radicado,
     proceso: models.Proceso | None,
     actuaciones: list[dict],
+    db: Session,
 ) -> None:
-    for canal in canales_habilitados(usuario, "ACTUACIONES", emisor=emisor):
+    for canal in canales_habilitados(usuario, "ACTUACIONES", emisor=emisor, db=db):
         clave = (usuario.id, canal)
         grupo = grupos.setdefault(clave, {"usuario": usuario, "canal": canal, "secciones": {}})
         proceso_id = proceso.id if proceso else None
@@ -266,7 +289,7 @@ def _agregar_actuaciones_a_grupo(
             {
                 "proceso": proceso.nombre if proceso else None,
                 "radicado": radicado.numero,
-                "detalle_url": _url_radicado(usuario, radicado.id),
+                "detalle_url": _url_radicado(usuario, radicado.id, proceso.id if proceso else None),
                 "actuaciones": {},
             },
         )
@@ -279,7 +302,8 @@ def _cuerpo_novedades(secciones: list[dict]) -> str:
     for seccion in secciones:
         actuaciones = list(seccion["actuaciones"].values())
         actuaciones.sort(key=lambda item: (item.get("orden", 0), item.get("id", 0)))
-        reciente = actuaciones[-1]
+        # Orden 1 corresponde a la actuación más reciente en la Rama Judicial.
+        reciente = actuaciones[0]
         encabezado = f"Proceso: {seccion['proceso']}\n" if seccion["proceso"] else ""
         bloque = (
             f"{encabezado}Radicado: {seccion['radicado']}\n"
@@ -295,14 +319,104 @@ def _cuerpo_novedades(secciones: list[dict]) -> str:
     return "\n\n".join(bloques)
 
 
-def _url_radicado(usuario: models.Usuario, radicado_id: int) -> str:
+def _url_radicado(usuario: models.Usuario, radicado_id: int, proceso_id: int | None = None) -> str:
     if usuario.rol == models.RolUsuario.CLIENTE:
-        ruta = f"/gestion-procesos/cliente?radicado={radicado_id}#radicado-{radicado_id}"
+        ruta = f"/gestion-procesos/cliente/procesos/{proceso_id}#radicado-{radicado_id}" if proceso_id else "/gestion-procesos/cliente/procesos"
     elif usuario.rol == models.RolUsuario.ABOGADO:
         ruta = f"/gestion-procesos/dashboard/radicados/{radicado_id}"
+    elif usuario.rol == models.RolUsuario.ADMIN:
+        ruta = f"/gestion-procesos/admin/radicados?detalle={radicado_id}"
     else:
         ruta = f"/gestion-procesos/abogado/radicados/{radicado_id}"
-    return f"{public_site_url()}{ruta}"
+    return user_portal_url(usuario, ruta)
+
+
+def _enviar_push_actuacion(
+    db: Session,
+    usuario: models.Usuario,
+    proceso: models.Proceso | None,
+    radicado: models.Radicado,
+    actuacion: dict,
+) -> None:
+    if not db.query(models.ChatPushSubscription.id).filter_by(usuario_id=usuario.id).first():
+        logger.info(
+            "Push de actuación %s no enviada al usuario %s: no tiene suscripciones registradas.",
+            actuacion["id"], usuario.id,
+        )
+        return
+
+    key = f"ACTUACION_PUSH:{usuario.id}:{actuacion['id']}"
+    entrega = db.query(models.EntregaNotificacion).filter_by(
+        clave_idempotencia=key,
+    ).with_for_update().first()
+    if entrega and entrega.estado == "ENVIADA":
+        return
+    if entrega and entrega.estado == "ERROR" and entrega.intentos >= MAX_INTENTOS_NOTIFICACION:
+        return
+    now = datetime.utcnow()
+    if entrega and entrega.estado == "ENVIANDO" and entrega.lease_hasta and entrega.lease_hasta > now:
+        return
+
+    valores = {
+        "nombre": usuario.nombre_completo,
+        "proceso": proceso.nombre if proceso else "Proceso judicial",
+        "radicado": radicado.numero,
+        "fecha": actuacion.get("fecha_actuacion") or "Sin fecha",
+        "actuacion": actuacion.get("actuacion") or "Nueva actuación judicial",
+        "anotacion": actuacion.get("anotacion") or "",
+        "cantidad": "1",
+    }
+    try:
+        title, body = render_push_message(db, "ACTUACIONES_DIGEST", valores)
+    except Exception:
+        logger.exception(
+            "No se pudo construir Push de actuación %s para usuario %s: revisa los textos Push de ACTUACIONES_DIGEST.",
+            actuacion["id"], usuario.id,
+        )
+        return
+
+    if entrega is None:
+        entrega = models.EntregaNotificacion(
+            clave_idempotencia=key,
+            usuario_id=usuario.id,
+            tipo="ACTUACIONES",
+            canal="PUSH",
+            asunto=title[:255],
+            cuerpo=body,
+            estado="ENVIANDO",
+            intentos=1,
+            lease_hasta=now + timedelta(minutes=15),
+        )
+        db.add(entrega)
+        db.flush()
+        db.add(models.EntregaNotificacionActuacion(
+            entrega_id=entrega.id,
+            actuacion_id=actuacion["id"],
+            usuario_id=usuario.id,
+            canal="PUSH",
+        ))
+    else:
+        entrega.asunto = title[:255]
+        entrega.cuerpo = body
+        entrega.estado = "ENVIANDO"
+        entrega.intentos += 1
+        entrega.error = None
+        entrega.lease_hasta = now + timedelta(minutes=15)
+    db.commit()
+
+    delivered = send_web_push(
+        db,
+        usuario,
+        title=title,
+        body=body,
+        link=_url_radicado(usuario, radicado.id, proceso.id if proceso else None),
+        tag=f"actuacion-{actuacion['id']}",
+    )
+    entrega.estado = "ENVIADA" if delivered else "ERROR"
+    entrega.error = None if delivered else "Push no entregada; consulta los logs del proveedor y reintenta la preparación."
+    entrega.enviado_en = datetime.utcnow() if delivered else None
+    entrega.lease_hasta = None
+    db.commit()
 
 
 @router.post("/consultas/{ejecucion_id}/notificaciones/preparar")
@@ -317,6 +431,7 @@ def preparar_notificaciones_actuaciones(
         raise HTTPException(status_code=404, detail="Ejecución no encontrada.")
 
     grupos: dict[tuple[int, str], dict] = {}
+    push_targets: dict[tuple[int, int], tuple[models.Usuario, models.Proceso | None, models.Radicado, dict]] = {}
     seen_by_recipient: set[tuple[int, int, str]] = set()
     for evento in datos.eventos:
         resultado_radicado = db.query(models.EjecucionRadicado).filter_by(
@@ -345,6 +460,8 @@ def preparar_notificaciones_actuaciones(
         for lawyer in lawyers:
             if processes:
                 for proceso in processes:
+                    for actuacion in nuevas:
+                        push_targets.setdefault((lawyer.id, actuacion["id"]), (lawyer, proceso, radicado, actuacion))
                     _agregar_actuaciones_a_grupo(
                         grupos,
                         lawyer,
@@ -352,8 +469,11 @@ def preparar_notificaciones_actuaciones(
                         radicado,
                         proceso,
                         nuevas,
+                        db=db,
                     )
             else:
+                for actuacion in nuevas:
+                    push_targets.setdefault((lawyer.id, actuacion["id"]), (lawyer, None, radicado, actuacion))
                 _agregar_actuaciones_a_grupo(
                     grupos,
                     lawyer,
@@ -361,14 +481,17 @@ def preparar_notificaciones_actuaciones(
                     radicado,
                     None,
                     nuevas,
+                    db=db,
                 )
 
         for cliente, proceso in clientes_notificables_para_radicado(radicado):
-            if not canales_habilitados(cliente, "ACTUACIONES", emisor=proceso.abogado):
+            for actuacion in nuevas:
+                push_targets.setdefault((cliente.id, actuacion["id"]), (cliente, proceso, radicado, actuacion))
+            if not canales_habilitados(cliente, "ACTUACIONES", emisor=proceso.abogado, db=db):
                 omitida = _cuerpo_novedades([{
                     "proceso": proceso.nombre,
                     "radicado": radicado.numero,
-                    "detalle_url": _url_radicado(cliente, radicado.id),
+                    "detalle_url": _url_radicado(cliente, radicado.id, proceso.id),
                     "actuaciones": {actuacion["id"]: actuacion for actuacion in nuevas},
                 }])
                 emitir_notificacion_workflow(
@@ -392,7 +515,11 @@ def preparar_notificaciones_actuaciones(
                     radicado,
                     proceso,
                     nuevas,
+                    db=db,
                 )
+
+    for push_usuario, proceso, radicado, actuacion in push_targets.values():
+        _enviar_push_actuacion(db, push_usuario, proceso, radicado, actuacion)
 
     delivery_ids = []
     for grupo in grupos.values():
@@ -500,6 +627,7 @@ def listar_entregas_notificacion_pendientes(
         db.query(models.EntregaNotificacion.id)
         .filter(
             models.EntregaNotificacion.id > despues_de,
+            models.EntregaNotificacion.canal.in_(("EMAIL", "WHATSAPP")),
             models.EntregaNotificacion.intentos < MAX_INTENTOS_NOTIFICACION,
             or_(
                 models.EntregaNotificacion.estado == "PENDIENTE",
@@ -620,6 +748,8 @@ def preparar_recordatorio_workflow(
         tarea_path = f"/gestion-procesos/dashboard/tareas/{tarea.id}"
     elif usuario.rol == models.RolUsuario.CLIENTE:
         tarea_path = f"/gestion-procesos/cliente/tareas?tarea={tarea.id}#tarea-{tarea.id}"
+    elif usuario.rol == models.RolUsuario.ADMIN:
+        tarea_path = f"/gestion-procesos/admin/tareas?detalle={tarea.id}"
     else:
         tarea_path = f"/gestion-procesos/abogado/tareas/{tarea.id}"
     mensaje = f"Recordatorio de tarea: {tarea.titulo}"
@@ -633,12 +763,14 @@ def preparar_recordatorio_workflow(
         mensaje += f"\nActuación: {tarea.actuacion_rel.actuacion or 'Actuación judicial'}"
     if tarea.descripcion:
         mensaje += f"\nDetalle: {tarea.descripcion}"
+    programado_por = "en el momento programado"
     if tarea.fecha_limite:
         fecha_limite = normalizar_utc_naive(tarea.fecha_limite)
         anticipacion = recordatorio.anticipacion_minutos
         programado_por = f"{anticipacion // 60} horas antes" if anticipacion else "en el momento programado"
         mensaje += f"\nVencimiento: {format_colombia_datetime(fecha_limite)}\nAviso: {programado_por}"
-    mensaje += f"\n\nAbrir enlace: Ver tarea | {public_site_url()}{tarea_path}"
+    tarea_url = user_portal_url(usuario, tarea_path)
+    mensaje += f"\n\nAbrir enlace: Ver tarea | {tarea_url}"
     entrega_ids = emitir_notificacion_workflow(
         db,
         usuario,
@@ -659,7 +791,7 @@ def preparar_recordatorio_workflow(
                    "detalle": tarea.descripcion or "Sin detalles adicionales",
                    "fecha_limite": format_colombia_datetime(fecha_limite) if tarea.fecha_limite else "Sin fecha límite",
                    "anticipacion": programado_por},
-        enlace_texto="Ver tarea", enlace_url=f"{public_site_url()}{tarea_path}",
+        enlace_texto="Ver tarea", enlace_url=tarea_url,
     )
     if not entrega_ids:
         recordatorio.enviado_en = ahora
@@ -691,6 +823,8 @@ def enviar_entrega_notificacion_workflow(
         raise HTTPException(status_code=404, detail="Entrega no encontrada.")
     if entrega.estado in {"DESCARTADA", "OMITIDA"}:
         return {"estado": entrega.estado, "repetida": True}
+    if entrega.canal == "PUSH":
+        raise HTTPException(status_code=409, detail="Las entregas Push se procesan desde el evento de actuación.")
     if entrega.estado == "ENVIADA":
         return {"estado": "ENVIADA", "repetida": True}
     ahora = datetime.utcnow()
@@ -735,7 +869,7 @@ def enviar_entrega_notificacion_workflow(
             db.query(models.RecordatorioTarea).filter_by(id=entrega.recordatorio_id).first(),
         )
         if entrega.tipo == "RECORDATORIOS" and entrega.recordatorio_id is not None
-        else usuario is not None and entrega.canal in canales_habilitados(usuario, entrega.tipo)
+        else usuario is not None and entrega.canal in canales_habilitados(usuario, entrega.tipo, db=db)
     )
     if not usuario or not canal_habilitado:
         entrega.estado = "OMITIDA"
@@ -754,16 +888,16 @@ def enviar_entrega_notificacion_workflow(
         if entrega.canal == "EMAIL":
             enviado = enviar_correo(usuario.email, entrega.asunto, entrega.cuerpo)
         else:
-            enviado = enviar_mensaje_whatsapp(usuario.whatsapp_numero, entrega.cuerpo)
+            enviado = enviar_mensaje_whatsapp(usuario.whatsapp_numero, entrega.cuerpo, raise_on_error=True)
         if not enviado:
             raise RuntimeError("El proveedor no confirmó la entrega.")
     except Exception as exc:
         entrega.estado = "ERROR"
-        entrega.error = str(exc)
+        entrega.error = _diagnostico_entrega(entrega.canal, exc)
         entrega.lease_hasta = None
         _marcar_recordatorio_completo_si_aplica(db, entrega)
         db.commit()
-        raise HTTPException(status_code=503, detail="No fue posible entregar la notificación; Workflow reintentará.") from exc
+        raise HTTPException(status_code=503, detail=entrega.error) from exc
 
     entrega.estado = "ENVIADA"
     entrega.error = None

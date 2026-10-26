@@ -59,6 +59,34 @@ function normalizarTexto(texto: string | null | undefined) {
 function formatearEstado(estado: string | null | undefined) {
   const estadoNormalizado = normalizarTexto(estado);
 
+  if (estadoNormalizado === "ok") {
+    return {
+      label: "Consultado",
+      className: "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400",
+    };
+  }
+
+  if (estadoNormalizado.includes("no_encontrado") || estadoNormalizado.includes("no encontrado")) {
+    return {
+      label: "No encontrado en la Rama Judicial",
+      className: "bg-amber-500/10 text-amber-600 dark:text-amber-400",
+    };
+  }
+
+  if (estadoNormalizado.includes("privado")) {
+    return {
+      label: "Proceso privado",
+      className: "bg-blue-500/10 text-blue-600 dark:text-blue-400",
+    };
+  }
+
+  if (estadoNormalizado.startsWith("error")) {
+    return {
+      label: "Error de consulta",
+      className: "bg-red-500/10 text-red-600 dark:text-red-400",
+    };
+  }
+
   if (estadoNormalizado === "sin consultar") {
     return {
       label: "Sin consultar",
@@ -125,6 +153,12 @@ export default function DetalleRadicadoPage() {
   const params = useParams();
   const router = useRouter();
 
+  function volverAListado() {
+    const returnTo = new URLSearchParams(window.location.search).get("returnTo");
+    const listPath = "/gestion-procesos/dashboard/radicados";
+    router.push(returnTo?.startsWith(`${listPath}?`) || returnTo === listPath ? returnTo : listPath);
+  }
+
   const { user, token, loading: sessionLoading } = useSession();
 
   const id = Array.isArray(params?.id)
@@ -171,8 +205,8 @@ export default function DetalleRadicadoPage() {
    * CARGAR DETALLE
    * ============================================================
    *
-   * El backend actualmente expone GET /api/radicados.
-   * Por eso obtenemos la lista del usuario y buscamos el ID.
+   * GET /api/radicados/{id} devuelve solo el radicado solicitado
+   * con su historial de actuaciones autorizado.
    */
 
   async function cargarDetalle(authToken: string) {
@@ -180,24 +214,14 @@ export default function DetalleRadicadoPage() {
       setLoading(true);
       setError("");
 
-      const radicados =
-        (await fetchApi("/api/radicados", {
-          method: "GET",
-          token: authToken,
-        })) as RadicadoDetalle[];
-
-      const actual = radicados.find(
-        (radicado) => String(radicado.id) === String(id)
-      );
-
-      if (!actual) {
-        setRadicado(null);
-        setError("Radicado no encontrado.");
-        return;
-      }
+      const actual = (await fetchApi(
+        `/api/radicados/${encodeURIComponent(String(id))}`,
+        { method: "GET", token: authToken },
+      )) as RadicadoDetalle;
 
       setRadicado(actual);
     } catch (err) {
+      setRadicado(null);
       console.error(
         "Error cargando detalle del radicado:",
         err
@@ -446,7 +470,7 @@ export default function DetalleRadicadoPage() {
 
       <button
         type="button"
-        onClick={() => router.push("/gestion-procesos/dashboard/radicados")}
+        onClick={volverAListado}
         className="inline-flex items-center gap-2 rounded-lg px-1 py-1 text-sm text-[var(--foreground-muted)] transition hover:text-[var(--foreground)]"
       >
         <ArrowLeft className="h-4 w-4" />
@@ -500,10 +524,8 @@ export default function DetalleRadicadoPage() {
 
           <button
             type="button"
-            onClick={() =>
-              router.push("/gestion-procesos/dashboard/radicados")
-            }
-            className="mt-5 rounded-lg bg-[var(--primary)] px-4 py-2.5 text-sm font-medium text-white transition hover:opacity-90"
+            onClick={volverAListado}
+            className="mt-5 rounded-lg bg-[var(--primary)] px-4 py-2.5 text-sm font-medium !text-white transition hover:opacity-90"
           >
             Volver a Radicados
           </button>
@@ -541,7 +563,7 @@ export default function DetalleRadicadoPage() {
                   type="button"
                   onClick={handleConsultar}
                   disabled={consultando}
-                  className="inline-flex w-full shrink-0 items-center justify-center gap-2 rounded-lg bg-[var(--primary)] px-4 py-2.5 text-sm font-medium text-white transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto"
+                  className="inline-flex w-full shrink-0 items-center justify-center gap-2 rounded-lg bg-[var(--primary)] px-4 py-2.5 text-sm font-medium !text-white transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto"
                 >
                   {consultando ? (
                     <Loader2 className="h-4 w-4 animate-spin" />

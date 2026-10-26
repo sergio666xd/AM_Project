@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { CalendarClock, Check, Clock3, ListChecks, RefreshCw } from "lucide-react";
 import { useSession } from "@/context/SessionContext";
@@ -7,9 +8,13 @@ import { fetchApi } from "@/lib/api";
 import TaskMonthCalendar, {
   type CalendarTask,
 } from "@/components/calendar/TaskMonthCalendar";
+import { PageHeader } from "@/components/ui/PageHeader";
+import { Button } from "@/components/ui/Button";
+import { Badge } from "@/components/ui/Badge";
 
 type Task = CalendarTask & {
   proceso_id?: number | null;
+  cliente_id?: number | null;
   descripcion?: string | null;
   completada_en?: string | null;
   subtareas: {
@@ -41,7 +46,7 @@ async function loadTasks(token: string): Promise<Task[]> {
 }
 
 export default function TareasClientePage() {
-  const { token, loading: sessionLoading } = useSession();
+  const { user, token, loading: sessionLoading } = useSession();
   const [tasks, setTasks] = useState<Task[]>([]);
   const [processes, setProcesses] = useState<ClientProcess[]>([]);
   const [loading, setLoading] = useState(true);
@@ -50,8 +55,12 @@ export default function TareasClientePage() {
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const [focusedTaskId, setFocusedTaskId] = useState<number | null>(null);
+  const [processFilter, setProcessFilter] = useState("TODOS");
   const [deadlineDrafts, setDeadlineDrafts] = useState<Record<number, string>>({});
   const [deadlineBusyId, setDeadlineBusyId] = useState<number | null>(null);
+
+  const isMainTaskAssignedToClient = (task: Task) => Boolean(user && task.cliente_id === user.id);
+  const canClientManageMainTask = (task: Task) => isMainTaskAssignedToClient(task) && task.estado !== "COMPLETADA" && task.estado !== "CANCELADA";
 
   useEffect(() => {
     if (sessionLoading || !token) return;
@@ -104,6 +113,8 @@ export default function TareasClientePage() {
 
   async function complete(taskId: number) {
     if (!token) return;
+    const task = tasks.find((item) => item.id === taskId);
+    if (!task || !canClientManageMainTask(task)) return;
     setWorkingId(taskId);
     setError("");
     setNotice("");
@@ -137,7 +148,7 @@ export default function TareasClientePage() {
   }
 
   async function updateDeadline(task: Task) {
-    if (!token) return;
+    if (!token || !canClientManageMainTask(task)) return;
     const localValue = deadlineDrafts[task.id] ?? fechaLocalParaInput(task.fecha_limite);
     const date = new Date(localValue);
     if (!localValue || Number.isNaN(date.getTime())) {
@@ -201,18 +212,19 @@ export default function TareasClientePage() {
     }
   }
 
+  const visibleTasks = useMemo(() => processFilter === "TODOS" ? tasks : tasks.filter((task) => String(task.proceso_id ?? "GENERAL") === processFilter), [tasks, processFilter]);
   const openTasks = useMemo(
     () =>
-      tasks.filter(
+      visibleTasks.filter(
         (task) =>
-          (task.estado !== "COMPLETADA" && task.estado !== "CANCELADA") ||
+          (task.cliente_id === user?.id && task.estado !== "COMPLETADA" && task.estado !== "CANCELADA") ||
           task.subtareas.some((subtask) => !subtask.completada),
       ),
-    [tasks],
+    [visibleTasks, user?.id],
   );
-  const completedTasks = tasks.filter((task) => task.estado === "COMPLETADA");
+  const completedTasks = visibleTasks.filter((task) => task.estado === "COMPLETADA" && task.subtareas.every((subtask) => subtask.completada));
   const processNames = new Map(processes.map((process) => [process.id, process.nombre]));
-  const calendarTasks: CalendarTask[] = tasks
+  const calendarTasks: CalendarTask[] = visibleTasks
     .filter((task) => task.fecha_limite)
     .map((task) => ({
       id: task.id,
@@ -222,46 +234,63 @@ export default function TareasClientePage() {
       fecha_limite: task.fecha_limite,
       href: `/gestion-procesos/cliente/tareas?tarea=${task.id}#tarea-${task.id}`,
     }));
+  const upcomingByDate = Array.from(calendarTasks.reduce((groups, task) => {
+    if (!task.fecha_limite || task.estado === "COMPLETADA" || task.estado === "CANCELADA" || Date.parse(task.fecha_limite) < Date.now()) return groups;
+    const dateParts = new Intl.DateTimeFormat("en", { timeZone: "America/Bogota", year: "numeric", month: "2-digit", day: "2-digit" }).formatToParts(new Date(task.fecha_limite));
+    const part = (type: string) => dateParts.find((item) => item.type === type)?.value ?? "";
+    const date = `${part("year")}-${part("month")}-${part("day")}`;
+    const group = groups.get(date) ?? [];
+    group.push(task);
+    groups.set(date, group);
+    return groups;
+  }, new Map<string, CalendarTask[]>())).sort(([left], [right]) => left.localeCompare(right)).slice(0, 6);
 
   return (
-    <section className="mx-auto max-w-5xl space-y-5">
-      <header className="flex flex-wrap items-end justify-between gap-4">
-        <div>
-          <p className="text-sm text-(--foreground-muted)">
-            Portal del cliente
-          </p>
-          <h1 className="mt-1 text-2xl font-semibold text-foreground">
-            Mis tareas
-          </h1>
-          <p className="mt-1 text-sm text-(--foreground-muted)">
-            Revisa vencimientos y marca como completadas las tareas asignadas.
-          </p>
-        </div>
-        <button
-          type="button"
-          onClick={() => void refresh()}
-          disabled={loading || sessionLoading}
-          className="inline-flex items-center gap-2 rounded-lg border border-border bg-surface px-3 py-2 text-sm font-medium hover:bg-surface-hover disabled:opacity-50"
-        >
-          <RefreshCw className={`size-4 ${loading ? "animate-spin" : ""}`} />
-          Actualizar
-        </button>
-      </header>
+    <section className="mx-auto max-w-5xl space-y-6 pb-24">
+      <PageHeader
+        overline="Portal del cliente"
+        title="Mis tareas"
+        description="Revisa los vencimientos y completa únicamente las tareas o subtareas que te asignaron."
+        action={
+          <div className="flex flex-wrap items-center gap-2">
+            {processes.length > 0 && (
+              <select
+                value={processFilter}
+                onChange={(event) => setProcessFilter(event.target.value)}
+                aria-label="Filtrar tareas por proceso"
+                className="min-h-9 rounded-lg border border-border bg-surface-secondary px-3 text-xs text-foreground focus:border-brand-500 focus:outline-none"
+              >
+                <option value="TODOS">Todos los procesos</option>
+                <option value="GENERAL">Tareas generales</option>
+                {processes.map((process) => (
+                  <option key={process.id} value={String(process.id)}>
+                    {process.nombre}
+                  </option>
+                ))}
+              </select>
+            )}
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => void refresh()}
+              loading={loading || sessionLoading}
+              icon={<RefreshCw className="size-4" />}
+            >
+              Actualizar
+            </Button>
+          </div>
+        }
+      />
+
       {error && (
-        <p
-          role="alert"
-          className="rounded-lg border border-danger/30 bg-danger-light p-3 text-sm text-danger"
-        >
+        <div role="alert" className="rounded-lg border border-risk/30 bg-risk/10 p-3.5 text-sm font-medium text-risk">
           {error}
-        </p>
+        </div>
       )}
       {notice && (
-        <p
-          role="status"
-          className="rounded-lg border border-success/30 bg-success-light p-3 text-sm text-success"
-        >
+        <div role="status" className="rounded-lg border border-completed/30 bg-completed/10 p-3.5 text-sm font-medium text-completed">
           {notice}
-        </p>
+        </div>
       )}
       {loading || sessionLoading ? (
         <div className="grid min-h-48 place-items-center gap-3 text-sm text-(--foreground-muted)">
@@ -270,13 +299,14 @@ export default function TareasClientePage() {
         </div>
       ) : (
         <>
-          <TaskMonthCalendar tasks={calendarTasks} />
+          <div className="hidden md:block"><TaskMonthCalendar tasks={calendarTasks} /></div>
+          {upcomingByDate.length > 0 && <section className="rounded-lg border border-border bg-surface p-4 md:hidden" aria-label="Fechas próximas"><h2 className="font-semibold">Fechas próximas</h2><p className="mt-1 text-sm text-(--foreground-muted)">Resumen de vencimientos; abre una fecha para ir a las tareas.</p><ul className="mt-2 divide-y divide-border">{upcomingByDate.map(([date, tasksForDate]) => <li key={date}><Link className="flex min-h-11 items-center justify-between gap-3 py-2 hover:text-primary" href={tasksForDate[0].href ?? `/gestion-procesos/cliente/tareas?tarea=${tasksForDate[0].id}#tarea-${tasksForDate[0].id}`}><time className="font-medium">{new Intl.DateTimeFormat("es-CO", { dateStyle: "full", timeZone: "America/Bogota" }).format(new Date(`${date}T12:00:00-05:00`))}</time><span className="shrink-0 text-sm text-(--foreground-muted)">{tasksForDate.length} tarea{tasksForDate.length === 1 ? "" : "s"} →</span></Link></li>)}</ul></section>}
           <section className="overflow-hidden rounded-lg border border-border bg-surface">
             <header className="flex items-center justify-between gap-3 border-b border-border px-4 py-3">
               <div>
-                <h2 className="font-semibold text-foreground">Pendientes</h2>
+                <h2 className="font-semibold text-foreground">Pendientes contigo</h2>
                 <p className="mt-0.5 text-xs text-(--foreground-muted)">
-                  {openTasks.length} tarea(s) por completar
+                  {openTasks.length} tarea(s) o subtarea(s) pendiente(s)
                 </p>
               </div>
               <ListChecks className="size-5 text-primary" />
@@ -293,6 +323,9 @@ export default function TareasClientePage() {
                       <p className="font-medium text-foreground">
                         {task.titulo}
                       </p>
+                      <span className={`mt-1 inline-flex rounded-full px-2 py-0.5 text-[11px] font-medium ${isMainTaskAssignedToClient(task) ? "bg-primary/10 text-primary" : "bg-surface-muted text-(--foreground-muted)"}`}>
+                        {isMainTaskAssignedToClient(task) ? "Tarea principal asignada a ti" : "Solo tienes asignada una subtarea; la tarea principal sigue a cargo del despacho"}
+                      </span>
                       {task.descripcion && (
                         <p className="mt-1 text-sm text-(--foreground-muted)">
                           {task.descripcion}
@@ -342,6 +375,7 @@ export default function TareasClientePage() {
                       )}
                       <p className="mt-1 inline-flex items-center gap-1.5 text-xs text-(--foreground-muted)">
                         <Clock3 className="size-3.5" />
+                        {task.fecha_limite && !isMainTaskAssignedToClient(task) ? "Fecha limite de la tarea principal: " : null}
                         {task.fecha_limite
                           ? new Intl.DateTimeFormat("es-CO", {
                               dateStyle: "medium",
@@ -351,15 +385,15 @@ export default function TareasClientePage() {
                           : "Sin fecha límite"}{" "}
                         · {task.prioridad}
                       </p>
-                      <div className="mt-3 flex flex-wrap items-center gap-2">
+                      {canClientManageMainTask(task) ? <div className="mt-3 flex flex-wrap items-center gap-2">
                         <label className="flex items-center gap-2 text-xs text-(--foreground-muted)">
                           Cambiar fecha y hora
                           <input aria-label={`Nueva fecha límite de ${task.titulo}`} type="datetime-local" value={deadlineDrafts[task.id] ?? fechaLocalParaInput(task.fecha_limite)} onChange={(event) => setDeadlineDrafts((current) => ({ ...current, [task.id]: event.target.value }))} className="rounded-md border border-border bg-surface-secondary px-2 py-1.5 text-xs text-foreground" />
                         </label>
                         <button type="button" disabled={deadlineBusyId === task.id} onClick={() => void updateDeadline(task)} className="inline-flex items-center gap-1.5 rounded-md border border-border px-2.5 py-1.5 text-xs font-medium hover:bg-surface-hover disabled:opacity-50"><CalendarClock className="size-3.5" />{deadlineBusyId === task.id ? "Reprogramando…" : "Guardar fecha"}</button>
-                      </div>
+                      </div> : <p className="mt-3 text-xs text-(--foreground-muted)">Puedes completar tu subtarea. Esta acción no cambia el estado de la tarea principal.</p>}
                     </div>
-                    <button
+                    {canClientManageMainTask(task) && <button
                       type="button"
                       disabled={workingId === task.id}
                       onClick={() => void complete(task.id)}
@@ -367,7 +401,7 @@ export default function TareasClientePage() {
                     >
                       <Check className="size-4" />
                       {workingId === task.id ? "Guardando…" : "Completar"}
-                    </button>
+                    </button>}
                   </li>
                 ))}
               </ul>
@@ -379,7 +413,7 @@ export default function TareasClientePage() {
           </section>
           <section className="overflow-hidden rounded-lg border border-border bg-surface">
             <header className="flex items-center justify-between border-b border-border px-4 py-3"><div><h2 className="font-semibold">Completadas</h2><p className="text-xs text-(--foreground-muted)">{completedTasks.length} tarea(s)</p></div><Check className="size-5 text-success"/></header>
-            {completedTasks.length ? <ul className="divide-y divide-border">{completedTasks.map((task) => <li key={task.id} className="px-4 py-3"><p className="font-medium">{task.titulo}</p><p className="mt-1 text-xs text-(--foreground-muted)">{task.proceso_id ? processNames.get(task.proceso_id) || "Proceso relacionado" : "Tarea general"} · Completada</p></li>)}</ul> : <p className="px-4 py-6 text-sm text-(--foreground-muted)">Aún no has completado tareas.</p>}
+            {completedTasks.length ? <ul className="divide-y divide-border">{completedTasks.map((task) => <li key={task.id} className="px-4 py-3"><p className="font-medium">{task.titulo}</p><p className="mt-1 text-xs text-(--foreground-muted)">{task.proceso_id ? processNames.get(task.proceso_id) || "Proceso relacionado" : "Tarea general"} · {isMainTaskAssignedToClient(task) ? "Tarea principal asignada a ti y completada" : "Tarea principal del despacho completada; tu subtarea tambien termino"}</p></li>)}</ul> : <p className="px-4 py-6 text-sm text-(--foreground-muted)">No has completado tareas asignadas.</p>}
           </section>
         </>
       )}

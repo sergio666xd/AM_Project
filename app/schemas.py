@@ -10,6 +10,7 @@ from app.models import (
     EstadoTarea,
     PrioridadTarea,
     CanalRecordatorio,
+    TIPOS_NOTIFICACION,
 )
 
 
@@ -72,6 +73,20 @@ class ConfiguracionFirmaUpdate(BaseModel):
     mostrar_contacto_publico: bool = True
     preferencias_notificacion: dict[str, bool] = Field(default_factory=lambda: {"email": True, "whatsapp": True})
     parametros_generales: dict[str, Any] = Field(default_factory=dict)
+
+    @field_validator("correo_contacto", "correo_pqr", mode="before")
+    @classmethod
+    def normalizar_correo_opcional(cls, value: Any) -> Any:
+        # Los inputs type=email del panel envían "" cuando el correo opcional
+        # queda vacío; EmailStr espera null en ese caso.
+        return None if isinstance(value, str) and not value.strip() else value
+
+    @field_validator("telefono", "whatsapp", "direccion", "ciudad", "pais", "logo_url", "sitio_web", mode="before")
+    @classmethod
+    def normalizar_texto_opcional(cls, value: Any) -> Any:
+        # Estos campos son nullable en la tabla y pueden llegar como null desde
+        # registros antiguos; el formulario y el esquema los manejan como texto.
+        return "" if value is None else value
 
 
 class ConfiguracionIntegracionesUpdate(BaseModel):
@@ -272,7 +287,10 @@ class CanalesNotificacionTipo(BaseModel):
 
 class UsuarioOut(BaseModel):
     id: int
-    email: EmailStr
+    # Los usuarios históricos pueden usar correos internos de desarrollo
+    # (por ejemplo, dominios .local); la validación se mantiene en los esquemas
+    # de creación y cambio de correo, no al serializar una cuenta existente.
+    email: str
     nombre_completo: str
     whatsapp_numero: str
     rol: RolUsuario
@@ -287,6 +305,35 @@ class UsuarioOut(BaseModel):
     created_at: Optional[datetime] = None
     ultimo_acceso: Optional[datetime] = None
 
+    @field_validator("preferencias_notificacion", mode="before")
+    @classmethod
+    def normalizar_preferencias_notificacion(cls, value: Any) -> dict[str, dict[str, bool]]:
+        """Acepta el formato histórico plano y completa preferencias parciales."""
+        if not isinstance(value, dict):
+            value = {}
+
+        # Algunas filas anteriores guardaban una sola preferencia global.
+        if "email" in value or "whatsapp" in value:
+            email = value.get("email", True)
+            whatsapp = value.get("whatsapp", False)
+            return {
+                tipo: {"email": bool(email), "whatsapp": bool(whatsapp)}
+                for tipo in TIPOS_NOTIFICACION
+            }
+
+        normalized: dict[str, dict[str, bool]] = {}
+        for tipo in TIPOS_NOTIFICACION:
+            canales = value.get(tipo, {})
+            if isinstance(canales, bool):
+                canales = {"email": canales, "whatsapp": False}
+            if not isinstance(canales, dict):
+                canales = {}
+            normalized[tipo] = {
+                "email": bool(canales.get("email", True)),
+                "whatsapp": bool(canales.get("whatsapp", False)),
+            }
+        return normalized
+
     class Config:
         from_attributes = True
 
@@ -294,7 +341,7 @@ class UsuarioOut(BaseModel):
 class SolicitudRegistroOut(BaseModel):
     id: int
     usuario_id: int
-    ruta_tarjeta_profesional: str
+    ruta_tarjeta_profesional: Optional[str] = None
     fecha_solicitud: datetime
     usuario: UsuarioOut
 
@@ -327,6 +374,8 @@ class PreferenciasNotificacionUpdate(BaseModel):
     canal_cliente: Literal["EMAIL", "WHATSAPP"] | None = None
     notificaciones_email: Optional[bool] = None
     notificaciones_whatsapp: Optional[bool] = None
+    silenciar_email_si_push: Optional[bool] = None
+    silenciar_whatsapp_si_push: Optional[bool] = None
 
 
 class PerfilUpdate(BaseModel):
@@ -388,6 +437,10 @@ class ClienteCreate(BaseModel):
 class ClienteUpdate(BaseModel):
     nombre_completo: str
     whatsapp_numero: str = ""
+    genero: Optional[str] = Field(default=None, max_length=16)
+    numero_documento: Optional[str] = Field(default=None, max_length=40)
+    domicilio: Optional[str] = Field(default=None, max_length=120)
+    direccion: Optional[str] = Field(default=None, max_length=300)
 
 
 class AbogadoAdminCreate(BaseModel):
@@ -602,12 +655,46 @@ class ComunicacionClienteCreate(BaseModel):
 
 class ChatMensajeCreate(BaseModel):
     contenido: str = Field(min_length=1, max_length=12000)
-    referencia_tipo: Literal["ACTUACION", "TAREA", "EVENTO", "DOCUMENTO"] | None = None
+    referencia_tipo: Literal["ACTUACION", "RADICADO", "TAREA", "SUBTAREA", "EVENTO", "DOCUMENTO"] | None = None
     referencia_id: int | None = Field(default=None, gt=0)
 
 
 class ChatMensajeLeidoUpdate(BaseModel):
     mensaje_id: int = Field(gt=0)
+
+
+class ChatPushEntrega(BaseModel):
+    usuario_id: int = Field(gt=0)
+    mensaje_id: int = Field(gt=0)
+    firma: str = Field(min_length=64, max_length=64)
+
+
+class ChatPresenciaUpdate(BaseModel):
+    session_id: str = Field(min_length=16, max_length=80, pattern=r"^[a-zA-Z0-9-]+$")
+
+
+class ChatPushSubscriptionCreate(BaseModel):
+    endpoint: str = Field(min_length=1, max_length=2048)
+    keys: dict[str, str]
+    user_agent: str = Field(default="", max_length=512)
+    device_label: str = Field(default="", max_length=120)
+
+    @field_validator("keys")
+    @classmethod
+    def validar_claves_push(cls, value: dict[str, str]) -> dict[str, str]:
+        if not value.get("p256dh") or not value.get("auth"):
+            raise ValueError("La suscripción del navegador no incluye sus claves de cifrado.")
+        return value
+
+
+class ChatPushSubscriptionDelete(BaseModel):
+    endpoint: str = Field(min_length=1, max_length=2048)
+
+
+class ChatPushDiagnosticCreate(BaseModel):
+    etapa: Literal["clave_publica", "registrar_service_worker", "esperar_service_worker", "buscar_suscripcion", "eliminar_suscripcion_anterior", "crear_suscripcion", "guardar_suscripcion"]
+    nombre_error: str = Field(default="Error", max_length=120)
+    mensaje_error: str = Field(default="", max_length=500)
 
 
 class NotificacionesClienteLeidasUpdate(BaseModel):

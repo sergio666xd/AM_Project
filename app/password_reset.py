@@ -9,6 +9,7 @@ from app.database import SessionLocal
 from app.email_service import enviar_correo
 from app.message_templates import render_direct_message
 from app.workflow_service import public_site_url
+from app.workflow_service import user_portal_url
 
 logger = logging.getLogger(__name__)
 
@@ -39,11 +40,11 @@ def password_reset_frontend_url() -> str:
     return canonical
 
 
-def password_reset_url(token: str) -> str:
-    return (
-        f"{password_reset_frontend_url()}/gestion-procesos/auth/"
-        f"restablecer-password?token={quote(token, safe='')}"
-    )
+def password_reset_url(token: str, role: object | None = None) -> str:
+    route = f"/gestion-procesos/auth/restablecer-password?token={quote(token, safe='')}"
+    if role is not None:
+        return user_portal_url(role, route)
+    return f"{password_reset_frontend_url()}{route}"
 
 
 def send_password_reset_email(email: str, reset_url: str) -> None:

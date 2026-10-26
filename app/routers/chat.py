@@ -1,20 +1,31 @@
 from __future__ import annotations
 
-from datetime import datetime
+import hashlib
+import hmac
+import logging
+import json
+import os
+from datetime import datetime, timedelta
+from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy.orm import Session
+from fastapi import APIRouter, Depends, HTTPException, Query
+from sqlalchemy import func, or_
+from sqlalchemy.orm import Session, selectinload
 
 from app import models, schemas, security
 from app.audit import registrar_evento_auditoria
 from app.database import get_db
 from app.firm_access import lawyer_process_ids, require_process_access, role_name
 from app.notification_service import emitir_notificacion_workflow
-from app.timezone import format_colombia_datetime
-from app.workflow_service import public_site_url
+from app.notification_policy import canales_habilitados
+from app.workflow_service import compact_portal_path, user_portal_url
+from app.web_push import firm_push_icon
 
 router = APIRouter(prefix="/api/chat", tags=["Chat"])
+logger = logging.getLogger(__name__)
 STAFF_ROLES = {"ADMIN", "ABOGADO", "ABOGADO_ADMIN"}
+PANEL_PRESENCE_TTL = timedelta(seconds=90)
+CHAT_NOTIFICATION_COOLDOWN = timedelta(hours=1)
 
 
 def _role(user: models.Usuario) -> str:
@@ -23,6 +34,344 @@ def _role(user: models.Usuario) -> str:
 
 def _chat_area(user: models.Usuario) -> str:
     return {"CLIENTE": "cliente", "ADMIN": "admin"}.get(_role(user), "abogado")
+
+
+def _supports_firm_panel_presence(user: models.Usuario) -> bool:
+    return _role(user) in {"CLIENTE", "ABOGADO_ADMIN", "ADMIN"}
+
+
+@router.post("/presencia")
+def actualizar_presencia_panel(
+    data: schemas.ChatPresenciaUpdate,
+    db: Session = Depends(get_db),
+    user: models.Usuario = Depends(security.obtener_usuario_actual),
+):
+    if not _supports_firm_panel_presence(user):
+        return {"activo": False}
+    now = datetime.utcnow()
+    db.query(models.ChatPresenciaPanel).filter(
+        models.ChatPresenciaPanel.last_seen_at < now - PANEL_PRESENCE_TTL
+    ).delete(synchronize_session=False)
+    presence = db.query(models.ChatPresenciaPanel).filter_by(
+        usuario_id=user.id, session_id=data.session_id,
+    ).with_for_update().first()
+    if presence is None:
+        presence = models.ChatPresenciaPanel(
+            usuario_id=user.id, session_id=data.session_id, last_seen_at=now,
+        )
+        db.add(presence)
+    else:
+        presence.last_seen_at = now
+    db.commit()
+    return {"activo": True, "expira_en_segundos": int(PANEL_PRESENCE_TTL.total_seconds())}
+
+
+@router.delete("/presencia")
+def cerrar_presencia_panel(
+    data: schemas.ChatPresenciaUpdate,
+    db: Session = Depends(get_db),
+    user: models.Usuario = Depends(security.obtener_usuario_actual),
+):
+    db.query(models.ChatPresenciaPanel).filter_by(
+        usuario_id=user.id, session_id=data.session_id,
+    ).delete(synchronize_session=False)
+    db.commit()
+    return {"activo": False}
+
+
+@router.get("/push/clave-publica")
+def obtener_clave_publica_push(user: models.Usuario = Depends(security.obtener_usuario_actual)):
+    public_key = os.getenv("WEB_PUSH_VAPID_PUBLIC_KEY", "").strip()
+    if not public_key:
+        raise HTTPException(status_code=503, detail="Las notificaciones del navegador aún no están configuradas.")
+    return {"public_key": public_key}
+
+
+@router.post("/push/suscripciones", status_code=201)
+def guardar_suscripcion_push(
+    data: schemas.ChatPushSubscriptionCreate,
+    db: Session = Depends(get_db),
+    user: models.Usuario = Depends(security.obtener_usuario_actual),
+):
+    if user.estado != models.EstadoUsuario.ACTIVO:
+        raise HTTPException(status_code=403, detail="La cuenta no está activa.")
+    if not os.getenv("WEB_PUSH_VAPID_PUBLIC_KEY") or not os.getenv("WEB_PUSH_VAPID_PRIVATE_KEY"):
+        raise HTTPException(status_code=503, detail="Las notificaciones del navegador aún no están configuradas.")
+    subscription = db.query(models.ChatPushSubscription).filter_by(endpoint=data.endpoint).with_for_update().first()
+    if subscription is None:
+        subscription = models.ChatPushSubscription(
+            usuario_id=user.id, endpoint=data.endpoint,
+            p256dh=data.keys["p256dh"], auth=data.keys["auth"],
+            user_agent=data.user_agent, device_label=data.device_label,
+        )
+        db.add(subscription)
+    else:
+        subscription.usuario_id = user.id
+        subscription.p256dh = data.keys["p256dh"]
+        subscription.auth = data.keys["auth"]
+        subscription.user_agent = data.user_agent
+        subscription.device_label = data.device_label
+        subscription.updated_at = datetime.utcnow()
+    db.commit()
+    return {"registrada": True}
+
+
+@router.delete("/push/suscripciones")
+def eliminar_suscripcion_push(
+    data: schemas.ChatPushSubscriptionDelete,
+    db: Session = Depends(get_db),
+    user: models.Usuario = Depends(security.obtener_usuario_actual),
+):
+    db.query(models.ChatPushSubscription).filter_by(usuario_id=user.id, endpoint=data.endpoint).delete(synchronize_session=False)
+    db.commit()
+    return {"registrada": False}
+
+
+@router.get("/push/dispositivos")
+def listar_dispositivos_push(
+    db: Session = Depends(get_db),
+    user: models.Usuario = Depends(security.obtener_usuario_actual),
+):
+    """Lista los dispositivos del usuario con notificaciones push activas."""
+    subs = (
+        db.query(models.ChatPushSubscription)
+        .filter_by(usuario_id=user.id)
+        .order_by(models.ChatPushSubscription.updated_at.desc())
+        .all()
+    )
+    return [
+        {
+            "id": s.id,
+            "device_label": s.device_label or _label_from_user_agent(s.user_agent),
+            "user_agent": s.user_agent,
+            "created_at": s.created_at.isoformat() if s.created_at else None,
+            "updated_at": s.updated_at.isoformat() if s.updated_at else None,
+        }
+        for s in subs
+    ]
+
+
+@router.delete("/push/dispositivos/{device_id}")
+def eliminar_dispositivo_push(
+    device_id: int,
+    db: Session = Depends(get_db),
+    user: models.Usuario = Depends(security.obtener_usuario_actual),
+):
+    """Elimina una suscripción push específica del usuario por ID."""
+    deleted = (
+        db.query(models.ChatPushSubscription)
+        .filter_by(id=device_id, usuario_id=user.id)
+        .delete(synchronize_session=False)
+    )
+    if not deleted:
+        raise HTTPException(status_code=404, detail="Dispositivo no encontrado.")
+    db.commit()
+    return {"eliminado": True}
+
+
+def _label_from_user_agent(ua: str) -> str:
+    """Genera una etiqueta legible a partir del user-agent."""
+    if not ua:
+        return "Dispositivo desconocido"
+    ua_lower = ua.lower()
+    # Detectar SO
+    os_name = "Dispositivo"
+    if "iphone" in ua_lower or "ipad" in ua_lower:
+        os_name = "iPhone" if "iphone" in ua_lower else "iPad"
+    elif "android" in ua_lower:
+        os_name = "Android"
+    elif "macintosh" in ua_lower or "mac os" in ua_lower:
+        os_name = "Mac"
+    elif "windows" in ua_lower:
+        os_name = "Windows"
+    elif "linux" in ua_lower:
+        os_name = "Linux"
+    # Detectar navegador
+    browser = ""
+    if "edg/" in ua_lower or "edga/" in ua_lower or "edgios/" in ua_lower:
+        browser = "Edge"
+    elif "chrome/" in ua_lower and "safari/" in ua_lower and "edg" not in ua_lower:
+        browser = "Chrome"
+    elif "firefox/" in ua_lower or "fxios/" in ua_lower:
+        browser = "Firefox"
+    elif "safari/" in ua_lower and "chrome" not in ua_lower:
+        browser = "Safari"
+    elif "samsung" in ua_lower:
+        browser = "Samsung Internet"
+    return f"{os_name} · {browser}" if browser else os_name
+
+
+@router.post("/push/diagnosticos", status_code=204)
+def registrar_error_configuracion_push(
+    data: schemas.ChatPushDiagnosticCreate,
+    user: models.Usuario = Depends(security.obtener_usuario_actual),
+):
+    logger.warning(
+        "No se pudo configurar Push en navegador para usuario %s: etapa=%s error=%s mensaje=%s",
+        user.id, data.etapa, data.nombre_error, data.mensaje_error,
+    )
+    return None
+
+
+def _send_chat_push(
+    db: Session,
+    recipient: models.Usuario,
+    sender: models.Usuario,
+    link: str,
+    *,
+    title: str | None = None,
+    body: str | None = None,
+    tag: str | None = None,
+    ack: dict | None = None,
+) -> bool:
+    public_key = os.getenv("WEB_PUSH_VAPID_PUBLIC_KEY", "").strip()
+    private_key = os.getenv("WEB_PUSH_VAPID_PRIVATE_KEY", "").strip()
+    subject = os.getenv("WEB_PUSH_VAPID_SUBJECT", "mailto:contacto@alejandramunozabogada.com").strip()
+    if not public_key or not private_key:
+        missing = [name for name, value in (
+            ("WEB_PUSH_VAPID_PUBLIC_KEY", public_key),
+            ("WEB_PUSH_VAPID_PRIVATE_KEY", private_key),
+        ) if not value]
+        logger.warning(
+            "Push no enviada al usuario %s: faltan variables de configuración %s.",
+            recipient.id, ", ".join(missing),
+        )
+        return False
+    subscriptions = db.query(models.ChatPushSubscription).filter_by(usuario_id=recipient.id).all()
+    if not subscriptions:
+        logger.info("Push no enviada al usuario %s: no tiene suscripciones registradas.", recipient.id)
+        return False
+    try:
+        from pywebpush import WebPushException, webpush
+    except ImportError as exc:
+        logger.exception("No se pudo importar pywebpush o una dependencia necesaria: %s", exc)
+        return False
+
+    delivered = False
+    icon = firm_push_icon(db)
+    payload_data = {
+        "title": title or f"Nuevo mensaje de {sender.nombre_completo}",
+        "body": f"{sender.nombre_completo} te está escribiendo.",
+        "url": link,
+        "tag": tag or f"chat-user-{sender.id}",
+        "icon": icon,
+        "badge": icon,
+    }
+    if body is not None:
+        payload_data["body"] = body
+    if ack:
+        payload_data["ack"] = ack
+    payload = json.dumps(payload_data, ensure_ascii=False)
+    failed = 0
+    for subscription in subscriptions:
+        try:
+            webpush(
+                subscription_info={
+                    "endpoint": subscription.endpoint,
+                    "keys": {"p256dh": subscription.p256dh, "auth": subscription.auth},
+                },
+                data=payload,
+                vapid_private_key=private_key,
+                vapid_claims={"sub": subject},
+                ttl=60 * 60,
+                timeout=8,
+            )
+            delivered = True
+        except WebPushException as exc:
+            failed += 1
+            status_code = getattr(exc, "status_code", None) or getattr(getattr(exc, "response", None), "status_code", None)
+            if status_code in {404, 410}:
+                db.delete(subscription)
+                logger.info(
+                    "Suscripción Push vencida eliminada para usuario %s (HTTP %s).",
+                    recipient.id, status_code,
+                )
+            else:
+                logger.warning(
+                    "No se pudo entregar Web Push al usuario %s (HTTP %s).",
+                    recipient.id, status_code or "desconocido",
+                )
+        except Exception as exc:
+            failed += 1
+            logger.exception("Error al enviar Web Push al usuario %s: %s", recipient.id, exc)
+    if not delivered:
+        logger.warning(
+            "Push no enviada al usuario %s: fallaron sus %s suscripciones registradas.",
+            recipient.id, failed,
+        )
+    elif failed:
+        logger.warning(
+            "Push entregada al usuario %s, pero fallaron %s de %s suscripciones.",
+            recipient.id, failed, len(subscriptions),
+        )
+    return delivered
+
+
+def _firma_entrega_push(usuario_id: int, mensaje_id: int) -> str:
+    return hmac.new(
+        security.get_jwt_secret().encode(),
+        f"chat-push-entrega:{usuario_id}:{mensaje_id}".encode(),
+        hashlib.sha256,
+    ).hexdigest()
+
+
+def _ack_entrega_push(usuario_id: int, mensaje_id: int) -> dict:
+    return {
+        "url": "/api/chat/push/entregado",
+        "usuario_id": usuario_id,
+        "mensaje_id": mensaje_id,
+        "firma": _firma_entrega_push(usuario_id, mensaje_id),
+    }
+
+
+@router.post("/push/entregado", status_code=204)
+def confirmar_entrega_push(data: schemas.ChatPushEntrega, db: Session = Depends(get_db)):
+    """El service worker confirma que la notificación llegó al dispositivo.
+
+    No lleva sesión: la firma HMAC emitida con el push autoriza solo ese mensaje para ese usuario.
+    """
+    if not hmac.compare_digest(data.firma, _firma_entrega_push(data.usuario_id, data.mensaje_id)):
+        raise HTTPException(status_code=403, detail="Confirmación de entrega no válida.")
+    message = db.get(models.ChatMensaje, data.mensaje_id)
+    if not message:
+        return None
+    participant = db.query(models.ChatParticipante).filter_by(
+        conversacion_id=message.conversacion_id,
+        usuario_id=data.usuario_id,
+    ).first()
+    if participant and participant.ultimo_entregado_mensaje_id < message.id:
+        participant.ultimo_entregado_mensaje_id = message.id
+        db.commit()
+    return None
+
+
+@router.post("/push/prueba")
+def probar_notificacion_push(
+    db: Session = Depends(get_db),
+    user: models.Usuario = Depends(security.obtener_usuario_actual),
+):
+    if user.estado != models.EstadoUsuario.ACTIVO:
+        raise HTTPException(status_code=403, detail="La cuenta no esta activa.")
+    if not os.getenv("WEB_PUSH_VAPID_PUBLIC_KEY", "").strip() or not os.getenv("WEB_PUSH_VAPID_PRIVATE_KEY", "").strip():
+        raise HTTPException(status_code=503, detail="Las notificaciones del navegador aun no estan configuradas.")
+    subscription_exists = db.query(models.ChatPushSubscription.id).filter_by(usuario_id=user.id).first()
+    if not subscription_exists:
+        raise HTTPException(status_code=409, detail="Este navegador no tiene una suscripcion Push registrada. Activa las notificaciones en este dispositivo.")
+
+    chat_path = f"/gestion-procesos/{_chat_area(user)}/chat"
+    delivered = _send_chat_push(
+        db,
+        user,
+        user,
+        user_portal_url(user, chat_path),
+        title="Prueba de notificaciones",
+        body="Las notificaciones Push de este navegador estan funcionando.",
+        tag=f"chat-test-{user.id}",
+    )
+    if not delivered:
+        raise HTTPException(status_code=502, detail="El servicio Push rechazo el envio. Revisa los logs del backend y confirma que las claves VAPID correspondan a las usadas al crear la suscripcion.")
+    db.commit()
+    return {"entregada": True}
 
 
 def _path_id(value: str) -> int:
@@ -90,7 +439,80 @@ def _conversation_for_actor(db: Session, conversation_id: int, user: models.Usua
 
 
 def _display_conversation(db: Session, conversation: models.ChatConversacion, user: models.Usuario) -> dict:
+    return _display_conversations(db, [conversation], user)[0]
+
+
+def _display_conversations(db: Session, conversations: list[models.ChatConversacion], user: models.Usuario) -> list[dict]:
+    """Serializa varias conversaciones con un número fijo de consultas.
+
+    La lista se consulta periódicamente desde cada pestaña abierta, por lo que
+    presencia, último mensaje y no leídos se calculan en bloque.
+    """
+    if not conversations:
+        return []
+    conversation_ids = [item.id for item in conversations]
+    other_ids = {
+        participant.usuario_id
+        for conversation in conversations
+        for participant in conversation.participantes
+        if participant.usuario_id != user.id
+    }
+    online_ids = {row[0] for row in db.query(models.ChatPresenciaPanel.usuario_id).filter(
+        models.ChatPresenciaPanel.usuario_id.in_(other_ids or [-1]),
+        models.ChatPresenciaPanel.last_seen_at >= datetime.utcnow() - PANEL_PRESENCE_TTL,
+    ).distinct().all()}
+    last_ids = (
+        db.query(func.max(models.ChatMensaje.id))
+        .filter(models.ChatMensaje.conversacion_id.in_(conversation_ids))
+        .group_by(models.ChatMensaje.conversacion_id)
+    )
+    last_by_conversation = {
+        message.conversacion_id: message
+        for message in db.query(models.ChatMensaje)
+        .options(selectinload(models.ChatMensaje.remitente))
+        .filter(models.ChatMensaje.id.in_(last_ids))
+        .all()
+    }
+    unread_by_conversation = {
+        row.conversacion_id: (row.total, row.primero)
+        for row in db.query(
+            models.ChatMensaje.conversacion_id,
+            func.count(models.ChatMensaje.id).label("total"),
+            func.min(models.ChatMensaje.id).label("primero"),
+        )
+        .join(
+            models.ChatParticipante,
+            (models.ChatParticipante.conversacion_id == models.ChatMensaje.conversacion_id)
+            & (models.ChatParticipante.usuario_id == user.id),
+        )
+        .filter(
+            models.ChatMensaje.conversacion_id.in_(conversation_ids),
+            models.ChatMensaje.remitente_id != user.id,
+            models.ChatMensaje.id > models.ChatParticipante.ultimo_leido_mensaje_id,
+        )
+        .group_by(models.ChatMensaje.conversacion_id)
+        .all()
+    }
+    return [
+        _serialize_conversation(
+            conversation, user, online_ids,
+            last_by_conversation.get(conversation.id),
+            unread_by_conversation.get(conversation.id, (0, None)),
+        )
+        for conversation in conversations
+    ]
+
+
+def _serialize_conversation(
+    conversation: models.ChatConversacion,
+    user: models.Usuario,
+    online_user_ids: set[int],
+    last: models.ChatMensaje | None,
+    unread_info: tuple[int, int | None],
+) -> dict:
     other = next((item.usuario for item in conversation.participantes if item.usuario_id != user.id and item.usuario), None)
+    other_ids = {item.usuario_id for item in conversation.participantes if item.usuario_id != user.id}
+    online_ids = other_ids & online_user_ids
     if conversation.tipo == "PROCESO_COLABORADORES":
         title = "Colaboradores"
         subtitle = conversation.proceso.nombre if conversation.proceso else "Proceso"
@@ -108,32 +530,68 @@ def _display_conversation(db: Session, conversation: models.ChatConversacion, us
         target_path = "administrador" if other and _role(other) == "ADMIN" else f"directo/{other.id if other else 0}"
         base = f"/gestion-procesos/{_chat_area(user)}/chat/{target_path}"
         route_key = f"direct:{'administrador' if other and _role(other) == 'ADMIN' else (other.id if other else 0)}"
-    last = db.query(models.ChatMensaje).filter_by(conversacion_id=conversation.id).order_by(models.ChatMensaje.id.desc()).first()
-    own_participant = next((item for item in conversation.participantes if item.usuario_id == user.id), None)
-    last_read_id = own_participant.ultimo_leido_mensaje_id if own_participant else 0
-    unread = db.query(models.ChatMensaje).filter(
-        models.ChatMensaje.conversacion_id == conversation.id,
-        models.ChatMensaje.remitente_id != user.id,
-        models.ChatMensaje.id > last_read_id,
-    ).count()
+    base = compact_portal_path(user, base)
+    unread, first_unread_id = unread_info
     return {
         "id": conversation.id, "clave": conversation.clave, "route_key": route_key, "tipo": conversation.tipo,
         "titulo": title, "subtitulo": subtitle, "href": base, "no_leidos": unread,
+        "primer_no_leido_id": first_unread_id,
         "proceso_id": conversation.proceso_id,
+        "en_linea": bool(other and other.id in online_ids),
+        "participantes_en_linea": len(online_ids),
         "updated_at": last.created_at if last else conversation.updated_at,
         "ultimo_mensaje": last.contenido if last else None,
         "ultimo_remitente": last.remitente.nombre_completo if last and last.remitente else None,
     }
 
 
-def _message_reference_url(message: models.ChatMensaje, conversation: models.ChatConversacion, user: models.Usuario) -> str | None:
-    if message.referencia_tipo != "DOCUMENTO" or conversation.proceso_id is None:
+def _message_reference_url(message: models.ChatMensaje, conversation: models.ChatConversacion, user: models.Usuario, db: Session) -> str | None:
+    if conversation.proceso_id is None:
         return message.referencia_url
     if _role(user) == "CLIENTE":
-        return f"/gestion-procesos/cliente/procesos/{conversation.proceso_id}#documentos"
+        process_url = f"/gestion-procesos/cliente/procesos/{conversation.proceso_id}"
+        if message.referencia_tipo == "DOCUMENTO":
+            document = db.query(models.DocumentoProceso).filter_by(id=message.referencia_id, proceso_id=conversation.proceso_id).first()
+            return f"/gestion-procesos/cliente/documentos#solicitud-{document.solicitud_id}" if document and document.solicitud_id else f"{process_url}#documentos"
+        if message.referencia_tipo == "TAREA":
+            return f"/gestion-procesos/cliente/tareas?tarea={message.referencia_id}#tarea-{message.referencia_id}"
+        if message.referencia_tipo == "SUBTAREA":
+            subtask = db.query(models.Subtarea).filter_by(id=message.referencia_id).first()
+            task_id = subtask.tarea_id if subtask else message.referencia_id
+            return f"/gestion-procesos/cliente/tareas?tarea={task_id}#tarea-{task_id}"
+        if message.referencia_tipo == "EVENTO":
+            return f"{process_url}#evento-{message.referencia_id}"
+        if message.referencia_tipo == "RADICADO":
+            return f"{process_url}#radicado-{message.referencia_id}"
+        if message.referencia_tipo == "ACTUACION":
+            actuation = db.query(models.Actuacion).filter_by(id=message.referencia_id).first()
+            return f"{process_url}#radicado-{actuation.radicado_id}" if actuation else f"{process_url}#radicados"
+    process_base = f"/gestion-procesos/abogado/procesos/{conversation.proceso_id}"
     if _role(user) == "ADMIN":
-        return "/gestion-procesos/admin/documentos"
-    return f"/gestion-procesos/abogado/documentos?proceso={conversation.proceso_id}#documento-{message.referencia_id}"
+        if message.referencia_tipo == "DOCUMENTO":
+            return f"/gestion-procesos/admin/documentos?proceso={conversation.proceso_id}#documento-{message.referencia_id}"
+        if message.referencia_tipo in {"TAREA", "SUBTAREA"}:
+            return f"/gestion-procesos/admin/tareas?tarea={message.referencia_id}"
+        if message.referencia_tipo == "EVENTO":
+            return f"/gestion-procesos/admin/agenda?evento={message.referencia_id}"
+        if message.referencia_tipo in {"RADICADO", "ACTUACION"}:
+            return f"/gestion-procesos/admin/radicados?proceso={conversation.proceso_id}"
+        return f"/gestion-procesos/admin/procesos?proceso={conversation.proceso_id}"
+    if message.referencia_tipo == "DOCUMENTO":
+        return f"/gestion-procesos/abogado/documentos?proceso={conversation.proceso_id}#documento-{message.referencia_id}"
+    if message.referencia_tipo == "TAREA":
+        return f"{process_base}/tareas#tarea-{message.referencia_id}"
+    if message.referencia_tipo == "SUBTAREA":
+        subtask = db.query(models.Subtarea).filter_by(id=message.referencia_id).first()
+        task_id = subtask.tarea_id if subtask else message.referencia_id
+        return f"{process_base}/tareas#tarea-{task_id}"
+    if message.referencia_tipo == "EVENTO":
+        return f"{process_base}/agenda#evento-{message.referencia_id}"
+    if message.referencia_tipo == "RADICADO":
+        return f"{process_base}/radicados#radicado-{message.referencia_id}"
+    if message.referencia_tipo == "ACTUACION":
+        return f"{process_base}/radicados#actuacion-{message.referencia_id}"
+    return message.referencia_url
 
 
 def _message_delivery(message: models.ChatMensaje, participants: list[models.ChatParticipante]) -> dict:
@@ -276,37 +734,90 @@ def _resolve(db: Session, key: str, user: models.Usuario) -> models.ChatConversa
 
 
 @router.get("/conversaciones")
-def listar_conversaciones(db: Session = Depends(get_db), user: models.Usuario = Depends(security.obtener_usuario_actual)):
-    conversations = _create_available_conversations(db, user)
-    member_ids = [row.conversacion_id for row in db.query(models.ChatParticipante).filter_by(usuario_id=user.id).all()]
-    saved = db.query(models.ChatConversacion).filter(models.ChatConversacion.id.in_(member_ids or [-1])).all()
-    by_id = {item.id: item for item in [*saved, *conversations]}
-    db.commit()
-    result = []
-    for item in by_id.values():
-        try:
-            _conversation_for_actor(db, item.id, user)
-        except HTTPException:
-            continue
-        result.append(_display_conversation(db, item, user))
+def listar_conversaciones(
+    sincronizar: bool = True,
+    db: Session = Depends(get_db),
+    user: models.Usuario = Depends(security.obtener_usuario_actual),
+):
+    """Lista las conversaciones del usuario.
+
+    ``sincronizar=false`` omite la creación de conversaciones disponibles (que
+    escribe en la base de datos) y sirve para los sondeos periódicos.
+    """
+    if sincronizar:
+        _create_available_conversations(db, user)
+        db.commit()
+    member_ids = db.query(models.ChatParticipante.conversacion_id).filter_by(usuario_id=user.id)
+    conversations = (
+        db.query(models.ChatConversacion)
+        .filter(models.ChatConversacion.id.in_(member_ids))
+        .options(
+            selectinload(models.ChatConversacion.participantes).selectinload(models.ChatParticipante.usuario),
+            selectinload(models.ChatConversacion.proceso),
+        )
+        .all()
+    )
+    allowed_process_ids = _accessible_process_ids(
+        db, user, {item.proceso_id for item in conversations if item.proceso_id is not None},
+    )
+    visible = [
+        item for item in conversations
+        if item.proceso_id is None or item.proceso_id in allowed_process_ids
+    ]
+    result = _display_conversations(db, visible, user)
     return sorted(result, key=lambda item: item["updated_at"], reverse=True)
 
 
+def _accessible_process_ids(db: Session, user: models.Usuario, process_ids: set[int]) -> set[int]:
+    """Equivalente en bloque a ``_process`` para un conjunto de procesos."""
+    if not process_ids:
+        return set()
+    query = db.query(models.Proceso.id).filter(
+        models.Proceso.id.in_(process_ids),
+        models.Proceso.archivado_en.is_(None),
+    )
+    role = _role(user)
+    if role == "CLIENTE":
+        query = query.filter(models.Proceso.id.in_(
+            db.query(models.ProcesoCliente.proceso_id).filter(models.ProcesoCliente.cliente_id == user.id)
+        ))
+    elif role != "ADMIN":
+        query = query.filter(models.Proceso.id.in_(lawyer_process_ids(db, user)))
+    return {row[0] for row in query.all()}
+
+
 @router.get("/resolver")
-def resolver_conversacion(clave: str, after_id: int = 0, db: Session = Depends(get_db), user: models.Usuario = Depends(security.obtener_usuario_actual)):
+def resolver_conversacion(
+    clave: str,
+    after_id: int = 0,
+    before_id: int = 0,
+    limite: Annotated[int, Query(ge=1, le=200)] = 30,
+    db: Session = Depends(get_db),
+    user: models.Usuario = Depends(security.obtener_usuario_actual),
+):
     conversation = _resolve(db, clave, user)
     conversation = _conversation_for_actor(db, conversation.id, user)
     participant = next((item for item in conversation.participantes if item.usuario_id == user.id), None)
     message_query = db.query(models.ChatMensaje).filter(models.ChatMensaje.conversacion_id == conversation.id)
+    has_more = False
     if after_id > 0:
         messages = message_query.filter(models.ChatMensaje.id > after_id).order_by(models.ChatMensaje.id.asc()).limit(500).all()
     else:
-        messages = list(reversed(message_query.order_by(models.ChatMensaje.id.desc()).limit(500).all()))
-    status_messages = db.query(models.ChatMensaje).filter_by(
-        conversacion_id=conversation.id,
-        remitente_id=user.id,
-    ).order_by(models.ChatMensaje.id.desc()).limit(500).all()
-    if participant and messages:
+        # Carga paginada desde el final: los últimos `limite` mensajes, o los anteriores a `before_id`.
+        if before_id > 0:
+            message_query = message_query.filter(models.ChatMensaje.id < before_id)
+        page = message_query.order_by(models.ChatMensaje.id.desc()).limit(limite + 1).all()
+        has_more = len(page) > limite
+        messages = list(reversed(page[:limite]))
+    if before_id > 0:
+        # Al subir en el historial solo se piden mensajes antiguos; los estados ya están en el cliente.
+        status_messages = []
+    else:
+        status_messages = db.query(models.ChatMensaje).filter_by(
+            conversacion_id=conversation.id,
+            remitente_id=user.id,
+        ).order_by(models.ChatMensaje.id.desc()).limit(200).all()
+    if participant and messages and before_id <= 0:
         participant.ultimo_entregado_mensaje_id = max(
             participant.ultimo_entregado_mensaje_id,
             messages[-1].id,
@@ -314,6 +825,7 @@ def resolver_conversacion(clave: str, after_id: int = 0, db: Session = Depends(g
     db.commit()
     return {
         "conversacion": _display_conversation(db, conversation, user),
+        "hay_mas": has_more,
         "participantes": [{"id": item.usuario.id, "nombre": item.usuario.nombre_completo} for item in conversation.participantes if item.usuario],
         "estados_mensajes": [{"id": item.id, **_message_delivery(item, conversation.participantes)} for item in status_messages],
         "mensajes": [{
@@ -321,7 +833,7 @@ def resolver_conversacion(clave: str, after_id: int = 0, db: Session = Depends(g
             "remitente": item.remitente.nombre_completo if item.remitente else "Usuario eliminado",
             "es_mio": item.remitente_id == user.id, "created_at": item.created_at,
             **_message_delivery(item, conversation.participantes),
-            "referencia": ({"tipo": item.referencia_tipo, "id": item.referencia_id, "titulo": item.referencia_titulo, "url": _message_reference_url(item, conversation, user)} if item.referencia_tipo else None),
+            "referencia": ({"tipo": item.referencia_tipo, "id": item.referencia_id, "titulo": item.referencia_titulo, "url": _message_reference_url(item, conversation, user, db)} if item.referencia_tipo else None),
         } for item in messages],
     }
 
@@ -353,7 +865,7 @@ def _document_visible_to_user(db: Session, document: models.DocumentoProceso, pr
     if role == "ADMIN":
         return True
     if role == "CLIENTE":
-        linked = db.query(models.ProcesoCliente.id).filter_by(proceso_id=process.id, cliente_id=viewer.id).first()
+        linked = db.query(models.ProcesoCliente.proceso_id).filter_by(proceso_id=process.id, cliente_id=viewer.id).first()
         if not linked or document.cliente_id != viewer.id:
             return False
         if document.contrato_id is not None:
@@ -371,24 +883,107 @@ def _document_visible_to_user(db: Session, document: models.DocumentoProceso, pr
 def _listar_referencias(process: models.Proceso, conversation: models.ChatConversacion, db: Session, user: models.Usuario):
     if _role(user) == "CLIENTE":
         raise HTTPException(status_code=403, detail="Solo el equipo puede adjuntar referencias.")
+    client_id = conversation.cliente_id
+    if client_id is None:
+        client_id = next((
+            participant.usuario_id for participant in conversation.participantes
+            if participant.usuario and _role(participant.usuario) == "CLIENTE"
+        ), None)
+    if client_id is not None and not db.query(models.ProcesoCliente.proceso_id).filter_by(
+        proceso_id=process.id, cliente_id=client_id,
+    ).first():
+        client_id = None
+
     result = []
-    for item in db.query(models.Actuacion).join(models.ProcesoRadicado, models.ProcesoRadicado.radicado_id == models.Actuacion.radicado_id).filter(models.ProcesoRadicado.proceso_id == process.id).order_by(models.Actuacion.fecha_actuacion.desc()).limit(100).all():
-        description = item.actuacion or item.anotacion or "Actuacion judicial"
-        result.append({"tipo": "ACTUACION", "id": item.id, "titulo": f"Actuacion - {description[:180]}", "href": f"/gestion-procesos/abogado/procesos/{process.id}/radicados"})
-    for item in db.query(models.Tarea).filter_by(proceso_id=process.id).order_by(models.Tarea.created_at.desc()).limit(100).all():
-        result.append({"tipo": "TAREA", "id": item.id, "titulo": f"Tarea - {item.titulo}", "href": f"/gestion-procesos/abogado/procesos/{process.id}/tareas"})
-    for item in db.query(models.EventoAgenda).filter_by(proceso_id=process.id).order_by(models.EventoAgenda.fecha_inicio.desc()).limit(100).all():
-        result.append({"tipo": "EVENTO", "id": item.id, "titulo": f"Evento - {item.titulo}", "href": f"/gestion-procesos/abogado/procesos/{process.id}/agenda"})
+    process_radications = db.query(models.Radicado).join(
+        models.ProcesoRadicado, models.ProcesoRadicado.radicado_id == models.Radicado.id,
+    ).filter(models.ProcesoRadicado.proceso_id == process.id).order_by(models.Radicado.numero.asc()).all()
+    radication_ids = [item.id for item in process_radications]
+    for item in process_radications:
+        result.append({"tipo": "RADICADO", "id": item.id, "titulo": item.numero,
+                       "href": f"/gestion-procesos/abogado/procesos/{process.id}/radicados#radicado-{item.id}"})
+    actuation_query = db.query(models.Actuacion).filter(models.Actuacion.radicado_id.in_(radication_ids or [-1]))
+    for item in actuation_query.order_by(models.Actuacion.fecha_actuacion.desc(), models.Actuacion.id.desc()).all():
+        radication = next((row for row in process_radications if row.id == item.radicado_id), None)
+        description = item.actuacion or item.anotacion or "Actuación judicial"
+        result.append({"tipo": "ACTUACION", "id": item.id,
+                       "titulo": description[:180], "grupo": str(item.radicado_id),
+                       "radicado_numero": radication.numero if radication else "",
+                       "href": f"/gestion-procesos/abogado/procesos/{process.id}/radicados#actuacion-{item.id}"})
+
+    task_scope = [models.Tarea.proceso_id == process.id]
+    if radication_ids:
+        task_scope.append(models.Tarea.radicado_id.in_(radication_ids))
+        process_actuation_ids = db.query(models.Actuacion.id).filter(models.Actuacion.radicado_id.in_(radication_ids))
+        task_scope.append(models.Tarea.actuacion_id.in_(process_actuation_ids))
+    if client_id is not None:
+        task_scope.append(models.Tarea.id.in_(db.query(models.Subtarea.tarea_id).filter(
+            models.Subtarea.proceso_id == process.id,
+            models.Subtarea.asignada_cliente.is_(True),
+            models.Subtarea.cliente_id == client_id,
+        )))
+    task_query = db.query(models.Tarea).filter(or_(*task_scope))
+    if client_id is not None:
+        assigned_parent_ids = db.query(models.Subtarea.tarea_id).filter(
+            models.Subtarea.asignada_cliente.is_(True), models.Subtarea.cliente_id == client_id,
+        ).distinct()
+        task_query = task_query.filter(or_(
+            models.Tarea.cliente_id == client_id,
+            models.Tarea.id.in_(assigned_parent_ids),
+        ))
+    visible_tasks = task_query.order_by(models.Tarea.created_at.desc()).all()
+    visible_task_ids = {item.id for item in visible_tasks}
+    for item in visible_tasks:
+        result.append({"tipo": "TAREA", "id": item.id, "titulo": f"Tarea - {item.titulo}", "href": f"/gestion-procesos/abogado/procesos/{process.id}/tareas#tarea-{item.id}"})
+    subtask_query = db.query(models.Subtarea).join(
+        models.Tarea, models.Tarea.id == models.Subtarea.tarea_id,
+    ).filter(models.Tarea.id.in_(visible_task_ids or [-1]))
+    if client_id is not None:
+        subtask_query = subtask_query.filter(
+            models.Subtarea.asignada_cliente.is_(True), models.Subtarea.cliente_id == client_id,
+        )
+    for item in subtask_query.order_by(models.Subtarea.orden.asc(), models.Subtarea.id.asc()).all():
+        result.append({"tipo": "SUBTAREA", "id": item.id, "titulo": f"Subtarea - {item.titulo}",
+                       "grupo": item.tarea.titulo if item.tarea else "Tarea",
+                       "parent_id": item.tarea_id,
+                       "href": f"/gestion-procesos/abogado/procesos/{process.id}/tareas#tarea-{item.tarea_id}"})
+
+    event_query = db.query(models.EventoAgenda).filter_by(proceso_id=process.id)
+    if client_id is not None:
+        event_query = event_query.filter(or_(
+            models.EventoAgenda.cliente_id == client_id,
+            (models.EventoAgenda.proceso_id == process.id) & models.EventoAgenda.cliente_id.is_(None),
+        ))
+    for item in event_query.order_by(models.EventoAgenda.fecha_inicio.desc()).all():
+        result.append({"tipo": "EVENTO", "id": item.id, "titulo": f"Evento - {item.titulo}", "href": f"/gestion-procesos/abogado/procesos/{process.id}/agenda#evento-{item.id}"})
     participants = [item.usuario for item in conversation.participantes if item.usuario]
     documents = db.query(models.DocumentoProceso).filter_by(proceso_id=process.id).order_by(
         models.DocumentoProceso.created_at.desc(), models.DocumentoProceso.id.desc(),
-    ).limit(300).all()
+    ).all()
     for document in documents:
         if not participants or not all(_document_visible_to_user(db, document, process, participant) for participant in participants):
             continue
-        title = document.solicitud.titulo if document.solicitud else document.nombre_archivo
-        display_title = f"Documento - {title} - {document.nombre_archivo}" if document.solicitud else f"Documento - {title}"
-        result.append({"tipo": "DOCUMENTO", "id": document.id, "titulo": display_title,
+        request = document.solicitud
+        requested_name = None
+        if request:
+            requested_items = request.documentos_requeridos or []
+            requested_name = next((
+                str(item.get("nombre")) for item in requested_items
+                if str(item.get("id") or "legacy") == str(document.solicitud_item_id)
+            ), None)
+            if not requested_name and len(requested_items) == 1:
+                requested_name = str(requested_items[0].get("nombre") or request.titulo)
+            requested_name = requested_name or request.titulo
+        if requested_name:
+            title = requested_name
+        elif document.contrato_id is not None:
+            title = "Contrato firmado"
+        else:
+            title = "Documento del proceso"
+        result.append({"tipo": "DOCUMENTO", "id": document.id,
+                       "titulo": title,
+                       "grupo": request.titulo if request else ("Contratos" if document.contrato_id is not None else "Otros documentos del proceso"),
+                       "request_id": request.id if request else None,
                        "href": f"/gestion-procesos/abogado/documentos?proceso={process.id}#documento-{document.id}"})
     return result
 
@@ -439,17 +1034,103 @@ def enviar_mensaje(conversation_id: int, data: schemas.ChatMensajeCreate, db: Se
     db.commit()
     db.refresh(message)
     process = conversation.proceso
-    link = f"{public_site_url()}{_display_conversation(db, conversation, next(item.usuario for item in conversation.participantes if item.usuario_id != user.id))[ 'href' ]}"
-    for recipient in [item.usuario for item in conversation.participantes if item.usuario and item.usuario_id != user.id and item.usuario.estado == models.EstadoUsuario.ACTIVO]:
-        staff_sender = _role(user) != "CLIENTE"
-        template = "COMUNICACION_ABOGADO_CLIENTE" if staff_sender else "COMUNICACION_CLIENTE_ABOGADO"
-        process_name = process.nombre if process else "Conversación del despacho"
-        emitir_notificacion_workflow(
-            db, recipient, "RESUMENES", f"CHAT:{message.id}:{recipient.id}",
-            f"Nuevo mensaje de {user.nombre_completo}",
-            f"{user.nombre_completo}: {content}", emisor=user, plantilla_clave=template,
-            variables={"nombre": recipient.nombre_completo, "actor": user.nombre_completo,
-                       "proceso": process_name, "asunto": "Nuevo mensaje", "fecha": format_colombia_datetime(message.created_at),
-                       "mensaje": content}, enlace_texto="Abrir conversación", enlace_url=link,
-        )
+    recipients = [item.usuario for item in conversation.participantes if item.usuario and item.usuario_id != user.id and item.usuario.estado == models.EstadoUsuario.ACTIVO]
+    now = datetime.utcnow()
+    db.query(models.ChatPresenciaPanel).filter(models.ChatPresenciaPanel.last_seen_at < now - PANEL_PRESENCE_TTL).delete(synchronize_session=False)
+    for recipient in recipients:
+        display = _display_conversation(db, conversation, recipient)
+        link = user_portal_url(recipient, display["href"])
+        process_name = process.nombre if process else "Conversacion del despacho"
+        push_enabled = db.query(models.ChatPushSubscription.id).filter_by(usuario_id=recipient.id).first() is not None
+        if not push_enabled:
+            logger.info(
+                "Push no enviada para el mensaje %s al usuario %s: no tiene suscripciones registradas.",
+                message.id, recipient.id,
+            )
+        sender_type = "Cliente" if _role(user) == "CLIENTE" else "Abogado"
+        push_delivered = _send_chat_push(
+            db, recipient, user, link,
+            title=f"Nuevo mensaje de tu {sender_type} - {user.nombre_completo}.",
+            body=content,
+            tag=f"chat-message-{message.id}",
+            ack=_ack_entrega_push(recipient.id, message.id),
+        ) if push_enabled else False
+        if not (_supports_firm_panel_presence(user) and _supports_firm_panel_presence(recipient)):
+            staff_sender = _role(user) != "CLIENTE"
+            template = "COMUNICACION_ABOGADO_CLIENTE" if staff_sender else "COMUNICACION_CLIENTE_ABOGADO"
+            whatsapp_enabled = "WHATSAPP" in canales_habilitados(recipient, "RESUMENES", emisor=user, db=db)
+            if not push_delivered or whatsapp_enabled:
+                emitir_notificacion_workflow(
+                    db, recipient, "RESUMENES", f"CHAT:{message.id}:{recipient.id}",
+                    f"Nuevo mensaje de {user.nombre_completo}", f"{user.nombre_completo}: {content}",
+                    emisor=user, plantilla_clave=template,
+                    variables={"nombre": recipient.nombre_completo, "actor": user.nombre_completo,
+                               "proceso": process_name, "asunto": "Nuevo mensaje", "mensaje": content},
+                    enlace_texto="Abrir conversacion", enlace_url=link,
+                    excluir_canales=("EMAIL",) if push_delivered else (),
+                )
+            continue
+
+        is_panel_active = db.query(models.ChatPresenciaPanel.id).filter(
+            models.ChatPresenciaPanel.usuario_id == recipient.id,
+            models.ChatPresenciaPanel.last_seen_at >= now - PANEL_PRESENCE_TTL,
+        ).first() is not None
+        # Push is sent for every message, whether the recipient is online or offline.
+        # Presence only suppresses the grouped email/WhatsApp workflow notices.
+        if is_panel_active:
+            continue
+
+        whatsapp_enabled = "WHATSAPP" in canales_habilitados(recipient, "RESUMENES", emisor=user, db=db)
+        should_send_workflow = not push_delivered or whatsapp_enabled
+        if not should_send_workflow:
+            continue
+
+        db.query(models.Usuario.id).filter_by(id=recipient.id).with_for_update().first()
+        notice = db.query(models.ChatAvisoDestinatario).filter_by(
+            remitente_id=user.id, destinatario_id=recipient.id,
+        ).with_for_update().first()
+        previous_notice_at = notice.ultima_notificacion_en if notice else None
+        if previous_notice_at and now - previous_notice_at < CHAT_NOTIFICATION_COOLDOWN:
+            db.rollback()
+            continue
+
+        template_exists = db.query(models.PlantillaMensaje.id).filter_by(clave="CHAT_MENSAJE", activo=True).first()
+        if should_send_workflow and not template_exists:
+            db.rollback()
+            logger.warning("Falta configurar la plantilla CHAT_MENSAJE; se omite el aviso externo del chat.")
+            continue
+
+        if notice is None:
+            notice = models.ChatAvisoDestinatario(remitente_id=user.id, destinatario_id=recipient.id, ultima_notificacion_en=now)
+            db.add(notice)
+        else:
+            notice.ultima_notificacion_en = now
+        db.commit()
+
+        try:
+            delivery_ids = emitir_notificacion_workflow(
+                db, recipient, "RESUMENES", f"CHAT_AVISO:{user.id}:{recipient.id}:{int(now.timestamp())}",
+                f"Nuevos mensajes de {user.nombre_completo}",
+                f"{user.nombre_completo} te esta enviando mensajes.",
+                emisor=user, plantilla_clave="CHAT_MENSAJE",
+                variables={"nombre": recipient.nombre_completo, "actor": user.nombre_completo},
+                enlace_texto="Abrir chat", enlace_url=link,
+                excluir_canales=("EMAIL",) if push_delivered else (),
+            ) if should_send_workflow else []
+        except Exception:
+            db.rollback()
+            logger.exception("No se pudo preparar la notificacion agrupada del chat.")
+            delivery_ids = []
+
+        if not delivery_ids and not push_delivered:
+            db.query(models.Usuario.id).filter_by(id=recipient.id).with_for_update().first()
+            current_notice = db.query(models.ChatAvisoDestinatario).filter_by(
+                remitente_id=user.id, destinatario_id=recipient.id,
+            ).with_for_update().first()
+            if current_notice:
+                if previous_notice_at is None:
+                    db.delete(current_notice)
+                else:
+                    current_notice.ultima_notificacion_en = previous_notice_at
+                db.commit()
     return {"id": message.id, "mensaje": "Mensaje enviado."}

@@ -4,17 +4,24 @@ import { apiRequest } from "@/lib/api";
 import Image from "next/image";
 import Link from "next/link";
 import { useSession } from "@/context/SessionContext";
+import { PageHeader } from "@/components/ui/PageHeader";
+import { Badge, type StatusTone } from "@/components/ui/Badge";
+import { DataTable, type DataTableColumn, type RowAction } from "@/components/ui/DataTable";
+import { Drawer } from "@/components/ui/Drawer";
+import { SegmentedControl } from "@/components/ui/SegmentedControl";
+import { SummaryStrip } from "@/components/ui/SummaryStrip";
+import { formatDate, formatDateTime, reviewStatusLabel, toDate } from "@/lib/labels";
+import { Button } from "@/components/ui/Button";
 
-import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
+import { FormEvent, useCallback, useEffect, useState } from "react";
 import {
   AlertCircle,
   CheckCircle2,
+  Download,
+  Eye,
   FileText,
-  Loader2,
+  FolderOpen,
   Plus,
-  RefreshCw,
-  Search,
-  Upload,
   X,
 } from "lucide-react";
 
@@ -35,6 +42,7 @@ type Document = {
   id: number;
   proceso_id: number;
   solicitud_id: number | null;
+  solicitud_item_id?: string | null;
   contrato_id?: number | null;
   proceso: string;
   cliente: string;
@@ -55,6 +63,42 @@ type Client = {
   nombre_completo: string;
 };
 
+const REQUEST_STATUS: Record<string, string> = {
+  FALTAN_DOCUMENTOS: "Faltan documentos",
+  DOCUMENTOS_SUMINISTRADOS: "Documentos entregados",
+  EN_REVISION: "En revisión",
+  RECHAZADO: "Rechazada",
+  APROBADO: "Aprobada",
+  VENCIDO: "Vencida",
+};
+
+function requestStatusLabel(status: string) {
+  return REQUEST_STATUS[status] ?? status.replaceAll("_", " ");
+}
+
+function requestTone(status: string): StatusTone {
+  if (status === "APROBADO") return "completed";
+  if (status === "RECHAZADO" || status === "VENCIDO") return "risk";
+  if (status === "EN_REVISION" || status === "DOCUMENTOS_SUMINISTRADOS") return "review";
+  return "pending";
+}
+
+function fileKind(mime: string) {
+  if (mime === "application/pdf") return "PDF";
+  if (mime.startsWith("image/")) return "Imagen";
+  if (mime.includes("word")) return "Word";
+  if (mime.includes("sheet") || mime.includes("excel")) return "Excel";
+  return mime.split("/").pop()?.toUpperCase() || "Archivo";
+}
+
+function requestedDocumentName(document: Document, requests: Request[]) {
+  if (!document.solicitud_id) return null;
+  const request = requests.find((item) => item.id === document.solicitud_id);
+  if (!request) return null;
+  return request.documentos_requeridos.find((item) => item.id === document.solicitud_item_id)?.nombre
+    || (request.documentos_requeridos.length === 1 ? request.documentos_requeridos[0].nombre : request.titulo);
+}
+
 export default function DocumentosPage() {
   const { user } = useSession();
   const [data, setData] = useState<{
@@ -68,13 +112,14 @@ export default function DocumentosPage() {
   const [processes, setProcesses] = useState<Process[]>([]);
   const [clients, setClients] = useState<Client[]>([]);
 
-  const [query, setQuery] = useState("");
   const [filtroEstado, setFiltroEstado] = useState("TODAS");
-  const [filtroEstadoArchivo, setFiltroEstadoArchivo] = useState("TODOS");
+  const [fileFilter, setFileFilter] = useState<string | null>("POR_REVISAR");
+  const [tab, setTab] = useState<"archivos" | "solicitudes" | "contratos">("archivos");
+  const [requestDetailId, setRequestDetailId] = useState<number | null>(null);
   const [selectedProcessId, setSelectedProcessId] = useState<number | null>(null);
 
   const [loading, setLoading] = useState(true);
-  const [actualizando, setActualizando] = useState(false);
+  const [, setActualizando] = useState(false);
 
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
@@ -189,12 +234,6 @@ export default function DocumentosPage() {
     return () => window.clearTimeout(timer);
   }, [loading, processes]);
 
-  useEffect(() => {
-    if (selectedProcessId === null || loading || !window.location.hash) return;
-    const timer = window.setTimeout(() => document.getElementById(decodeURIComponent(window.location.hash.slice(1)))?.scrollIntoView({ behavior: "smooth", block: "center" }), 80);
-    return () => window.clearTimeout(timer);
-  }, [selectedProcessId, loading, data]);
-
   useEffect(() => () => {
     if (archivoPreview) URL.revokeObjectURL(archivoPreview);
   }, [archivoPreview]);
@@ -257,596 +296,300 @@ export default function DocumentosPage() {
     } finally { setGuardandoRevision(false); }
   };
 
-  const solicitudesFiltradas = useMemo(() => {
-    const text = query.toLowerCase().trim();
+  useEffect(() => {
+    if (loading || !window.location.hash) return;
+    const target = decodeURIComponent(window.location.hash.slice(1));
+    const timer = window.setTimeout(() => {
+      const [kind, rawId] = target.split("-");
+      const id = Number(rawId);
+      if (kind === "solicitud" && data.solicitudes.some((item) => item.id === id)) {
+        setTab("solicitudes");
+        setRequestDetailId(id);
+      } else if (kind === "documento") {
+        const document = data.documentos.find((item) => item.id === id);
+        if (document) {
+          setTab(document.contrato_id ? "contratos" : "archivos");
+          setFileFilter(null);
+          void abrirDocumento(document);
+        }
+      }
+      window.history.replaceState(null, "", window.location.pathname + window.location.search);
+    }, 0);
+    return () => window.clearTimeout(timer);
+    // Solo al terminar la primera carga.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loading]);
 
-    return data.solicitudes.filter((item) => {
-      if (selectedProcessId !== null && item.proceso_id !== selectedProcessId) return false;
-      const matchesSearch =
-        !text ||
-        `${item.titulo} ${item.proceso} ${item.cliente} ${
-          item.instrucciones || ""
-        }`
-          .toLowerCase()
-          .includes(text);
+  const reviewState = (item: Document) => item.estado_revision || "RECIBIDO";
+  const toReview = (item: Document) => ["RECIBIDO", "EN_REVISION"].includes(reviewState(item));
+  const inProcess = <T extends { proceso_id: number }>(item: T) => selectedProcessId === null || item.proceso_id === selectedProcessId;
+  const files = data.documentos.filter((item) => !item.contrato_id && inProcess(item));
+  const visibleFiles = files.filter((item) =>
+    !fileFilter ||
+    (fileFilter === "POR_REVISAR" && toReview(item)) ||
+    reviewState(item) === fileFilter,
+  );
+  const requests = data.solicitudes.filter(inProcess);
+  const pendingRequest = (item: Request) => ["FALTAN_DOCUMENTOS", "RECHAZADO"].includes(item.estado);
+  const visibleRequests = requests.filter((item) =>
+    filtroEstado === "TODAS" ||
+    (filtroEstado === "PENDIENTES" && pendingRequest(item)) ||
+    (filtroEstado === "ENTREGADAS" && !pendingRequest(item)),
+  );
+  const contracts = data.documentos.filter((item) => Boolean(item.contrato_id) && inProcess(item));
+  const activeRequest = data.solicitudes.find((item) => item.id === requestDetailId) ?? null;
 
-      const matchesStatus =
-        filtroEstado === "TODAS" ||
-        (filtroEstado === "PENDIENTES" && ["FALTAN_DOCUMENTOS", "RECHAZADO"].includes(item.estado)) ||
-        (filtroEstado === "ENTREGADAS" && !["FALTAN_DOCUMENTOS", "RECHAZADO"].includes(item.estado));
+  const fileColumns: DataTableColumn<Document>[] = [
+    {
+      key: "nombre",
+      header: "Documento",
+      mobile: "title",
+      sortValue: (item) => requestedDocumentName(item, data.solicitudes) || item.nombre_archivo,
+      searchValue: (item) => `${requestedDocumentName(item, data.solicitudes) ?? ""} ${item.nombre_archivo}`,
+      render: (item) => {
+        const requiredName = requestedDocumentName(item, data.solicitudes);
+        return (
+          <span className="flex min-w-0 items-center gap-2.5">
+            <FileText aria-hidden="true" className="hidden size-4 shrink-0 text-primary md:block" />
+            <span className="min-w-0">
+              <span className="block truncate font-medium text-foreground">{requiredName || item.nombre_archivo}</span>
+              {requiredName && <span className="block truncate text-xs font-normal text-foreground-muted">{item.nombre_archivo}</span>}
+            </span>
+          </span>
+        );
+      },
+      className: "max-w-xs",
+    },
+    { key: "estado", header: "Revisión", mobile: "badge", sortValue: (item) => reviewStatusLabel(reviewState(item)).label, render: (item) => <Badge tone={reviewStatusLabel(reviewState(item)).tone}>{reviewStatusLabel(reviewState(item)).label}</Badge> },
+    { key: "cliente", header: "Cliente", mobile: "subtitle", sortValue: (item) => item.cliente, render: (item) => item.cliente },
+    { key: "proceso", header: "Proceso", mobile: "meta", sortValue: (item) => item.proceso, render: (item) => <span className="block max-w-56 truncate">{item.proceso}</span> },
+    { key: "tipo", header: "Tipo", mobile: "hidden", wideOnly: true, sortValue: (item) => fileKind(item.mime_type), render: (item) => fileKind(item.mime_type) },
+    { key: "created_at", header: "Recibido", mobile: "meta", className: "whitespace-nowrap", sortValue: (item) => toDate(item.created_at), exportValue: (item) => formatDateTime(item.created_at), render: (item) => formatDate(item.created_at) },
+  ];
 
-      return matchesSearch && matchesStatus;
-    });
-  }, [data.solicitudes, query, filtroEstado, selectedProcessId]);
+  const fileActions: RowAction<Document>[] = [
+    { label: "Vista previa y revisar", icon: <Eye />, onSelect: (item) => abrirDocumento(item), disabled: () => documentAction !== null },
+    { label: "Descargar", icon: <Download />, onSelect: (item) => descargarDocumento(item), disabled: () => documentAction !== null },
+    { label: "Ir al proceso", icon: <FolderOpen />, href: (item) => `/gestion-procesos/abogado/procesos/${item.proceso_id}`, separated: true },
+  ];
 
-  const documentosVisibles = useMemo(() => {
-    const text = query.toLowerCase().trim();
+  const requestColumns: DataTableColumn<Request>[] = [
+    { key: "titulo", header: "Solicitud", mobile: "title", sortValue: (item) => item.titulo, searchValue: (item) => `${item.titulo} ${item.instrucciones ?? ""} ${item.documentos_requeridos.map((doc) => doc.nombre).join(" ")}`, render: (item) => <span className="font-medium text-foreground">{item.titulo}</span> },
+    { key: "estado", header: "Estado", mobile: "badge", sortValue: (item) => item.estado, render: (item) => <Badge tone={requestTone(item.estado)}>{requestStatusLabel(item.estado)}</Badge> },
+    { key: "cliente", header: "Cliente", mobile: "subtitle", sortValue: (item) => item.cliente, render: (item) => item.cliente },
+    { key: "proceso", header: "Proceso", mobile: "meta", sortValue: (item) => item.proceso, render: (item) => <span className="block max-w-56 truncate">{item.proceso}</span> },
+    {
+      key: "recibidos",
+      header: "Recibidos",
+      mobile: "meta",
+      align: "right",
+      sortValue: (item) => item.documentos_requeridos.filter((doc) => doc.documento).length / Math.max(1, item.documentos_requeridos.length),
+      exportValue: (item) => `${item.documentos_requeridos.filter((doc) => doc.documento).length}/${item.documentos_requeridos.length}`,
+      render: (item) => <span className="tabular-nums">{item.documentos_requeridos.filter((doc) => doc.documento).length}/{item.documentos_requeridos.length}</span>,
+    },
+  ];
 
-    return data.documentos.filter((item) => {
-      if (selectedProcessId !== null && item.proceso_id !== selectedProcessId) return false;
-      return (
-        !text ||
-        `${item.nombre_archivo} ${item.proceso} ${item.cliente} ${item.mime_type}`
-          .toLowerCase()
-          .includes(text)
-      );
-    });
-  }, [data.documentos, query, selectedProcessId]);
-  const documentosFiltrados = documentosVisibles.filter((item) => !item.contrato_id
-    && (filtroEstadoArchivo === "TODOS" || (item.estado_revision || "RECIBIDO") === filtroEstadoArchivo));
-  const contratosCargados = documentosVisibles.filter((item) => Boolean(item.contrato_id));
+  const contractColumns: DataTableColumn<Document>[] = [
+    { key: "nombre_archivo", header: "Archivo", mobile: "title", sortValue: (item) => item.nombre_archivo, render: (item) => <span className="font-medium text-foreground">{item.nombre_archivo}</span> },
+    { key: "contrato", header: "Contrato", mobile: "badge", sortValue: (item) => item.contrato_id, render: (item) => <Badge tone="review">Contrato #{item.contrato_id}</Badge> },
+    { key: "cliente", header: "Cliente", mobile: "subtitle", sortValue: (item) => item.cliente, render: (item) => item.cliente },
+    { key: "proceso", header: "Proceso", mobile: "meta", sortValue: (item) => item.proceso, render: (item) => item.proceso },
+    { key: "created_at", header: "Cargado", mobile: "meta", sortValue: (item) => toDate(item.created_at), render: (item) => formatDate(item.created_at) },
+  ];
 
-  const carpetasFiltradas = useMemo(() => {
-    const text = query.toLowerCase().trim();
-    if (!text) return processes;
-    return processes.filter((process) => process.nombre.toLowerCase().includes(text)
-      || data.solicitudes.some((item) => item.proceso_id === process.id && `${item.titulo} ${item.cliente} ${item.instrucciones || ""}`.toLowerCase().includes(text))
-      || data.documentos.some((item) => item.proceso_id === process.id && `${item.nombre_archivo} ${item.cliente} ${item.mime_type}`.toLowerCase().includes(text)));
-  }, [processes, data.solicitudes, data.documentos, query]);
-
-  const pendientes = data.solicitudes.filter(
-    (item) => !item.atendida_en,
-  ).length;
-
-  const entregadas = data.solicitudes.filter(
-    (item) => !!item.atendida_en,
-  ).length;
-
-  if (loading) {
-    return (
-      <div
-        className="flex min-h-[60vh] items-center justify-center"
-        style={{ color: "var(--foreground-muted)" }}
-      >
-        Cargando documentos...
-      </div>
-    );
-  }
+  const processFilter = (
+    <select
+      aria-label="Filtrar por proceso"
+      value={selectedProcessId ?? ""}
+      onChange={(event) => setSelectedProcessId(event.target.value ? Number(event.target.value) : null)}
+      className="h-10 max-w-full rounded-[var(--radius-md)] border border-border bg-background px-3 text-sm text-foreground sm:max-w-64"
+    >
+      <option value="">Todos los procesos</option>
+      {processes.map((process) => <option key={process.id} value={process.id}>{process.nombre}</option>)}
+    </select>
+  );
 
   return (
-    <div
-      className="space-y-5"
-      style={{ color: "var(--foreground)" }}
-    >
-      {/* ENCABEZADO */}
-      <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-        <div>
-          <div className="flex items-center gap-2">
-            <FileText
-              size={24}
-              style={{ color: "var(--primary)" }}
-            />
-            <h1 className="text-2xl font-semibold">
-              Documentos
-            </h1>
-          </div>
+    <div className="mx-auto max-w-7xl space-y-5">
+      <PageHeader
+        overline="Expedientes"
+        title="Documentos"
+        description="Revisa los archivos que envían tus clientes y haz seguimiento a lo que les has solicitado."
+        action={<Button variant="primary" onClick={() => setMostrarModal(true)} icon={<Plus className="size-4" />}>Solicitar documentos</Button>}
+      />
 
-          <p
-            className="mt-1 text-sm"
-            style={{ color: "var(--foreground-muted)" }}
-          >
-            Solicita documentos a tus clientes y consulta los
-            archivos entregados.
-          </p>
-        </div>
-
-        <button
-          onClick={() => setMostrarModal(true)}
-          className="flex items-center justify-center gap-2 rounded-lg px-4 py-2.5 text-sm font-medium transition"
-          style={{
-            background: "var(--primary)",
-            color: "var(--primary-foreground)",
-          }}
-        >
-          <Plus size={17} />
-          Solicitar documento
-        </button>
-      </div>
-
-      {/* BARRA DE HERRAMIENTAS */}
-      <div
-        className="rounded-xl border"
-        style={{
-          background: "var(--surface)",
-          borderColor: "var(--border)",
-          boxShadow: "var(--shadow-sm)",
+      <SummaryStrip
+        active={tab === "archivos" ? fileFilter : tab === "solicitudes" && filtroEstado === "PENDIENTES" ? "SOLICITUDES" : null}
+        onSelect={(key) => {
+          if (key === "SOLICITUDES") { setTab("solicitudes"); setFiltroEstado("PENDIENTES"); return; }
+          setTab("archivos");
+          setFileFilter(key);
         }}
-      >
-        <div className="flex flex-col gap-3 p-3 sm:flex-row sm:items-center">
-          <div className="relative flex-1">
-            <Search
-              size={16}
-              className="absolute left-3 top-1/2 -translate-y-1/2"
-              style={{
-                color: "var(--foreground-muted)",
-              }}
-            />
+        items={[
+          { key: "POR_REVISAR", label: "Por revisar", value: files.filter(toReview).length, tone: "warning" },
+          { key: "REQUIERE_CORRECCION", label: "Requieren corrección", value: files.filter((item) => reviewState(item) === "REQUIERE_CORRECCION").length, tone: "danger" },
+          { key: "SOLICITUDES", label: "Solicitudes pendientes", value: requests.filter(pendingRequest).length },
+          { key: "APROBADO", label: "Aprobados", value: files.filter((item) => reviewState(item) === "APROBADO").length, tone: "success" },
+        ]}
+      />
 
-            <input
-              value={query}
-              onChange={(event) =>
-                setQuery(event.target.value)
-              }
-              placeholder="Buscar proceso, cliente o documento..."
-              className="w-full rounded-lg border py-2.5 pl-9 pr-3 text-sm outline-none"
-              style={{
-                background: "var(--surface-muted)",
-                borderColor: "var(--border)",
-                color: "var(--foreground)",
-              }}
-            />
-          </div>
-
-          <select
-            value={filtroEstado}
-            onChange={(event) =>
-              setFiltroEstado(event.target.value)
-            }
-            className="rounded-lg border px-3 py-2.5 text-sm outline-none"
-            style={{
-              background: "var(--surface-muted)",
-              borderColor: "var(--border)",
-              color: "var(--foreground)",
-            }}
-          >
-            <option value="TODAS">Todas las solicitudes</option>
-            <option value="PENDIENTES">Pendientes</option>
-            <option value="ENTREGADAS">Entregadas</option>
-          </select>
-
-          <select value={filtroEstadoArchivo} onChange={(event) => setFiltroEstadoArchivo(event.target.value)} aria-label="Filtrar archivos por estado" className="rounded-lg border px-3 py-2.5 text-sm outline-none" style={{ background: "var(--surface-muted)", borderColor: "var(--border)", color: "var(--foreground)" }}>
-            <option value="TODOS">Todos los estados de archivo</option>
-            <option value="RECIBIDO">Recibidos</option>
-            <option value="EN_REVISION">En revisión</option>
-            <option value="APROBADO">Aprobados</option>
-            <option value="REQUIERE_CORRECCION">Requieren corrección</option>
-            <option value="RECHAZADO">Rechazados</option>
-          </select>
-
-          <button
-            onClick={() => void load()}
-            disabled={actualizando}
-            className="flex items-center justify-center gap-2 rounded-lg px-3 py-2.5 text-sm transition disabled:opacity-50"
-            style={{
-              color: "var(--foreground-secondary)",
-            }}
-          >
-            <RefreshCw
-              size={16}
-              className={actualizando ? "animate-spin" : ""}
-            />
-            Actualizar
-          </button>
-        </div>
-      </div>
-
-      {/* RESUMEN */}
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-        <ResumenCard
-          label="Solicitudes"
-          value={data.solicitudes.length}
-        />
-
-        <ResumenCard
-          label="Pendientes"
-          value={pendientes}
-          danger={pendientes > 0}
-        />
-
-        <ResumenCard
-          label="Entregadas"
-          value={entregadas}
-          success
-        />
-
-        <ResumenCard
-          label="Archivos"
-          value={data.documentos.length}
-        />
-      </div>
-
-      {/* MENSAJES */}
       {error && (
-        <div
-          className="flex items-center justify-between rounded-lg border px-4 py-3 text-sm"
-          style={{
-            background: "var(--danger-light)",
-            borderColor: "var(--danger)",
-            color: "var(--danger)",
-          }}
-        >
-          <div className="flex items-center gap-2">
-            <AlertCircle size={17} />
-            <span>{error}</span>
-          </div>
-
-          <button
-            onClick={() => setError("")}
-            aria-label="Cerrar error"
-          >
-            <X size={17} />
-          </button>
+        <div role="alert" className="flex items-center justify-between gap-3 rounded-[var(--radius-lg)] border border-danger/30 bg-danger-light px-4 py-3 text-sm text-danger">
+          <span className="flex items-center gap-2"><AlertCircle aria-hidden="true" className="size-4 shrink-0" />{error}</span>
+          <button type="button" onClick={() => setError("")} aria-label="Cerrar error"><X className="size-4" /></button>
         </div>
       )}
-
       {notice && (
-        <div
-          className="flex items-center justify-between rounded-lg border px-4 py-3 text-sm"
-          style={{
-            background: "var(--success-light)",
-            borderColor: "var(--success)",
-            color: "var(--success)",
-          }}
-        >
-          <div className="flex items-center gap-2">
-            <CheckCircle2 size={17} />
-            <span>{notice}</span>
-          </div>
-
-          <button
-            onClick={() => setNotice("")}
-            aria-label="Cerrar notificación"
-          >
-            <X size={17} />
-          </button>
+        <div role="status" className="flex items-center justify-between gap-3 rounded-[var(--radius-lg)] border border-success/30 bg-success-light px-4 py-3 text-sm text-success">
+          <span className="flex items-center gap-2"><CheckCircle2 aria-hidden="true" className="size-4 shrink-0" />{notice}</span>
+          <button type="button" onClick={() => setNotice("")} aria-label="Cerrar aviso"><X className="size-4" /></button>
         </div>
       )}
 
-      {selectedProcessId === null ? (
-        <section className="space-y-3">
-          <div><h2 className="text-lg font-semibold">Carpetas por proceso</h2><p className="text-sm" style={{ color: "var(--foreground-muted)" }}>Abre una carpeta para ver solicitudes y archivos; los filtros se aplican dentro de cada proceso.</p></div>
-          {carpetasFiltradas.length ? <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">{carpetasFiltradas.map((process) => {
-            const requests = data.solicitudes.filter((item) => item.proceso_id === process.id);
-            const documents = data.documentos.filter((item) => item.proceso_id === process.id);
-            return <button type="button" key={process.id} onClick={() => setSelectedProcessId(process.id)} className="rounded-xl border p-4 text-left transition hover:border-primary hover:bg-surface-hover" style={{ borderColor: "var(--border)", background: "var(--surface)" }}><div className="flex items-center gap-3"><div className="grid size-11 place-items-center rounded-lg" style={{ background: "var(--primary-light)", color: "var(--primary)" }}><FileText size={21}/></div><span className="min-w-0"><span className="block truncate font-semibold">{process.nombre}</span><span className="text-xs" style={{ color: "var(--foreground-muted)" }}>Abrir carpeta</span></span></div><div className="mt-4 flex gap-4 border-t pt-3 text-xs" style={{ borderColor: "var(--border)", color: "var(--foreground-muted)" }}><span>{requests.filter((item) => !item.atendida_en).length} solicitudes pendientes</span><span>{documents.length} archivos</span></div></button>;
-          })}</div> : <EmptyState icon={<FileText size={30}/>} title="No hay carpetas de procesos" description="Los documentos aparecerán organizados aquí cuando existan procesos asignados."/>}
-        </section>
-      ) : <>
-      <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border p-4" style={{ borderColor: "var(--border)", background: "var(--surface)" }}><div><button type="button" onClick={() => setSelectedProcessId(null)} className="text-xs font-medium text-primary hover:underline">← Todas las carpetas</button><h2 className="mt-1 text-lg font-semibold">{processes.find((process) => process.id === selectedProcessId)?.nombre || "Proceso"}</h2></div><span className="text-xs" style={{ color: "var(--foreground-muted)" }}>{solicitudesFiltradas.length} solicitudes · {documentosFiltrados.length} archivos visibles</span></div>
-      {/* SOLICITUDES */}
-      <section
-        className="overflow-hidden rounded-xl border"
-        style={{
-          background: "var(--surface)",
-          borderColor: "var(--border)",
-          boxShadow: "var(--shadow-sm)",
-        }}
+      <SegmentedControl
+        label="Sección de documentos"
+        value={tab}
+        onChange={setTab}
+        options={[
+          { value: "archivos", label: "Archivos recibidos", count: files.length },
+          { value: "solicitudes", label: "Solicitudes", count: requests.length },
+          { value: "contratos", label: "Contratos", count: contracts.length },
+        ]}
+      />
+
+      {tab === "archivos" && (
+        <DataTable
+          caption="Archivos recibidos"
+          rows={visibleFiles}
+          columns={fileColumns}
+          rowKey={(item) => item.id}
+          onRowClick={(item) => void abrirDocumento(item)}
+          rowActions={fileActions}
+          rowTone={(item) => (reviewState(item) === "RECIBIDO" ? "warning" : undefined)}
+          searchPlaceholder="Buscar documento, cliente o proceso"
+          initialSort={{ key: "created_at", direction: "desc" }}
+          exportFilename="documentos-recibidos"
+          storageKey="abogado-documentos"
+          loading={loading}
+          onRefresh={() => void load()}
+          activeFilterCount={(selectedProcessId !== null ? 1 : 0) + (fileFilter ? 1 : 0)}
+          toolbar={
+            <>
+              {processFilter}
+              <select aria-label="Filtrar por revisión" value={fileFilter ?? ""} onChange={(event) => setFileFilter(event.target.value || null)} className="h-10 rounded-[var(--radius-md)] border border-border bg-background px-3 text-sm text-foreground">
+                <option value="">Todos los estados</option>
+                <option value="POR_REVISAR">Por revisar</option>
+                <option value="APROBADO">Aprobados</option>
+                <option value="REQUIERE_CORRECCION">Requieren corrección</option>
+                <option value="RECHAZADO">Rechazados</option>
+              </select>
+            </>
+          }
+          emptyTitle={data.documentos.length === 0 ? "Aún no hay archivos" : "Ningún archivo coincide con los filtros"}
+          emptyDescription={data.documentos.length === 0 ? "Cuando tus clientes carguen documentos aparecerán aquí para revisarlos." : undefined}
+        />
+      )}
+
+      {tab === "solicitudes" && (
+        <DataTable
+          caption="Solicitudes de documentos"
+          rows={visibleRequests}
+          columns={requestColumns}
+          rowKey={(item) => item.id}
+          onRowClick={(item) => setRequestDetailId(item.id)}
+          rowActions={[
+            { label: "Ver documentos solicitados", icon: <Eye />, onSelect: (item) => setRequestDetailId(item.id) },
+            { label: "Ir al proceso", icon: <FolderOpen />, href: (item) => `/gestion-procesos/abogado/procesos/${item.proceso_id}` },
+          ]}
+          rowTone={(item) => (pendingRequest(item) ? "warning" : undefined)}
+          searchPlaceholder="Buscar solicitud o documento"
+          exportFilename="solicitudes-documentos"
+          storageKey="abogado-solicitudes"
+          loading={loading}
+          onRefresh={() => void load()}
+          activeFilterCount={(selectedProcessId !== null ? 1 : 0) + (filtroEstado !== "TODAS" ? 1 : 0)}
+          toolbar={
+            <>
+              {processFilter}
+              <select aria-label="Filtrar solicitudes" value={filtroEstado} onChange={(event) => setFiltroEstado(event.target.value)} className="h-10 rounded-[var(--radius-md)] border border-border bg-background px-3 text-sm text-foreground">
+                <option value="TODAS">Todas las solicitudes</option>
+                <option value="PENDIENTES">Pendientes del cliente</option>
+                <option value="ENTREGADAS">Entregadas</option>
+              </select>
+            </>
+          }
+          emptyTitle={data.solicitudes.length === 0 ? "No has solicitado documentos" : "Ninguna solicitud coincide con los filtros"}
+          emptyAction={data.solicitudes.length === 0 ? <Button variant="primary" onClick={() => setMostrarModal(true)} icon={<Plus className="size-4" />}>Solicitar documentos</Button> : undefined}
+        />
+      )}
+
+      {tab === "contratos" && (
+        <DataTable
+          caption="Contratos cargados"
+          rows={contracts}
+          columns={contractColumns}
+          rowKey={(item) => item.id}
+          onRowClick={(item) => void abrirDocumento(item)}
+          rowActions={[
+            { label: "Ver PDF", icon: <Eye />, onSelect: (item) => abrirDocumento(item), disabled: () => documentAction !== null },
+            { label: "Descargar", icon: <Download />, onSelect: (item) => descargarDocumento(item), disabled: () => documentAction !== null },
+          ]}
+          initialSort={{ key: "created_at", direction: "desc" }}
+          loading={loading}
+          toolbar={
+            <>
+              {processFilter}
+              {user?.rol === "ABOGADO_ADMIN" && <Link href="/gestion-procesos/abogado/contratos" className="inline-flex h-10 items-center px-2 text-sm font-medium text-primary hover:underline">Gestionar contratos</Link>}
+            </>
+          }
+          activeFilterCount={selectedProcessId !== null ? 1 : 0}
+          emptyTitle="Sin contratos cargados"
+          emptyDescription="Los PDF firmados de los contratos aparecerán aquí."
+        />
+      )}
+
+      <Drawer
+        open={Boolean(activeRequest)}
+        onClose={() => setRequestDetailId(null)}
+        overline="Solicitud de documentos"
+        title={activeRequest?.titulo ?? ""}
+        subtitle={activeRequest ? `${activeRequest.cliente} · ${activeRequest.proceso}` : undefined}
       >
-        <div
-          className="flex items-center justify-between border-b px-5 py-4"
-          style={{ borderColor: "var(--border)" }}
-        >
-          <div>
-            <h2 className="font-semibold">
-              Solicitudes documentales
-            </h2>
-
-            <p
-              className="mt-1 text-xs"
-              style={{ color: "var(--foreground-muted)" }}
-            >
-              Documentos solicitados a tus clientes.
-            </p>
+        {activeRequest && (
+          <div className="space-y-4">
+            <Badge tone={requestTone(activeRequest.estado)}>{requestStatusLabel(activeRequest.estado)}</Badge>
+            {activeRequest.instrucciones && <p className="whitespace-pre-wrap rounded-[var(--radius-md)] bg-surface-muted p-3 text-sm text-foreground-secondary">{activeRequest.instrucciones}</p>}
+            <ul className="divide-y divide-border rounded-[var(--radius-lg)] border border-border">
+              {activeRequest.documentos_requeridos.map((requested) => (
+                <li key={requested.id} className="flex items-start gap-3 p-3">
+                  <FileText aria-hidden="true" className="mt-0.5 size-4 shrink-0 text-primary" />
+                  <div className="min-w-0 flex-1">
+                    <p className="text-sm font-medium text-foreground">{requested.nombre}</p>
+                    {requested.documento ? (
+                      <p className="mt-0.5 truncate text-xs text-foreground-muted">{requested.documento.nombre_archivo}</p>
+                    ) : (
+                      <p className="mt-0.5 text-xs text-foreground-muted">El cliente aún no lo ha cargado</p>
+                    )}
+                    {requested.documento?.comentario_revision && <p className="mt-1 text-xs text-warning">Observación: {requested.documento.comentario_revision}</p>}
+                  </div>
+                  {requested.documento ? (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const document = data.documentos.find((item) => item.id === requested.documento?.id);
+                        if (document) { setRequestDetailId(null); void abrirDocumento(document); }
+                      }}
+                      className="shrink-0 text-xs font-semibold text-primary hover:underline"
+                    >
+                      {reviewStatusLabel(requested.documento.estado_revision).label} · Revisar
+                    </button>
+                  ) : <Badge tone="pending">Pendiente</Badge>}
+                </li>
+              ))}
+            </ul>
           </div>
-
-          <span
-            className="rounded-full px-2.5 py-1 text-xs font-semibold"
-            style={{
-              background: "var(--surface-muted)",
-              color: "var(--foreground-secondary)",
-            }}
-          >
-            {solicitudesFiltradas.length}
-          </span>
-        </div>
-
-        <div className="overflow-x-auto">
-          <table className="w-full min-w-[760px] text-left text-sm">
-            <thead>
-              <tr
-                className="border-b text-xs font-semibold uppercase tracking-wide"
-                style={{
-                  background: "var(--surface-muted)",
-                  borderColor: "var(--border)",
-                  color: "var(--foreground-muted)",
-                }}
-              >
-        <th className="p-4">Solicitud y documentos</th>
-                <th className="p-4">Proceso</th>
-                <th className="p-4">Cliente</th>
-                <th className="p-4">Estado</th>
-              </tr>
-            </thead>
-
-            <tbody>
-              {solicitudesFiltradas.length === 0 ? (
-                <tr>
-                  <td colSpan={4}>
-                    <EmptyState
-                      icon={<FileText size={30} />}
-                      title="No hay solicitudes"
-                      description={
-                        query || filtroEstado !== "TODAS"
-                          ? "No hay solicitudes que coincidan con los filtros."
-                          : "Todavía no has solicitado documentos a tus clientes."
-                      }
-                    />
-                  </td>
-                </tr>
-              ) : (
-                solicitudesFiltradas.map((item) => (
-                  <tr id={`solicitud-${item.id}`}
-                    key={item.id}
-                    className="border-b transition hover:bg-surface-hover"
-                    style={{
-                      borderColor: "var(--border)",
-                    }}
-                  >
-                    <td className="p-4">
-                      <div className="flex items-start gap-3">
-                        <div
-                          className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-lg"
-                          style={{
-                            background: item.atendida_en
-                              ? "var(--success-light)"
-                              : "var(--warning-light)",
-                            color: item.atendida_en
-                              ? "var(--success)"
-                              : "var(--warning)",
-                          }}
-                        >
-                          <FileText size={17} />
-                        </div>
-
-                        <div className="min-w-0">
-                          <p className="font-medium">
-                            {item.titulo}
-                          </p>
-
-                          <p
-                            className="mt-1 max-w-md text-xs"
-                            style={{
-                              color: "var(--foreground-muted)",
-                            }}
-                          >
-                            {item.instrucciones ||
-                              "Sin instrucciones adicionales."}
-                          </p>
-                          <ul className="mt-2 space-y-1 text-xs">
-                            {item.documentos_requeridos.map((requested) => (
-                              <li key={requested.id}>
-                                <span className="font-medium">{requested.nombre}</span>
-                                <span className="text-foreground-muted"> · {requested.estado.replaceAll("_", " ")}</span>
-                                {requested.documento && <span className="text-foreground-muted"> ({requested.documento.nombre_archivo})</span>}
-                                {requested.documento?.comentario_revision && <span className="block text-amber-700">Observación: {requested.documento.comentario_revision}</span>}
-                              </li>
-                            ))}
-                          </ul>
-                        </div>
-                      </div>
-                    </td>
-
-                    <td className="p-4">
-                      <span
-                        className="text-sm"
-                        style={{
-                          color: "var(--foreground-secondary)",
-                        }}
-                      >
-                        {item.proceso}
-                      </span>
-                    </td>
-
-                    <td className="p-4">
-                      <span className="text-sm">
-                        {item.cliente}
-                      </span>
-                    </td>
-
-                    <td className="p-4">
-                      {item.estado === "APROBADO" ? (
-                        <span
-                          className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold"
-                          style={{
-                            background: "var(--success-light)",
-                            color: "var(--success)",
-                          }}
-                        >
-                          <CheckCircle2 size={13} />
-                          Aprobada
-                        </span>
-                      ) : item.estado === "EN_REVISION" || item.estado === "DOCUMENTOS_SUMINISTRADOS" ? (
-                        <span className="inline-flex rounded-full px-2.5 py-1 text-xs font-semibold" style={{ background: "var(--primary-light)", color: "var(--primary)" }}>{item.estado === "EN_REVISION" ? "En revisión" : "Documentos suministrados"}</span>
-                      ) : item.estado === "RECHAZADO" ? (
-                        <span className="inline-flex rounded-full px-2.5 py-1 text-xs font-semibold" style={{ background: "var(--danger-light)", color: "var(--danger)" }}>Requiere corrección</span>
-                      ) : (
-                        <span
-                          className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold"
-                          style={{
-                            background: "var(--warning-light)",
-                            color: "var(--warning)",
-                          }}
-                        >
-                          <Upload size={13} />
-                          Faltan documentos
-                        </span>
-                      )}
-                    </td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
-      </section>
-
-      {/* ARCHIVOS */}
-      <section
-        className="overflow-hidden rounded-xl border"
-        style={{
-          background: "var(--surface)",
-          borderColor: "var(--border)",
-          boxShadow: "var(--shadow-sm)",
-        }}
-      >
-        <div
-          className="flex items-center justify-between border-b px-5 py-4"
-          style={{ borderColor: "var(--border)" }}
-        >
-          <div>
-            <h2 className="font-semibold">Archivos entregados</h2>
-
-            <p
-              className="mt-1 text-xs"
-              style={{ color: "var(--foreground-muted)" }}
-            >
-              Documentos enviados por tus clientes.
-            </p>
-          </div>
-
-          <span
-            className="rounded-full px-2.5 py-1 text-xs font-semibold"
-            style={{
-              background: "var(--surface-muted)",
-              color: "var(--foreground-secondary)",
-            }}
-          >
-            {documentosFiltrados.length}
-          </span>
-        </div>
-
-        <div className="overflow-x-auto">
-          <table className="w-full min-w-[700px] text-left text-sm">
-            <thead>
-              <tr
-                className="border-b text-xs font-semibold uppercase tracking-wide"
-                style={{
-                  background: "var(--surface-muted)",
-                  borderColor: "var(--border)",
-                  color: "var(--foreground-muted)",
-                }}
-              >
-                <th className="p-4">Archivo</th>
-                <th className="p-4">Proceso</th>
-                <th className="p-4">Cliente</th>
-                <th className="p-4">Tipo</th>
-                <th className="p-4">Fecha</th>
-                <th className="p-4">Revisión</th>
-              </tr>
-            </thead>
-
-            <tbody>
-              {documentosFiltrados.length === 0 ? (
-                <tr>
-                  <td colSpan={6}>
-                    <EmptyState
-                      icon={<FileText size={30} />}
-                      title="No hay archivos entregados"
-                      description={
-                        query
-                          ? "No hay archivos que coincidan con la búsqueda."
-                          : "Los documentos enviados por los clientes aparecerán aquí."
-                      }
-                    />
-                  </td>
-                </tr>
-              ) : (
-                documentosFiltrados.map((item) => (
-                  <tr id={`documento-${item.id}`}
-                    key={item.id}
-                    className="border-b transition hover:bg-surface-hover"
-                    style={{
-                      borderColor: "var(--border)",
-                    }}
-                  >
-                    <td className="p-4">
-                      <div className="flex items-center gap-3">
-                        <div
-                          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg"
-                          style={{
-                            background: "var(--primary-light)",
-                            color: "var(--primary)",
-                          }}
-                        >
-                          <FileText size={17} />
-                        </div>
-
-                        <span className="font-medium">
-                          {item.nombre_archivo}
-                        </span>
-                      </div>
-                    </td>
-
-                    <td className="p-4">
-                      {item.proceso}
-                    </td>
-
-                    <td className="p-4">
-                      {item.cliente}
-                    </td>
-
-                    <td className="p-4">
-                      <span
-                        className="rounded-full px-2.5 py-1 text-xs"
-                        style={{
-                          background: "var(--surface-muted)",
-                          color: "var(--foreground-secondary)",
-                        }}
-                      >
-                        {item.mime_type}
-                      </span>
-                    </td>
-                    <td className="p-4">
-                      <span
-                        className="text-sm"
-                        style={{
-                          color: "var(--foreground-muted)",
-                        }}
-                      >
-                        {formatearFecha(item.created_at)}
-                      </span>
-                    </td>
-                    <td className="p-4">
-                      <div className="flex flex-col items-start gap-2">
-                        <span className="text-xs text-foreground-muted">{(item.estado_revision || "RECIBIDO").replaceAll("_", " ")}</span>
-                        <button type="button" disabled={documentAction !== null} onClick={() => void abrirDocumento(item)} className="inline-flex items-center gap-1.5 rounded-lg border px-3 py-2 text-xs font-medium disabled:opacity-50" style={{ borderColor: "var(--border)", color: "var(--primary)" }}>
-                          {documentAction?.id === item.id && documentAction.type === "view" ? <><Loader2 className="size-3.5 animate-spin" />Abriendo…</> : "Vista previa y revisar"}
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
-      </section>
-      </>}
-
-      <section id="contratos-cargados" className="overflow-hidden rounded-xl border" style={{ background: "var(--surface)", borderColor: "var(--border)", boxShadow: "var(--shadow-sm)" }}>
-        <div className="flex items-center justify-between border-b px-5 py-4" style={{ borderColor: "var(--border)" }}><div><h2 className="font-semibold">Contratos cargados</h2><p className="mt-1 text-xs" style={{ color: "var(--foreground-muted)" }}>PDF firmados y versiones anteriores asociados a los expedientes.</p></div><div className="flex items-center gap-3"><span className="rounded-full px-2.5 py-1 text-xs font-semibold" style={{ background: "var(--surface-muted)", color: "var(--foreground-secondary)" }}>{contratosCargados.length}</span>{user?.rol === "ABOGADO_ADMIN" && <Link href="/gestion-procesos/abogado/contratos" className="text-xs font-semibold text-[var(--primary)] hover:underline">Gestionar todos</Link>}</div></div>
-        {contratosCargados.length ? <div className="divide-y" style={{ borderColor: "var(--border)" }}>{contratosCargados.map((item) => <article id={`documento-${item.id}`} key={item.id} className="flex flex-wrap items-center justify-between gap-3 px-5 py-3"><div className="flex min-w-0 items-center gap-3"><FileText size={18} className="shrink-0" style={{ color: "var(--primary)" }} /><div className="min-w-0"><p className="truncate text-sm font-medium">{item.nombre_archivo}</p><p className="mt-1 truncate text-xs" style={{ color: "var(--foreground-muted)" }}>{item.proceso} · {item.cliente} · Contrato #{item.contrato_id} · {formatearFecha(item.created_at)}</p></div></div><div className="flex gap-2"><button type="button" disabled={documentAction !== null} onClick={() => void abrirDocumento(item)} className="inline-flex items-center gap-1.5 rounded-lg border px-3 py-2 text-xs font-medium disabled:opacity-50" style={{ borderColor: "var(--border)", color: "var(--primary)" }}>{documentAction?.id === item.id && documentAction.type === "view" ? <><Loader2 className="size-3.5 animate-spin" />Abriendo…</> : "Ver PDF"}</button><button type="button" disabled={documentAction !== null} onClick={() => void descargarDocumento(item)} className="inline-flex items-center gap-1.5 rounded-lg border px-3 py-2 text-xs font-medium disabled:opacity-50" style={{ borderColor: "var(--border)" }}>{documentAction?.id === item.id && documentAction.type === "download" ? <><Loader2 className="size-3.5 animate-spin" />Descargando…</> : "Descargar"}</button></div></article>)}</div> : <div className="px-5 py-10 text-center text-sm" style={{ color: "var(--foreground-muted)" }}>Los documentos firmados de contratos aparecerán aquí.</div>}
-      </section>
+        )}
+      </Drawer>
 
       {documentoActivo && archivoPreview && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-3 sm:p-6" role="dialog" aria-modal="true" aria-labelledby="documento-preview-titulo" onMouseDown={(event) => { if (event.target === event.currentTarget) { setDocumentoActivo(null); setArchivoPreview(""); } }}>
@@ -880,86 +623,6 @@ export default function DocumentosPage() {
           onError={(message) => setError(message)}
         />
       )}
-    </div>
-  );
-}
-
-function ResumenCard({
-  label,
-  value,
-  danger,
-  success,
-}: {
-  label: string;
-  value: number;
-  danger?: boolean;
-  success?: boolean;
-}) {
-  return (
-    <div
-      className="rounded-xl border p-4"
-      style={{
-        background: "var(--surface)",
-        borderColor: "var(--border)",
-        boxShadow: "var(--shadow-sm)",
-      }}
-    >
-      <p
-        className="text-xs"
-        style={{
-          color: "var(--foreground-muted)",
-        }}
-      >
-        {label}
-      </p>
-
-      <p
-        className="mt-1 text-2xl font-semibold"
-        style={{
-          color: danger
-            ? "var(--danger)"
-            : success
-              ? "var(--success)"
-              : "var(--foreground)",
-        }}
-      >
-        {value}
-      </p>
-    </div>
-  );
-}
-
-function EmptyState({
-  icon,
-  title,
-  description,
-}: {
-  icon: React.ReactNode;
-  title: string;
-  description: string;
-}) {
-  return (
-    <div className="py-14 text-center">
-      <div
-        className="mx-auto flex h-12 w-12 items-center justify-center rounded-xl"
-        style={{
-          background: "var(--surface-muted)",
-          color: "var(--foreground-muted)",
-        }}
-      >
-        {icon}
-      </div>
-
-      <p className="mt-3 text-sm font-medium">{title}</p>
-
-      <p
-        className="mt-1 text-xs"
-        style={{
-          color: "var(--foreground-muted)",
-        }}
-      >
-        {description}
-      </p>
     </div>
   );
 }
@@ -1084,10 +747,7 @@ function SolicitudDocumentoModal({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-4"
-      style={{
-        background: "rgba(0, 0, 0, 0.5)",
-      }}
+      className="fixed inset-0 z-50 flex items-center justify-center bg-brand-950/40 p-4 backdrop-blur-xs"
       onMouseDown={(event) => {
         if (event.target === event.currentTarget) {
           onClose();
@@ -1096,24 +756,14 @@ function SolicitudDocumentoModal({
     >
       <form
         onSubmit={submit}
-        className="max-h-[90vh] w-full max-w-xl overflow-y-auto rounded-2xl border p-5 sm:p-6"
-        style={{
-          background: "var(--surface)",
-          borderColor: "var(--border)",
-          color: "var(--foreground)",
-          boxShadow: "var(--shadow-lg)",
-        }}
+        className="max-h-[90vh] w-full max-w-xl overflow-y-auto rounded-2xl border border-border bg-surface p-5 sm:p-6 text-foreground shadow-2xl"
       >
         {/* HEADER */}
         <div className="flex items-start justify-between gap-4">
           <div>
             <div className="flex items-center gap-2">
               <div
-                className="flex h-9 w-9 items-center justify-center rounded-lg"
-                style={{
-                  background: "var(--primary-light)",
-                  color: "var(--primary)",
-                }}
+                className="flex size-9 items-center justify-center rounded-lg bg-brand-50 text-brand-700 dark:bg-brand-950 dark:text-brand-300"
               >
                 <FileText size={18} />
               </div>
@@ -1124,10 +774,7 @@ function SolicitudDocumentoModal({
             </div>
 
             <p
-              className="mt-2 text-xs"
-              style={{
-                color: "var(--foreground-muted)",
-              }}
+              className="mt-2 text-xs text-muted"
             >
               Envía una solicitud de documento a un cliente
               asociada a un proceso.
@@ -1137,10 +784,7 @@ function SolicitudDocumentoModal({
           <button
             type="button"
             onClick={onClose}
-            className="rounded-lg p-2"
-            style={{
-              color: "var(--foreground-muted)",
-            }}
+            className="rounded-lg p-2 text-muted hover:bg-surface-secondary hover:text-foreground"
             aria-label="Cerrar"
           >
             <X size={19} />
@@ -1303,46 +947,23 @@ function SolicitudDocumentoModal({
           </div>
 
           {/* ACTIONS */}
-          <div
-            className="flex justify-end gap-2 border-t pt-4"
-            style={{
-              borderColor: "var(--border)",
-            }}
-          >
-            <button
+          <div className="flex justify-end gap-2 border-t border-border pt-4">
+            <Button
               type="button"
+              variant="outline"
               onClick={onClose}
               disabled={saving}
-              className="rounded-lg border px-4 py-2.5 text-sm font-medium"
-              style={{
-                background: "var(--surface)",
-                borderColor: "var(--border)",
-                color: "var(--foreground-secondary)",
-              }}
             >
               Cancelar
-            </button>
+            </Button>
 
-            <button
+            <Button
               type="submit"
-              disabled={saving}
-              className="flex items-center gap-2 rounded-lg px-4 py-2.5 text-sm font-medium disabled:opacity-50"
-              style={{
-                background: "var(--primary)",
-                color: "var(--primary-foreground)",
-              }}
+              variant="primary"
+              loading={saving}
             >
-              {saving && (
-                <RefreshCw
-                  size={15}
-                  className="animate-spin"
-                />
-              )}
-
-              {saving
-                ? "Enviando..."
-                : "Enviar solicitud"}
-            </button>
+              Enviar solicitud
+            </Button>
           </div>
         </div>
       </form>
@@ -1360,18 +981,3 @@ function getAuthHeaders() {
   };
 }
 
-function formatearFecha(fecha?: string) {
-  if (!fecha) return "—";
-
-  const date = new Date(fecha);
-
-  if (Number.isNaN(date.getTime())) {
-    return "—";
-  }
-
-  return date.toLocaleDateString("es-CO", { timeZone: "America/Bogota",
-    day: "2-digit",
-    month: "short",
-    year: "numeric",
-  });
-}

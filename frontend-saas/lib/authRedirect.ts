@@ -1,4 +1,5 @@
-const LOGIN_PATH = "/gestion-procesos/auth/login";
+const LOGIN_PATH = "/login";
+const ADMIN_LOGIN_PATH = "/login";
 
 export function safeInternalRedirect(value: string | null | undefined): string | null {
   if (!value || !value.startsWith("/") || value.startsWith("//") || value.includes("\\")) {
@@ -6,10 +7,10 @@ export function safeInternalRedirect(value: string | null | undefined): string |
   }
   try {
     const url = new URL(value, "https://internal.invalid");
-    if (url.origin !== "https://internal.invalid" || !url.pathname.startsWith("/gestion-procesos/")) {
+    if (url.origin !== "https://internal.invalid") {
       return null;
     }
-    if (url.pathname === LOGIN_PATH || url.pathname.startsWith(`${LOGIN_PATH}/`) || url.pathname.startsWith("/gestion-procesos/auth/cambiar-password")) {
+    if (url.pathname === LOGIN_PATH || url.pathname.startsWith("/gestion-procesos/auth/") || ["/recuperar-password", "/restablecer-password", "/cambiar-password"].includes(url.pathname)) {
       return null;
     }
     return `${url.pathname}${url.search}${url.hash}`;

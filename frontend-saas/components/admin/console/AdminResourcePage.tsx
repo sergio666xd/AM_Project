@@ -1,25 +1,51 @@
 "use client";
 
-import { FormEvent, useEffect, useMemo, useState } from "react";
+import { FormEvent, type ReactNode, useEffect, useMemo, useState } from "react";
+import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
+  Archive,
   ArchiveRestore,
+  CalendarDays,
+  FileText,
+  FolderOpen,
   Copy,
   Download,
   Eye,
   Link2,
-  Loader2,
   Mail,
   Pencil,
   Plus,
   RefreshCw,
-  Search,
   Trash2,
   Users,
   X,
 } from "lucide-react";
 import { useSession } from "@/context/SessionContext";
+import { useNow } from "@/lib/useNow";
 import { API_URL, apiRequest, iniciarWorkflowConsultaRadicado } from "@/lib/api";
+import { PageHeader } from "@/components/ui/PageHeader";
+import { Button } from "@/components/ui/Button";
+import { Badge, type StatusTone } from "@/components/ui/Badge";
+import { DataTable, type BulkAction, type DataTableColumn, type RowAction } from "@/components/ui/DataTable";
+import { Drawer, DetailList } from "@/components/ui/Drawer";
+import { SegmentedControl } from "@/components/ui/SegmentedControl";
+import { SummaryStrip, type SummaryItem } from "@/components/ui/SummaryStrip";
+import {
+  consultaLabel,
+  formatDate,
+  formatDateTime,
+  formatRelative,
+  healthLabel,
+  healthRank,
+  isOverdue,
+  priorityLabel,
+  priorityRank,
+  reviewStatusLabel,
+  taskStatusLabel,
+  toDate,
+  toDateTimeLocalInput,
+} from "@/lib/labels";
 
 type Sector = "FIRMA" | "SAAS" | "GLOBAL";
 type Resource = "procesos" | "radicados" | "tareas" | "documentos";
@@ -155,6 +181,22 @@ async function loadOptions(sector: Sector, token: string) {
   };
 }
 
+function fileKind(mime: string) {
+  if (!mime) return "Archivo";
+  if (mime === "application/pdf") return "PDF";
+  if (mime.startsWith("image/")) return "Imagen";
+  if (mime.includes("word")) return "Word";
+  if (mime.includes("sheet") || mime.includes("excel")) return "Excel";
+  return mime.split("/").pop()?.toUpperCase() || "Archivo";
+}
+
+function requestTone(status: string): StatusTone {
+  if (status === "APROBADO") return "completed";
+  if (status === "RECHAZADO" || status === "VENCIDO") return "risk";
+  if (status === "EN_REVISION" || status === "DOCUMENTOS_SUMINISTRADOS") return "review";
+  return "pending";
+}
+
 function display(value: unknown) {
   if (value === null || value === undefined || value === "") return "—";
   if (Array.isArray(value)) return value.length ? value.join(" · ") : "Ninguna";
@@ -175,9 +217,10 @@ function display(value: unknown) {
 
 export default function AdminResourcePage({ sector }: { sector: Sector }) {
   const pathname = usePathname();
-  const requestsOnly = pathname.endsWith("/documentos/solicitudes");
-  const contractsOnly = pathname.endsWith("/documentos/contratos");
-  const resource = (requestsOnly || contractsOnly ? "documentos" : pathname.split("/").filter(Boolean).pop()) as Resource;
+  const normalizedPath = pathname.replace(/\/+$/, "");
+  const requestsOnly = normalizedPath.endsWith("/documentos/solicitudes");
+  const contractsOnly = normalizedPath.endsWith("/documentos/contratos");
+  const resource = (requestsOnly || contractsOnly ? "documentos" : normalizedPath.split("/").filter(Boolean).pop()) as Resource;
   const validResource =
     typeof resource === "string" && Object.hasOwn(resourceNames, resource);
   const { token } = useSession();
@@ -193,14 +236,14 @@ export default function AdminResourcePage({ sector }: { sector: Sector }) {
     [],
   );
   const [archived, setArchived] = useState(false);
-  const [query, setQuery] = useState("");
+  const [quickFilter, setQuickFilter] = useState<string | null>(null);
+  const now = useNow();
   const [state, setState] = useState("TODOS");
   const [ownerFilter, setOwnerFilter] = useState("TODOS");
   const [processFilter, setProcessFilter] = useState("TODOS");
   const [clientFilter, setClientFilter] = useState("TODOS");
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
-  const [selectedIds, setSelectedIds] = useState<number[]>([]);
   const [detailsRow, setDetailsRow] = useState<Row | null>(null);
   const [taskView, setTaskView] = useState<TaskView>("LISTA");
   const [calendarMonth, setCalendarMonth] = useState(() => new Date().toISOString().slice(0, 7));
@@ -224,7 +267,6 @@ export default function AdminResourcePage({ sector }: { sector: Sector }) {
   } | null>(null);
   const [teamSelection, setTeamSelection] = useState("");
   const [documentRequests, setDocumentRequests] = useState<DocumentRequest[]>([]);
-  const [selectedRequestIds, setSelectedRequestIds] = useState<number[]>([]);
   const [detailRequest, setDetailRequest] = useState<DocumentRequest | null>(null);
 
   async function reload() {
@@ -304,27 +346,19 @@ export default function AdminResourcePage({ sector }: { sector: Sector }) {
         const matchesState =
           state === "TODOS" ||
           String(row.estado ?? row.estado_consulta ?? row.salud ?? "") === state;
-        const matchesQuery =
-          !query ||
-          Object.values(row).some((value) =>
-            String(value ?? "")
-              .toLowerCase()
-              .includes(query.toLowerCase()),
-          );
         const matchesOwner = ownerFilter === "TODOS" || String(row.owner_id ?? row.responsable_id ?? "") === ownerFilter;
         const matchesProcess = processFilter === "TODOS" || String(row.proceso_id ?? "") === processFilter;
         const matchesClient = clientFilter === "TODOS" || String(row.cliente_id ?? "") === clientFilter;
         const rowDate = String(row.fecha_limite ?? row.created_at ?? row.consultado_en ?? "").slice(0, 10);
         const matchesFrom = !dateFrom || (rowDate && rowDate >= dateFrom);
         const matchesTo = !dateTo || (rowDate && rowDate <= dateTo);
-        return matchesState && matchesQuery && matchesOwner && matchesProcess && matchesClient && matchesFrom && matchesTo;
+        return matchesState && matchesOwner && matchesProcess && matchesClient && matchesFrom && matchesTo;
       }),
-    [rows, state, query, ownerFilter, processFilter, clientFilter, dateFrom, dateTo],
+    [rows, state, ownerFilter, processFilter, clientFilter, dateFrom, dateTo],
   );
   const routeFiltered = resource === "documentos"
     ? filtered.filter((row) => contractsOnly === Boolean(row.contrato_id))
     : filtered;
-  const selectedVisibleRows = routeFiltered.filter((row) => selectedIds.includes(row.id));
   const states = [
     ...new Set([
       rows
@@ -333,20 +367,39 @@ export default function AdminResourcePage({ sector }: { sector: Sector }) {
       ...(resource === "documentos" ? documentRequests.map((request) => request.estado) : []),
     ].flat()),
   ];
+  // Versión del filtro rápido para tablero y calendario (solo tareas).
+  function matchesQuickTaskFilter(row: Row) {
+    if (resource !== "tareas" || !quickFilter) return true;
+    const open = row.estado === "PENDIENTE" || row.estado === "EN_CURSO";
+    const due = row.fecha_limite ? Date.parse(String(row.fecha_limite)) : NaN;
+    if (quickFilter === "ABIERTAS") return open;
+    if (quickFilter === "VENCIDAS") return open && due < now;
+    if (quickFilter === "SEMANA") return open && due >= now && due <= now + 7 * 86400000;
+    return row.estado === quickFilter;
+  }
   const tasksByState = ["PENDIENTE", "EN_CURSO", "COMPLETADA", "CANCELADA"].map((status) => ({
     status,
-    rows: routeFiltered.filter((row) => String(row.estado) === status),
+    rows: routeFiltered.filter((row) => String(row.estado) === status && matchesQuickTaskFilter(row)),
   }));
   const [calendarYear, calendarMonthNumber] = calendarMonth.split("-").map(Number);
   const calendarDays = new Date(Date.UTC(calendarYear, calendarMonthNumber, 0)).getUTCDate();
   const calendarOffset = (new Date(Date.UTC(calendarYear, calendarMonthNumber - 1, 1)).getUTCDay() + 6) % 7;
   const tasksByDueDate = new Map<string, Row[]>();
-  for (const row of routeFiltered) {
+  for (const row of routeFiltered.filter(matchesQuickTaskFilter)) {
     const due = typeof row.fecha_limite === "string" ? row.fecha_limite.slice(0, 10) : "";
     if (due.startsWith(calendarMonth)) tasksByDueDate.set(due, [...(tasksByDueDate.get(due) ?? []), row]);
   }
+  const activeFilterCount = [state, ownerFilter, processFilter, clientFilter].filter((value) => value !== "TODOS").length + (dateFrom || dateTo ? 1 : 0);
+  function clearFilters() {
+    setState("TODOS");
+    setOwnerFilter("TODOS");
+    setProcessFilter("TODOS");
+    setClientFilter("TODOS");
+    setDateFrom("");
+    setDateTo("");
+    setQuickFilter(null);
+  }
   const visibleDocumentRequests = documentRequests.filter((request) =>
-    (!query || `${request.titulo} ${request.proceso} ${request.cliente} ${request.documento ?? ""}`.toLowerCase().includes(query.trim().toLowerCase())) &&
     (state === "TODOS" || request.estado === state) &&
     (processFilter === "TODOS" || String(request.proceso_id) === processFilter) &&
     (clientFilter === "TODOS" || String(request.cliente_id) === clientFilter) &&
@@ -374,7 +427,7 @@ export default function AdminResourcePage({ sector }: { sector: Sector }) {
       estado: String(row.estado ?? "PENDIENTE"),
       prioridad: String(row.prioridad ?? "MEDIA"),
       fecha_limite: row.fecha_limite
-        ? new Date(String(row.fecha_limite)).toISOString().slice(0, 16)
+        ? toDateTimeLocalInput(String(row.fecha_limite))
         : "",
       proceso_id: String(row.proceso_id ?? ""),
       radicado_id: String(row.radicado_id ?? ""),
@@ -761,9 +814,8 @@ export default function AdminResourcePage({ sector }: { sector: Sector }) {
     }
   }
 
-  async function runBulkAction(action: "DELETE" | "RESTORE" | "CONSULT") {
+  async function runBulkAction(action: "DELETE" | "RESTORE" | "CONSULT", selectedRows: Row[]) {
     if (!token) return;
-    const selectedRows = selectedVisibleRows;
     if (!selectedRows.length) return;
     if (action === "DELETE" && !window.confirm(`¿Aplicar la acción a ${selectedRows.length} registros seleccionados? Esta operación puede ser irreversible.`)) return;
     setWorking(true);
@@ -788,7 +840,6 @@ export default function AdminResourcePage({ sector }: { sector: Sector }) {
         setNotice(`${succeeded} registro(s) procesados${failed ? `; ${failed} con error` : ""}.`);
         if (failed) setError(outcomes.filter((item): item is PromiseRejectedResult => item.status === "rejected").map((item) => item.reason instanceof Error ? item.reason.message : "Error al procesar registro.").join(" "));
       }
-      setSelectedIds([]);
       await reload();
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "No fue posible completar la acción masiva.");
@@ -797,23 +848,10 @@ export default function AdminResourcePage({ sector }: { sector: Sector }) {
     }
   }
 
-  function exportSelectedRequests() {
-    const selected = visibleDocumentRequests.filter((request) => selectedRequestIds.includes(request.id));
-    if (!selected.length) return;
-    const escapeCsv = (value: string | number | null) => `"${String(value ?? "").replaceAll('"', '""')}"`;
-    const csv = [["Solicitud", "Proceso", "Cliente", "Estado", "Documento", "Solicitado", "Fecha límite"], ...selected.map((request) => [request.titulo, request.proceso, request.cliente, request.estado, request.documento, request.solicitado_en, request.fecha_limite])].map((line) => line.map(escapeCsv).join(",")).join("\r\n");
-    const url = URL.createObjectURL(new Blob([`\uFEFF${csv}`], { type: "text/csv;charset=utf-8" }));
-    const anchor = window.document.createElement("a");
-    anchor.href = url;
-    anchor.download = "solicitudes-documentales.csv";
-    anchor.click();
-    URL.revokeObjectURL(url);
-    setSelectedRequestIds([]);
-  }
 
   if (!validResource)
     return (
-      <p role="alert" className="p-6 text-sm text-red-700">
+      <p role="alert" className="p-6 text-sm text-danger">
         Tipo de recurso no disponible.
       </p>
     );
@@ -823,366 +861,543 @@ export default function AdminResourcePage({ sector }: { sector: Sector }) {
       : sector === "SAAS"
         ? "SaaS individual"
         : "Global";
-  const canCreate = true;
-  const columns: { key: string; label: string }[] =
+  const weekAhead = now + 7 * 24 * 60 * 60 * 1000;
+  const list = (value: unknown) => (Array.isArray(value) ? value.map(String) : []);
+  const text = (value: unknown) => (value === null || value === undefined ? "" : String(value));
+  const processHref = (id: unknown) => `/gestion-procesos/admin/procesos/${id}`;
+  const taskOverdue = (row: Row) => isOverdue(row.fecha_limite, row.estado, now);
+  const taskDueSoon = (row: Row) => {
+    const due = toDate(row.fecha_limite)?.getTime();
+    return Boolean(due && due >= now && due <= weekAhead && row.estado !== "COMPLETADA" && row.estado !== "CANCELADA");
+  };
+
+  const summary: SummaryItem[] =
     resource === "procesos"
       ? [
-          { key: "nombre", label: "Proceso" },
-          { key: "abogado", label: "Responsable" },
-          { key: "ultima_actividad", label: "Última actividad" },
-          { key: "salud", label: "Salud" },
-          { key: "senales_salud", label: "Señales" },
+          { key: "TODOS", label: archived ? "Archivados" : "Procesos activos", value: routeFiltered.length },
+          { key: "RIESGO", label: "En riesgo", value: routeFiltered.filter((row) => row.salud === "RIESGO").length, tone: "danger" },
+          { key: "ATENCION", label: "Requieren atención", value: routeFiltered.filter((row) => row.salud === "ATENCION").length, tone: "warning" },
+          { key: "NORMAL", label: "Al día", value: routeFiltered.filter((row) => row.salud === "NORMAL").length, tone: "success" },
+        ]
+      : resource === "tareas"
+        ? [
+            { key: "ABIERTAS", label: "Abiertas", value: routeFiltered.filter((row) => row.estado === "PENDIENTE" || row.estado === "EN_CURSO").length },
+            { key: "VENCIDAS", label: "Vencidas", value: routeFiltered.filter(taskOverdue).length, tone: "danger" },
+            { key: "SEMANA", label: "Vencen en 7 días", value: routeFiltered.filter(taskDueSoon).length, tone: "warning" },
+            { key: "COMPLETADA", label: "Completadas", value: routeFiltered.filter((row) => row.estado === "COMPLETADA").length, tone: "success" },
+          ]
+        : resource === "radicados"
+          ? [
+              { key: "TODOS", label: "Radicados", value: routeFiltered.length },
+              { key: "ERROR", label: "Con error o no encontrados", value: routeFiltered.filter((row) => ["risk", "attention"].includes(consultaLabel(text(row.estado_consulta)).tone)).length, tone: "danger" },
+              { key: "SIN_CONSULTAR", label: "Sin consultar", value: routeFiltered.filter((row) => consultaLabel(text(row.estado_consulta)).label === "Sin consultar").length, tone: "warning" },
+              { key: "SIN_PROCESO", label: "Sin proceso asociado", value: routeFiltered.filter((row) => list(row.procesos).length === 0).length },
+            ]
+          : [
+              { key: "TODOS", label: contractsOnly ? "Contratos" : "Documentos", value: routeFiltered.length },
+              { key: "RECIBIDO", label: "Por revisar", value: routeFiltered.filter((row) => row.estado_revision === "RECIBIDO").length, tone: "warning" },
+              { key: "REQUIERE_CORRECCION", label: "Requieren corrección", value: routeFiltered.filter((row) => row.estado_revision === "REQUIERE_CORRECCION").length, tone: "danger" },
+              { key: "APROBADO", label: "Aprobados", value: routeFiltered.filter((row) => row.estado_revision === "APROBADO").length, tone: "success" },
+            ];
+
+  const matchesQuickFilter = (row: Row) => {
+    if (!quickFilter || quickFilter === "TODOS") return true;
+    if (resource === "procesos") return row.salud === quickFilter;
+    if (resource === "tareas") {
+      if (quickFilter === "ABIERTAS") return row.estado === "PENDIENTE" || row.estado === "EN_CURSO";
+      if (quickFilter === "VENCIDAS") return taskOverdue(row);
+      if (quickFilter === "SEMANA") return taskDueSoon(row);
+      return row.estado === quickFilter;
+    }
+    if (resource === "radicados") {
+      const tone = consultaLabel(text(row.estado_consulta));
+      if (quickFilter === "ERROR") return tone.tone === "risk" || tone.tone === "attention";
+      if (quickFilter === "SIN_CONSULTAR") return tone.label === "Sin consultar";
+      if (quickFilter === "SIN_PROCESO") return list(row.procesos).length === 0;
+    }
+    return row.estado_revision === quickFilter;
+  };
+  const viewRows = routeFiltered.filter(matchesQuickFilter);
+
+  const stateLabel = (value: string) =>
+    resource === "tareas"
+      ? taskStatusLabel(value).label
+      : resource === "procesos"
+        ? healthLabel(value).label
+        : resource === "radicados"
+          ? consultaLabel(value).label
+          : resource === "documentos" && requestsOnly
+            ? labelDocumentRequestStatus(value)
+            : reviewStatusLabel(value).label;
+
+  const columns: DataTableColumn<Row>[] =
+    resource === "procesos"
+      ? [
+          {
+            key: "nombre",
+            header: "Proceso",
+            mobile: "title",
+            sortValue: (row) => text(row.nombre),
+            searchValue: (row) => [row.nombre, row.descripcion, ...list(row.radicados_numeros), ...list(row.clientes_nombres), ...list(row.colaboradores)].map(text).join(" "),
+            exportValue: (row) => text(row.nombre),
+            render: (row) => (
+              <span className="block min-w-0">
+                <span className="block truncate font-medium text-foreground">{text(row.nombre)}</span>
+                {list(row.radicados_numeros).length > 0 && (
+                  <span className="mt-0.5 block truncate font-mono text-xs font-normal text-foreground-muted">{list(row.radicados_numeros).join(" · ")}</span>
+                )}
+              </span>
+            ),
+            className: "max-w-xs",
+          },
+          { key: "abogado", header: "Responsable", mobile: "meta", sortValue: (row) => text(row.abogado), render: (row) => text(row.abogado) || "—" },
+          { key: "clientes", header: "Clientes", mobile: "meta", sortValue: (row) => list(row.clientes_nombres).join(", "), render: (row) => <span className="line-clamp-2">{list(row.clientes_nombres).join(", ") || "Sin cliente"}</span> },
+          { key: "salud", header: "Estado", mobile: "badge", sortValue: (row) => healthRank(text(row.salud)), exportValue: (row) => healthLabel(text(row.salud)).label, render: (row) => <Badge tone={healthLabel(text(row.salud)).tone}>{healthLabel(text(row.salud)).label}</Badge> },
+          { key: "senales", header: "Señales", mobile: "subtitle", wideOnly: true, searchValue: (row) => list(row.senales_salud).join(" "), render: (row) => <span className="text-xs text-foreground-muted">{list(row.senales_salud).join(" · ") || "Sin alertas"}</span> },
+          { key: "tareas", header: "Tareas", mobile: "meta", align: "right", hideOnMobile: true, sortValue: (row) => Number(row.tareas_vencidas ?? 0) * 1000 + Number(row.tareas_activas ?? 0), render: (row) => <span className="whitespace-nowrap tabular-nums">{Number(row.tareas_activas ?? 0)}{Number(row.tareas_vencidas ?? 0) > 0 && <span className="ml-1 font-semibold text-danger">({Number(row.tareas_vencidas)} venc.)</span>}</span> },
+          { key: "ultima_actividad", header: "Actividad", mobile: "meta", className: "whitespace-nowrap", sortValue: (row) => toDate(text(row.ultima_actividad)), exportValue: (row) => formatDateTime(text(row.ultima_actividad)), render: (row) => <span title={formatDateTime(text(row.ultima_actividad))}>{row.ultima_actividad ? formatRelative(text(row.ultima_actividad), now) : "Sin actividad"}</span> },
         ]
       : resource === "radicados"
         ? [
-            { key: "numero", label: "Radicado" },
-            { key: "abogado", label: "Responsable" },
-            { key: "estado_consulta", label: "Estado" },
-            { key: "actuaciones", label: "Actuaciones" },
-            { key: "consultado_en", label: "Última consulta" },
+            {
+              key: "numero",
+              header: "Radicado",
+              mobile: "title",
+              sortValue: (row) => text(row.numero),
+              searchValue: (row) => [row.numero, row.demandante, row.demandado, row.despacho, row.abogado, ...list(row.procesos)].map(text).join(" "),
+              render: (row) => <span className="font-mono text-[13px] font-medium text-foreground">{text(row.numero)}</span>,
+            },
+            { key: "partes", header: "Partes", mobile: "subtitle", sortValue: (row) => text(row.demandante), render: (row) => <span className="line-clamp-2 text-sm">{[row.demandante, row.demandado].map(text).filter(Boolean).join(" vs. ") || "Sin datos de partes"}</span>, className: "max-w-xs" },
+            { key: "procesos", header: "Proceso", mobile: "meta", sortValue: (row) => list(row.procesos).join(", "), render: (row) => list(row.procesos).join(", ") || <span className="text-foreground-muted">Sin proceso</span> },
+            { key: "estado_consulta", header: "Consulta", mobile: "badge", sortValue: (row) => consultaLabel(text(row.estado_consulta)).label, render: (row) => <Badge tone={consultaLabel(text(row.estado_consulta)).tone}>{consultaLabel(text(row.estado_consulta)).label}</Badge> },
+            { key: "ultima_actuacion", header: "Última actuación", hideOnMobile: true, mobile: "meta", sortValue: (row) => text(row.ultima_actuacion_fecha), searchValue: (row) => text(row.ultima_actuacion), render: (row) => row.ultima_actuacion ? <span className="block max-w-56"><span className="block truncate">{text(row.ultima_actuacion)}</span><span className="text-xs text-foreground-muted">{text(row.ultima_actuacion_fecha)}</span></span> : <span className="text-foreground-muted">—</span> },
+            { key: "actuaciones", header: "Actuaciones", align: "right", hideOnMobile: true, mobile: "hidden", sortValue: (row) => Number(row.actuaciones ?? 0), render: (row) => <span className="tabular-nums">{Number(row.actuaciones ?? 0)}</span> },
+            { key: "abogado", header: "Responsable", mobile: "meta", hideOnMobile: true, sortValue: (row) => text(row.abogado), render: (row) => text(row.abogado) || "—" },
           ]
         : resource === "tareas"
           ? [
-              { key: "titulo", label: "Tarea" },
-              { key: "estado", label: "Estado" },
-              { key: "abogado", label: "Responsable" },
-              { key: "cliente", label: "Cliente" },
-              { key: "proceso", label: "Proceso" },
-              { key: "fecha_limite", label: "Vence" },
+              {
+                key: "titulo",
+                header: "Tarea",
+                mobile: "title",
+                sortValue: (row) => text(row.titulo),
+                searchValue: (row) => [row.titulo, row.descripcion, row.proceso, row.cliente, row.abogado, row.radicado].map(text).join(" "),
+                render: (row) => (
+                  <span className="block min-w-0">
+                    <span className="block truncate font-medium text-foreground">{text(row.titulo)}</span>
+                    <span className="block truncate text-xs font-normal text-foreground-muted">{text(row.proceso) || "Tarea general"}</span>
+                  </span>
+                ),
+                className: "max-w-xs",
+              },
+              { key: "estado", header: "Estado", mobile: "badge", sortValue: (row) => taskStatusLabel(text(row.estado)).label, render: (row) => <Badge tone={taskStatusLabel(text(row.estado)).tone}>{taskStatusLabel(text(row.estado)).label}</Badge> },
+              { key: "prioridad", header: "Prioridad", mobile: "badge", sortValue: (row) => priorityRank(text(row.prioridad)), exportValue: (row) => priorityLabel(text(row.prioridad)).label, render: (row) => <Badge tone={priorityLabel(text(row.prioridad)).tone}>{priorityLabel(text(row.prioridad)).label}</Badge> },
+              { key: "fecha_limite", header: "Vence", mobile: "meta", sortValue: (row) => toDate(text(row.fecha_limite)), exportValue: (row) => formatDateTime(text(row.fecha_limite)), className: "whitespace-nowrap", render: (row) => row.fecha_limite ? <span className={taskOverdue(row) ? "font-semibold text-danger" : ""}>{taskOverdue(row) ? "Venció " : ""}{formatDate(text(row.fecha_limite))}</span> : <span className="text-foreground-muted">Sin fecha</span> },
+              { key: "abogado", header: "Responsable", mobile: "meta", sortValue: (row) => text(row.abogado), render: (row) => text(row.abogado) || "—" },
+              { key: "cliente", header: "Cliente", mobile: "hidden", wideOnly: true, sortValue: (row) => text(row.cliente), render: (row) => text(row.cliente) || <span className="text-foreground-muted">—</span> },
+              { key: "subtareas", header: "Avance", align: "right", hideOnMobile: true, mobile: "hidden", sortValue: (row) => Number(row.subtareas ?? 0) ? Number(row.subtareas_completadas ?? 0) / Number(row.subtareas) : -1, render: (row) => Number(row.subtareas ?? 0) ? <span className="tabular-nums">{Number(row.subtareas_completadas ?? 0)}/{Number(row.subtareas)}</span> : <span className="text-foreground-muted">—</span> },
             ]
           : [
-              { key: "nombre_archivo", label: "Documento" },
-              ...(contractsOnly ? [{ key: "contrato_id", label: "Contrato" }] : []),
-              { key: "estado_revision", label: "Estado de revisión" },
-              { key: "proceso", label: "Proceso" },
-              { key: "cliente", label: "Cliente" },
-              { key: "mime_type", label: "Tipo" },
-              { key: "created_at", label: "Cargado" },
+              {
+                key: "nombre_archivo",
+                header: contractsOnly ? "Contrato" : "Documento",
+                mobile: "title",
+                sortValue: (row) => text(row.nombre_archivo),
+                searchValue: (row) => [row.nombre_archivo, row.proceso, row.cliente, row.comentario_revision].map(text).join(" "),
+                render: (row) => (
+                  <span className="flex min-w-0 items-center gap-2">
+                    <FileText aria-hidden="true" className="size-4 shrink-0 text-primary" />
+                    <span className="truncate font-medium text-foreground">{text(row.nombre_archivo)}</span>
+                  </span>
+                ),
+                className: "max-w-xs",
+              },
+              { key: "estado_revision", header: "Revisión", mobile: "badge", sortValue: (row) => reviewStatusLabel(text(row.estado_revision)).label, render: (row) => <Badge tone={reviewStatusLabel(text(row.estado_revision)).tone}>{reviewStatusLabel(text(row.estado_revision)).label}</Badge> },
+              { key: "proceso", header: "Proceso", mobile: "subtitle", sortValue: (row) => text(row.proceso), render: (row) => text(row.proceso) || "—" },
+              { key: "cliente", header: "Cliente", mobile: "meta", sortValue: (row) => text(row.cliente), render: (row) => text(row.cliente) || "—" },
+              { key: "tipo", header: "Tipo", mobile: "meta", hideOnMobile: true, sortValue: (row) => fileKind(text(row.mime_type)), render: (row) => fileKind(text(row.mime_type)) },
+              { key: "created_at", header: "Cargado", mobile: "meta", sortValue: (row) => toDate(text(row.created_at)), exportValue: (row) => formatDateTime(text(row.created_at)), render: (row) => formatDate(text(row.created_at)) },
+            ];
+
+  const rowActions: RowAction<Row>[] =
+    resource === "procesos"
+      ? archived
+        ? [
+            { label: "Ver resumen", icon: <Eye />, onSelect: (row) => setDetailsRow(row) },
+            { label: "Restaurar proceso", icon: <ArchiveRestore />, onSelect: (row) => restore(row) },
+          ]
+        : [
+            { label: "Abrir ficha completa", icon: <FolderOpen />, href: (row) => processHref(row.id) },
+            { label: "Ver resumen", icon: <Eye />, onSelect: (row) => setDetailsRow(row) },
+            { label: "Editar datos", icon: <Pencil />, onSelect: (row) => openEdit(row) },
+            { label: "Gestionar equipo", icon: <Users />, onSelect: (row) => openTeam(row), hidden: (row) => row.owner_rol !== "ABOGADO_ADMIN" },
+            { label: "Archivar proceso", icon: <Archive />, tone: "danger", separated: true, onSelect: (row) => remove(row) },
+          ]
+      : resource === "radicados"
+        ? [
+            { label: "Ver detalle", icon: <Eye />, onSelect: (row) => setDetailsRow(row) },
+            { label: "Abrir proceso", icon: <FolderOpen />, href: (row) => processHref(list(row.proceso_ids)[0]), hidden: (row) => list(row.proceso_ids).length === 0 },
+            { label: "Consultar ahora", icon: <RefreshCw />, onSelect: (row) => consult(row), disabled: () => working },
+            { label: "Editar número", icon: <Pencil />, onSelect: (row) => openEdit(row) },
+            { label: "Eliminar radicado", icon: <Trash2 />, tone: "danger", separated: true, onSelect: (row) => remove(row) },
+          ]
+        : resource === "tareas"
+          ? [
+              { label: "Ver detalle", icon: <Eye />, onSelect: (row) => setDetailsRow(row) },
+              { label: "Editar tarea", icon: <Pencil />, onSelect: (row) => openEdit(row) },
+              { label: "Abrir proceso", icon: <FolderOpen />, href: (row) => processHref(row.proceso_id), hidden: (row) => !row.proceso_id },
+              { label: "Eliminar tarea", icon: <Trash2 />, tone: "danger", separated: true, onSelect: (row) => remove(row) },
+            ]
+          : [
+              { label: "Ver detalle", icon: <Eye />, onSelect: (row) => setDetailsRow(row) },
+              { label: "Descargar", icon: <Download />, onSelect: (row) => download(row), disabled: () => downloadingDocumentId !== null },
+              { label: "Enlace temporal (15 min)", icon: <Link2 />, onSelect: (row) => issueTemporaryLink(row), disabled: () => working },
+              { label: "Revisar o renombrar", icon: <Pencil />, onSelect: (row) => openEdit(row) },
+              { label: "Abrir proceso", icon: <FolderOpen />, href: (row) => processHref(row.proceso_id), hidden: (row) => !row.proceso_id },
+              { label: "Eliminar documento", icon: <Trash2 />, tone: "danger", separated: true, onSelect: (row) => remove(row) },
+            ];
+
+  const bulkActions: BulkAction<Row>[] =
+    resource === "radicados"
+      ? [
+          { label: "Consultar", icon: <RefreshCw />, onRun: (selected) => runBulkAction("CONSULT", selected) },
+          { label: "Eliminar", icon: <Trash2 />, tone: "danger", onRun: (selected) => runBulkAction("DELETE", selected) },
+        ]
+      : resource === "procesos" && archived
+        ? [{ label: "Restaurar", icon: <ArchiveRestore />, onRun: (selected) => runBulkAction("RESTORE", selected) }]
+        : [{ label: resource === "procesos" ? "Archivar" : "Eliminar", icon: resource === "procesos" ? <Archive /> : <Trash2 />, tone: "danger", onRun: (selected) => runBulkAction("DELETE", selected) }];
+
+  const requestColumns: DataTableColumn<DocumentRequest>[] = [
+    { key: "titulo", header: "Solicitud", mobile: "title", sortValue: (request) => request.titulo, searchValue: (request) => `${request.titulo} ${request.proceso} ${request.cliente} ${request.documentos_requeridos.map((item) => item.nombre).join(" ")}`, render: (request) => <span className="font-medium text-foreground">{request.titulo}</span> },
+    { key: "estado", header: "Estado", mobile: "badge", sortValue: (request) => labelDocumentRequestStatus(request.estado), render: (request) => <Badge tone={requestTone(request.estado)}>{labelDocumentRequestStatus(request.estado)}</Badge> },
+    { key: "proceso", header: "Proceso", mobile: "subtitle", sortValue: (request) => request.proceso, render: (request) => request.proceso },
+    { key: "cliente", header: "Cliente", mobile: "meta", sortValue: (request) => request.cliente, render: (request) => request.cliente },
+    { key: "documentos", header: "Recibidos", mobile: "meta", align: "right", sortValue: (request) => request.documentos_requeridos.filter((item) => item.archivo).length, exportValue: (request) => request.documentos_requeridos.map((item) => `${item.nombre} (${item.estado})`).join(" | "), render: (request) => <span className="tabular-nums">{request.documentos_requeridos.filter((item) => item.archivo).length}/{request.documentos_requeridos.length}</span> },
+    { key: "solicitado_en", header: "Solicitado", mobile: "meta", sortValue: (request) => toDate(request.solicitado_en), exportValue: (request) => formatDateTime(request.solicitado_en), render: (request) => formatDate(request.solicitado_en) },
+    { key: "fecha_limite", header: "Vence", mobile: "meta", sortValue: (request) => toDate(request.fecha_limite), exportValue: (request) => formatDateTime(request.fecha_limite), render: (request) => request.fecha_limite ? <span className={isOverdue(request.fecha_limite, request.atendida_en ? "COMPLETADA" : "PENDIENTE", now) ? "font-semibold text-danger" : ""}>{formatDate(request.fecha_limite)}</span> : "—" },
+  ];
+
+  const pageTitle = requestsOnly ? "Solicitudes documentales" : contractsOnly ? "Contratos cargados" : resourceNames[resource];
+  const pageDescription =
+    requestsOnly
+      ? "Documentos pedidos a los clientes y su estado de entrega y revisión."
+      : resource === "procesos"
+        ? "Todos los expedientes de la firma con su estado de salud, responsables y actividad."
+        : resource === "radicados"
+          ? "Radicados judiciales, estado de su última consulta y actuaciones registradas."
+          : resource === "tareas"
+            ? "Trabajo pendiente del equipo: vencimientos, prioridades y responsables."
+            : "Archivos recibidos de los clientes, pendientes de revisión o ya aprobados.";
+
+  const filterSelectClass = "h-10 min-w-0 flex-1 rounded-[var(--radius-md)] border border-border bg-background px-3 text-sm text-foreground sm:flex-none";
+  const toolbar = (
+    <>
+      <select aria-label="Filtrar por estado" value={state} onChange={(event) => setState(event.target.value)} className={filterSelectClass}>
+        <option value="TODOS">Todos los estados</option>
+        {states.map((value) => <option key={value} value={value}>{stateLabel(value)}</option>)}
+      </select>
+      {resource !== "documentos" && (
+        <select aria-label="Filtrar por responsable" value={ownerFilter} onChange={(event) => setOwnerFilter(event.target.value)} className={filterSelectClass}>
+          <option value="TODOS">Todos los responsables</option>
+          {owners.map((owner) => <option key={owner.id} value={owner.id}>{owner.nombre_completo}</option>)}
+        </select>
+      )}
+      {(resource === "tareas" || resource === "documentos") && (
+        <select aria-label="Filtrar por proceso" value={processFilter} onChange={(event) => setProcessFilter(event.target.value)} className={filterSelectClass}>
+          <option value="TODOS">Todos los procesos</option>
+          {processes.map((process) => <option key={process.id} value={process.id}>{process.nombre}</option>)}
+        </select>
+      )}
+      {(resource === "tareas" || resource === "documentos") && (
+        <select aria-label="Filtrar por cliente" value={clientFilter} onChange={(event) => setClientFilter(event.target.value)} className={filterSelectClass}>
+          <option value="TODOS">Todos los clientes</option>
+          {clients.map((client) => <option key={client.id} value={client.id}>{client.nombre_completo}</option>)}
+        </select>
+      )}
+      <details className="group relative">
+        <summary className="flex h-10 cursor-pointer list-none items-center gap-2 rounded-[var(--radius-md)] border border-border px-3 text-sm text-foreground hover:bg-surface-hover">
+          <CalendarDays aria-hidden="true" className="size-4" />
+          {dateFrom || dateTo ? `${dateFrom || "…"} → ${dateTo || "…"}` : "Fechas"}
+        </summary>
+        <div className="absolute left-0 z-20 mt-2 grid w-64 gap-2 rounded-[var(--radius-lg)] border border-border bg-surface p-3 shadow-lg">
+          <label className="text-xs text-foreground-muted">Desde<input type="date" value={dateFrom} onChange={(event) => setDateFrom(event.target.value)} className="mt-1 h-10 w-full rounded-[var(--radius-md)] border border-border bg-background px-2 text-sm text-foreground" /></label>
+          <label className="text-xs text-foreground-muted">Hasta<input type="date" value={dateTo} onChange={(event) => setDateTo(event.target.value)} className="mt-1 h-10 w-full rounded-[var(--radius-md)] border border-border bg-background px-2 text-sm text-foreground" /></label>
+          {(dateFrom || dateTo) && <button type="button" onClick={() => { setDateFrom(""); setDateTo(""); }} className="text-left text-xs font-medium text-primary hover:underline">Quitar fechas</button>}
+        </div>
+      </details>
+      {activeFilterCount > 0 && (
+        <button type="button" onClick={clearFilters} className="inline-flex h-10 items-center gap-1 rounded-[var(--radius-md)] px-2 text-sm font-medium text-primary hover:underline">
+          <X aria-hidden="true" className="size-4" />
+          Limpiar ({activeFilterCount})
+        </button>
+      )}
+    </>
+  );
+
+  const detail = detailsRow;
+  const detailItems: { label: string; value: ReactNode; wide?: boolean }[] = !detail
+    ? []
+    : resource === "procesos"
+      ? [
+          { label: "Estado", value: <Badge tone={healthLabel(text(detail.salud)).tone}>{healthLabel(text(detail.salud)).label}</Badge> },
+          { label: "Responsable", value: text(detail.abogado) || "—" },
+          { label: "Colaboradores", value: list(detail.colaboradores).join(", ") || "Ninguno" },
+          { label: "Clientes", value: list(detail.clientes_nombres).join(", ") || "Sin cliente" },
+          { label: "Radicados", value: list(detail.radicados_numeros).join(" · ") || "Sin radicados", wide: true },
+          { label: "Tareas activas", value: `${Number(detail.tareas_activas ?? 0)} (${Number(detail.tareas_vencidas ?? 0)} vencidas)` },
+          { label: "Documentos pendientes", value: Number(detail.documentos_pendientes ?? 0) },
+          { label: "Última actividad", value: detail.ultima_actividad ? formatDateTime(text(detail.ultima_actividad)) : "Sin actividad" },
+          { label: "Creado", value: formatDateTime(text(detail.created_at)) },
+          { label: "Señales", value: list(detail.senales_salud).join(" · ") || "Sin alertas", wide: true },
+          { label: "Descripción", value: text(detail.descripcion) || "Sin descripción", wide: true },
+        ]
+      : resource === "radicados"
+        ? [
+            { label: "Consulta", value: <Badge tone={consultaLabel(text(detail.estado_consulta)).tone}>{consultaLabel(text(detail.estado_consulta)).label}</Badge> },
+            { label: "Última consulta", value: text(detail.consultado_en) || "Nunca" },
+            { label: "Demandante", value: text(detail.demandante) || "—" },
+            { label: "Demandado", value: text(detail.demandado) || "—" },
+            { label: "Despacho", value: text(detail.despacho) || "—", wide: true },
+            { label: "Procesos", value: list(detail.procesos).join(", ") || "Sin proceso asociado", wide: true },
+            { label: "Actuaciones registradas", value: Number(detail.actuaciones ?? 0) },
+            { label: "Responsable", value: text(detail.abogado) || "—" },
+            { label: "Última actuación", value: detail.ultima_actuacion ? `${text(detail.ultima_actuacion_fecha)} · ${text(detail.ultima_actuacion)}` : "—", wide: true },
+          ]
+        : resource === "tareas"
+          ? [
+              { label: "Estado", value: <Badge tone={taskStatusLabel(text(detail.estado)).tone}>{taskStatusLabel(text(detail.estado)).label}</Badge> },
+              { label: "Prioridad", value: <Badge tone={priorityLabel(text(detail.prioridad)).tone}>{priorityLabel(text(detail.prioridad)).label}</Badge> },
+              { label: "Vence", value: detail.fecha_limite ? formatDateTime(text(detail.fecha_limite)) : "Sin fecha" },
+              { label: "Responsable", value: text(detail.abogado) || "—" },
+              { label: "Proceso", value: text(detail.proceso) || "Tarea general" },
+              { label: "Cliente", value: text(detail.cliente) || "—" },
+              { label: "Radicado", value: text(detail.radicado) || "—" },
+              { label: "Subtareas", value: Number(detail.subtareas ?? 0) ? `${Number(detail.subtareas_completadas ?? 0)} de ${Number(detail.subtareas)} completadas` : "Sin subtareas" },
+              { label: "Creada", value: formatDateTime(text(detail.created_at)) },
+              { label: "Completada", value: detail.completada_en ? formatDateTime(text(detail.completada_en)) : "—" },
+              { label: "Descripción", value: text(detail.descripcion) || "Sin descripción", wide: true },
+            ]
+          : [
+              { label: "Revisión", value: <Badge tone={reviewStatusLabel(text(detail.estado_revision)).tone}>{reviewStatusLabel(text(detail.estado_revision)).label}</Badge> },
+              { label: "Tipo", value: fileKind(text(detail.mime_type)) },
+              { label: "Proceso", value: text(detail.proceso) || "—" },
+              { label: "Cliente", value: text(detail.cliente) || "—" },
+              { label: "Cargado", value: formatDateTime(text(detail.created_at)) },
+              { label: "Revisado", value: detail.revisado_en ? formatDateTime(text(detail.revisado_en)) : "Pendiente" },
+              { label: "Comentario de revisión", value: text(detail.comentario_revision) || "—", wide: true },
             ];
 
   return (
-    <section className="mx-auto max-w-6xl space-y-5">
-      <header className="flex flex-wrap items-end justify-between gap-4">
-        <div>
-          <p className="text-xs font-semibold uppercase tracking-wide text-primary">
-            Panel Administrativo · {sectorLabel}
-          </p>
-          <h1 className="mt-1 text-2xl font-semibold text-foreground">
-            {requestsOnly ? "Solicitudes documentales" : contractsOnly ? "Contratos cargados" : resourceNames[resource]}
-          </h1>
-          <p className="mt-1 text-sm text-foreground-muted">
-            Registros restringidos a este ámbito administrativo.
-          </p>
-        </div>
-        <div className="flex gap-2">
-          {resource === "radicados" && (
-            <button
-              type="button"
-              disabled={working || rows.length === 0}
-              onClick={() => void consultAll()}
-              className="inline-flex items-center gap-2 rounded-lg border border-border bg-surface px-3 py-2 text-sm font-semibold hover:bg-surface-hover disabled:opacity-50"
-            >
-              <RefreshCw className="size-4" />
-              Consultar todos
-            </button>
-          )}
-          <button
-            type="button"
-            onClick={() => void reload()}
-            aria-label="Actualizar inventario"
-            className="grid size-10 place-items-center rounded-lg border border-border bg-surface hover:bg-surface-hover"
-          >
-            <RefreshCw className={`size-4 ${loading ? "animate-spin" : ""}`} />
-          </button>
-          {canCreate && !requestsOnly && (
-            <button
-              type="button"
-              onClick={openCreate}
-              className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground"
-            >
-              <Plus className="size-4" />
-              Nuevo
-            </button>
-          )}
-        </div>
-      </header>
-      {error && (
-        <p
-          role="alert"
-          className="rounded-lg border border-danger/30 bg-danger-light p-3 text-sm text-danger"
-        >
-          {error}
-        </p>
-      )}
-      {notice && (
-        <p
-          role="status"
-          className="rounded-lg border border-success/30 bg-success-light p-3 text-sm text-success"
-        >
-          {notice}
-        </p>
+    <section className="mx-auto max-w-7xl space-y-5">
+      <PageHeader
+        overline={`Administración · ${sectorLabel}`}
+        title={pageTitle}
+        description={pageDescription}
+        action={
+          <div className="flex flex-wrap gap-2">
+            {resource === "radicados" && (
+              <Button variant="outline" disabled={working || rows.length === 0} onClick={() => void consultAll()} icon={<RefreshCw className="size-4" />}>
+                <span className="hidden sm:inline">Consultar todos</span>
+                <span className="sm:hidden">Consultar</span>
+              </Button>
+            )}
+            <Button variant="outline" onClick={() => void reload()} aria-label="Actualizar" icon={<RefreshCw className={`size-4 ${loading ? "animate-spin" : ""}`} />} />
+            {!requestsOnly && (
+              <Button variant="primary" onClick={openCreate} icon={<Plus className="size-4" />}>
+                {resource === "procesos" ? "Nuevo proceso" : resource === "radicados" ? "Nuevo radicado" : resource === "tareas" ? "Nueva tarea" : "Cargar documento"}
+              </Button>
+            )}
+          </div>
+        }
+      />
+
+      {error && <p role="alert" className="rounded-[var(--radius-lg)] border border-danger/30 bg-danger-light p-3 text-sm text-danger">{error}</p>}
+      {notice && <p role="status" className="rounded-[var(--radius-lg)] border border-success/30 bg-success-light p-3 text-sm text-success">{notice}</p>}
+
+      {resource === "documentos" && (
+        <SegmentedControl
+          label="Tipo de documentos"
+          value={requestsOnly ? "solicitudes" : contractsOnly ? "contratos" : "archivos"}
+          options={[
+            { value: "archivos", label: "Archivos recibidos", href: "/gestion-procesos/admin/documentos" },
+            { value: "contratos", label: "Contratos cargados", href: "/gestion-procesos/admin/documentos/contratos" },
+            { value: "solicitudes", label: "Solicitudes", href: "/gestion-procesos/admin/documentos/solicitudes", count: documentRequests.filter((request) => !request.atendida_en).length },
+          ]}
+        />
       )}
       {resource === "procesos" && (
-        <div
-          role="group"
-          aria-label="Estado de procesos"
-          className="inline-flex gap-1 rounded-lg border border-border p-1"
-        >
-          <button
-            type="button"
-            aria-pressed={!archived}
-            onClick={() => setArchived(false)}
-            className={`rounded-md px-3 py-1.5 text-sm ${!archived ? "bg-primary text-white" : "text-foreground-muted"}`}
-          >
-            Activos
-          </button>
-          <button
-            type="button"
-            aria-pressed={archived}
-            onClick={() => setArchived(true)}
-            className={`rounded-md px-3 py-1.5 text-sm ${archived ? "bg-primary text-white" : "text-foreground-muted"}`}
-          >
-            Archivados
-          </button>
+        <SegmentedControl
+          label="Estado de procesos"
+          value={archived ? "archivados" : "activos"}
+          onChange={(value) => { setArchived(value === "archivados"); setQuickFilter(null); }}
+          options={[{ value: "activos", label: "Activos" }, { value: "archivados", label: "Archivados" }]}
+        />
+      )}
+
+      {!requestsOnly && <SummaryStrip items={summary} active={quickFilter ?? "TODOS"} onSelect={(key) => setQuickFilter(key === "TODOS" ? null : key)} />}
+
+      {resource === "tareas" && (
+        <SegmentedControl
+          label="Vista de tareas"
+          value={taskView}
+          onChange={setTaskView}
+          options={[{ value: "LISTA", label: "Lista" }, { value: "KANBAN", label: "Tablero" }, { value: "CALENDARIO", label: "Calendario" }]}
+        />
+      )}
+
+      {resource === "tareas" && taskView === "KANBAN" && (
+        <div className="-mx-4 flex snap-x gap-3 overflow-x-auto px-4 pb-2 xl:mx-0 xl:grid xl:grid-cols-4 xl:overflow-visible xl:px-0">
+          {tasksByState.map(({ status, rows: stateRows }) => (
+            <section key={status} aria-label={taskStatusLabel(status).label} className="min-h-56 w-[80vw] max-w-xs shrink-0 snap-start rounded-[var(--radius-lg)] border border-border bg-surface-muted p-3 xl:w-auto xl:max-w-none">
+              <h2 className="mb-3 flex items-center justify-between text-sm font-semibold">
+                {taskStatusLabel(status).label}
+                <span className="rounded-full bg-surface px-2 py-0.5 text-xs text-foreground-muted">{stateRows.length}</span>
+              </h2>
+              <div className="space-y-2">
+                {stateRows.map((row) => (
+                  <button key={row.id} type="button" onClick={() => setDetailsRow(row)} className={`w-full rounded-[var(--radius-md)] border bg-surface p-3 text-left shadow-[var(--shadow-xs)] hover:bg-surface-hover ${taskOverdue(row) ? "border-danger/40" : "border-border"}`}>
+                    <p className="font-medium text-foreground">{text(row.titulo)}</p>
+                    <p className="mt-1 text-xs text-foreground-muted">{text(row.proceso) || "Tarea general"}</p>
+                    <div className="mt-2 flex flex-wrap items-center gap-1.5">
+                      <Badge tone={priorityLabel(text(row.prioridad)).tone}>{priorityLabel(text(row.prioridad)).label}</Badge>
+                      {row.fecha_limite && <span className={`text-xs ${taskOverdue(row) ? "font-semibold text-danger" : "text-foreground-muted"}`}>{formatDate(text(row.fecha_limite))}</span>}
+                    </div>
+                    <p className="mt-1.5 text-xs text-foreground-muted">{text(row.abogado)}</p>
+                  </button>
+                ))}
+                {stateRows.length === 0 && <p className="py-6 text-center text-xs text-foreground-muted">Sin tareas</p>}
+              </div>
+            </section>
+          ))}
         </div>
       )}
-      <div className="flex flex-wrap gap-3 rounded-lg border border-border bg-surface p-3">
-        <label className="relative min-w-55 flex-1">
-          <span className="sr-only">Buscar {resourceNames[resource]}</span>
-          <Search className="absolute left-3 top-2.5 size-4 text-foreground-muted" />
-          <input
-            value={query}
-            onChange={(event) => setQuery(event.target.value)}
-            placeholder={`Buscar ${resourceNames[resource].toLowerCase()}`}
-            className="w-full rounded-md border border-border bg-background py-2 pl-9 pr-3 text-sm"
-          />
-        </label>
-        <select
-          aria-label="Filtrar estado"
-          value={state}
-          onChange={(event) => setState(event.target.value)}
-          className="rounded-md border border-border bg-background px-3 py-2 text-sm"
-        >
-          <option value="TODOS">Todos los estados</option>
-          {states.map((value) => (
-            <option key={value}>{value}</option>
-          ))}
-        </select>
-        {resource !== "documentos" && <select aria-label="Filtrar responsable" value={ownerFilter} onChange={(event) => setOwnerFilter(event.target.value)} className="rounded-md border border-border bg-background px-3 py-2 text-sm">
-          <option value="TODOS">Todos los responsables</option>{owners.map((owner) => <option key={owner.id} value={owner.id}>{owner.nombre_completo}</option>)}
-        </select>}
-        {(resource === "tareas" || resource === "documentos") && <select aria-label="Filtrar proceso" value={processFilter} onChange={(event) => setProcessFilter(event.target.value)} className="rounded-md border border-border bg-background px-3 py-2 text-sm"><option value="TODOS">Todos los procesos</option>{processes.map((process) => <option key={process.id} value={process.id}>{process.nombre}</option>)}</select>}
-        {(resource === "tareas" || resource === "documentos") && <select aria-label="Filtrar cliente" value={clientFilter} onChange={(event) => setClientFilter(event.target.value)} className="rounded-md border border-border bg-background px-3 py-2 text-sm"><option value="TODOS">Todos los clientes</option>{clients.map((client) => <option key={client.id} value={client.id}>{client.nombre_completo}</option>)}</select>}
-        <label className="flex items-center gap-2 text-xs text-foreground-muted">Desde<input type="date" aria-label="Desde la fecha" value={dateFrom} onChange={(event) => setDateFrom(event.target.value)} className="h-9 rounded-md border border-border bg-background px-2 text-sm text-foreground" /></label>
-        <label className="flex items-center gap-2 text-xs text-foreground-muted">Hasta<input type="date" aria-label="Hasta la fecha" value={dateTo} onChange={(event) => setDateTo(event.target.value)} className="h-9 rounded-md border border-border bg-background px-2 text-sm text-foreground" /></label>
-      </div>
-      {resource === "tareas" && <div role="group" aria-label="Vista de tareas" className="inline-flex gap-1 rounded-md border border-border p-1">
-        {(["LISTA", "KANBAN", "CALENDARIO"] as const).map((mode) => <button key={mode} type="button" aria-pressed={taskView === mode} onClick={() => setTaskView(mode)} className={`rounded px-3 py-1.5 text-sm ${taskView === mode ? "bg-primary text-white" : "hover:bg-surface-hover"}`}>{mode === "LISTA" ? "Lista" : mode === "KANBAN" ? "Kanban" : "Calendario"}</button>)}
-      </div>}
-      {resource === "tareas" && taskView === "KANBAN" && <div className="grid gap-3 xl:grid-cols-4">
-        {tasksByState.map(({ status, rows: stateRows }) => <section key={status} aria-label={status} className="min-h-56 rounded-lg border border-border bg-surface-secondary p-3"><h2 className="mb-3 flex items-center justify-between text-sm font-semibold">{status === "EN_CURSO" ? "En curso" : status === "COMPLETADA" ? "Completadas" : status === "CANCELADA" ? "Canceladas" : "Pendientes"}<span className="rounded-full bg-surface px-2 py-0.5 text-xs text-foreground-muted">{stateRows.length}</span></h2><div className="space-y-2">{stateRows.map((row) => <button key={row.id} type="button" onClick={() => openEdit(row)} className="w-full rounded-md border border-border bg-surface p-3 text-left hover:bg-surface-hover"><p className="font-medium">{String(row.titulo ?? row.nombre ?? "Tarea")}</p><p className="mt-1 text-xs text-foreground-muted">{display(row.owner_id ? owners.find((owner) => owner.id === row.owner_id)?.nombre_completo : "")}</p><p className="mt-1 text-xs text-foreground-muted">{display(row.proceso)}{row.fecha_limite ? ` · ${display(row.fecha_limite)}` : ""}</p></button>)}</div></section>)}
-      </div>}
-      {resource === "tareas" && taskView === "CALENDARIO" && <section className="space-y-3 rounded-lg border border-border bg-surface p-3">
-        <div className="flex items-center justify-between"><h2 className="font-semibold">Vencimientos</h2><label className="text-xs text-foreground-muted">Mes<input type="month" aria-label="Mes del calendario de tareas" value={calendarMonth} onChange={(event) => setCalendarMonth(event.target.value)} className="ml-2 h-9 rounded-md border border-border bg-background px-2 text-sm text-foreground" /></label></div>
-        <div className="grid grid-cols-7 border-l border-t border-border">{["Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom"].map((day) => <div key={day} className="border-b border-r border-border bg-surface-secondary p-2 text-xs font-semibold text-foreground-muted">{day}</div>)}{Array.from({ length: Math.ceil((calendarOffset + calendarDays) / 7) * 7 }, (_, index) => { const day = index - calendarOffset + 1; if (day < 1 || day > calendarDays) return <div key={`empty-${index}`} className="min-h-24 border-b border-r border-border bg-background-secondary/40" />; const key = `${calendarMonth}-${String(day).padStart(2, "0")}`; return <div key={key} className="min-h-24 border-b border-r border-border p-2"><p className="mb-1 text-xs text-foreground-muted">{day}</p><div className="space-y-1">{(tasksByDueDate.get(key) ?? []).map((row) => <button key={row.id} type="button" onClick={() => openEdit(row)} className="block w-full truncate rounded bg-primary/10 px-1.5 py-1 text-left text-xs text-primary">{String(row.titulo ?? row.nombre ?? "Tarea")}</button>)}</div></div>;})}</div>
-      </section>}
-      {resource === "documentos" && <nav aria-label="Subpáginas documentales" className="flex flex-wrap gap-2"><a href="/gestion-procesos/admin/documentos" aria-current={!requestsOnly && !contractsOnly ? "page" : undefined} className={`rounded-md border border-border px-3 py-2 text-sm ${!requestsOnly && !contractsOnly ? "bg-primary text-white" : "hover:bg-surface-hover"}`}>Archivos</a><a href="/gestion-procesos/admin/documentos/contratos" aria-current={contractsOnly ? "page" : undefined} className={`rounded-md border border-border px-3 py-2 text-sm ${contractsOnly ? "bg-primary text-white" : "hover:bg-surface-hover"}`}>Contratos cargados</a><a href="/gestion-procesos/admin/documentos/solicitudes" aria-current={requestsOnly ? "page" : undefined} className={`rounded-md border border-border px-3 py-2 text-sm ${requestsOnly ? "bg-primary text-white" : "hover:bg-surface-hover"}`}>Solicitudes documentales</a></nav>}
-      {resource === "documentos" && requestsOnly && <section className="space-y-3 rounded-lg border border-border bg-surface p-4">
-        <div><h2 className="font-semibold">Solicitudes y revisión</h2><p className="text-sm text-foreground-muted">Seguimiento de documentos solicitados y recibidos por los clientes.</p></div>
-        <div className="overflow-x-auto"><table className="w-full min-w-190 text-left text-sm"><thead className="bg-surface-secondary text-xs text-foreground-muted"><tr><th className="px-3 py-2">Solicitud</th><th className="px-3 py-2">Proceso</th><th className="px-3 py-2">Cliente</th><th className="px-3 py-2">Estado</th><th className="px-3 py-2">Documento</th><th className="px-3 py-2">Solicitado</th><th className="px-3 py-2">Vence</th><th className="px-3 py-2">Detalle</th></tr></thead><tbody>{visibleDocumentRequests.map((request) => <tr key={request.id} className="border-t border-border"><td className="px-3 py-2 font-medium"><button type="button" onClick={() => setDetailRequest(request)} className="text-left text-primary hover:underline">{request.titulo}</button></td><td className="px-3 py-2">{request.proceso}</td><td className="px-3 py-2">{request.cliente}</td><td className="px-3 py-2">{labelDocumentRequestStatus(request.estado)}</td><td className="px-3 py-2"><ul className="space-y-1">{request.documentos_requeridos.map((requested) => <li key={requested.id}><span>{requested.nombre}</span><span className="ml-1 text-xs text-foreground-muted">· {requested.estado.replaceAll("_", " ")}</span>{requested.archivo && <span className="block text-xs text-foreground-muted">{requested.archivo}</span>}{requested.documento_id && <button type="button" onClick={() => { const row = rows.find((item) => item.id === requested.documento_id); if (row) openEdit(row); }} className="ml-1 text-xs text-primary underline">Revisar</button>}</li>)}</ul></td><td className="px-3 py-2 text-xs text-foreground-muted">{display(request.solicitado_en)}</td><td className="px-3 py-2 text-xs text-foreground-muted">{display(request.fecha_limite)}</td><td className="px-3 py-2"><button type="button" onClick={() => setDetailRequest(request)} className="rounded border border-border px-2 py-1 text-xs hover:bg-surface-hover">Ver detalle</button></td></tr>)}</tbody></table>{visibleDocumentRequests.length === 0 && <p className="py-6 text-center text-sm text-foreground-muted">No hay solicitudes documentales para estos filtros.</p>}</div>
-      </section>}
-      {resource === "documentos" && requestsOnly && <div className="flex flex-wrap items-center gap-3 rounded-lg border border-border bg-surface p-3"><label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={visibleDocumentRequests.length > 0 && visibleDocumentRequests.every((request) => selectedRequestIds.includes(request.id))} onChange={(event) => setSelectedRequestIds((current) => event.target.checked ? [...new Set([...current, ...visibleDocumentRequests.map((request) => request.id)])] : current.filter((id) => !visibleDocumentRequests.some((request) => request.id === id)))} />Seleccionar solicitudes visibles</label><span className="text-sm text-foreground-muted">{visibleDocumentRequests.filter((request) => selectedRequestIds.includes(request.id)).length} seleccionadas</span><button type="button" disabled={!visibleDocumentRequests.some((request) => selectedRequestIds.includes(request.id))} onClick={exportSelectedRequests} className="ml-auto rounded-md border border-border px-3 py-2 text-sm disabled:opacity-50">Exportar selección CSV</button></div>}
-      {!requestsOnly && <div className="flex flex-wrap items-center gap-3 rounded-lg border border-border bg-surface p-3"><label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={routeFiltered.length > 0 && routeFiltered.every((row) => selectedIds.includes(row.id))} onChange={(event) => setSelectedIds((current) => event.target.checked ? [...new Set([...current, ...routeFiltered.map((row) => row.id)])] : current.filter((id) => !routeFiltered.some((row) => row.id === id)))} />Seleccionar registros visibles</label><span className="text-sm text-foreground-muted">{selectedVisibleRows.length} seleccionados</span><div className="ml-auto flex flex-wrap gap-2">{resource === "radicados" && <button type="button" disabled={!selectedVisibleRows.length || working} onClick={() => void runBulkAction("CONSULT")} className="rounded-md border border-border px-3 py-2 text-sm disabled:opacity-50">Consultar selección</button>}{resource === "procesos" && archived && <button type="button" disabled={!selectedVisibleRows.length || working} onClick={() => void runBulkAction("RESTORE")} className="rounded-md border border-border px-3 py-2 text-sm disabled:opacity-50">Restaurar seleccionados</button>}{selectedVisibleRows.length > 0 && (resource !== "procesos" || !archived) && <button type="button" disabled={working} onClick={() => void runBulkAction("DELETE")} className="rounded-md border border-danger/30 px-3 py-2 text-sm text-danger disabled:opacity-50">{resource === "procesos" ? "Archivar seleccionados" : "Eliminar seleccionados"}</button>}</div></div>}
-      {!requestsOnly && <div className="overflow-x-auto rounded-lg border border-border bg-surface">
-        <table className="w-full min-w-195 text-left text-sm">
-          <thead className="border-b border-border bg-surface-secondary text-xs uppercase text-foreground-muted">
-            <tr>
-              <th className="px-4 py-3"><input type="checkbox" aria-label="Seleccionar registros visibles" checked={routeFiltered.length > 0 && routeFiltered.every((row) => selectedIds.includes(row.id))} onChange={(event) => setSelectedIds((current) => event.target.checked ? [...new Set([...current, ...routeFiltered.map((row) => row.id)])] : current.filter((id) => !routeFiltered.some((row) => row.id === id)))} /></th>
-              <th className="px-4 py-3">ID / detalle</th>
-              {columns.map((column) => (
-                <th key={column.key} className="px-4 py-3">
-                  {column.label}
-                </th>
-              ))}
-              <th className="px-4 py-3 text-right">Acciones</th>
-            </tr>
-          </thead>
-          <tbody>
-            {loading ? (
-              <tr>
-                <td
-                  colSpan={columns.length + 3}
-                  className="px-4 py-10 text-center text-foreground-muted"
-                >
-                  Cargando registros...
-                </td>
-              </tr>
-            ) : routeFiltered.length ? (
-              routeFiltered.map((row) => (
-                <tr
-                  key={row.id}
-                  className="border-b border-border last:border-0"
-                >
-                  <td className="px-4 py-3"><input type="checkbox" aria-label={`Seleccionar registro ${row.id}`} checked={selectedIds.includes(row.id)} onChange={() => setSelectedIds((current) => current.includes(row.id) ? current.filter((id) => id !== row.id) : [...current, row.id])} /></td>
-                  <td className="px-4 py-3 font-mono text-xs text-foreground-muted">
-                    <button type="button" onClick={() => setDetailsRow(row)} className="inline-flex items-center gap-1 rounded px-1 py-1 text-primary hover:bg-primary/5 hover:underline"><Eye className="size-3.5" />{row.id}</button>
-                  </td>
-                  {columns.map((column) => (
-                    <td
-                      key={column.key}
-                      className="max-w-60 truncate px-4 py-3 text-foreground-secondary"
-                    >
-                      {column.key === "salud" ? (
-                        <span
-                          className={`inline-flex rounded-full px-2 py-1 text-xs font-semibold ${
-                            row.salud === "RIESGO"
-                              ? "bg-danger-light text-danger"
-                              : row.salud === "ATENCION"
-                                ? "bg-warning-light text-warning"
-                                : row.salud === "ARCHIVADO"
-                                  ? "bg-surface-secondary text-foreground-muted"
-                                  : "bg-success-light text-success"
-                          }`}
-                        >
-                          {row.salud === "ATENCION" ? "Atención" : row.salud === "RIESGO" ? "Riesgo" : row.salud === "ARCHIVADO" ? "Archivado" : "Normal"}
-                        </span>
-                      ) : (
-                        display(row[column.key])
-                      )}
-                    </td>
-                  ))}
-                  <td className="px-4 py-3">
-                    <div className="flex justify-end gap-1">
-                      {resource === "documentos" ? (
-                        <>
-                          <button
-                            type="button"
-                            disabled={working}
-                            onClick={() => void issueTemporaryLink(row)}
-                            aria-label={`Generar enlace temporal para ${String(row.nombre_archivo)}`}
-                            title="Generar enlace temporal (15 minutos)"
-                            className="grid size-9 place-items-center rounded-md border border-border hover:bg-surface-hover disabled:opacity-50"
-                          >
-                            <Link2 className="size-4" />
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => openEdit(row)}
-                            aria-label={`Editar ${String(row.nombre_archivo)}`}
-                            className="grid size-9 place-items-center rounded-md border border-border hover:bg-surface-hover"
-                          >
-                            <Pencil className="size-4" />
-                          </button>
-                          <button
-                            type="button"
-                            disabled={downloadingDocumentId !== null}
-                            onClick={() => void download(row)}
-                            aria-label={`Descargar ${String(row.nombre_archivo)}`}
-                            className="grid size-9 place-items-center rounded-md border border-border hover:bg-surface-hover disabled:opacity-50"
-                          >
-                            {downloadingDocumentId === row.id ? <Loader2 className="size-4 animate-spin" /> : <Download className="size-4" />}
-                          </button>
-                          <button
-                            type="button"
-                            disabled={working}
-                            onClick={() => void remove(row)}
-                            aria-label={`Eliminar ${String(row.nombre_archivo)}`}
-                            className="grid size-9 place-items-center rounded-md border border-danger/30 text-danger hover:bg-danger-light"
-                          >
-                            <Trash2 className="size-4" />
-                          </button>
-                        </>
-                      ) : resource === "radicados" ? (
-                        <>
-                          <button
-                            type="button"
-                            disabled={working}
-                            onClick={() => void consult(row)}
-                            aria-label={`Consultar radicado ${row.numero}`}
-                            className="grid size-9 place-items-center rounded-md border border-border hover:bg-surface-hover disabled:opacity-50"
-                          >
-                            <RefreshCw className="size-4" />
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => openEdit(row)}
-                            aria-label={`Editar radicado ${row.numero}`}
-                            className="grid size-9 place-items-center rounded-md border border-border hover:bg-surface-hover"
-                          >
-                            <Pencil className="size-4" />
-                          </button>
-                          <button
-                            type="button"
-                            disabled={working}
-                            onClick={() => void remove(row)}
-                            aria-label={`Eliminar radicado ${row.numero}`}
-                            className="grid size-9 place-items-center rounded-md border border-danger/30 text-danger hover:bg-danger-light disabled:opacity-50"
-                          >
-                            <Trash2 className="size-4" />
-                          </button>
-                        </>
-                      ) : resource === "procesos" && archived ? (
-                        <button
-                          type="button"
-                          disabled={working}
-                          onClick={() => void restore(row)}
-                          aria-label={`Restaurar proceso ${row.id}`}
-                          className="grid size-9 place-items-center rounded-md border border-border hover:bg-surface-hover"
-                        >
-                          <ArchiveRestore className="size-4" />
-                        </button>
-                      ) : (
-                        <>
-                          {resource === "procesos" && row.owner_rol === "ABOGADO_ADMIN" && !archived && (
-                            <button
-                              type="button"
-                              onClick={() => void openTeam(row)}
-                              aria-label={`Gestionar equipo de ${String(row.nombre ?? `proceso ${row.id}`)}`}
-                              title="Gestionar equipo"
-                              className="grid size-9 place-items-center rounded-md border border-border hover:bg-surface-hover"
-                            >
-                              <Users className="size-4" />
-                            </button>
-                          )}
-                          <button
-                            type="button"
-                            onClick={() => openEdit(row)}
-                            aria-label={`Editar registro ${row.id}`}
-                            className="grid size-9 place-items-center rounded-md border border-border hover:bg-surface-hover"
-                          >
-                            <Pencil className="size-4" />
-                          </button>
-                          <button
-                            type="button"
-                            disabled={working}
-                            onClick={() => void remove(row)}
-                            aria-label={`${resource === "procesos" ? "Archivar" : "Eliminar"} registro ${row.id}`}
-                            className="grid size-9 place-items-center rounded-md border border-danger/30 text-danger hover:bg-danger-light"
-                          >
-                            <Trash2 className="size-4" />
-                          </button>
-                        </>
-                      )}
-                    </div>
-                  </td>
-                </tr>
-              ))
-            ) : (
-              <tr>
-                <td
-                  colSpan={columns.length + 3}
-                  className="px-4 py-12 text-center text-sm text-foreground-muted"
-                >
-                  No hay registros para este filtro.
-                </td>
-              </tr>
-            )}
-          </tbody>
-        </table>
-      </div>}
 
-      {detailsRow && <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) setDetailsRow(null); }}><section role="dialog" aria-modal="true" aria-labelledby="inventory-detail-title" className="max-h-[88vh] w-full max-w-3xl overflow-y-auto rounded-xl border border-border bg-surface shadow-2xl"><header className="sticky top-0 flex items-start justify-between gap-4 border-b border-border bg-surface p-5"><div><p className="text-xs font-semibold uppercase text-primary">{resourceNames[resource]} · {sectorLabel}</p><h2 id="inventory-detail-title" className="mt-1 text-xl font-semibold">{String(detailsRow.nombre ?? detailsRow.numero ?? detailsRow.titulo ?? detailsRow.nombre_archivo ?? `Registro ${detailsRow.id}`)}</h2><p className="text-xs text-foreground-muted">ID {detailsRow.id}</p></div><button type="button" onClick={() => setDetailsRow(null)} aria-label="Cerrar detalle" className="rounded-md border border-border p-2 hover:bg-surface-hover"><X className="size-4" /></button></header><dl className="grid gap-3 p-5 sm:grid-cols-2">{Object.entries(detailsRow).filter(([key]) => !["ruta_archivo", "url_temporal"].includes(key)).map(([key, value]) => <div key={key} className="min-w-0 rounded-lg border border-border p-3"><dt className="text-xs font-semibold uppercase tracking-wide text-foreground-muted">{key.replaceAll("_", " ")}</dt><dd className="mt-1 break-words text-sm text-foreground">{display(value)}</dd></div>)}</dl><footer className="flex justify-end gap-2 border-t border-border p-4"><button type="button" onClick={() => { setDetailsRow(null); openEdit(detailsRow); }} className="rounded-md bg-primary px-3 py-2 text-sm font-semibold text-white">Editar registro</button><button type="button" onClick={() => setDetailsRow(null)} className="rounded-md border border-border px-3 py-2 text-sm">Cerrar</button></footer></section></div>}
-      {detailRequest && <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) setDetailRequest(null); }}><section role="dialog" aria-modal="true" aria-labelledby="document-request-detail-title" className="w-full max-w-xl space-y-4 rounded-xl border border-border bg-surface p-5 shadow-2xl"><header className="flex items-start justify-between"><div><p className="text-xs uppercase text-primary">Solicitud documental · #{detailRequest.id}</p><h2 id="document-request-detail-title" className="mt-1 text-lg font-semibold">{detailRequest.titulo}</h2></div><button type="button" onClick={() => setDetailRequest(null)} aria-label="Cerrar detalle" className="rounded-md p-2 hover:bg-surface-hover"><X className="size-4" /></button></header><dl className="grid gap-3 sm:grid-cols-2">{([["Proceso", detailRequest.proceso], ["Cliente", detailRequest.cliente], ["Estado", detailRequest.estado], ["Documento", detailRequest.documento ?? "Pendiente de carga"], ["Solicitado", detailRequest.solicitado_en], ["Fecha límite", detailRequest.fecha_limite]] as const).map(([label, value]) => <div key={label} className="rounded-lg border border-border p-3"><dt className="text-xs text-foreground-muted">{label}</dt><dd className="mt-1 break-words text-sm font-medium">{display(value)}</dd></div>)}</dl><section className="space-y-2"><h3 className="text-sm font-semibold">Documentos solicitados y estado</h3>{detailRequest.documentos_requeridos.map((requested) => <article key={requested.id} className="rounded-lg border border-border p-3"><p className="font-medium">{requested.nombre} · {requested.estado.replaceAll("_", " ")}</p>{requested.archivo && <p className="text-xs text-foreground-muted">Archivo: {requested.archivo}</p>}{requested.comentario && <p className="mt-1 text-sm text-amber-700">Observación: {requested.comentario}</p>}{requested.documento_id && <button type="button" onClick={() => { const row = rows.find((item) => item.id === requested.documento_id); setDetailRequest(null); if (row) openEdit(row); }} className="mt-2 text-sm text-primary underline">Revisar documento</button>}</article>)}</section>{detailRequest.documento_id && <button type="button" onClick={() => { const row = rows.find((item) => item.id === detailRequest.documento_id); setDetailRequest(null); if (row) openEdit(row); }} className="rounded-md bg-primary px-3 py-2 text-sm font-semibold text-white">Revisar documento</button>}</section></div>}
+      {resource === "tareas" && taskView === "CALENDARIO" && (
+        <section className="space-y-3 rounded-[var(--radius-lg)] border border-border bg-surface p-3">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <h2 className="font-semibold">Vencimientos del mes</h2>
+            <input type="month" aria-label="Mes del calendario de tareas" value={calendarMonth} onChange={(event) => setCalendarMonth(event.target.value)} className="h-10 rounded-[var(--radius-md)] border border-border bg-background px-2 text-sm text-foreground" />
+          </div>
+          <div className="hidden grid-cols-7 border-l border-t border-border md:grid">
+            {["Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom"].map((day) => <div key={day} className="border-b border-r border-border bg-surface-muted p-2 text-xs font-semibold text-foreground-muted">{day}</div>)}
+            {Array.from({ length: Math.ceil((calendarOffset + calendarDays) / 7) * 7 }, (_, index) => {
+              const day = index - calendarOffset + 1;
+              if (day < 1 || day > calendarDays) return <div key={`empty-${index}`} className="min-h-24 border-b border-r border-border bg-surface-muted/60" />;
+              const key = `${calendarMonth}-${String(day).padStart(2, "0")}`;
+              return (
+                <div key={key} className="min-h-24 border-b border-r border-border p-2">
+                  <p className="mb-1 text-xs text-foreground-muted">{day}</p>
+                  <div className="space-y-1">
+                    {(tasksByDueDate.get(key) ?? []).map((row) => (
+                      <button key={row.id} type="button" onClick={() => setDetailsRow(row)} className={`block w-full truncate rounded px-1.5 py-1 text-left text-xs ${taskOverdue(row) ? "bg-danger-light text-danger" : "bg-primary-light text-primary"}`}>
+                        {text(row.titulo)}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+          {/* En móvil, la cuadrícula de 7 columnas es ilegible: se muestra como agenda. */}
+          <ol className="space-y-3 md:hidden">
+            {[...tasksByDueDate.entries()].sort(([left], [right]) => left.localeCompare(right)).map(([day, dayRows]) => (
+              <li key={day}>
+                <p className="text-xs font-semibold uppercase tracking-wide text-foreground-muted">{formatDate(`${day}T12:00:00`)}</p>
+                <div className="mt-1 space-y-1.5">
+                  {dayRows.map((row) => (
+                    <button key={row.id} type="button" onClick={() => setDetailsRow(row)} className="flex w-full items-center justify-between gap-2 rounded-[var(--radius-md)] border border-border p-3 text-left">
+                      <span className="min-w-0 truncate text-sm font-medium">{text(row.titulo)}</span>
+                      <Badge tone={taskStatusLabel(text(row.estado)).tone}>{taskStatusLabel(text(row.estado)).label}</Badge>
+                    </button>
+                  ))}
+                </div>
+              </li>
+            ))}
+            {tasksByDueDate.size === 0 && <p className="py-6 text-center text-sm text-foreground-muted">No hay vencimientos este mes.</p>}
+          </ol>
+        </section>
+      )}
+
+      {requestsOnly ? (
+        <DataTable
+          caption="Solicitudes documentales"
+          rows={visibleDocumentRequests}
+          columns={requestColumns}
+          rowKey={(request) => request.id}
+          onRowClick={(request) => setDetailRequest(request)}
+          rowActions={[{ label: "Ver detalle", icon: <Eye />, onSelect: (request) => setDetailRequest(request) }]}
+          searchPlaceholder="Buscar solicitud, proceso o cliente"
+          toolbar={toolbar}
+          activeFilterCount={activeFilterCount}
+          initialSort={{ key: "solicitado_en", direction: "desc" }}
+          exportFilename="solicitudes-documentales"
+          storageKey="admin-solicitudes"
+          loading={loading}
+          emptyTitle="No hay solicitudes documentales"
+          emptyDescription="Cuando un abogado pida documentos a un cliente, aparecerán aquí."
+        />
+      ) : (resource !== "tareas" || taskView === "LISTA") && (
+        <DataTable
+          caption={pageTitle}
+          rows={viewRows}
+          columns={columns}
+          rowKey={(row) => row.id}
+          onRowClick={(row) => setDetailsRow(row)}
+          rowHref={resource === "procesos" && !archived ? (row) => processHref(row.id) : undefined}
+          rowActions={rowActions}
+          bulkActions={bulkActions}
+          rowTone={resource === "tareas" ? (row) => (taskOverdue(row) ? "danger" : undefined) : resource === "procesos" ? (row) => (row.salud === "RIESGO" ? "danger" : undefined) : undefined}
+          searchPlaceholder={`Buscar en ${pageTitle.toLowerCase()}`}
+          toolbar={toolbar}
+          activeFilterCount={activeFilterCount}
+          initialSort={
+            resource === "procesos"
+              ? { key: "salud", direction: "desc" }
+              : resource === "tareas"
+                ? { key: "fecha_limite", direction: "asc" }
+                : resource === "radicados"
+                  ? { key: "numero", direction: "asc" }
+                  : { key: "created_at", direction: "desc" }
+          }
+          exportFilename={`${resource}-${sector.toLowerCase()}`}
+          storageKey={`admin-${resource}-${sector}`}
+          loading={loading}
+          emptyTitle={archived ? "No hay procesos archivados" : `No hay ${pageTitle.toLowerCase()} para mostrar`}
+          emptyDescription={activeFilterCount || quickFilter ? "Prueba a quitar filtros." : undefined}
+        />
+      )}
+
+      <Drawer
+        open={Boolean(detail)}
+        onClose={() => setDetailsRow(null)}
+        overline={`${resourceNames[resource]} · ${sectorLabel}`}
+        title={text(detail?.nombre ?? detail?.numero ?? detail?.titulo ?? detail?.nombre_archivo) || `Registro ${detail?.id ?? ""}`}
+        subtitle={detail ? `Referencia #${detail.id}` : undefined}
+        footer={
+          detail && (
+            <>
+              {resource === "procesos" && !archived && (
+                <Link href={processHref(detail.id)} className="inline-flex min-h-10 items-center gap-2 rounded-[var(--radius-md)] border border-border px-4 text-sm font-semibold text-foreground hover:bg-surface-hover">
+                  <FolderOpen aria-hidden="true" className="size-4" />
+                  Ficha completa
+                </Link>
+              )}
+              {resource === "documentos" && (
+                <Button variant="outline" onClick={() => void download(detail)} icon={<Download className="size-4" />}>Descargar</Button>
+              )}
+              {!(resource === "procesos" && archived) && (
+                <Button variant="primary" onClick={() => { const row = detail; setDetailsRow(null); openEdit(row); }} icon={<Pencil className="size-4" />}>
+                  {resource === "documentos" ? "Revisar" : "Editar"}
+                </Button>
+              )}
+            </>
+          )
+        }
+      >
+        <DetailList items={detailItems} />
+      </Drawer>
+
+      {detailRequest && <div className="fixed inset-0 z-50 flex items-center justify-center bg-brand-950/40 backdrop-blur-sm p-4" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) setDetailRequest(null); }}><section role="dialog" aria-modal="true" aria-labelledby="document-request-detail-title" className="w-full max-w-xl space-y-4 rounded-xl border border-border bg-surface p-5 shadow-2xl"><header className="flex items-start justify-between"><div><p className="text-xs uppercase text-primary">Solicitud documental · #{detailRequest.id}</p><h2 id="document-request-detail-title" className="mt-1 text-lg font-semibold">{detailRequest.titulo}</h2></div><button type="button" onClick={() => setDetailRequest(null)} aria-label="Cerrar detalle" className="rounded-md p-2 hover:bg-surface-hover"><X className="size-4" /></button></header><dl className="grid gap-3 sm:grid-cols-2">{([["Proceso", detailRequest.proceso], ["Cliente", detailRequest.cliente], ["Estado", detailRequest.estado], ["Documento", detailRequest.documento ?? "Pendiente de carga"], ["Solicitado", detailRequest.solicitado_en], ["Fecha límite", detailRequest.fecha_limite]] as const).map(([label, value]) => <div key={label} className="rounded-lg border border-border p-3"><dt className="text-xs text-foreground-muted">{label}</dt><dd className="mt-1 break-words text-sm font-medium">{display(value)}</dd></div>)}</dl><section className="space-y-2"><h3 className="text-sm font-semibold">Documentos solicitados y estado</h3>{detailRequest.documentos_requeridos.map((requested) => <article key={requested.id} className="rounded-lg border border-border p-3"><p className="font-medium">{requested.nombre} · {requested.estado.replaceAll("_", " ")}</p>{requested.archivo && <p className="text-xs text-foreground-muted">Archivo: {requested.archivo}</p>}{requested.comentario && <p className="mt-1 text-sm text-amber-700">Observación: {requested.comentario}</p>}{requested.documento_id && <button type="button" onClick={() => { const row = rows.find((item) => item.id === requested.documento_id); setDetailRequest(null); if (row) openEdit(row); }} className="mt-2 text-sm text-primary underline">Revisar documento</button>}</article>)}</section>{detailRequest.documento_id && <button type="button" onClick={() => { const row = rows.find((item) => item.id === detailRequest.documento_id); setDetailRequest(null); if (row) openEdit(row); }} className="rounded-md bg-primary px-3 py-2 text-sm font-semibold !text-white">Revisar documento</button>}</section></div>}
       {formOpen && (
         <div
           role="dialog"
@@ -1192,7 +1407,7 @@ export default function AdminResourcePage({ sector }: { sector: Sector }) {
               ? `Editar ${resourceNames[resource]}`
               : `Crear ${resourceNames[resource]}`
           }
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+          className="fixed inset-0 z-50 flex items-center justify-center bg-brand-950/40 backdrop-blur-sm p-4"
         >
           <form
             onSubmit={save}
@@ -1519,7 +1734,7 @@ export default function AdminResourcePage({ sector }: { sector: Sector }) {
           role="dialog"
           aria-modal="true"
           aria-label="Enlace temporal del documento"
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4"
+          className="fixed inset-0 z-50 flex items-center justify-center bg-brand-950/40 backdrop-blur-sm p-4"
         >
           <section className="w-full max-w-2xl space-y-4 rounded-lg border border-border bg-surface p-5 shadow-2xl">
             <header className="flex items-start justify-between gap-4">
@@ -1548,7 +1763,7 @@ export default function AdminResourcePage({ sector }: { sector: Sector }) {
           role="dialog"
           aria-modal="true"
           aria-label={`Equipo del proceso ${teamProcess.nombre}`}
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+          className="fixed inset-0 z-50 flex items-center justify-center bg-brand-950/40 backdrop-blur-sm p-4"
         >
           <section className="w-full max-w-xl space-y-4 rounded-xl border border-border bg-surface p-5 shadow-2xl">
             <header className="flex items-start justify-between gap-3">

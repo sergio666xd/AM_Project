@@ -11,8 +11,6 @@ import {
 } from "react";
 import {
   Check,
-  ChevronDown,
-  ClipboardList,
   Filter,
   Plus,
   RefreshCw,
@@ -20,10 +18,21 @@ import {
   Trash2,
   X,
   ChevronRight,
+  Users,
+  Gavel,
+  Clock,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useSession } from "@/context/SessionContext";
 import TaskMonthCalendar, { type CalendarTask } from "@/components/calendar/TaskMonthCalendar";
+import { PageHeader } from "@/components/ui/PageHeader";
+import { DataTable, type DataTableColumn, type RowAction } from "@/components/ui/DataTable";
+import { SegmentedControl } from "@/components/ui/SegmentedControl";
+import { SummaryStrip } from "@/components/ui/SummaryStrip";
+import { formatDate, formatDateTime, isOverdue, priorityLabel, priorityRank, taskStatusLabel, toDate } from "@/lib/labels";
+import { useNow } from "@/lib/useNow";
+import { Button } from "@/components/ui/Button";
+import { Badge } from "@/components/ui/Badge";
 
 
 type NivelTarea =
@@ -50,11 +59,20 @@ type Task = {
 type Process = {
   id: number;
   nombre: string;
+  radicados?: { id: number; numero: string }[];
+  clientes?: { id: number; nombre_completo: string }[];
 };
 
 type Client = {
   id: number;
   nombre_completo: string;
+};
+
+type Radicado = {
+  id: number;
+  numero?: string;
+  numero_radicado?: string;
+  titulo?: string;
 };
 
 function estadoLabel(estado: string) {
@@ -192,6 +210,7 @@ export default function TareasPage() {
   const [tasks, setTasks] = useState<Task[]>([]);
   const [processes, setProcesses] = useState<Process[]>([]);
   const [clients, setClients] = useState<Client[]>([]);
+  const [radicados, setRadicados] = useState<Radicado[]>([]);
   const [loading, setLoading] = useState(true);
   const [actualizando, setActualizando] = useState(false);
 
@@ -208,6 +227,8 @@ export default function TareasPage() {
 
   const [mostrarFiltros, setMostrarFiltros] = useState(false);
   const [mostrarModal, setMostrarModal] = useState(false);
+  const [quickFilter, setQuickFilter] = useState<string | null>("ABIERTAS");
+  const now = useNow();
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
 
@@ -227,7 +248,7 @@ export default function TareasPage() {
       setActualizando(true);
       setError("");
 
-      const [tasksResponse, processesResponse, clientsResponse] =
+      const [tasksResponse, processesResponse, clientsResponse, radicadosResponse] =
         await Promise.all([
           apiRequest(`/api/tareas`, {
             headers: headers(),
@@ -238,13 +259,15 @@ export default function TareasPage() {
           apiRequest(`/api/expedientes/clientes`, {
             headers: headers(),
           }),
+          apiRequest(`/api/radicados`, { headers: headers() }),
         ]);
 
-      const [tasksData, processesData, clientsData] =
+      const [tasksData, processesData, clientsData, radicadosData] =
         await Promise.all([
           tasksResponse.json(),
           processesResponse.json(),
           clientsResponse.json(),
+          radicadosResponse.json(),
         ]);
 
       if (!tasksResponse.ok) {
@@ -266,10 +289,14 @@ export default function TareasPage() {
             "No fue posible cargar los clientes.",
         );
       }
+      if (!radicadosResponse.ok) {
+        throw new Error(radicadosData.detail || "No fue posible cargar los radicados.");
+      }
 
       setTasks(Array.isArray(tasksData) ? tasksData : []);
       setProcesses(Array.isArray(processesData) ? processesData : []);
       setClients(Array.isArray(clientsData) ? clientsData : []);
+      setRadicados(Array.isArray(radicadosData) ? radicadosData : (radicadosData.items ?? []));
     } catch (cause) {
       setError(
         cause instanceof Error
@@ -406,409 +433,301 @@ export default function TareasPage() {
     fecha_limite: task.fecha_limite || null, href: `/gestion-procesos/abogado/tareas/${task.id}`,
   }));
 
-  const pendientes = tasks.filter(
-    (task) =>
-      task.estado === "PENDIENTE" ||
-      task.estado === "EN_CURSO",
-  ).length;
-
-  const enCurso = tasks.filter(
-    (task) => task.estado === "EN_CURSO",
-  ).length;
-
-  const vencidas = tasks.filter(esVencida).length;
-
-  const completadas = tasks.filter(
-    (task) => task.estado === "COMPLETADA",
-  ).length;
-
   function openTask(taskId: number) {
     router.push(`/gestion-procesos/abogado/tareas/${taskId}`);
   }
 
-  if (loading) {
-    return (
-      <div
-        className="flex min-h-[60vh] items-center justify-center"
-        style={{ color: "var(--foreground-muted)" }}
-      >
-        Cargando tareas...
-      </div>
-    );
-  }
+  const processName = (task: Task) => processes.find((item) => item.id === task.proceso_id)?.nombre;
+  const clientName = (task: Task) => clients.find((item) => item.id === task.cliente_id)?.nombre_completo;
+  const radicadoNumber = (task: Task) => {
+    const radicado = radicados.find((item) => item.id === task.radicado_id);
+    return radicado ? radicado.numero || radicado.numero_radicado || radicado.titulo : undefined;
+  };
+  const isOpen = (task: Task) => task.estado === "PENDIENTE" || task.estado === "EN_CURSO";
+  const isOverdueTask = (task: Task) => isOverdue(task.fecha_limite, task.estado, now);
+  const dueThisWeek = (task: Task) => {
+    const due = toDate(task.fecha_limite)?.getTime();
+    return Boolean(due && isOpen(task) && due >= now && due <= now + 7 * 86400000);
+  };
+  const quickFiltered = filteredTasks.filter((task) =>
+    !quickFilter ||
+    (quickFilter === "ABIERTAS" && isOpen(task)) ||
+    (quickFilter === "VENCIDAS" && isOverdueTask(task)) ||
+    (quickFilter === "SEMANA" && dueThisWeek(task)) ||
+    (quickFilter === "COMPLETADAS" && task.estado === "COMPLETADA"),
+  );
+  const activeFilters = [filtroEstado !== "TODAS", filtroPrioridad !== "TODAS", filtroNivel !== "TODAS", filtroResponsable !== "TODAS", filtroProceso !== "TODOS", filtroCliente !== "TODOS", Boolean(desde || hasta)].filter(Boolean).length;
+  const clearFilters = () => {
+    setFiltroEstado("TODAS");
+    setFiltroPrioridad("TODAS");
+    setFiltroNivel("TODAS");
+    setFiltroResponsable("TODAS");
+    setFiltroProceso("TODOS");
+    setFiltroCliente("TODOS");
+    setDesde("");
+    setHasta("");
+    setQuickFilter(null);
+  };
+  const completeTask = (task: Task) => request(`/api/tareas/${task.id}/completar`, "PATCH");
+  const deleteTask = (task: Task) => {
+    if (window.confirm(`¿Eliminar la tarea “${task.titulo}”?`)) void request(`/api/tareas/${task.id}`, "DELETE");
+  };
+
+  const taskColumns: DataTableColumn<Task>[] = [
+    {
+      key: "titulo",
+      header: "Tarea",
+      mobile: "title",
+      sortValue: (task) => task.titulo,
+      render: (task) => (
+        <span className="flex min-w-0 items-start gap-2.5">
+          <button
+            type="button"
+            onClick={(event) => {
+              event.preventDefault();
+              event.stopPropagation();
+              if (isOpen(task)) void completeTask(task);
+            }}
+            disabled={!isOpen(task)}
+            aria-label={isOpen(task) ? `Marcar “${task.titulo}” como completada` : "Tarea cerrada"}
+            title={isOpen(task) ? "Marcar como completada" : undefined}
+            className={`mt-0.5 grid size-5 shrink-0 place-items-center rounded-full border transition-colors ${
+              task.estado === "COMPLETADA" ? "border-success bg-success text-white" : "border-border-strong hover:border-success hover:bg-success-light"
+            }`}
+          >
+            {task.estado === "COMPLETADA" && <Check aria-hidden="true" className="size-3" />}
+          </button>
+          <span className={`min-w-0 ${task.estado === "COMPLETADA" || task.estado === "CANCELADA" ? "text-foreground-muted line-through" : ""}`}>{task.titulo}</span>
+        </span>
+      ),
+      className: "max-w-sm",
+    },
+    {
+      key: "contexto",
+      header: "Contexto",
+      mobile: "subtitle",
+      sortValue: (task) => processName(task) || clientName(task) || nivelLabel(nivelTarea(task)),
+      searchValue: (task) => [processName(task), clientName(task), radicadoNumber(task), task.descripcion].filter(Boolean).join(" "),
+      render: (task) => (
+        <span className="block min-w-0 max-w-64">
+          <span className="block truncate">{processName(task) || clientName(task) || "Tarea general"}</span>
+          {(radicadoNumber(task) || (processName(task) && clientName(task))) && (
+            <span className="block truncate text-xs text-foreground-muted">{[clientName(task) && processName(task) ? clientName(task) : null, radicadoNumber(task)].filter(Boolean).join(" · ")}</span>
+          )}
+        </span>
+      ),
+    },
+    { key: "prioridad", header: "Prioridad", mobile: "badge", sortValue: (task) => priorityRank(task.prioridad), exportValue: (task) => prioridadLabel(task.prioridad), render: (task) => <Badge tone={priorityLabel(task.prioridad).tone}>{priorityLabel(task.prioridad).label}</Badge> },
+    { key: "estado", header: "Estado", mobile: "badge", sortValue: (task) => estadoLabel(task.estado), render: (task) => <Badge tone={taskStatusLabel(task.estado).tone}>{taskStatusLabel(task.estado).label}</Badge> },
+    {
+      key: "fecha_limite",
+      header: "Vence",
+      mobile: "meta",
+      className: "whitespace-nowrap",
+      sortValue: (task) => toDate(task.fecha_limite),
+      exportValue: (task) => formatDateTime(task.fecha_limite),
+      render: (task) => task.fecha_limite ? (
+        <span className={isOverdueTask(task) ? "font-semibold text-danger" : dueThisWeek(task) ? "font-medium text-warning" : ""} title={formatDateTime(task.fecha_limite)}>
+          {isOverdueTask(task) ? "Venció " : ""}{formatDate(task.fecha_limite)}
+        </span>
+      ) : <span className="text-foreground-muted">Sin fecha</span>,
+    },
+    {
+      key: "responsable",
+      header: "Responsable",
+      mobile: "hidden",
+      wideOnly: true,
+      sortValue: (task) => (task.usuario_id === user?.id ? "Yo" : "Otro"),
+      render: (task) => (task.usuario_id === user?.id ? "Yo" : <span className="text-foreground-muted">Otro abogado</span>),
+    },
+  ];
+
+  const taskActions: RowAction<Task>[] = [
+    { label: "Abrir tarea", icon: <ChevronRight />, href: (task) => `/gestion-procesos/abogado/tareas/${task.id}` },
+    { label: "Marcar como completada", icon: <Check />, onSelect: (task) => completeTask(task), hidden: (task) => !isOpen(task) },
+    { label: "Empezar (en curso)", icon: <Clock />, onSelect: (task) => request(`/api/tareas/${task.id}`, "PUT", { estado: "EN_CURSO" }), hidden: (task) => task.estado !== "PENDIENTE" },
+    { label: "Reabrir", icon: <RefreshCw />, onSelect: (task) => request(`/api/tareas/${task.id}`, "PUT", { estado: "PENDIENTE" }), hidden: (task) => isOpen(task) },
+    { label: "Ir al proceso", icon: <Gavel />, href: (task) => `/gestion-procesos/abogado/procesos/${task.proceso_id}`, hidden: (task) => !task.proceso_id },
+    { label: "Eliminar tarea", icon: <Trash2 />, tone: "danger", separated: true, onSelect: (task) => deleteTask(task) },
+  ];
+
+  const selectClass = "h-10 w-full rounded-[var(--radius-md)] border border-border bg-background px-3 text-sm text-foreground";
 
   return (
-    <div
-      className="space-y-5"
-      style={{ color: "var(--foreground)" }}
-    >
-      {/* ENCABEZADO */}
-      <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-        <div>
-          <div className="flex items-center gap-2">
-            <ClipboardList
-              size={24}
-              style={{ color: "var(--primary)" }}
+    <div className="mx-auto max-w-7xl space-y-5">
+      <PageHeader
+        overline="Mi día"
+        title="Tareas"
+        description="Pendientes del despacho por proceso, cliente y fecha límite."
+        action={<Button variant="primary" onClick={() => setMostrarModal(true)} icon={<Plus className="size-4" />}>Nueva tarea</Button>}
+      />
+
+      <SummaryStrip
+        active={quickFilter}
+        onSelect={setQuickFilter}
+        items={[
+          { key: "ABIERTAS", label: "Abiertas", value: filteredTasks.filter(isOpen).length },
+          { key: "VENCIDAS", label: "Vencidas", value: filteredTasks.filter(isOverdueTask).length, tone: "danger" },
+          { key: "SEMANA", label: "Vencen en 7 días", value: filteredTasks.filter(dueThisWeek).length, tone: "warning" },
+          { key: "COMPLETADAS", label: "Completadas", value: filteredTasks.filter((task) => task.estado === "COMPLETADA").length, tone: "success" },
+        ]}
+      />
+
+      {error && (
+        <div role="alert" className="flex items-center justify-between gap-3 rounded-[var(--radius-lg)] border border-danger/30 bg-danger-light px-4 py-3 text-sm text-danger">
+          <span>{error}</span>
+          <button type="button" onClick={() => setError("")} aria-label="Cerrar error"><X className="size-4" /></button>
+        </div>
+      )}
+      {notice && (
+        <div role="status" className="flex items-center justify-between gap-3 rounded-[var(--radius-lg)] border border-success/30 bg-success-light px-4 py-3 text-sm text-success">
+          <span>{notice}</span>
+          <button type="button" onClick={() => setNotice("")} aria-label="Cerrar aviso"><X className="size-4" /></button>
+        </div>
+      )}
+
+      {/* Filtros compartidos por las tres vistas. */}
+      <section className="rounded-[var(--radius-lg)] border border-border bg-surface p-3 shadow-[var(--shadow-xs)]">
+        <div className="flex flex-wrap items-center gap-2">
+          <div className="relative min-w-0 flex-1 sm:max-w-sm">
+            <Search aria-hidden="true" className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-foreground-muted" />
+            <input
+              type="search"
+              value={query}
+              onChange={(event) => setQuery(event.target.value)}
+              placeholder="Buscar tarea, proceso o cliente"
+              aria-label="Buscar tareas"
+              className="h-10 w-full rounded-[var(--radius-md)] border border-border bg-background pl-9 pr-3 text-sm text-foreground placeholder:text-foreground-muted focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
             />
-            <h1 className="text-2xl font-semibold">Tareas</h1>
           </div>
-
-          <p
-            className="mt-1 text-sm"
-            style={{ color: "var(--foreground-muted)" }}
-          >
-            Organiza pendientes, procesos, clientes y fechas
-            límite de tu despacho.
-          </p>
-        </div>
-      </div>
-
-      {/* BARRA DE ACCIONES */}
-      <div
-        className="rounded-xl border"
-        style={{
-          background: "var(--surface)",
-          borderColor: "var(--border)",
-          boxShadow: "var(--shadow-sm)",
-        }}
-      >
-        <div className="flex flex-wrap items-center gap-1 p-2">
           <button
-            onClick={() => setMostrarModal(true)}
-            className="flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium transition"
-            style={{
-              background: "var(--primary)",
-              color: "var(--primary-foreground)",
-            }}
-          >
-            <Plus size={17} />
-            Nueva tarea
-          </button>
-
-          <button
-            onClick={() => void load()}
-            disabled={actualizando}
-            className="flex items-center gap-2 rounded-lg px-3 py-2 text-sm transition disabled:opacity-50"
-            style={{ color: "var(--foreground-secondary)" }}
-          >
-            <RefreshCw
-              size={16}
-              className={actualizando ? "animate-spin" : ""}
-            />
-            Actualizar
-          </button>
-
-          <div
-            className="mx-1 hidden h-6 w-px sm:block"
-            style={{ background: "var(--border)" }}
-          />
-
-          <button
-            onClick={() =>
-              setFiltroEstado(
-                filtroEstado === "PENDIENTE"
-                  ? "TODAS"
-                  : "PENDIENTE",
-              )
-            }
-            className="rounded-lg px-3 py-2 text-sm transition"
-            style={{
-              background:
-                filtroEstado === "PENDIENTE"
-                  ? "var(--primary-light)"
-                  : "transparent",
-              color:
-                filtroEstado === "PENDIENTE"
-                  ? "var(--primary)"
-                  : "var(--foreground-secondary)",
-            }}
-          >
-            Pendientes
-          </button>
-
-          <button
-            onClick={() =>
-              setFiltroEstado(
-                filtroEstado === "COMPLETADA"
-                  ? "TODAS"
-                  : "COMPLETADA",
-              )
-            }
-            className="rounded-lg px-3 py-2 text-sm transition"
-            style={{
-              background:
-                filtroEstado === "COMPLETADA"
-                  ? "var(--success-light)"
-                  : "transparent",
-              color:
-                filtroEstado === "COMPLETADA"
-                  ? "var(--success)"
-                  : "var(--foreground-secondary)",
-            }}
-          >
-            Completadas
-          </button>
-
-          <button
+            type="button"
             onClick={() => setMostrarFiltros(!mostrarFiltros)}
-            className="ml-auto flex items-center gap-2 rounded-lg px-3 py-2 text-sm transition"
-            style={{
-              background: mostrarFiltros
-                ? "var(--surface-hover)"
-                : "transparent",
-              color: "var(--foreground-secondary)",
-            }}
+            aria-expanded={mostrarFiltros}
+            className={`inline-flex h-10 items-center gap-2 rounded-[var(--radius-md)] border px-3 text-sm font-medium ${activeFilters ? "border-primary bg-primary-light text-primary" : "border-border text-foreground hover:bg-surface-hover"}`}
           >
-            <Filter size={16} />
-            Filtros
-            <ChevronDown
-              size={15}
-              className={`transition ${
-                mostrarFiltros ? "rotate-180" : ""
-              }`}
-            />
+            <Filter aria-hidden="true" className="size-4" />
+            Filtros{activeFilters ? ` (${activeFilters})` : ""}
+          </button>
+          {activeFilters > 0 && <button type="button" onClick={clearFilters} className="h-10 px-2 text-sm font-medium text-primary hover:underline">Limpiar</button>}
+          <button type="button" onClick={() => void load()} disabled={actualizando} aria-label="Actualizar" className="grid size-10 place-items-center rounded-[var(--radius-md)] border border-border text-foreground hover:bg-surface-hover disabled:opacity-50 sm:ml-auto">
+            <RefreshCw aria-hidden="true" className={`size-4 ${actualizando ? "animate-spin" : ""}`} />
           </button>
         </div>
-
-        {/* FILTROS */}
         {mostrarFiltros && (
-          <div
-            className="grid grid-cols-1 gap-3 border-t p-3 md:grid-cols-4"
-            style={{ borderColor: "var(--border)" }}
-          >
-            <div className="relative md:col-span-2">
-              <Search
-                size={16}
-                className="absolute left-3 top-1/2 -translate-y-1/2"
-                style={{ color: "var(--foreground-muted)" }}
-              />
-              <input
-                value={query}
-                onChange={(event) => setQuery(event.target.value)}
-                placeholder="Buscar tarea, proceso o cliente..."
-                className="w-full rounded-lg border py-2.5 pl-9 pr-3 text-sm outline-none"
-                style={{
-                  background: "var(--surface-muted)",
-                  borderColor: "var(--border)",
-                  color: "var(--foreground)",
-                }}
-              />
-            </div>
-
-            <select
-              value={filtroNivel}
-              onChange={(event) =>
-                setFiltroNivel(event.target.value)
-              }
-              className="rounded-lg border px-3 py-2.5 text-sm outline-none"
-              style={{
-                background: "var(--surface-muted)",
-                borderColor: "var(--border)",
-                color: "var(--foreground)",
-              }}
-            >
-              <option value="TODAS">Todos los contextos</option>
-              <option value="GENERAL">Generales</option>
-              <option value="PROCESO">Procesos</option>
-              <option value="CLIENTE">Clientes</option>
-              <option value="RADICADO">Radicados</option>
-              <option value="ACTUACION">Actuaciones</option>
+          <div className="mt-3 grid grid-cols-1 gap-2 border-t border-border pt-3 sm:grid-cols-2 lg:grid-cols-4">
+            <select aria-label="Estado" value={filtroEstado} onChange={(event) => setFiltroEstado(event.target.value)} className={selectClass}>
+              <option value="TODAS">Todos los estados</option>
+              <option value="PENDIENTE">Pendientes</option>
+              <option value="EN_CURSO">En curso</option>
+              <option value="COMPLETADA">Completadas</option>
+              <option value="CANCELADA">Canceladas</option>
             </select>
-
-            <select value={filtroProceso} onChange={(event) => setFiltroProceso(event.target.value)} className="rounded-lg border px-3 py-2.5 text-sm outline-none" style={{ background: "var(--surface-muted)", borderColor: "var(--border)", color: "var(--foreground)" }}>
-              <option value="TODOS">Todos los procesos</option>{processes.map((process) => <option key={process.id} value={process.id}>{process.nombre}</option>)}
-            </select>
-            <select value={filtroCliente} onChange={(event) => setFiltroCliente(event.target.value)} className="rounded-lg border px-3 py-2.5 text-sm outline-none" style={{ background: "var(--surface-muted)", borderColor: "var(--border)", color: "var(--foreground)" }}>
-              <option value="TODOS">Todos los clientes</option>{clients.map((client) => <option key={client.id} value={client.id}>{client.nombre_completo}</option>)}
-            </select>
-
-            <select value={filtroResponsable} onChange={(event) => setFiltroResponsable(event.target.value)} className="rounded-lg border px-3 py-2.5 text-sm outline-none" style={{ background: "var(--surface-muted)", borderColor: "var(--border)", color: "var(--foreground)" }}>
-              <option value="TODAS">Todos los responsables</option><option value="MIA">Asignadas a mí</option><option value="OTRAS">Asignadas a otros</option>
-            </select>
-            <label className="text-xs text-foreground-muted">Vence desde<input type="date" value={desde} onChange={(event) => setDesde(event.target.value)} className="mt-1 w-full rounded-lg border px-3 py-2 text-sm" style={{ background: "var(--surface-muted)", borderColor: "var(--border)", color: "var(--foreground)" }} /></label>
-            <label className="text-xs text-foreground-muted">Vence hasta<input type="date" value={hasta} onChange={(event) => setHasta(event.target.value)} className="mt-1 w-full rounded-lg border px-3 py-2 text-sm" style={{ background: "var(--surface-muted)", borderColor: "var(--border)", color: "var(--foreground)" }} /></label>
-
-            <select
-              value={filtroPrioridad}
-              onChange={(event) =>
-                setFiltroPrioridad(event.target.value)
-              }
-              className="rounded-lg border px-3 py-2.5 text-sm outline-none"
-              style={{
-                background: "var(--surface-muted)",
-                borderColor: "var(--border)",
-                color: "var(--foreground)",
-              }}
-            >
+            <select aria-label="Prioridad" value={filtroPrioridad} onChange={(event) => setFiltroPrioridad(event.target.value)} className={selectClass}>
               <option value="TODAS">Todas las prioridades</option>
               <option value="URGENTE">Urgentes</option>
               <option value="ALTA">Altas</option>
               <option value="MEDIA">Medias</option>
               <option value="BAJA">Bajas</option>
             </select>
+            <select aria-label="Responsable" value={filtroResponsable} onChange={(event) => setFiltroResponsable(event.target.value)} className={selectClass}>
+              <option value="TODAS">Todos los responsables</option>
+              <option value="MIA">Asignadas a mí</option>
+              <option value="OTRAS">Asignadas a otros</option>
+            </select>
+            <select aria-label="Contexto" value={filtroNivel} onChange={(event) => setFiltroNivel(event.target.value)} className={selectClass}>
+              <option value="TODAS">Todos los contextos</option>
+              <option value="GENERAL">Generales</option>
+              <option value="PROCESO">De proceso</option>
+              <option value="CLIENTE">De cliente</option>
+              <option value="RADICADO">De radicado</option>
+              <option value="ACTUACION">De actuación</option>
+            </select>
+            <select aria-label="Proceso" value={filtroProceso} onChange={(event) => setFiltroProceso(event.target.value)} className={selectClass}>
+              <option value="TODOS">Todos los procesos</option>
+              {processes.map((process) => <option key={process.id} value={process.id}>{process.nombre}</option>)}
+            </select>
+            <select aria-label="Cliente" value={filtroCliente} onChange={(event) => setFiltroCliente(event.target.value)} className={selectClass}>
+              <option value="TODOS">Todos los clientes</option>
+              {clients.map((client) => <option key={client.id} value={client.id}>{client.nombre_completo}</option>)}
+            </select>
+            <label className="text-xs text-foreground-muted">Vence desde<input type="date" value={desde} onChange={(event) => setDesde(event.target.value)} className={`mt-1 ${selectClass}`} /></label>
+            <label className="text-xs text-foreground-muted">Vence hasta<input type="date" value={hasta} onChange={(event) => setHasta(event.target.value)} className={`mt-1 ${selectClass}`} /></label>
           </div>
         )}
-      </div>
+      </section>
 
-      {/* RESUMEN */}
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-        <ResumenCard label="Pendientes" value={pendientes} />
-        <ResumenCard label="En curso" value={enCurso} />
-        <ResumenCard label="Vencidas" value={vencidas} danger />
-        <ResumenCard
-          label="Completadas"
-          value={completadas}
-          success
+      <SegmentedControl
+        label="Vista de tareas"
+        value={vista}
+        onChange={setVista}
+        options={[{ value: "LISTA", label: "Lista" }, { value: "KANBAN", label: "Tablero" }, { value: "CALENDARIO", label: "Calendario" }]}
+      />
+
+      {vista === "CALENDARIO" ? (
+        <TaskMonthCalendar tasks={calendarTasks} />
+      ) : vista === "KANBAN" ? (
+        <div className="-mx-4 flex snap-x gap-3 overflow-x-auto px-4 pb-2 lg:mx-0 lg:grid lg:grid-cols-4 lg:overflow-visible lg:px-0">
+          {["PENDIENTE", "EN_CURSO", "COMPLETADA", "CANCELADA"].map((status) => {
+            const columnTasks = quickFiltered.filter((task) => task.estado === status);
+            return (
+              <section key={status} className="min-h-48 w-[82vw] max-w-sm shrink-0 snap-start rounded-[var(--radius-lg)] border border-border bg-surface-muted p-3 lg:w-auto lg:max-w-none">
+                <h2 className="mb-3 flex items-center justify-between text-sm font-semibold">
+                  {estadoLabel(status)}
+                  <span className="rounded-full bg-surface px-2 py-0.5 text-xs text-foreground-muted">{columnTasks.length}</span>
+                </h2>
+                <div className="space-y-2">
+                  {columnTasks.map((task) => (
+                    <TaskCard
+                      key={task.id}
+                      task={task}
+                      processes={processes}
+                      clients={clients}
+                      radicados={radicados}
+                      onOpen={() => openTask(task.id)}
+                      onComplete={() => void completeTask(task)}
+                      onDelete={() => deleteTask(task)}
+                      onStatusChange={(estado) => void request(`/api/tareas/${task.id}`, "PUT", { estado })}
+                    />
+                  ))}
+                  {columnTasks.length === 0 && <p className="py-6 text-center text-xs text-foreground-muted">Sin tareas</p>}
+                </div>
+              </section>
+            );
+          })}
+        </div>
+      ) : (
+        <DataTable
+          caption="Tareas"
+          rows={quickFiltered}
+          columns={taskColumns}
+          rowKey={(task) => task.id}
+          rowHref={(task) => `/gestion-procesos/abogado/tareas/${task.id}`}
+          rowActions={taskActions}
+          bulkActions={[
+            { label: "Completar", icon: <Check />, onRun: async (rows) => { for (const task of rows.filter(isOpen)) await completeTask(task); } },
+            {
+              label: "Eliminar",
+              icon: <Trash2 />,
+              tone: "danger",
+              onRun: async (rows) => {
+                if (!window.confirm(`¿Eliminar ${rows.length} tarea(s)?`)) return;
+                for (const task of rows) await request(`/api/tareas/${task.id}`, "DELETE");
+              },
+            },
+          ]}
+          rowTone={(task) => (isOverdueTask(task) ? "danger" : undefined)}
+          searchable={false}
+          initialSort={{ key: "fecha_limite", direction: "asc" }}
+          exportFilename="tareas"
+          storageKey="abogado-tareas"
+          loading={loading}
+          emptyTitle={tasks.length === 0 ? "No tienes tareas" : "Ninguna tarea coincide con los filtros"}
+          emptyDescription={tasks.length === 0 ? "Crea una tarea para organizar el trabajo del despacho." : "Ajusta la búsqueda o los filtros."}
+          emptyAction={tasks.length === 0 ? <Button variant="primary" onClick={() => setMostrarModal(true)} icon={<Plus className="size-4" />}>Nueva tarea</Button> : <Button variant="outline" onClick={clearFilters}>Limpiar filtros</Button>}
         />
-      </div>
-
-      {/* MENSAJES */}
-      {error && (
-        <div
-          className="flex items-center justify-between rounded-lg border px-4 py-3 text-sm"
-          style={{
-            background: "var(--danger-light)",
-            borderColor: "var(--danger)",
-            color: "var(--danger)",
-          }}
-        >
-          <span>{error}</span>
-          <button onClick={() => setError("")} aria-label="Cerrar error">
-            <X size={17} />
-          </button>
-        </div>
       )}
 
-      {notice && (
-        <div
-          className="flex items-center justify-between rounded-lg border px-4 py-3 text-sm"
-          style={{
-            background: "var(--success-light)",
-            borderColor: "var(--success)",
-            color: "var(--success)",
-          }}
-        >
-          <span>{notice}</span>
-          <button
-            onClick={() => setNotice("")}
-            aria-label="Cerrar notificación"
-          >
-            <X size={17} />
-          </button>
-        </div>
-      )}
-
-      <div className="flex flex-wrap gap-2" role="tablist" aria-label="Vista de tareas">
-        {([ ["LISTA", "Lista"], ["KANBAN", "Kanban"], ["CALENDARIO", "Calendario"] ] as const).map(([key, label]) => <button key={key} type="button" role="tab" aria-selected={vista === key} onClick={() => setVista(key)} className="rounded-lg border px-3 py-2 text-sm font-medium" style={{ borderColor: vista === key ? "var(--primary)" : "var(--border)", background: vista === key ? "var(--primary-light)" : "var(--surface)", color: vista === key ? "var(--primary)" : "var(--foreground-secondary)" }}>{label}</button>)}
-      </div>
-
-      {vista === "CALENDARIO" ? <TaskMonthCalendar tasks={calendarTasks} /> : vista === "KANBAN" ? <div className="grid gap-4 lg:grid-cols-4">{["PENDIENTE", "EN_CURSO", "COMPLETADA", "CANCELADA"].map((status) => <section key={status} className="min-h-48 rounded-xl border p-3" style={{ borderColor: "var(--border)", background: "var(--surface-muted)" }}><h2 className="mb-3 flex items-center justify-between text-sm font-semibold">{estadoLabel(status)}<span className="rounded-full bg-[var(--surface)] px-2 py-0.5 text-xs">{filteredTasks.filter((task) => task.estado === status).length}</span></h2><div className="space-y-2">{filteredTasks.filter((task) => task.estado === status).map((task) => <TaskCard key={task.id} task={task} processes={processes} clients={clients} onOpen={() => openTask(task.id)} onComplete={() => void request(`/api/tareas/${task.id}/completar`, "PATCH")} onDelete={() => { if (confirm("¿Eliminar tarea?")) void request(`/api/tareas/${task.id}`, "DELETE"); }} onStatusChange={(estado) => void request(`/api/tareas/${task.id}`, "PUT", { estado })} />)}</div></section>)}</div> : <>
-      {/* ESCRITORIO */}
-      <div
-        className="hidden overflow-hidden rounded-xl border md:block"
-        style={{
-          background: "var(--surface)",
-          borderColor: "var(--border)",
-          boxShadow: "var(--shadow-sm)",
-        }}
-      >
-        <table className="w-full border-collapse text-left">
-          <thead>
-            <tr
-              className="border-b text-xs font-semibold uppercase tracking-wide"
-              style={{
-                borderColor: "var(--border)",
-                color: "var(--foreground-muted)",
-                background: "var(--surface-muted)",
-              }}
-            >
-              <th className="w-12 px-4 py-3" />
-              <th className="px-4 py-3">Tarea</th>
-              <th className="px-4 py-3">Contexto</th>
-              <th className="px-4 py-3">Prioridad</th>
-              <th className="px-4 py-3">Fecha límite</th>
-              <th className="px-4 py-3">Estado</th>
-              <th className="w-20 px-4 py-3" />
-            </tr>
-          </thead>
-
-          <tbody>
-            {filteredTasks.length === 0 ? (
-              <tr>
-                <td colSpan={7} className="p-4">
-                  <EmptyState />
-                </td>
-              </tr>
-            ) : (
-              filteredTasks.map((task) => (
-                <TaskRow
-                  key={task.id}
-                  task={task}
-                  processes={processes}
-                  clients={clients}
-                  onOpen={() => openTask(task.id)}
-                  onComplete={() =>
-                    void request(
-                      `/api/tareas/${task.id}/completar`,
-                      "PATCH",
-                    )
-                  }
-                  onDelete={() => {
-                    if (confirm("¿Eliminar tarea?")) {
-                      void request(`/api/tareas/${task.id}`, "DELETE");
-                    }
-                  }}
-                  onStatusChange={(estado) =>
-                    void request(
-                      `/api/tareas/${task.id}`,
-                      "PUT",
-                      { estado },
-                    )
-                  }
-                />
-              ))
-            )}
-          </tbody>
-        </table>
-      </div>
-
-      {/* MÓVIL */}
-      <div className="space-y-3 md:hidden">
-        {filteredTasks.length === 0 ? (
-          <EmptyState />
-        ) : (
-          filteredTasks.map((task) => (
-            <TaskCard
-              key={task.id}
-              task={task}
-              processes={processes}
-              clients={clients}
-              onOpen={() => openTask(task.id)}
-              onComplete={() =>
-                void request(
-                  `/api/tareas/${task.id}/completar`,
-                  "PATCH",
-                )
-              }
-              onDelete={() => {
-                if (confirm("¿Eliminar tarea?")) {
-                  void request(`/api/tareas/${task.id}`, "DELETE");
-                }
-              }}
-              onStatusChange={(estado) =>
-                void request(
-                  `/api/tareas/${task.id}`,
-                  "PUT",
-                  { estado },
-                )
-              }
-            />
-          ))
-        )}
-      </div>
-      </>}
-
-      {/* MODAL */}
       {mostrarModal && (
         <NuevaTareaModal
           processes={processes}
@@ -821,48 +740,6 @@ export default function TareasPage() {
           onError={(message) => setError(message)}
         />
       )}
-    </div>
-  );
-}
-
-function ResumenCard({
-  label,
-  value,
-  danger,
-  success,
-}: {
-  label: string;
-  value: number;
-  danger?: boolean;
-  success?: boolean;
-}) {
-  return (
-    <div
-      className="rounded-xl border p-4"
-      style={{
-        background: "var(--surface)",
-        borderColor: "var(--border)",
-        boxShadow: "var(--shadow-sm)",
-      }}
-    >
-      <p
-        className="text-xs"
-        style={{ color: "var(--foreground-muted)" }}
-      >
-        {label}
-      </p>
-      <p
-        className="mt-1 text-2xl font-semibold"
-        style={{
-          color: danger
-            ? "var(--danger)"
-            : success
-              ? "var(--success)"
-              : "var(--foreground)",
-        }}
-      >
-        {value}
-      </p>
     </div>
   );
 }
@@ -900,160 +777,11 @@ function Checkbox({
   );
 }
 
-function TaskRow({
-  task,
-  processes,
-  clients,
-  onOpen,
-  onComplete,
-  onDelete,
-  onStatusChange,
-}: {
-  task: Task;
-  processes: Process[];
-  clients: Client[];
-  onOpen: () => void;
-  onComplete: () => void;
-  onDelete: () => void;
-  onStatusChange: (status: string) => void;
-}) {
-  const process = processes.find(
-    (item) => item.id === task.proceso_id,
-  );
-  const client = clients.find(
-    (item) => item.id === task.cliente_id,
-  );
-
-  return (
-    <tr
-      onClick={onOpen}
-      onKeyDown={(event) => {
-        if (event.key === "Enter") onOpen();
-      }}
-      tabIndex={0}
-      className="group cursor-pointer border-b transition hover:bg-surface-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary"
-      style={{ borderColor: "var(--border)" }}
-      title="Ver detalle de la tarea"
-    >
-      <td className="px-4 py-4">
-        <Checkbox
-          checked={task.estado === "COMPLETADA"}
-          onChange={onComplete}
-        />
-      </td>
-
-      <td className="px-4 py-4">
-        <div className="min-w-0">
-          <p className="truncate font-medium text-foreground group-hover:text-primary">
-            {task.titulo}
-          </p>
-          {task.descripcion && (
-            <p className="mt-1 max-w-md truncate text-xs text-foreground-muted">
-              {task.descripcion}
-            </p>
-          )}
-        </div>
-      </td>
-
-      <td className="px-4 py-4">
-        <div className="space-y-1">
-          {process && (
-            <p className="text-sm text-foreground">{process.nombre}</p>
-          )}
-          {client && (
-            <p className="text-xs text-foreground-muted">
-              {client.nombre_completo}
-            </p>
-          )}
-          {!process && !client && (
-            <span className="text-xs text-foreground-muted">
-              {nivelLabel(nivelTarea(task))}
-            </span>
-          )}
-        </div>
-      </td>
-
-      <td className="px-4 py-4">
-        <span
-          className="rounded-full px-2.5 py-1 text-xs font-semibold"
-          style={prioridadClasses(task.prioridad)}
-        >
-          {prioridadLabel(task.prioridad)}
-        </span>
-      </td>
-
-      <td className="px-4 py-4">
-        <span
-          className="text-sm"
-          style={{
-            color: esVencida(task)
-              ? "var(--danger)"
-              : "var(--foreground-secondary)",
-          }}
-        >
-          {formatearFecha(task.fecha_limite)}
-        </span>
-      </td>
-
-      <td className="px-4 py-4">
-        <select
-          aria-label="Cambiar estado"
-          value={task.estado}
-          onClick={(event) => event.stopPropagation()}
-          onChange={(event) => {
-            event.stopPropagation();
-            onStatusChange(event.target.value);
-          }}
-          className="appearance-none rounded-full border-0 px-3 py-1.5 text-xs font-semibold outline-none"
-          style={estadoClasses(task.estado)}
-        >
-          <option value="PENDIENTE">Pendiente</option>
-          <option value="EN_CURSO">En curso</option>
-          <option value="COMPLETADA">Completada</option>
-          <option value="CANCELADA">Cancelada</option>
-        </select>
-      </td>
-
-      <td className="px-4 py-4">
-        <div className="flex items-center justify-end gap-1">
-          <button
-            type="button"
-            onClick={(event) => {
-              event.stopPropagation();
-              onComplete();
-            }}
-            className="rounded-lg p-2 text-foreground-muted transition hover:bg-success-light hover:text-success"
-            title="Completar tarea"
-            aria-label="Completar tarea"
-          >
-            <Check size={16} />
-          </button>
-          <button
-            type="button"
-            onClick={(event) => {
-              event.stopPropagation();
-              onDelete();
-            }}
-            className="rounded-lg p-2 text-foreground-muted transition hover:bg-danger-light hover:text-danger"
-            title="Eliminar tarea"
-            aria-label="Eliminar tarea"
-          >
-            <Trash2 size={16} />
-          </button>
-          <ChevronRight
-            size={16}
-            className="text-foreground-muted"
-          />
-        </div>
-      </td>
-    </tr>
-  );
-}
-
 function TaskCard({
   task,
   processes,
   clients,
+  radicados,
   onOpen,
   onComplete,
   onDelete,
@@ -1062,6 +790,7 @@ function TaskCard({
   task: Task;
   processes: Process[];
   clients: Client[];
+  radicados: Radicado[];
   onOpen: () => void;
   onComplete: () => void;
   onDelete: () => void;
@@ -1073,6 +802,8 @@ function TaskCard({
   const client = clients.find(
     (item) => item.id === task.cliente_id,
   );
+  const hasClientAssociation = Boolean(task.cliente_id || process?.clientes?.length);
+  const radicado = radicados.find((item) => item.id === task.radicado_id);
 
   return (
     <div
@@ -1103,9 +834,7 @@ function TaskCard({
         <div className="min-w-0 flex-1">
           <div className="flex items-start justify-between gap-3">
             <div className="min-w-0">
-              <h3 className="truncate font-semibold text-foreground">
-                {task.titulo}
-              </h3>
+              <div className="flex items-center gap-2"><h3 className="truncate font-semibold text-foreground">{task.titulo}</h3>{hasClientAssociation && <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-semibold text-primary"><Users size={12} />{task.cliente_id ? "Tarea asignada" : "Proceso con clientes"}</span>}</div>
               {task.descripcion && (
                 <p className="mt-1 line-clamp-2 text-xs text-foreground-muted">
                   {task.descripcion}
@@ -1130,6 +859,7 @@ function TaskCard({
                 </p>
               </div>
             )}
+            {radicado && <div><p className="text-xs text-foreground-muted">Radicado</p><p className="text-sm text-foreground">{radicado.numero || radicado.numero_radicado || `#${radicado.id}`}</p></div>}
 
             {client && (
               <div>
@@ -1139,8 +869,9 @@ function TaskCard({
                 </p>
               </div>
             )}
+            {!client && process?.clientes && process.clientes.length > 0 && <div><p className="text-xs text-foreground-muted">Clientes del proceso</p><p className="text-sm text-foreground">{process.clientes.map((item) => item.nombre_completo).join(", ")}</p></div>}
 
-            {!process && !client && (
+            {!process && !client && !radicado && (
               <p className="text-xs text-foreground-muted">
                 {nivelLabel(nivelTarea(task))}
               </p>
@@ -1183,7 +914,7 @@ function TaskCard({
                 event.stopPropagation();
                 onStatusChange(event.target.value);
               }}
-              className="rounded-full border-0 px-3 py-1.5 text-xs font-semibold outline-none"
+              className="min-h-11 rounded-full border-0 px-3 py-1.5 text-xs font-semibold outline-none"
               style={estadoClasses(task.estado)}
             >
               <option value="PENDIENTE">Pendiente</option>
@@ -1199,11 +930,12 @@ function TaskCard({
                   event.stopPropagation();
                   onComplete();
                 }}
-                className="rounded-lg p-2 text-foreground-muted transition hover:bg-success-light hover:text-success"
+                className="inline-flex min-h-11 items-center gap-2 rounded-lg px-3 text-sm font-medium text-success transition hover:bg-success-light"
                 title="Completar tarea"
                 aria-label="Completar tarea"
               >
                 <Check size={16} />
+                <span>Completar</span>
               </button>
               <button
                 type="button"
@@ -1211,7 +943,7 @@ function TaskCard({
                   event.stopPropagation();
                   onDelete();
                 }}
-                className="rounded-lg p-2 text-foreground-muted transition hover:bg-danger-light hover:text-danger"
+                className="inline-flex min-h-11 min-w-11 items-center justify-center rounded-lg text-foreground-muted transition hover:bg-danger-light hover:text-danger"
                 title="Eliminar tarea"
                 aria-label="Eliminar tarea"
               >
@@ -1221,33 +953,6 @@ function TaskCard({
           </div>
         </div>
       </div>
-    </div>
-  );
-}
-
-function EmptyState() {
-  return (
-    <div
-      className="rounded-xl border border-dashed py-16 text-center"
-      style={{
-        background: "var(--surface)",
-        borderColor: "var(--border-strong)",
-      }}
-    >
-      <ClipboardList
-        size={32}
-        className="mx-auto"
-        style={{ color: "var(--foreground-muted)" }}
-      />
-      <p className="mt-3 text-sm font-medium">
-        No hay tareas para mostrar
-      </p>
-      <p
-        className="mt-1 text-xs"
-        style={{ color: "var(--foreground-muted)" }}
-      >
-        Ajusta los filtros o crea una nueva tarea.
-      </p>
     </div>
   );
 }
@@ -1298,8 +1003,11 @@ function NuevaTareaModal({
           cliente_id: form.get("cliente_id")
             ? Number(form.get("cliente_id"))
             : null,
-          fecha_limite:
-            String(form.get("fecha_limite") || "") || null,
+          // El campo datetime-local está en hora local; se envía en UTC como
+          // el resto de formularios para que los recordatorios se calculen bien.
+          fecha_limite: form.get("fecha_limite")
+            ? new Date(String(form.get("fecha_limite"))).toISOString()
+            : null,
         }),
       });
 

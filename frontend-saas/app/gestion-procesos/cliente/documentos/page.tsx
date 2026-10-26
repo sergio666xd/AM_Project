@@ -4,8 +4,11 @@ import { apiRequest } from "@/lib/api";
 import Link from "next/link";
 
 import { ChangeEvent, useEffect, useState } from "react";
-import { AlertCircle, CheckCircle2, Download, FileText, FileUp, Loader2, RefreshCw, Upload } from "lucide-react";
+import { AlertCircle, CheckCircle2, Download, FileText, FileUp, FolderOpen, Loader2, RefreshCw, Upload } from "lucide-react";
 import { useSession } from "@/context/SessionContext";
+import { PageHeader } from "@/components/ui/PageHeader";
+import { Button } from "@/components/ui/Button";
+import { Badge } from "@/components/ui/Badge";
 
 const MAX_FILE_SIZE = 15 * 1024 * 1024;
 const ALLOWED_TYPES = new Set([
@@ -41,6 +44,13 @@ type Document = {
 
 type DocumentsData = { solicitudes: Request[]; documentos: Document[] };
 
+function getRequestProgress(request: Request) {
+	const total = request.documentos_requeridos.length;
+	const faltantes = request.documentos_requeridos.filter((item) => item.estado === "FALTANTE").length;
+	const entregados = total - faltantes;
+	return { total, faltantes, entregados, percentage: total ? Math.round((entregados / total) * 100) : 0 };
+}
+
 async function fetchDocuments(token: string): Promise<DocumentsData> {
 	const response = await apiRequest(`/api/expedientes/documentos`, {
 		headers: { Authorization: `Bearer ${token}` },
@@ -71,6 +81,17 @@ export default function DocumentosClientePage() {
 		return () => { active = false; };
 	}, [sessionLoading, token]);
 
+	// Los enlaces #solicitud-N llegan antes de que exista la tarjeta; se desplaza al cargar.
+	useEffect(() => {
+		if (loading || !window.location.hash) return;
+		const target = document.getElementById(decodeURIComponent(window.location.hash.slice(1)));
+		if (!target) return;
+		target.scrollIntoView({ behavior: "smooth", block: "start" });
+		target.classList.add("ring-2", "ring-primary");
+		const timer = window.setTimeout(() => target.classList.remove("ring-2", "ring-primary"), 2500);
+		return () => window.clearTimeout(timer);
+	}, [loading]);
+
 	async function reload() {
 		if (!token) return;
 		setLoading(true);
@@ -86,6 +107,7 @@ export default function DocumentosClientePage() {
 
 	function selectFile(fileKey: string, event: ChangeEvent<HTMLInputElement>) {
 		const file = event.target.files?.[0] ?? null;
+		event.target.value = "";
 		setError("");
 		if (file && !ALLOWED_TYPES.has(file.type)) {
 			setFiles((current) => ({ ...current, [fileKey]: null }));
@@ -198,29 +220,54 @@ export default function DocumentosClientePage() {
 	const itemStatusLabel: Record<string, string> = { FALTANTE: "Pendiente", RECIBIDO: "Recibido", EN_REVISION: "En revisión", REQUIERE_CORRECCION: "Rechazado · requiere reemplazo", RECHAZADO: "Rechazado", APROBADO: "Aprobado" };
 
 	return (
-		<section className="mx-auto max-w-5xl space-y-6">
-			<header className="flex flex-wrap items-end justify-between gap-4">
-				<div>
-					<p className="text-sm text-(--foreground-muted)">Portal del cliente</p>
-					<h1 className="mt-1 text-2xl font-semibold text-foreground">Documentos</h1>
-					<p className="mt-1 text-sm text-(--foreground-muted)">Solicitudes de tus procesos y archivos entregados.</p>
-				</div>
-				<button type="button" onClick={() => void reload()} disabled={loading || sessionLoading} className="inline-flex items-center gap-2 rounded-lg border border-border bg-surface px-3 py-2 text-sm font-medium text-foreground hover:bg-surface-hover disabled:opacity-50">
-					<RefreshCw className={`size-4 ${loading ? "animate-spin" : ""}`} /> Actualizar
-				</button>
-			</header>
+		<section className="mx-auto max-w-5xl space-y-6 pb-24">
+			<PageHeader
+				overline="Portal del cliente"
+				title="Documentos"
+				description="Solicitudes de tus procesos y archivos entregados."
+				action={
+					<Button
+						variant="outline"
+						size="sm"
+						onClick={() => void reload()}
+						loading={loading || sessionLoading}
+						icon={<RefreshCw className="size-4" />}
+					>
+						Actualizar
+					</Button>
+				}
+			/>
 
-			{error && <div role="alert" className="flex items-center gap-2 rounded-lg border border-red-500/20 bg-red-500/5 p-4 text-sm text-red-700"><AlertCircle className="size-4 shrink-0" />{error}</div>}
-			{notice && <div role="status" className="flex items-center gap-2 rounded-lg border border-emerald-700/20 bg-surface p-4 text-sm text-emerald-700"><CheckCircle2 className="size-4 shrink-0" />{notice}</div>}
+			{error && (
+				<div role="alert" className="flex items-center gap-2 rounded-lg border border-risk/30 bg-risk/10 p-3.5 text-sm font-medium text-risk">
+					<AlertCircle className="size-4 shrink-0" />
+					{error}
+				</div>
+			)}
+			{notice && (
+				<div role="status" className="flex items-center gap-2 rounded-lg border border-completed/30 bg-completed/10 p-3.5 text-sm font-medium text-completed">
+					<CheckCircle2 className="size-4 shrink-0" />
+					{notice}
+				</div>
+			)}
 
 			{loading || sessionLoading ? <div className="flex min-h-40 items-center justify-center gap-3 text-sm text-(--foreground-muted)"><RefreshCw className="size-5 animate-spin" />Cargando documentos...</div> : <>
 								<section className="space-y-3">
 					<div><h2 className="font-semibold text-foreground">Solicitudes de documentos</h2><p className="mt-1 text-sm text-(--foreground-muted)">Carga cada archivo solicitado y consulta el estado individual de su revisión.</p></div>
 					{data.solicitudes.length ? data.solicitudes.map((request) => (
 						<article id={`solicitud-${request.id}`} key={request.id} className="rounded-lg border border-border bg-surface p-4 sm:p-5">
-							<div className="flex flex-wrap items-start justify-between gap-3"><div><p className="text-xs text-(--foreground-muted)">{request.proceso}</p><h3 className="mt-1 font-medium text-foreground">{request.titulo}</h3>{request.instrucciones && <p className="mt-1 text-sm text-(--foreground-muted)">{request.instrucciones}</p>}</div><span className="rounded-md bg-amber-500/10 px-2.5 py-1 text-xs text-amber-700">{requestStatusLabel[request.estado] || request.estado}</span></div>
+							<div className="flex flex-wrap items-start justify-between gap-3"><div className="flex min-w-0 items-start gap-3"><span className="grid size-10 shrink-0 place-items-center rounded-lg bg-amber-500/10 text-amber-700"><FolderOpen className="size-5" /></span><div className="min-w-0"><p className="text-xs text-(--foreground-muted)">{request.proceso}</p><h3 className="mt-1 font-medium text-foreground">{request.titulo}</h3>{request.instrucciones && <p className="mt-1 text-sm text-(--foreground-muted)">{request.instrucciones}</p>}</div></div><span className="rounded-md bg-amber-500/10 px-2.5 py-1 text-xs text-amber-700">{requestStatusLabel[request.estado] || request.estado}</span></div>
+							<div className="mt-4 rounded-md border border-border bg-background p-3">
+								<div className="flex flex-wrap items-center justify-between gap-2 text-xs">
+									<span className="font-medium text-foreground">{getRequestProgress(request).entregados} de {getRequestProgress(request).total} documentos entregados</span>
+									<span className={getRequestProgress(request).faltantes ? "text-amber-700" : "text-emerald-700"}>{getRequestProgress(request).faltantes ? `${getRequestProgress(request).faltantes} pendientes` : "Sin pendientes de carga"}</span>
+								</div>
+								<div role="progressbar" aria-label={`Documentos entregados de la solicitud ${request.titulo}`} aria-valuemin={0} aria-valuemax={100} aria-valuenow={getRequestProgress(request).percentage} className="mt-2 h-2 overflow-hidden rounded-full bg-surface-secondary">
+									<div className="h-full rounded-full bg-primary transition-[width]" style={{ width: `${getRequestProgress(request).percentage}%` }} />
+								</div>
+							</div>
 							<div className="mt-4 divide-y divide-border rounded-md border border-border">
-								{request.documentos_requeridos.map((item) => { const fileKey = `${request.id}:${item.id}`; const canUpload = ["FALTANTE", "REQUIERE_CORRECCION"].includes(item.estado); return <div key={item.id} className="space-y-2 p-3"><div className="flex flex-wrap items-center justify-between gap-2"><div><p className="text-sm font-medium">{item.nombre}</p>{item.documento && <p className="text-xs text-(--foreground-muted)">Archivo: {item.documento.nombre_archivo}</p>}</div><span className="rounded bg-surface-secondary px-2 py-1 text-xs">{itemStatusLabel[item.estado] || item.estado}</span></div>{item.documento?.comentario_revision && <p className="text-sm text-amber-800">Observación: {item.documento.comentario_revision}</p>}{canUpload && <div className="flex flex-col gap-2 sm:flex-row sm:items-center"><label className="flex-1 text-sm"><span className="sr-only">Archivo para {item.nombre}</span><input type="file" accept=".pdf,.jpg,.jpeg,.png,.docx,application/pdf,image/jpeg,image/png,application/vnd.openxmlformats-officedocument.wordprocessingml.document" onChange={(event) => selectFile(fileKey, event)} className="block w-full text-sm text-(--foreground-muted) file:mr-3 file:rounded-md file:border file:border-border file:bg-surface-secondary file:px-3 file:py-2 file:text-sm file:font-medium file:text-foreground" /></label><button type="button" onClick={() => void upload(request.id, item.id)} disabled={!files[fileKey] || workingId !== null} className="inline-flex items-center justify-center gap-2 rounded-lg bg-[var(--primary)] px-4 py-2.5 text-sm font-medium text-white disabled:cursor-not-allowed disabled:opacity-50"><Upload className="size-4" />{workingId === request.id ? "Entregando..." : "Entregar archivo"}</button></div>}</div>; })}
+								{request.documentos_requeridos.map((item) => { const fileKey = `${request.id}:${item.id}`; const canUpload = ["FALTANTE", "REQUIERE_CORRECCION"].includes(item.estado); return <div key={item.id} className="space-y-2 p-3"><div className="flex flex-wrap items-center justify-between gap-2"><div><p className="text-sm font-medium">{item.nombre}</p>{item.documento && <p className="text-xs text-(--foreground-muted)">Archivo entregado: {item.documento.nombre_archivo}</p>}</div><span className="rounded bg-surface-secondary px-2 py-1 text-xs">{itemStatusLabel[item.estado] || item.estado}</span></div>{item.documento?.comentario_revision && <p className="text-sm text-amber-800">Observación: {item.documento.comentario_revision}</p>}{canUpload && <div className="flex flex-col gap-2 sm:flex-row sm:items-center"><label className="flex min-h-12 min-w-0 flex-1 cursor-pointer items-center gap-3 rounded-lg border border-border bg-background px-3 py-2 text-sm hover:bg-surface-hover focus-within:ring-2 focus-within:ring-primary"><input type="file" accept=".pdf,.jpg,.jpeg,.png,.docx,application/pdf,image/jpeg,image/png,application/vnd.openxmlformats-officedocument.wordprocessingml.document" aria-label={`Seleccionar archivo para ${item.nombre}`} onChange={(event) => selectFile(fileKey, event)} className="sr-only" /><span className="shrink-0 rounded-md border border-border bg-surface-secondary px-3 py-2 font-medium text-foreground">Elegir archivo</span><span className="min-w-0 truncate text-(--foreground-muted)">{files[fileKey]?.name || "Ningún archivo seleccionado"}</span></label><button type="button" onClick={() => void upload(request.id, item.id)} disabled={!files[fileKey] || workingId !== null} className="inline-flex min-h-12 items-center justify-center gap-2 rounded-lg bg-[var(--primary)] px-4 py-2.5 text-sm font-medium !text-white disabled:cursor-not-allowed disabled:opacity-50"><Upload className="size-4" />{workingId === request.id ? "Entregando..." : "Entregar archivo"}</button></div>}</div>; })}
 							</div>
 							<p className="mt-2 text-xs text-(--foreground-muted)">PDF, JPG, PNG o DOCX; máximo 15 MB.</p>
 						</article>

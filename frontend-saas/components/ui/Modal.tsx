@@ -68,8 +68,8 @@ export function Modal({
 
   return (
     <div className="fixed inset-0 z-[100] grid place-items-center overflow-y-auto p-4" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose(); }}>
-      <div aria-hidden="true" onMouseDown={onClose} className="fixed inset-0 bg-slate-950/50" />
-      <div ref={dialogRef} role="dialog" aria-modal="true" aria-labelledby={titleId} aria-describedby={description ? descriptionId : undefined} tabIndex={-1} className={`relative z-[1] max-h-[calc(100vh-2rem)] w-full overflow-y-auto rounded-2xl border border-border bg-surface shadow-xl ${sizeClass}`}>
+      <div aria-hidden="true" onMouseDown={onClose} className="fixed inset-0 bg-brand-950/40 backdrop-blur-[2px]" />
+      <div ref={dialogRef} role="dialog" aria-modal="true" aria-labelledby={titleId} aria-describedby={description ? descriptionId : undefined} tabIndex={-1} className={`relative z-[1] max-h-[calc(100vh-2rem)] w-full overflow-y-auto rounded-[var(--radius-xl)] border border-border bg-surface shadow-lg ${sizeClass}`}>
         <header className="flex items-start justify-between gap-4 border-b border-border px-5 py-4">
           <div>
             <h2 id={titleId} className="text-lg font-semibold text-foreground">{title}</h2>

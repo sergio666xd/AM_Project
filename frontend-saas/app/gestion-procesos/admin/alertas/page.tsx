@@ -10,6 +10,9 @@ import { Card } from "@/components/ui/Card";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { LoadingState } from "@/components/ui/LoadingState";
 import { FilterBar } from "@/components/ui/FilterBar";
+import { PageHeader } from "@/components/ui/PageHeader";
+import { StatCard } from "@/components/ui/StatCard";
+import { useSession } from "@/context/SessionContext";
 
 type AlertState = "ACTIVA" | "ATENDIDA" | "DESCARTADA" | "ELIMINADA";
 type AlertItem = {
@@ -39,7 +42,7 @@ export default function AdminAlertsPage() {
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
   const [error, setError] = useState("");
-  const token = typeof window === "undefined" ? "" : localStorage.getItem("token") || "";
+  const { token } = useSession();
 
   const load = useCallback(async (showLoading = false) => {
     if (!token) return;
@@ -133,23 +136,27 @@ export default function AdminAlertsPage() {
   }
 
   return (
-    <div className="space-y-6 p-6">
-      <header className="flex flex-wrap items-start justify-between gap-4">
-        <div>
-          <p className="text-sm text-foreground-muted">Centro de atención</p>
-          <h1 className="mt-1 flex items-center gap-2 text-2xl font-semibold"><Bell className="size-6" /> Alertas</h1>
-          <p className="mt-2 text-sm text-foreground-muted">Pendientes, riesgos y eventos importantes de la operación.</p>
-        </div>
-        <div className="flex gap-2">
-          <Button variant="secondary" onClick={() => void load(true)} disabled={loading || busy}><RefreshCw className="mr-2 size-4" /> Actualizar</Button>
-          <Button variant="danger" onClick={() => void deleteAll()} disabled={!items.length || busy}><Trash2 className="mr-2 size-4" /> Eliminar todas</Button>
-        </div>
-      </header>
+    <div className="mx-auto max-w-7xl space-y-6">
+      <PageHeader
+        overline="Centro de atención"
+        title="Alertas"
+        description="Pendientes, riesgos y eventos importantes de la operación."
+        action={
+          <div className="flex gap-2">
+            <Button variant="secondary" onClick={() => void load(true)} disabled={loading || busy} icon={<RefreshCw className="size-4" />}>
+              Actualizar
+            </Button>
+            <Button variant="danger" onClick={() => void deleteAll()} disabled={!items.length || busy} icon={<Trash2 className="size-4" />}>
+              Eliminar todas
+            </Button>
+          </div>
+        }
+      />
 
       <div className="grid gap-3 sm:grid-cols-3">
-        <Card className="p-4"><p className="text-sm text-foreground-muted">Alertas activas</p><p className="mt-1 text-2xl font-semibold">{activeCount}</p></Card>
-        <Card className="p-4"><p className="text-sm text-foreground-muted">Errores y riesgos</p><p className="mt-1 text-2xl font-semibold">{items.filter((item) => item.estado === "ACTIVA" && ["Error", "Riesgo"].includes(item.tipo)).length}</p></Card>
-        <Card className="p-4"><p className="text-sm text-foreground-muted">Pendientes y eventos</p><p className="mt-1 text-2xl font-semibold">{items.filter((item) => item.estado === "ACTIVA" && ["Pendiente", "Evento"].includes(item.tipo)).length}</p></Card>
+        <StatCard label="Alertas activas" value={activeCount} icon={Bell} tone={activeCount > 0 ? "warning" : "default"} />
+        <StatCard label="Errores y riesgos" value={items.filter((item) => item.estado === "ACTIVA" && ["Error", "Riesgo"].includes(item.tipo)).length} icon={Bell} tone={items.some((item) => item.estado === "ACTIVA" && ["Error", "Riesgo"].includes(item.tipo)) ? "danger" : "default"} />
+        <StatCard label="Pendientes y eventos" value={items.filter((item) => item.estado === "ACTIVA" && ["Pendiente", "Evento"].includes(item.tipo)).length} icon={Bell} />
       </div>
 
       <FilterBar>
@@ -174,7 +181,7 @@ export default function AdminAlertsPage() {
       {loading ? <LoadingState label="Cargando alertas" rows={5} /> : visible.length === 0 ? (
         <EmptyState title={filter === "Activas" ? "Todo está al día" : "No hay alertas en esta vista"} description="Las alertas aparecen cuando hay pendientes o eventos reales que requieren atención." />
       ) : (
-        <div className="overflow-x-auto rounded-lg border border-border bg-surface">
+        <div className="hidden overflow-x-auto rounded-lg border border-border bg-surface md:block">
           <table className="w-full min-w-[900px] border-collapse text-left text-sm">
             <thead className="bg-surface-secondary text-xs uppercase text-foreground-muted">
               <tr>
@@ -192,15 +199,34 @@ export default function AdminAlertsPage() {
                 <td className="px-3 py-3">{item.recurso}</td>
                 <td className="px-3 py-3"><div className="flex flex-wrap gap-1">
                   <Link className="inline-flex min-h-8 items-center gap-1 rounded-md bg-surface-hover px-2 text-xs font-semibold" href={item.href}><ExternalLink className="size-3.5" /> Abrir</Link>
-                  {item.estado === "ACTIVA" && <button type="button" onClick={() => void applyBulkAction("ATENDIDA", [item.id])} disabled={busy} title="Marcar atendida" aria-label="Marcar atendida" className="grid size-8 place-items-center rounded-md hover:bg-surface-hover disabled:opacity-50"><Check className="size-4" /></button>}
-                  {item.estado === "ACTIVA" && item.descartable && <button type="button" onClick={() => void applyBulkAction("DESCARTADA", [item.id])} disabled={busy} title="Descartar" aria-label="Descartar" className="grid size-8 place-items-center rounded-md hover:bg-surface-hover disabled:opacity-50"><X className="size-4" /></button>}
-                  {item.estado !== "ELIMINADA" && <button type="button" onClick={() => void applyBulkAction("ELIMINADA", [item.id])} disabled={busy} title="Eliminar" aria-label="Eliminar" className="grid size-8 place-items-center rounded-md text-danger hover:bg-danger-light disabled:opacity-50"><Trash2 className="size-4" /></button>}
+                  {item.estado === "ACTIVA" && <button type="button" onClick={() => void applyBulkAction("ATENDIDA", [item.id])} disabled={busy} title="Marcar atendida" aria-label={`Marcar atendida: ${item.descripcion}`} className="grid size-11 place-items-center rounded-md hover:bg-surface-hover disabled:opacity-50"><Check className="size-4" /></button>}
+                  {item.estado === "ACTIVA" && item.descartable && <button type="button" onClick={() => void applyBulkAction("DESCARTADA", [item.id])} disabled={busy} title="Descartar" aria-label={`Descartar: ${item.descripcion}`} className="grid size-11 place-items-center rounded-md hover:bg-surface-hover disabled:opacity-50"><X className="size-4" /></button>}
+                  {item.estado !== "ELIMINADA" && <button type="button" onClick={() => void applyBulkAction("ELIMINADA", [item.id])} disabled={busy} title="Eliminar" aria-label={`Eliminar: ${item.descripcion}`} className="grid size-11 place-items-center rounded-md text-danger hover:bg-danger-light disabled:opacity-50"><Trash2 className="size-4" /></button>}
                 </div></td>
               </tr>)}
             </tbody>
           </table>
         </div>
       )}
+      {!loading && visible.length > 0 && <div className="space-y-3 md:hidden">
+        {visible.map((item) => <article key={item.id} className="rounded-lg border border-border bg-surface p-4">
+          <div className="flex items-start gap-3">
+            <input type="checkbox" aria-label={`Seleccionar ${item.descripcion}`} checked={selectedIds.includes(item.id)} onChange={() => setSelectedIds((current) => current.includes(item.id) ? current.filter((id) => id !== item.id) : [...current, item.id])} className="mt-1 size-4" />
+            <div className="min-w-0 flex-1">
+              <div className="flex flex-wrap items-center gap-2"><Badge tone={priorityTone[item.prioridad]}>{item.prioridad}</Badge><Badge tone={item.estado === "ACTIVA" ? "pending" : item.estado === "ATENDIDA" ? "completed" : "archived"}>{item.estado === "ACTIVA" ? item.tipo : item.estado === "ATENDIDA" ? "Atendida" : item.estado === "DESCARTADA" ? "Descartada" : "Eliminada"}</Badge></div>
+              <p className="mt-2 break-words font-semibold">{item.descripcion}</p>
+              <p className="mt-1 break-words text-sm text-foreground-muted">{item.accion_recomendada}</p>
+              <p className="mt-2 text-xs text-foreground-muted">{item.fecha ? new Date(item.fecha).toLocaleString("es-CO", { timeZone: "America/Bogota" }) : "Sin fecha"}{item.recurso ? ` · ${item.recurso}` : ""}</p>
+              <div className="mt-3 flex flex-wrap items-center gap-1">
+                <Link className="inline-flex min-h-11 items-center gap-1 rounded-md bg-surface-hover px-3 text-sm font-semibold" href={item.href}><ExternalLink className="size-4" />Abrir</Link>
+                {item.estado === "ACTIVA" && <button type="button" onClick={() => void applyBulkAction("ATENDIDA", [item.id])} disabled={busy} aria-label={`Marcar atendida: ${item.descripcion}`} className="grid size-11 place-items-center rounded-md hover:bg-surface-hover disabled:opacity-50"><Check className="size-4" /></button>}
+                {item.estado === "ACTIVA" && item.descartable && <button type="button" onClick={() => void applyBulkAction("DESCARTADA", [item.id])} disabled={busy} aria-label={`Descartar: ${item.descripcion}`} className="grid size-11 place-items-center rounded-md hover:bg-surface-hover disabled:opacity-50"><X className="size-4" /></button>}
+                {item.estado !== "ELIMINADA" && <button type="button" onClick={() => void applyBulkAction("ELIMINADA", [item.id])} disabled={busy} aria-label={`Eliminar: ${item.descripcion}`} className="grid size-11 place-items-center rounded-md text-danger hover:bg-danger-light disabled:opacity-50"><Trash2 className="size-4" /></button>}
+              </div>
+            </div>
+          </div>
+        </article>)}
+      </div>}
     </div>
   );
 }

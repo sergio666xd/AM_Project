@@ -5,6 +5,9 @@ import { Save, ShieldCheck } from "lucide-react";
 import { useSession } from "@/context/SessionContext";
 import { fetchApi } from "@/lib/api";
 import { SecurityChangeButton } from "@/components/security/SecurityChangeButton";
+import { PageHeader } from "@/components/ui/PageHeader";
+import { Button } from "@/components/ui/Button";
+import { Card } from "@/components/ui/Card";
 
 export default function AdminAccountPage() {
   const { user, token, refreshUser } = useSession();
@@ -53,36 +56,27 @@ export default function AdminAccountPage() {
 
   return (
     <section className="mx-auto max-w-4xl space-y-6">
-      <header>
-        <p className="text-xs font-semibold uppercase tracking-wide text-primary">
-          Panel Administrativo · Seguridad
-        </p>
-        <h1 className="mt-1 text-2xl font-semibold text-foreground">
-          Mi cuenta
-        </h1>
-        <p className="mt-1 text-sm text-foreground-muted">
-          Actualiza el correo de acceso y protege tu contraseña.
-        </p>
-      </header>
+      <PageHeader
+        overline="Panel Administrativo · Seguridad"
+        title="Mi cuenta"
+        description="Actualiza el correo de acceso y protege tu contraseña."
+      />
+
       <section className="grid gap-4 md:grid-cols-3">
         <SecurityChangeButton action="email" title="Cambiar correo" token={token} whatsappAvailable={Boolean(user?.whatsapp_numero)} onComplete={refreshUser} />
         <SecurityChangeButton action="whatsapp" title="Cambiar WhatsApp" token={token} whatsappAvailable={Boolean(user?.whatsapp_numero)} onComplete={refreshUser} />
         <SecurityChangeButton action="password" title="Cambiar contraseña" token={token} whatsappAvailable={Boolean(user?.whatsapp_numero)} onComplete={refreshUser} />
       </section>
-      <section className="space-y-4 border-t border-border pt-5">
-        <div className="flex items-center gap-3">
-          <ShieldCheck className="size-5 text-primary" />
-          <div>
-            <h2 className="font-semibold">Datos personales</h2>
-            <p className="text-sm text-foreground-muted">
-              El correo se utiliza para iniciar sesión.
-            </p>
-          </div>
-        </div>
+
+      <Card
+        title="Datos personales"
+        description="El correo se utiliza para iniciar sesión."
+        action={<ShieldCheck className="size-5 text-primary" />}
+      >
         {profileError && (
           <p
             role="alert"
-            className="rounded-lg border border-danger/30 bg-danger-light p-3 text-sm text-danger"
+            className="mb-4 rounded-[var(--radius-md)] border border-danger/30 bg-danger-light p-3 text-sm text-danger"
           >
             {profileError}
           </p>
@@ -90,7 +84,7 @@ export default function AdminAccountPage() {
         {profileNotice && (
           <p
             role="status"
-            className="rounded-lg border border-success/30 bg-success-light p-3 text-sm text-success"
+            className="mb-4 rounded-[var(--radius-md)] border border-success/30 bg-success-light p-3 text-sm text-success"
           >
             {profileNotice}
           </p>
@@ -103,23 +97,23 @@ export default function AdminAccountPage() {
               maxLength={150}
               value={name ?? user?.nombre_completo ?? ""}
               onChange={(event) => setName(event.target.value)}
-              className="mt-1 w-full rounded-md border border-border bg-surface px-3 py-2.5"
+              className="mt-1 w-full rounded-[var(--radius-md)] border border-border bg-surface px-3 py-2.5"
             />
           </label>
           <div className="text-sm">
             <span className="font-medium">Correo de acceso</span>
-            <p className="mt-1 rounded-md border border-border bg-surface-secondary px-3 py-2.5">{user?.email || "No configurado"}</p>
+            <p className="mt-1 rounded-[var(--radius-md)] border border-border bg-surface-secondary px-3 py-2.5">{user?.email || "No configurado"}</p>
           </div>
           <div className="text-sm">
             <span className="font-medium">WhatsApp</span>
-            <p className="mt-1 rounded-md border border-border bg-surface-secondary px-3 py-2.5">{user?.whatsapp_numero || "No configurado"}</p>
+            <p className="mt-1 rounded-[var(--radius-md)] border border-border bg-surface-secondary px-3 py-2.5">{user?.whatsapp_numero || "No configurado"}</p>
           </div>
           <label className="text-sm font-medium">
             Género para documentos
             <select
               value={gender ?? user?.genero ?? ""}
               onChange={(event) => setGender(event.target.value)}
-              className="mt-1 w-full rounded-md border border-border bg-surface px-3 py-2.5"
+              className="mt-1 w-full rounded-[var(--radius-md)] border border-border bg-surface px-3 py-2.5"
             >
               <option value="">Sin especificar</option>
               <option value="MASCULINO">Masculino</option>
@@ -128,32 +122,32 @@ export default function AdminAccountPage() {
           </label>
           <label className="text-sm font-medium">
             Número de identificación
-            <input maxLength={40} value={documentNumber ?? user?.numero_documento ?? ""} onChange={(event) => setDocumentNumber(event.target.value)} className="mt-1 w-full rounded-md border border-border bg-surface px-3 py-2.5" />
+            <input maxLength={40} value={documentNumber ?? user?.numero_documento ?? ""} onChange={(event) => setDocumentNumber(event.target.value)} className="mt-1 w-full rounded-[var(--radius-md)] border border-border bg-surface px-3 py-2.5" />
           </label>
           <label className="text-sm font-medium">
             Municipio / domicilio
-            <input maxLength={120} value={domicile ?? user?.domicilio ?? ""} onChange={(event) => setDomicile(event.target.value)} className="mt-1 w-full rounded-md border border-border bg-surface px-3 py-2.5" />
+            <input maxLength={120} value={domicile ?? user?.domicilio ?? ""} onChange={(event) => setDomicile(event.target.value)} className="mt-1 w-full rounded-[var(--radius-md)] border border-border bg-surface px-3 py-2.5" />
           </label>
           <label className="text-sm font-medium">
             Dirección de notificación
-            <input maxLength={300} value={address ?? user?.direccion ?? ""} onChange={(event) => setAddress(event.target.value)} className="mt-1 w-full rounded-md border border-border bg-surface px-3 py-2.5" />
+            <input maxLength={300} value={address ?? user?.direccion ?? ""} onChange={(event) => setAddress(event.target.value)} className="mt-1 w-full rounded-[var(--radius-md)] border border-border bg-surface px-3 py-2.5" />
           </label>
           <label className="text-sm font-medium">
             Tarjeta profesional
-            <input maxLength={40} value={professionalCard ?? user?.tarjeta_profesional ?? ""} onChange={(event) => setProfessionalCard(event.target.value)} className="mt-1 w-full rounded-md border border-border bg-surface px-3 py-2.5" />
+            <input maxLength={40} value={professionalCard ?? user?.tarjeta_profesional ?? ""} onChange={(event) => setProfessionalCard(event.target.value)} className="mt-1 w-full rounded-[var(--radius-md)] border border-border bg-surface px-3 py-2.5" />
           </label>
           <div className="flex items-end">
-            <button
+            <Button
               type="submit"
-              disabled={savingProfile}
-              className="inline-flex items-center gap-2 rounded-md bg-primary px-4 py-2.5 text-sm font-semibold text-primary-foreground disabled:opacity-50"
+              variant="primary"
+              loading={savingProfile}
+              icon={<Save className="size-4" />}
             >
-              <Save className="size-4" />
               Guardar datos
-            </button>
+            </Button>
           </div>
         </form>
-      </section>
+      </Card>
     </section>
   );
 }

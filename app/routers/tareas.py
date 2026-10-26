@@ -18,7 +18,7 @@ from app.security import obtener_usuario_actual
 from app.notification_service import emitir_notificacion_workflow
 from app.notification_policy import plan_whatsapp_habilitado
 from app.reminder_workflow import iniciar_workflow_recordatorio, normalizar_utc_naive
-from app.workflow_service import public_site_url
+from app.workflow_service import user_portal_url
 from app.timezone import format_colombia_datetime
 
 
@@ -33,9 +33,11 @@ def _url_tarea_notificacion(usuario: models.Usuario, tarea_id: int) -> str:
         ruta = f"/gestion-procesos/cliente/tareas?tarea={tarea_id}#tarea-{tarea_id}"
     elif usuario.rol == models.RolUsuario.ABOGADO:
         ruta = f"/gestion-procesos/dashboard/tareas/{tarea_id}"
+    elif usuario.rol == models.RolUsuario.ADMIN:
+        ruta = f"/gestion-procesos/admin/tareas?detalle={tarea_id}"
     else:
         ruta = f"/gestion-procesos/abogado/tareas/{tarea_id}"
-    return f"{public_site_url()}{ruta}"
+    return user_portal_url(usuario, ruta)
 
 
 def _versionar_recordatorios_pendientes(tarea: models.Tarea, incluir_sistema: bool = True) -> list[int]:
@@ -135,11 +137,13 @@ def _notificar_cambio_tarea(
         url_tarea = _url_tarea_notificacion(destinatario, tarea.id)
         if accion == "eliminó la tarea":
             if destinatario.rol == models.RolUsuario.CLIENTE:
-                url_tarea = f"{public_site_url()}/gestion-procesos/cliente/tareas"
+                url_tarea = user_portal_url(destinatario, "/gestion-procesos/cliente/tareas")
             elif destinatario.rol == models.RolUsuario.ABOGADO:
-                url_tarea = f"{public_site_url()}/gestion-procesos/dashboard/tareas"
+                url_tarea = user_portal_url(destinatario, "/gestion-procesos/dashboard/tareas")
+            elif destinatario.rol == models.RolUsuario.ADMIN:
+                url_tarea = user_portal_url(destinatario, "/gestion-procesos/admin/tareas")
             else:
-                url_tarea = f"{public_site_url()}/gestion-procesos/abogado/tareas"
+                url_tarea = user_portal_url(destinatario, "/gestion-procesos/abogado/tareas")
         cuerpo = (
             f"Hola {destinatario.nombre_completo},\n\n{actor.nombre_completo} {accion}.\n\n"
             f"Tarea: {tarea.titulo}\nDetalle: {detalle}\nEstado: {tarea.estado.value}\n"
@@ -193,6 +197,8 @@ def filtrar_tareas_cliente(query, cliente: models.Usuario, db: Session):
             models.Proceso.archivado_en.is_(None),
         )
     )
+
+
     radicados = (
         db.query(models.ProcesoRadicado.radicado_id)
         .join(models.ProcesoCliente, models.ProcesoCliente.proceso_id == models.ProcesoRadicado.proceso_id)
@@ -219,10 +225,21 @@ def filtrar_tareas_cliente(query, cliente: models.Usuario, db: Session):
     )
 
 
+def filtrar_tareas_visibles_cliente(query, cliente: models.Usuario, db: Session):
+    assigned_subtasks = db.query(models.Subtarea.tarea_id).filter(
+        models.Subtarea.asignada_cliente.is_(True),
+        models.Subtarea.cliente_id == cliente.id,
+    ).distinct()
+    return filtrar_tareas_cliente(query.filter(or_(
+        models.Tarea.cliente_id == cliente.id,
+        models.Tarea.id.in_(assigned_subtasks),
+    )), cliente, db)
+
+
 def obtener_tarea_usuario(tarea_id: int, usuario_actual: models.Usuario, db: Session):
     query = db.query(models.Tarea).filter(models.Tarea.id == tarea_id)
     if usuario_actual.rol == models.RolUsuario.CLIENTE:
-        query = filtrar_tareas_cliente(query.filter(models.Tarea.cliente_id == usuario_actual.id), usuario_actual, db)
+        query = filtrar_tareas_visibles_cliente(query, usuario_actual, db)
     elif not has_firm_wide_access(usuario_actual):
         responsible_lawyer_id = lawyer_scope_id(usuario_actual)
         assigned_processes = lawyer_process_ids(db, usuario_actual)
@@ -243,6 +260,10 @@ def serializar_tarea_para_usuario(tarea: models.Tarea, usuario: models.Usuario):
         for subtask in data["subtareas"]
         if subtask["asignada_cliente"] and subtask["cliente_id"] == usuario.id
     ]
+    # A parent task can be visible because one of its subtasks is shared with
+    # this client. Do not disclose another client's assignment on that parent.
+    if data.get("cliente_id") != usuario.id:
+        data["cliente_id"] = None
     return data
 
 
@@ -397,16 +418,11 @@ def validar_asignacion_subtarea(
     if existente is not None and "cliente_id" not in fields_set:
         client_id = existente.cliente_id
     if assigned_to_client and client_id is None:
-        client_id = tarea.cliente_id
-    if assigned_to_client and client_id is None:
         raise HTTPException(status_code=400, detail="Selecciona el cliente que recibirá la subtarea.")
     if not assigned_to_client:
-        if client_id is not None:
-            raise HTTPException(status_code=400, detail="Marca la asignación al cliente para enviarle la subtarea.")
+        # The client relation belongs to this subtask only; clear it independently.
         client_id = None
     if assigned_to_client:
-        if tarea.cliente_id is not None and client_id != tarea.cliente_id:
-            raise HTTPException(status_code=400, detail="La subtarea solo puede asignarse al cliente de la tarea padre.")
         client = db.query(models.Usuario).filter(
             models.Usuario.id == client_id,
             models.Usuario.rol == models.RolUsuario.CLIENTE,
@@ -480,7 +496,7 @@ def listar_tareas(
 ):
     query = db.query(models.Tarea)
     if usuario_actual.rol == models.RolUsuario.CLIENTE:
-        query = filtrar_tareas_cliente(query.filter(models.Tarea.cliente_id == usuario_actual.id), usuario_actual, db)
+        query = filtrar_tareas_visibles_cliente(query, usuario_actual, db)
     elif not has_firm_wide_access(usuario_actual):
         responsible_lawyer_id = lawyer_scope_id(usuario_actual)
         assigned_processes = lawyer_process_ids(db, usuario_actual)
@@ -632,6 +648,7 @@ def actualizar_tarea(
     estado_anterior = tarea.estado
     reprogramar_recordatorios = False
     fecha_cambio = False
+    relaciones_cambiadas = False
     fecha_anterior = tarea.fecha_limite
     if datos.titulo is not None:
         titulo = datos.titulo.strip()
@@ -651,15 +668,82 @@ def actualizar_tarea(
         fecha_cambio = tarea.fecha_limite != fecha_limite
         reprogramar_recordatorios = reprogramar_recordatorios or tarea.fecha_limite != fecha_limite
         tarea.fecha_limite = fecha_limite
-    if datos.radicado_id is not None or datos.actuacion_id is not None:
-        radicado, actuacion = validar_relaciones_tarea(datos, usuario_actual, db)
-        validar_ambito_proceso_radicado_actuacion(tarea.proceso_id, radicado, actuacion, db)
-        if datos.actuacion_id is not None:
-            tarea.actuacion_id = datos.actuacion_id
-            tarea.radicado_id = actuacion.radicado_id
-        else:
-            tarea.radicado_id = datos.radicado_id
-            tarea.actuacion_id = None
+    campos_relacion = {"proceso_id", "radicado_id", "actuacion_id", "cliente_id"}
+    if fields_set & campos_relacion:
+        proceso_id = datos.proceso_id if "proceso_id" in fields_set else tarea.proceso_id
+        radicado_id = datos.radicado_id if "radicado_id" in fields_set else tarea.radicado_id
+        actuacion_id = datos.actuacion_id if "actuacion_id" in fields_set else tarea.actuacion_id
+        cliente_id = datos.cliente_id if "cliente_id" in fields_set else tarea.cliente_id
+
+        # Clearing a radicado also clears its child actuation unless the caller
+        # explicitly chooses another actuation in the same update.
+        if "radicado_id" in fields_set and radicado_id is None and "actuacion_id" not in fields_set:
+            actuacion_id = None
+
+        if proceso_id is not None:
+            query_proceso = db.query(models.Proceso).filter(
+                models.Proceso.id == proceso_id,
+                models.Proceso.archivado_en.is_(None),
+            )
+            if not has_firm_wide_access(usuario_actual):
+                query_proceso = query_proceso.filter(
+                    models.Proceso.id.in_(lawyer_process_ids(db, usuario_actual))
+                )
+            if not query_proceso.first():
+                raise HTTPException(status_code=404, detail="Proceso no encontrado o no asignado.")
+
+        # If the process changes and the existing radicado was not explicitly
+        # replaced, detach it when it does not belong to the newly selected process.
+        if "proceso_id" in fields_set and "radicado_id" not in fields_set and proceso_id is not None and radicado_id is not None:
+            pertenece = db.query(models.ProcesoRadicado).filter_by(
+                proceso_id=proceso_id, radicado_id=radicado_id,
+            ).first()
+            if not pertenece:
+                radicado_id = None
+                actuacion_id = None
+
+        relation_data = schemas.TareaCreate(
+            titulo=tarea.titulo,
+            proceso_id=proceso_id,
+            radicado_id=radicado_id,
+            actuacion_id=actuacion_id,
+        )
+        radicado, actuacion = validar_relaciones_tarea(relation_data, usuario_actual, db)
+        validar_ambito_proceso_radicado_actuacion(proceso_id, radicado, actuacion, db)
+        if actuacion is not None:
+            radicado_id = actuacion.radicado_id
+        if cliente_id is not None:
+            cliente = db.query(models.Usuario).filter(
+                models.Usuario.id == cliente_id,
+                models.Usuario.rol == models.RolUsuario.CLIENTE,
+            ).first()
+            if not cliente:
+                raise HTTPException(status_code=400, detail="Cliente no encontrado.")
+            if proceso_id is not None and not db.query(models.ProcesoCliente).filter_by(
+                proceso_id=proceso_id, cliente_id=cliente_id,
+            ).first():
+                raise HTTPException(status_code=400, detail="El cliente no está asignado al proceso de la tarea.")
+            if responsible_lawyer_id := lawyer_scope_id(usuario_actual):
+                if proceso_id is None:
+                    client_process = db.query(models.ProcesoCliente.proceso_id).join(
+                        models.Proceso, models.ProcesoCliente.proceso_id == models.Proceso.id,
+                    ).filter(
+                        models.ProcesoCliente.cliente_id == cliente_id,
+                        models.Proceso.id.in_(lawyer_process_ids(db, usuario_actual)),
+                    ).first()
+                    if cliente.creado_por_abogado_id != responsible_lawyer_id and not client_process:
+                        raise HTTPException(status_code=400, detail="El cliente no está asignado a tus procesos.")
+
+        relaciones_cambiadas = (
+            tarea.proceso_id != proceso_id
+            or tarea.radicado_id != radicado_id
+            or tarea.actuacion_id != actuacion_id
+            or tarea.cliente_id != cliente_id
+        )
+        tarea.proceso_id = proceso_id
+        tarea.radicado_id = radicado_id
+        tarea.actuacion_id = actuacion_id
+        tarea.cliente_id = cliente_id
     if tarea.estado in (models.EstadoTarea.COMPLETADA, models.EstadoTarea.CANCELADA):
         _descartar_recordatorios_tarea(db, tarea)
         recordatorio_ids = []
@@ -682,6 +766,7 @@ def actualizar_tarea(
     if datos.estado is not None: cambios.append(f"estado {datos.estado.value}")
     if datos.prioridad is not None: cambios.append(f"prioridad {datos.prioridad.value}")
     if fecha_cambio: cambios.append(f"vencimiento actualizado desde {format_colombia_datetime(fecha_anterior) if fecha_anterior else 'sin fecha'}")
+    if relaciones_cambiadas: cambios.append("relaciones de proceso, radicado o cliente actualizadas")
     _notificar_cambio_tarea(db, tarea, usuario_actual, "actualizó la tarea", "; ".join(cambios) or "Se actualizaron sus datos.")
     return serializar_tarea_para_usuario(tarea, usuario_actual)
 

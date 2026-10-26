@@ -59,3 +59,14 @@ def render_direct_message(
     if link_label and link_url:
         body = f"{body.rstrip()}\n\nAbrir enlace: {link_label} | {link_url}"
     return _render(template.asunto_email, values), body
+
+
+def render_push_message(
+    db: Session,
+    key: str,
+    values: dict[str, Any],
+) -> tuple[str, str]:
+    template = db.query(models.PlantillaMensaje).filter_by(clave=key, activo=True).first()
+    if template is None or not template.titulo_push or not template.cuerpo_push:
+        raise HTTPException(status_code=503, detail=f"La plantilla Push '{key}' no está configurada.")
+    return _render(template.titulo_push, values), _render(template.cuerpo_push, values)

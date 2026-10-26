@@ -61,7 +61,7 @@ def formatear_mensaje_whatsapp(mensaje: str) -> str:
     return texto
 
 
-def enviar_mensaje_whatsapp(numero_destino: str, mensaje: str) -> bool:
+def enviar_mensaje_whatsapp(numero_destino: str, mensaje: str, *, raise_on_error: bool = False) -> bool:
     """
     Envía una alerta de WhatsApp al número del abogado.
     Soporta formato internacional (Ej: 573001234567).
@@ -76,6 +76,8 @@ def enviar_mensaje_whatsapp(numero_destino: str, mensaje: str) -> bool:
     token = str(config["whatsapp_token"] or "")
     if not api_url.startswith(("https://", "http://")) or not token or token == "TU_TOKEN_AQUI":
         logger.warning("WhatsApp API no está configurada; mensaje omitido.")
+        if raise_on_error:
+            raise RuntimeError("WhatsApp no está configurado: revisa la URL de API y el token en Admin > Operación > Integraciones.")
         return False
 
     payload = {
@@ -86,7 +88,14 @@ def enviar_mensaje_whatsapp(numero_destino: str, mensaje: str) -> bool:
 
     try:
         response = requests.post(api_url, data=payload, timeout=10)
-        return response.status_code == 200
-    except requests.RequestException:
+        if response.status_code == 200:
+            return True
+        logger.error("WhatsApp API rechazó el mensaje con HTTP %s.", response.status_code)
+        if raise_on_error:
+            raise RuntimeError(f"WhatsApp API respondió HTTP {response.status_code}.")
+        return False
+    except requests.RequestException as exc:
         logger.exception("Error enviando mensaje por WhatsApp API.")
+        if raise_on_error:
+            raise RuntimeError(f"No fue posible conectar con la API de WhatsApp ({type(exc).__name__}).") from exc
         return False

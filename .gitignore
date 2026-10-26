@@ -46,3 +46,7 @@ Thumbs.db
 # Mantener esta configuración en el repositorio.
 !.gitignore
 !frontend/.gitignore
+
+graphify-out/
+.codex/
+.github/

@@ -121,7 +121,7 @@ class ConfiguracionConsultas(Base):
 
 
 class PlantillaMensaje(Base):
-    """Editable templates for system email and WhatsApp messages."""
+    """Editable templates for system email, WhatsApp, and browser push messages."""
     __tablename__ = "plantillas_mensaje"
 
     id = Column(Integer, primary_key=True)
@@ -130,6 +130,8 @@ class PlantillaMensaje(Base):
     asunto_email = Column(Text, nullable=True)
     cuerpo_email = Column(Text, nullable=False)
     cuerpo_whatsapp = Column(Text, nullable=False)
+    titulo_push = Column(Text, nullable=True)
+    cuerpo_push = Column(Text, nullable=True)
     variables_ejemplo = Column(JSON, nullable=False, default=dict)
     enlace_ejemplo = Column(String(1000), nullable=True)
     activo = Column(Boolean, nullable=False, default=True)
@@ -236,6 +238,8 @@ class Usuario(Base):
         default=preferencias_notificacion_por_defecto,
     )
     canal_notificacion_cliente = Column(String(16), nullable=True)
+    silenciar_email_si_push = Column(Boolean, nullable=False, default=False)
+    silenciar_whatsapp_si_push = Column(Boolean, nullable=False, default=False)
     created_at = Column(DateTime, default=datetime.utcnow)
     ultimo_acceso = Column(DateTime, nullable=True)
 
@@ -282,7 +286,7 @@ class SolicitudRegistro(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     usuario_id = Column(Integer, ForeignKey("usuarios.id"), unique=True, nullable=False)
-    ruta_tarjeta_profesional = Column(String(255), nullable=False)
+    ruta_tarjeta_profesional = Column(String(255), nullable=True)
     notas_admin = Column(Text, nullable=True)
     fecha_solicitud = Column(DateTime, default=datetime.utcnow)
 
@@ -571,6 +575,51 @@ class ChatMensaje(Base):
     created_at = Column(DateTime, nullable=False, default=datetime.utcnow, index=True)
     conversacion = relationship("ChatConversacion", back_populates="mensajes")
     remitente = relationship("Usuario")
+
+
+class ChatPresenciaPanel(Base):
+    __tablename__ = "chat_presencias_panel"
+    __table_args__ = (
+        UniqueConstraint("usuario_id", "session_id", name="uq_chat_presencia_usuario_sesion"),
+        Index("ix_chat_presencia_last_seen", "last_seen_at"),
+    )
+
+    id = Column(Integer, primary_key=True)
+    usuario_id = Column(Integer, ForeignKey("usuarios.id", ondelete="CASCADE"), nullable=False, index=True)
+    session_id = Column(String(80), nullable=False)
+    last_seen_at = Column(DateTime, nullable=False, default=datetime.utcnow)
+    usuario = relationship("Usuario")
+
+
+class ChatAvisoDestinatario(Base):
+    __tablename__ = "chat_avisos_destinatario"
+    __table_args__ = (
+        UniqueConstraint("remitente_id", "destinatario_id", name="uq_chat_aviso_remitente_destinatario"),
+        Index("ix_chat_aviso_ultima_notificacion", "ultima_notificacion_en"),
+    )
+
+    id = Column(Integer, primary_key=True)
+    remitente_id = Column(Integer, ForeignKey("usuarios.id", ondelete="CASCADE"), nullable=False)
+    destinatario_id = Column(Integer, ForeignKey("usuarios.id", ondelete="CASCADE"), nullable=False)
+    ultima_notificacion_en = Column(DateTime, nullable=False)
+    remitente = relationship("Usuario", foreign_keys=[remitente_id])
+    destinatario = relationship("Usuario", foreign_keys=[destinatario_id])
+
+
+class ChatPushSubscription(Base):
+    __tablename__ = "chat_push_subscriptions"
+    __table_args__ = (UniqueConstraint("endpoint", name="uq_chat_push_subscription_endpoint"),)
+
+    id = Column(Integer, primary_key=True)
+    usuario_id = Column(Integer, ForeignKey("usuarios.id", ondelete="CASCADE"), nullable=False, index=True)
+    endpoint = Column(Text, nullable=False)
+    p256dh = Column(String(256), nullable=False)
+    auth = Column(String(128), nullable=False)
+    user_agent = Column(Text, nullable=False, default="")
+    device_label = Column(String(120), nullable=False, default="")
+    created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
+    updated_at = Column(DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow)
+    usuario = relationship("Usuario")
 
 
 class LecturaNotificacionAbogado(Base):

@@ -1,6 +1,7 @@
 """Procesos de abogados, acceso de clientes y colaboración documental."""
 
 import logging
+from collections import defaultdict
 import os
 import hashlib
 import json
@@ -13,7 +14,7 @@ from fastapi.responses import StreamingResponse
 from sqlalchemy import or_
 from sqlalchemy import func
 from botocore.exceptions import BotoCoreError, ClientError
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, selectinload
 from urllib.parse import quote
 
 from app import models, schemas, security, storage
@@ -26,7 +27,7 @@ from app.document_validation import (
     document_content_matches_type as _document_content_matches_type,
 )
 from app.notification_service import emitir_notificacion_workflow
-from app.workflow_service import public_site_url
+from app.workflow_service import chat_conversation_url, user_portal_url
 from app.timezone import format_colombia_datetime
 from app.radicados import (
     ambito_radicado_usuario,
@@ -129,12 +130,15 @@ def _timeline_proceso(proceso: models.Proceso, db: Session, cliente_id: int | No
                       "visibilidad": CLIENT_VISIBLE if tarea.cliente_id else INTERNAL, "fecha": tarea.created_at})
     events_query = db.query(models.EventoAgenda).filter(models.EventoAgenda.proceso_id == proceso.id)
     if cliente_id is not None:
-        events_query = events_query.filter(models.EventoAgenda.cliente_id == cliente_id)
+        events_query = events_query.filter(or_(
+            models.EventoAgenda.cliente_id == cliente_id,
+            models.EventoAgenda.cliente_id.is_(None),
+        ))
     for event in events_query.all():
         items.append({"id": f"evento:{event.id}", "tipo": event.tipo, "titulo": event.titulo,
                       "descripcion": event.descripcion or "Evento de agenda programado", "actor": event.responsable.nombre_completo if event.responsable else None,
                       "recurso": "Agenda", "recurso_id": event.id,
-                      "visibilidad": CLIENT_VISIBLE if event.cliente_id else INTERNAL, "fecha": event.fecha_inicio})
+                      "visibilidad": CLIENT_VISIBLE, "fecha": event.fecha_inicio})
     for solicitud in db.query(models.SolicitudDocumento).filter(models.SolicitudDocumento.proceso_id == proceso.id).all():
         if cliente_id is not None and solicitud.cliente_id != cliente_id:
             continue
@@ -352,7 +356,7 @@ def _notificar_clientes_proceso(
                               "accion": accion, "proceso": proceso.nombre,
                               "fecha": format_colombia_datetime(datetime.utcnow()), "detalle": detalle},
                    enlace_texto="Ver proceso",
-                   enlace_url=f"{public_site_url()}/gestion-procesos/cliente#proceso-{proceso.id}")
+                   enlace_url=user_portal_url(destinatario, f"/gestion-procesos/cliente/procesos/{proceso.id}"))
 
 
 def _notificar_evento_agenda(
@@ -387,8 +391,8 @@ def _notificar_evento_agenda(
                        "tipo": evento.tipo, "estado": evento.estado, "inicio": fecha_inicio,
                        "fin": fecha_fin, "responsable": responsable,
                        "detalle": evento.descripcion or "Sin detalles adicionales"},
-            enlace_texto="Ver proceso",
-            enlace_url=f"{public_site_url()}/gestion-procesos/cliente/procesos/{proceso.id}#agenda",
+            enlace_texto="Ver agenda",
+            enlace_url=user_portal_url(destinatario, f"/gestion-procesos/cliente/procesos/{proceso.id}#evento-{evento.id}"),
         )
 
 
@@ -421,7 +425,7 @@ def _timeline_cliente_visible(proceso: models.Proceso, db: Session, cliente_id: 
     ultimas_actuaciones = set()
     if radicado_ids:
         actuaciones = db.query(models.Actuacion).filter(models.Actuacion.radicado_id.in_(radicado_ids)).order_by(
-            models.Actuacion.radicado_id, models.Actuacion.orden.desc(), models.Actuacion.id.desc(),
+            models.Actuacion.radicado_id, models.Actuacion.orden.asc(), models.Actuacion.id.desc(),
         ).all()
         vistos = set()
         for actuacion in actuaciones:
@@ -459,7 +463,7 @@ def crear_abogado_admin(datos: schemas.AbogadoAdminCreate, db: Session = Depends
         emisor=usuario,
         plantilla_clave="ABOGADO_CREDENCIALES",
         variables={"nombre": abogado.nombre_completo, "correo": abogado.email},
-        enlace_texto="Ingresar al portal", enlace_url=f"{public_site_url()}/gestion-procesos/auth/login",
+        enlace_texto="Ingresar al portal", enlace_url=user_portal_url(abogado, "/"),
     )
     return {"id": abogado.id, "email": abogado.email, "debe_cambiar_password": True}
 
@@ -481,7 +485,7 @@ def crear_cliente(datos: schemas.ClienteCreate, db: Session = Depends(get_db), u
         db,
         cliente,
         "Acceso a sus procesos",
-        f"Hola {cliente.nombre_completo},\n\n{usuario.nombre_completo} creó tu acceso al portal de gestión de procesos.\n\nTus credenciales temporales son:\nUsuario: {cliente.email}\nContraseña temporal: {datos.password_temporal}\n\nAl iniciar sesión tendrás que cambiar esta contraseña. No compartas estas credenciales.\n\nCanal elegido para futuras notificaciones: {datos.canal_envio}.\n\nAbrir enlace: Ingresar al portal | {public_site_url()}/gestion-procesos/auth/login",
+        f"Hola {cliente.nombre_completo},\n\n{usuario.nombre_completo} creó tu acceso al portal de gestión de procesos.\n\nTus credenciales temporales son:\nUsuario: {cliente.email}\nContraseña temporal: {datos.password_temporal}\n\nAl iniciar sesión tendrás que cambiar esta contraseña. No compartas estas credenciales.\n\nCanal elegido para futuras notificaciones: {datos.canal_envio}.\n\nAbrir enlace: Ingresar al portal | {user_portal_url(cliente, '/')}",
         "ACCESO",
         f"USUARIO:{cliente.id}:ACCESO",
         emisor=usuario,
@@ -490,7 +494,7 @@ def crear_cliente(datos: schemas.ClienteCreate, db: Session = Depends(get_db), u
         variables={"nombre": cliente.nombre_completo, "actor": usuario.nombre_completo,
                    "correo": cliente.email, "password": datos.password_temporal,
                    "canal": datos.canal_envio},
-        enlace_texto="Ingresar al portal", enlace_url=f"{public_site_url()}/gestion-procesos/auth/login",
+                enlace_texto="Ingresar al portal", enlace_url=user_portal_url(cliente, "/"),
     )
     return {"id": cliente.id, "email": cliente.email, "debe_cambiar_password": True, "canal_envio": datos.canal_envio, "mensaje": "Cliente creado y credenciales programadas para envío."}
 
@@ -512,7 +516,42 @@ def listar_clientes(db: Session = Depends(get_db), usuario: models.Usuario = Dep
                 models.Usuario.id.in_(assigned_clients),
             )
         )
-    return [{"id": c.id, "nombre_completo": c.nombre_completo, "email": c.email, "whatsapp_numero": c.whatsapp_numero} for c in query.order_by(models.Usuario.nombre_completo).all()]
+    process_query = (
+        db.query(models.ProcesoCliente.cliente_id, models.Proceso.id)
+        .join(models.Proceso, models.Proceso.id == models.ProcesoCliente.proceso_id)
+        .filter(models.Proceso.archivado_en.is_(None))
+    )
+    if usuario.rol != models.RolUsuario.ADMIN:
+        process_query = process_query.filter(or_(
+            models.Proceso.abogado_id == usuario.id,
+            db.query(models.ProcesoColaborador.abogado_id).filter(
+                models.ProcesoColaborador.proceso_id == models.Proceso.id,
+                models.ProcesoColaborador.abogado_id == usuario.id,
+                models.ProcesoColaborador.visible_cliente.is_(True),
+            ).exists(),
+        ))
+    if responsible_lawyer_id is not None:
+        process_query = process_query.filter(models.Proceso.id.in_(lawyer_process_ids(db, usuario)))
+    chat_process_by_client = {}
+    for client_id, process_id in process_query.order_by(models.Proceso.id.desc()).all():
+        chat_process_by_client.setdefault(client_id, process_id)
+    return [{
+        "id": c.id,
+        "nombre_completo": c.nombre_completo,
+        "email": c.email,
+        "whatsapp_numero": c.whatsapp_numero,
+        "genero": c.genero,
+        "numero_documento": c.numero_documento,
+        "domicilio": c.domicilio,
+        "direccion": c.direccion,
+        "chat_href": (
+            chat_conversation_url(usuario, chat_process_by_client[c.id], c.id)
+            if usuario.rol != models.RolUsuario.ADMIN and c.id in chat_process_by_client
+            else user_portal_url(usuario, "/gestion-procesos/abogado/chat")
+            if usuario.rol != models.RolUsuario.ADMIN
+            else None
+        ),
+    } for c in query.order_by(models.Usuario.nombre_completo).all()]
 
 
 @router.get("/clientes/solicitud-edicion-perfil")
@@ -714,11 +753,24 @@ def obtener_cliente(cliente_id: int, db: Session = Depends(get_db), usuario: mod
             or_(models.Tarea.usuario_id == responsible_lawyer_id, models.Tarea.proceso_id.in_(assigned_processes))
         )
         solicitudes_query = solicitudes_query.filter(models.Proceso.abogado_id == responsible_lawyer_id)
-    procesos = procesos_query.all()
+    procesos = procesos_query.order_by(models.Proceso.id.desc()).all()
     process_names = {p.id: p.nombre for p in procesos}
     tareas = tareas_query.order_by(models.Tarea.created_at.desc()).all()
     solicitudes = solicitudes_query.order_by(models.SolicitudDocumento.created_at.desc()).all()
     process_ids = [p.id for p in procesos]
+    chat_process = None
+    if usuario.rol != models.RolUsuario.ADMIN:
+        chat_process = db.query(models.Proceso).filter(
+            models.Proceso.id.in_(process_ids or [-1]),
+            or_(
+                models.Proceso.abogado_id == usuario.id,
+                db.query(models.ProcesoColaborador.abogado_id).filter(
+                    models.ProcesoColaborador.proceso_id == models.Proceso.id,
+                    models.ProcesoColaborador.abogado_id == usuario.id,
+                    models.ProcesoColaborador.visible_cliente.is_(True),
+                ).exists(),
+            ),
+        ).order_by(models.Proceso.id.desc()).first()
     comunicaciones_query = db.query(models.ComunicacionProceso).filter(
         models.ComunicacionProceso.proceso_id.in_(process_ids or [-1]),
         or_(
@@ -771,6 +823,13 @@ def obtener_cliente(cliente_id: int, db: Session = Depends(get_db), usuario: mod
         "domicilio": cliente.domicilio, "direccion": cliente.direccion,
         "estado_relacion": "ACTIVO" if procesos else "SIN_PROCESOS",
         "ultimo_contacto": ultimo_contacto,
+        "chat_href": (
+            chat_conversation_url(usuario, chat_process.id, cliente.id)
+            if chat_process
+            else user_portal_url(usuario, "/gestion-procesos/abogado/chat")
+            if usuario.rol != models.RolUsuario.ADMIN
+            else None
+        ),
         "procesos": [{"id": p.id, "nombre": p.nombre} for p in procesos],
         "tareas": [{"id": t.id, "titulo": t.titulo, "estado": t.estado.value, "fecha_limite": t.fecha_limite, "proceso_id": t.proceso_id} for t in tareas],
         "solicitudes_documento": [{"id": s.id, "titulo": s.titulo, "atendida_en": s.atendida_en, "proceso": s.proceso.nombre, "created_at": s.created_at, **_resumen_solicitud_documento(s)} for s in solicitudes],
@@ -805,7 +864,15 @@ def actualizar_cliente(cliente_id: int, datos: schemas.ClienteUpdate, db: Sessio
         )
     cliente = cliente_query.first()
     if not cliente: raise HTTPException(status_code=404, detail="Cliente no encontrado.")
-    cliente.nombre_completo = datos.nombre_completo.strip(); cliente.whatsapp_numero = datos.whatsapp_numero.strip()
+    genero = (datos.genero or "").strip().upper() or None
+    if genero and genero not in {"MASCULINO", "FEMENINO"}:
+        raise HTTPException(status_code=422, detail="El género debe ser MASCULINO o FEMENINO.")
+    cliente.nombre_completo = datos.nombre_completo.strip()
+    cliente.whatsapp_numero = datos.whatsapp_numero.strip()
+    cliente.genero = genero
+    cliente.numero_documento = (datos.numero_documento or "").strip().replace(".", "") or None
+    cliente.domicilio = (datos.domicilio or "").strip() or None
+    cliente.direccion = (datos.direccion or "").strip() or None
     registrar_evento_auditoria(db, usuario, "cliente.actualizar", "usuario", cliente.id)
     db.commit(); db.refresh(cliente)
     return {"id": cliente.id, "mensaje": "Cliente actualizado."}
@@ -988,7 +1055,7 @@ def revisar_documento(documento_id: int, datos: schemas.DocumentoRevisionUpdate,
         try:
             _notificar(
                 db, cliente, f"Documento revisado: {documento.solicitud.titulo if documento.solicitud else documento.nombre_archivo}",
-                f"Hola {cliente.nombre_completo},\n\n{usuario.nombre_completo} revisó el documento {documento.nombre_archivo} del proceso {documento.proceso.nombre}.\n\nEstado: {documento.estado_revision.replace('_', ' ')}\nComentario: {documento.comentario_revision or 'Sin comentarios adicionales'}\nFecha de revisión: {format_colombia_datetime(documento.revisado_en)}\n\nAbrir enlace: Ver proceso | {public_site_url()}/gestion-procesos/cliente#proceso-{documento.proceso_id}",
+                f"Hola {cliente.nombre_completo},\n\n{usuario.nombre_completo} revisó el documento {documento.nombre_archivo} del proceso {documento.proceso.nombre}.\n\nEstado: {documento.estado_revision.replace('_', ' ')}\nComentario: {documento.comentario_revision or 'Sin comentarios adicionales'}\nFecha de revisión: {format_colombia_datetime(documento.revisado_en)}\n\nAbrir enlace: Ver documentos | {user_portal_url(cliente, f'/gestion-procesos/cliente/procesos/{documento.proceso_id}#documentos')}",
                 "DOCUMENTOS", f"REVISION_DOCUMENTO:{documento.id}:{documento.estado_revision}", emisor=usuario,
                 plantilla_clave="DOCUMENTO_REVISION",
                 variables={"nombre": cliente.nombre_completo, "actor": usuario.nombre_completo,
@@ -999,7 +1066,7 @@ def revisar_documento(documento_id: int, datos: schemas.DocumentoRevisionUpdate,
                            "estado": documento.estado_revision.replace("_", " "),
                            "comentario": documento.comentario_revision or "Sin comentarios adicionales",
                            "fecha": format_colombia_datetime(documento.revisado_en)},
-                enlace_texto="Ver proceso", enlace_url=f"{public_site_url()}/gestion-procesos/cliente#proceso-{documento.proceso_id}",
+                enlace_texto="Ver documentos", enlace_url=user_portal_url(cliente, f"/gestion-procesos/cliente/procesos/{documento.proceso_id}#documentos"),
             )
         except Exception:
             db.rollback()
@@ -1394,13 +1461,39 @@ def actualizar_proceso(proceso_id: int, datos: schemas.ProcesoUpdate, db: Sessio
     return {"id": proceso.id, "nombre": proceso.nombre, "descripcion": proceso.descripcion}
 
 
+_CARGA_LISTADO_PROCESOS = (
+    selectinload(models.Proceso.abogado),
+    selectinload(models.Proceso.colaboradores).selectinload(models.ProcesoColaborador.abogado),
+    selectinload(models.Proceso.clientes).selectinload(models.ProcesoCliente.cliente),
+    selectinload(models.Proceso.radicados)
+    .selectinload(models.ProcesoRadicado.radicado)
+    .selectinload(models.Radicado.actuaciones),
+)
+
+
+def _resumen_actividad_procesos(db: Session, proceso_ids: list[int]) -> dict[int, dict[str, list]]:
+    """Agrupa en tres consultas las tareas, solicitudes y documentos de varios procesos."""
+    resumen: dict[int, dict[str, list]] = defaultdict(lambda: {"tareas": [], "solicitudes": [], "documentos": []})
+    if not proceso_ids:
+        return resumen
+    fuentes = (
+        ("tareas", models.Tarea, models.Tarea.proceso_id),
+        ("solicitudes", models.SolicitudDocumento, models.SolicitudDocumento.proceso_id),
+        ("documentos", models.DocumentoProceso, models.DocumentoProceso.proceso_id),
+    )
+    for clave, modelo, columna in fuentes:
+        for item in db.query(modelo).filter(columna.in_(proceso_ids)).all():
+            resumen[item.proceso_id][clave].append(item)
+    return resumen
+
+
 @router.get("/procesos")
 def listar_procesos(db: Session = Depends(get_db), usuario: models.Usuario = Depends(security.obtener_usuario_actual)):
     if usuario.rol == models.RolUsuario.CLIENTE:
         procesos = db.query(models.Proceso).join(models.ProcesoCliente).filter(
             models.ProcesoCliente.cliente_id == usuario.id,
             models.Proceso.archivado_en.is_(None),
-        ).all()
+        ).options(*_CARGA_LISTADO_PROCESOS).all()
     else:
         _abogado(usuario); query = db.query(models.Proceso)
         query = query.filter(models.Proceso.archivado_en.is_(None))
@@ -1409,7 +1502,12 @@ def listar_procesos(db: Session = Depends(get_db), usuario: models.Usuario = Dep
             query
             if responsible_lawyer_id is None
             else query.filter(models.Proceso.id.in_(lawyer_process_ids(db, usuario)))
-        ).all()
+        ).options(*_CARGA_LISTADO_PROCESOS).all()
+    resumen_staff = (
+        _resumen_actividad_procesos(db, [proceso.id for proceso in procesos])
+        if usuario.rol != models.RolUsuario.CLIENTE
+        else {}
+    )
     result = []
     for proceso in procesos:
         item = {
@@ -1435,7 +1533,7 @@ def listar_procesos(db: Session = Depends(get_db), usuario: models.Usuario = Dep
                             ),
                         }
                         for actuacion in (
-                            sorted(enlace.radicado.actuaciones, key=lambda item: (item.orden, item.id))[-1:]
+                            sorted(enlace.radicado.actuaciones, key=lambda item: (item.orden, item.id))[:1]
                             if usuario.rol == models.RolUsuario.CLIENTE
                             else sorted(enlace.radicado.actuaciones, key=lambda item: (item.orden, item.id))
                         )
@@ -1443,6 +1541,11 @@ def listar_procesos(db: Session = Depends(get_db), usuario: models.Usuario = Dep
                 }
                 for enlace in proceso.radicados
                 if enlace.radicado
+            ],
+            "clientes": [
+                {"id": enlace.cliente.id, "nombre_completo": enlace.cliente.nombre_completo}
+                for enlace in proceso.clientes
+                if enlace.cliente and enlace.cliente.rol == models.RolUsuario.CLIENTE
             ],
         }
         if usuario.rol == models.RolUsuario.CLIENTE:
@@ -1481,9 +1584,10 @@ def listar_procesos(db: Session = Depends(get_db), usuario: models.Usuario = Dep
                 "proxima_actividad_titulo": proxima_titulo,
             })
         else:
-            tareas = db.query(models.Tarea).filter_by(proceso_id=proceso.id).all()
-            solicitudes = db.query(models.SolicitudDocumento).filter_by(proceso_id=proceso.id).all()
-            documentos = db.query(models.DocumentoProceso).filter_by(proceso_id=proceso.id).all()
+            actividad = resumen_staff.get(proceso.id, {})
+            tareas = actividad.get("tareas", [])
+            solicitudes = actividad.get("solicitudes", [])
+            documentos = actividad.get("documentos", [])
             pendientes = [task for task in tareas if task.estado in (models.EstadoTarea.PENDIENTE, models.EstadoTarea.EN_CURSO)]
             vencidas = [task for task in pendientes if task.fecha_limite and task.fecha_limite < datetime.utcnow()]
             solicitudes_pendientes = [request for request in solicitudes if request.atendida_en is None]
@@ -1594,7 +1698,7 @@ def obtener_proceso_detalle(proceso_id: int, db: Session = Depends(get_db), usua
         "clientes": [{"id": enlace.cliente.id, "nombre_completo": enlace.cliente.nombre_completo, "email": enlace.cliente.email, "whatsapp_numero": enlace.cliente.whatsapp_numero, "genero": enlace.cliente.genero, "numero_documento": enlace.cliente.numero_documento, "domicilio": enlace.cliente.domicilio, "direccion": enlace.cliente.direccion} for enlace in proceso.clientes if enlace.cliente and enlace.cliente.rol == models.RolUsuario.CLIENTE],
         "tareas": [{"id": t.id, "titulo": t.titulo, "descripcion": t.descripcion, "estado": t.estado.value, "prioridad": t.prioridad.value, "cliente_id": t.cliente_id, "fecha_limite": t.fecha_limite, "radicado_id": t.radicado_id, "actuacion_id": t.actuacion_id, "responsable": t.usuario.nombre_completo if t.usuario else None} for t in tareas],
         "solicitudes_documento": [{"id": s.id, "titulo": s.titulo, "instrucciones": s.instrucciones, "cliente_id": s.cliente_id, "cliente": s.cliente.nombre_completo, "atendida_en": s.atendida_en, "created_at": s.created_at, **_resumen_solicitud_documento(s)} for s in proceso.solicitudes_documento if s.cliente and s.cliente.rol == models.RolUsuario.CLIENTE],
-        "documentos": [{"id": d.id, "solicitud_id": d.solicitud_id, "nombre_archivo": d.nombre_archivo, "cliente": d.cliente.nombre_completo if d.cliente else "Usuario eliminado", "cliente_id": d.cliente_id, "mime_type": d.mime_type, "estado_revision": d.estado_revision, "comentario_revision": d.comentario_revision, "created_at": d.created_at} for d in proceso.documentos if d.cliente and d.cliente.rol == models.RolUsuario.CLIENTE],
+        "documentos": [{"id": d.id, "solicitud_id": d.solicitud_id, "solicitud_item_id": d.solicitud_item_id, "contrato_id": d.contrato_id, "nombre_archivo": d.nombre_archivo, "cliente": d.cliente.nombre_completo if d.cliente else "Usuario eliminado", "cliente_id": d.cliente_id, "mime_type": d.mime_type, "estado_revision": d.estado_revision, "comentario_revision": d.comentario_revision, "created_at": d.created_at} for d in proceso.documentos if d.cliente and d.cliente.rol == models.RolUsuario.CLIENTE],
         "contratos": [{"id": contract.id, "cliente_id": contract.cliente_id, "cliente": contract.cliente.nombre_completo if contract.cliente else contract.parte_cliente_snapshot.get("nombre", "Cliente"), "estado": contract.estado, "version_actual": contract.version_actual, "emitido_en": contract.emitido_en, "firmado_en": contract.firmado_en, "terminado_en": contract.terminado_en, "documento_firmado": ({"id": signed.id, "nombre_archivo": signed.nombre_archivo, "mime_type": signed.mime_type, "created_at": signed.created_at} if (signed := db.query(models.DocumentoProceso).filter_by(contrato_id=contract.id).order_by(models.DocumentoProceso.created_at.desc()).first()) else None)} for contract in db.query(models.ContratoServicio).filter_by(proceso_id=proceso.id).order_by(models.ContratoServicio.created_at.desc()).all()],
         "notificaciones": [
             {
@@ -1634,10 +1738,20 @@ def timeline_proceso_cliente(proceso_id: int, db: Session = Depends(get_db), usu
 def detalle_proceso_cliente(proceso_id: int, db: Session = Depends(get_db), usuario: models.Usuario = Depends(security.obtener_usuario_actual)):
     require_roles(usuario, ["CLIENTE"], action="consultar su proceso")
     proceso = _obtener_proceso_cliente(proceso_id, usuario, db)
-    tareas = db.query(models.Tarea).filter_by(proceso_id=proceso.id, cliente_id=usuario.id).order_by(models.Tarea.fecha_limite.asc()).all()
+    subtareas_asignadas = db.query(models.Subtarea.tarea_id).filter(
+        models.Subtarea.asignada_cliente.is_(True),
+        models.Subtarea.cliente_id == usuario.id,
+    ).distinct()
+    tareas = db.query(models.Tarea).filter(
+        models.Tarea.proceso_id == proceso.id,
+        or_(models.Tarea.cliente_id == usuario.id, models.Tarea.id.in_(subtareas_asignadas)),
+    ).order_by(models.Tarea.fecha_limite.asc()).all()
     solicitudes = db.query(models.SolicitudDocumento).filter_by(proceso_id=proceso.id, cliente_id=usuario.id).order_by(models.SolicitudDocumento.created_at.desc()).all()
     documentos = db.query(models.DocumentoProceso).filter_by(proceso_id=proceso.id, cliente_id=usuario.id).order_by(models.DocumentoProceso.created_at.desc()).all()
-    eventos = db.query(models.EventoAgenda).filter_by(proceso_id=proceso.id, cliente_id=usuario.id).order_by(models.EventoAgenda.fecha_inicio.asc()).all()
+    eventos = db.query(models.EventoAgenda).filter(
+        models.EventoAgenda.proceso_id == proceso.id,
+        or_(models.EventoAgenda.cliente_id == usuario.id, models.EventoAgenda.cliente_id.is_(None)),
+    ).order_by(models.EventoAgenda.fecha_inicio.asc()).all()
     comunicaciones = db.query(models.ComunicacionProceso).filter_by(
         proceso_id=proceso.id, cliente_id=usuario.id, visibilidad="CLIENTE",
     ).order_by(models.ComunicacionProceso.created_at.desc()).limit(300).all()
@@ -1673,9 +1787,9 @@ def detalle_proceso_cliente(proceso_id: int, db: Session = Depends(get_db), usua
             "id": link.radicado.id,
             "numero": link.radicado.numero,
             "estado_visible": "En seguimiento" if (link.radicado.estado_consulta or "").casefold() == "ok" else "En revisión",
-            "actuaciones": [{"id": a.id, "fecha": a.fecha_actuacion, "descripcion": a.actuacion} for a in sorted(link.radicado.actuaciones, key=lambda action: (action.orden, action.id))[-1:]],
+            "actuaciones": [{"id": a.id, "fecha": a.fecha_actuacion, "descripcion": a.actuacion} for a in sorted(link.radicado.actuaciones, key=lambda action: (action.orden, action.id))[:1]],
         } for link in proceso.radicados if link.radicado],
-        "tareas": [{"id": task.id, "titulo": task.titulo, "descripcion": task.descripcion, "estado": task.estado.value, "prioridad": task.prioridad.value, "fecha_limite": task.fecha_limite, "radicado_id": task.radicado_id, "actuacion_id": task.actuacion_id} for task in tareas],
+        "tareas": [{"id": task.id, "titulo": task.titulo, "descripcion": task.descripcion, "estado": task.estado.value, "prioridad": task.prioridad.value, "cliente_id": task.cliente_id if task.cliente_id == usuario.id else None, "asignada_a_cliente": task.cliente_id == usuario.id, "fecha_limite": task.fecha_limite, "radicado_id": task.radicado_id, "actuacion_id": task.actuacion_id, "subtareas": [{"id": subtask.id, "titulo": subtask.titulo, "completada": subtask.completada} for subtask in task.subtareas if subtask.asignada_cliente and subtask.cliente_id == usuario.id]} for task in tareas],
         "solicitudes_documento": [{"id": request.id, "titulo": request.titulo, "instrucciones": request.instrucciones, "fecha_limite": request.fecha_limite, "atendida_en": request.atendida_en, "created_at": request.created_at, **_resumen_solicitud_documento(request)} for request in solicitudes],
         "documentos": [{"id": document.id, "solicitud_id": document.solicitud_id, "contrato_id": document.contrato_id, "nombre_archivo": document.nombre_archivo, "mime_type": document.mime_type, "estado_revision": document.estado_revision, "comentario_revision": document.comentario_revision, "created_at": document.created_at} for document in documentos],
         "contratos": [{"id": contract.id, "estado": contract.estado, "version_actual": contract.version_actual, "firmado_en": contract.firmado_en, "documento_firmado": ({"id": signed.id, "nombre_archivo": signed.nombre_archivo, "mime_type": signed.mime_type, "created_at": signed.created_at} if (signed := db.query(models.DocumentoProceso).filter_by(contrato_id=contract.id).order_by(models.DocumentoProceso.created_at.desc()).first()) else None)} for contract in db.query(models.ContratoServicio).filter(models.ContratoServicio.proceso_id == proceso.id, models.ContratoServicio.cliente_id == usuario.id, models.ContratoServicio.estado.in_({"FIRMADO", "TERMINADO"})).order_by(models.ContratoServicio.firmado_en.desc()).all() if db.query(models.DocumentoProceso.id).filter_by(contrato_id=contract.id).first()],
@@ -1697,7 +1811,7 @@ def agenda_cliente(dias: int = 90, db: Session = Depends(get_db), usuario: model
         models.Proceso, models.Proceso.id == models.EventoAgenda.proceso_id,
     ).filter(
         models.ProcesoCliente.cliente_id == usuario.id,
-        models.EventoAgenda.cliente_id == usuario.id,
+        or_(models.EventoAgenda.cliente_id == usuario.id, models.EventoAgenda.cliente_id.is_(None)),
         models.EventoAgenda.estado == "PROGRAMADO",
         models.EventoAgenda.fecha_inicio >= desde,
         models.EventoAgenda.fecha_inicio <= hasta,
@@ -1852,14 +1966,14 @@ def enviar_mensaje_cliente(proceso_id: int, datos: schemas.ComunicacionClienteCr
     db.refresh(mensaje)
     _notificar(
         db, proceso.abogado, f"Mensaje de {usuario.nombre_completo}: {asunto}",
-        f"Hola {proceso.abogado.nombre_completo},\n\n{usuario.nombre_completo} te envió un mensaje sobre el proceso {proceso.nombre}.\n\nAsunto: {asunto}\nFecha: {format_colombia_datetime(mensaje.created_at)}\nMensaje:\n{contenido}\n\nAbrir enlace: Ver conversación | {public_site_url()}/gestion-procesos/abogado/procesos/{proceso.id}/comunicaciones",
+        f"Hola {proceso.abogado.nombre_completo},\n\n{usuario.nombre_completo} te envió un mensaje sobre el proceso {proceso.nombre}.\n\nAsunto: {asunto}\nFecha: {format_colombia_datetime(mensaje.created_at)}\nMensaje:\n{contenido}\n\nAbrir enlace: Abrir chat | {chat_conversation_url(proceso.abogado, proceso.id, usuario.id)}",
         "RESUMENES", f"COMUNICACION_CLIENTE:{mensaje.id}", emisor=usuario,
         plantilla_clave="COMUNICACION_CLIENTE_ABOGADO",
         variables={"nombre": proceso.abogado.nombre_completo, "actor": usuario.nombre_completo,
                    "proceso": proceso.nombre, "asunto": asunto,
                    "fecha": format_colombia_datetime(mensaje.created_at), "mensaje": contenido},
-        enlace_texto="Ver conversación",
-        enlace_url=f"{public_site_url()}/gestion-procesos/abogado/procesos/{proceso.id}/comunicaciones",
+        enlace_texto="Abrir chat",
+        enlace_url=chat_conversation_url(proceso.abogado, proceso.id, usuario.id),
     )
     return {"id": mensaje.id, "mensaje": "Tu mensaje fue enviado al despacho."}
 
@@ -1901,15 +2015,16 @@ def crear_comunicacion_proceso(proceso_id: int, datos: schemas.ComunicacionProce
     db.commit()
     db.refresh(item)
     if cliente:
-        cuerpo = f"Hola {cliente.nombre_completo},\n\n{usuario.nombre_completo} registro una comunicacion para el proceso {proceso.nombre}.\n\nAsunto: {item.asunto}\nFecha: {format_colombia_datetime(item.created_at)}\nDetalle: {item.contenido}\n\nAbrir enlace: Ver proceso | {public_site_url()}/gestion-procesos/cliente#proceso-{proceso.id}"
+        client_chat_url = chat_conversation_url(cliente, proceso.id, usuario.id)
+        cuerpo = f"Hola {cliente.nombre_completo},\n\n{usuario.nombre_completo} registró una comunicación para el proceso {proceso.nombre}.\n\nAsunto: {item.asunto}\nFecha: {format_colombia_datetime(item.created_at)}\nDetalle: {item.contenido}\n\nAbrir enlace: Abrir chat | {client_chat_url}"
         _notificar(db, cliente, f"Nueva comunicacion: {item.asunto}", cuerpo,
                    "RESUMENES", f"COMUNICACION_PROCESO:{item.id}", emisor=usuario,
                    plantilla_clave="COMUNICACION_ABOGADO_CLIENTE",
                    variables={"nombre": cliente.nombre_completo, "actor": usuario.nombre_completo,
                               "proceso": proceso.nombre, "asunto": item.asunto,
                               "fecha": format_colombia_datetime(item.created_at), "mensaje": item.contenido},
-                   enlace_texto="Ver proceso",
-                   enlace_url=f"{public_site_url()}/gestion-procesos/cliente/procesos/{proceso.id}#comunicaciones")
+                   enlace_texto="Abrir chat",
+                   enlace_url=client_chat_url)
     return {"id": item.id, "mensaje": "Comunicación registrada en el expediente."}
 
 
@@ -1953,7 +2068,7 @@ def asignar_colaborador_proceso(
         f"Proceso: {proceso.nombre}\n"
         f"Responsable: {proceso.abogado.nombre_completo}\n"
         f"Permiso: {permiso}\n\n"
-        f"Abrir enlace: Ver proceso | {public_site_url()}/gestion-procesos/abogado/procesos/{proceso.id}"
+        f"Abrir enlace: Ver proceso | {user_portal_url(abogado, f'/gestion-procesos/abogado/procesos/{proceso.id}/resumen')}"
     )
     _notificar(
         db, abogado, f"Te agregaron al proceso {proceso.nombre}", cuerpo,
@@ -1964,7 +2079,7 @@ def asignar_colaborador_proceso(
                    "permiso": permiso, "proceso": proceso.nombre,
                    "responsable": proceso.abogado.nombre_completo},
         enlace_texto="Ver proceso",
-        enlace_url=f"{public_site_url()}/gestion-procesos/abogado/procesos/{proceso.id}",
+        enlace_url=user_portal_url(abogado, f"/gestion-procesos/abogado/procesos/{proceso.id}/resumen"),
     )
     return {"mensaje": f"{abogado.nombre_completo} fue agregado como {permiso}."}
 
@@ -2199,7 +2314,7 @@ def notificar_actuacion(proceso_id: int, actuacion_id: int, datos: schemas.Notif
               f"Radicado: {actuacion.radicado_rel.numero}\nFecha: {actuacion.fecha_actuacion or 'No informada'}\n"
               f"Actuacion: {actuacion.actuacion}\nAnotacion: {actuacion.anotacion or 'Sin anotacion'}\n"
               f"Comentarios del abogado: {datos.comentarios}\n\n"
-              f"Abrir enlace: Ver proceso | {public_site_url()}/gestion-procesos/cliente#proceso-{proceso.id}")
+              f"Abrir enlace: Ver actuación | {user_portal_url(cliente, f'/gestion-procesos/cliente/procesos/{proceso.id}#actuacion-{actuacion.id}')}")
     asunto = f"Actualización del proceso {proceso.nombre}"
     _notificar(
         db,
@@ -2215,7 +2330,7 @@ def notificar_actuacion(proceso_id: int, actuacion_id: int, datos: schemas.Notif
                    "fecha": actuacion.fecha_actuacion or "No informada",
                    "actuacion": actuacion.actuacion, "anotacion": actuacion.anotacion or "Sin anotación",
                    "comentarios": datos.comentarios},
-        enlace_texto="Ver proceso", enlace_url=f"{public_site_url()}/gestion-procesos/cliente/procesos/{proceso.id}#actividad",
+        enlace_texto="Ver actuación", enlace_url=user_portal_url(cliente, f"/gestion-procesos/cliente/procesos/{proceso.id}#actuacion-{actuacion.id}"),
     )
     db.add(models.NotificacionProceso(
         abogado_id=usuario.id, proceso_id=proceso.id, cliente_id=cliente.id,
@@ -2299,7 +2414,7 @@ def solicitar_documento(proceso_id: int, datos: schemas.SolicitudDocumentoCreate
         f"Instrucciones: {solicitud.instrucciones or 'Sin instrucciones adicionales'}\n"
         f"Fecha límite: {format_colombia_datetime(solicitud.fecha_limite) if solicitud.fecha_limite else 'Sin fecha límite'}\n"
         f"Fecha de solicitud: {format_colombia_datetime(solicitud.created_at)}\n\n"
-        f"Abrir enlace: Ver proceso | {public_site_url()}/gestion-procesos/cliente#proceso-{proceso.id}"
+        f"Abrir enlace: Ver documentos | {user_portal_url(cliente, f'/gestion-procesos/cliente/procesos/{proceso.id}#documentos')}"
     )
     _notificar(
         db,
@@ -2316,7 +2431,7 @@ def solicitar_documento(proceso_id: int, datos: schemas.SolicitudDocumentoCreate
                    "instrucciones": solicitud.instrucciones or "Sin instrucciones adicionales",
                    "fecha_limite": format_colombia_datetime(solicitud.fecha_limite) if solicitud.fecha_limite else "Sin fecha límite",
                    "fecha": format_colombia_datetime(solicitud.created_at)},
-        enlace_texto="Ver proceso", enlace_url=f"{public_site_url()}/gestion-procesos/cliente/procesos/{proceso.id}#documentos",
+        enlace_texto="Ver documentos", enlace_url=user_portal_url(cliente, f"/gestion-procesos/cliente/procesos/{proceso.id}#documentos"),
     )
     return {"id": solicitud.id, "documentos_requeridos": required_items, "mensaje": "Solicitud enviada al cliente."}
 
@@ -2386,7 +2501,7 @@ def cargar_documento_cliente(solicitud_id: int, archivo: UploadFile = File(...),
         f"Documento solicitado: {selected_item['nombre']}\nArchivo recibido: {documento.nombre_archivo}\n"
         f"Proceso: {proceso.nombre}\nTipo: {documento.mime_type}\n"
         f"Fecha de carga: {format_colombia_datetime(documento.created_at)}\n\n"
-        f"Abrir enlace: Revisar documentos | {public_site_url()}/gestion-procesos/abogado/procesos/{proceso.id}/documentos"
+        f"Abrir enlace: Revisar documentos | {user_portal_url(usuario, f'/gestion-procesos/abogado/procesos/{proceso.id}/documentos')}"
     )
     _notificar(
         db, proceso.abogado, f"Documentos recibidos: {solicitud.titulo}",
@@ -2399,7 +2514,7 @@ def cargar_documento_cliente(solicitud_id: int, archivo: UploadFile = File(...),
                    "solicitud": solicitud.titulo, "tipo": documento.mime_type,
                    "fecha": format_colombia_datetime(documento.created_at)},
         enlace_texto="Revisar documentos",
-        enlace_url=f"{public_site_url()}/gestion-procesos/abogado/procesos/{proceso.id}/documentos",
+        enlace_url=user_portal_url(usuario, f"/gestion-procesos/abogado/procesos/{proceso.id}/documentos"),
     )
     return {"id": documento.id, "nombre_archivo": documento.nombre_archivo, "solicitud_item_id": selected_item["id"], "estado_revision": documento.estado_revision}
 

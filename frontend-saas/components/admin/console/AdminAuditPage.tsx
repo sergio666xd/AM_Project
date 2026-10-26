@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { LoadingState } from "@/components/ui/LoadingState";
+import { useSession } from "@/context/SessionContext";
 
 type TechnicalDetail = {
   endpoint: string | null;
@@ -53,7 +54,7 @@ export default function AdminAuditPage({ initialView = "actividad" }: { initialV
   const [selected, setSelected] = useState<AuditEvent | null>(null);
   const [selectedIds, setSelectedIds] = useState<number[]>([]);
   const [deleting, setDeleting] = useState(false);
-  const token = typeof window === "undefined" ? "" : localStorage.getItem("token") || "";
+  const { token } = useSession();
 
   async function loadEvents(activeFilters: AuditFilters) {
     if (!token) return;
@@ -215,7 +216,7 @@ export default function AdminAuditPage({ initialView = "actividad" }: { initialV
       )}
       {!loading && <p className="text-xs text-foreground-muted">Mostrando {events.length} eventos, máximo 200 por consulta.</p>}
 
-      {selected && <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) setSelected(null); }}>
+      {selected && <div className="fixed inset-0 z-50 flex items-center justify-center bg-brand-950/40 backdrop-blur-sm p-4" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) setSelected(null); }}>
         <section role="dialog" aria-modal="true" aria-labelledby="audit-detail-title" className="max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-xl border border-border bg-surface shadow-xl">
           <header className="flex items-start justify-between gap-4 border-b border-border p-5"><div><p className="text-xs uppercase tracking-wide text-foreground-muted">{selected.actor} · {formatDate(selected.created_at)}</p><h2 id="audit-detail-title" className="mt-1 text-lg font-semibold">{selected.descripcion}</h2></div><Button variant="ghost" aria-label="Cerrar detalle" onClick={() => setSelected(null)}><X className="size-4" /></Button></header>
           <div className="space-y-5 p-5"><div><h3 className="mb-3 text-sm font-semibold">Vista humana</h3><p className="text-sm">{selected.actor} {selected.descripcion.replace(`${selected.actor} `, "")}</p><p className="mt-2 text-sm text-foreground-muted">Resultado: evento registrado.</p></div>

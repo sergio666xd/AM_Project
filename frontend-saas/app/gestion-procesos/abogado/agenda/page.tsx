@@ -6,6 +6,8 @@ import { AlertCircle, Bell, CalendarDays, Clock3, RefreshCw } from "lucide-react
 import { fetchApi } from "@/lib/api";
 import { useSession } from "@/context/SessionContext";
 import TaskMonthCalendar, { type CalendarTask } from "@/components/calendar/TaskMonthCalendar";
+import { PageHeader } from "@/components/ui/PageHeader";
+import { Button } from "@/components/ui/Button";
 
 type Reminder = { id: number; activo: boolean; fecha_hora?: string | null };
 type Task = {
@@ -34,7 +36,7 @@ async function cargarAgenda(token: string): Promise<AgendaData> {
     fetchApi("/api/tareas", { method: "GET", token }),
     fetchApi("/api/expedientes/procesos", { method: "GET", token }),
     fetchApi("/api/expedientes/clientes", { method: "GET", token }),
-    fetchApi("/api/radicados", { method: "GET", token }),
+    fetchApi("/api/radicados?resumen=true", { method: "GET", token }),
     fetchApi("/api/expedientes/agenda/eventos", { method: "GET", token }),
     fetchApi("/api/expedientes/agenda/actuaciones", { method: "GET", token }),
   ]);
@@ -170,33 +172,63 @@ export default function AgendaPage() {
     { id: "HOY", label: "Hoy" },
     { id: "PROXIMAS", label: "Próximos 7 días" },
   ];
+  const fechaColombia = (value: string) => new Intl.DateTimeFormat("es-CO", { dateStyle: "medium", timeZone: "America/Bogota" }).format(new Date(`${value}T12:00:00-05:00`));
+  const activeRangeLabel = view === "DIA"
+    ? fechaColombia(selectedDate)
+    : view === "SEMANA"
+      ? `${fechaColombia(weekStart)} – ${fechaColombia(sumarDias(weekStart, 6))}`
+      : view === "MES"
+        ? new Intl.DateTimeFormat("es-CO", { month: "long", year: "numeric", timeZone: "America/Bogota" }).format(new Date(`${selectedDate.slice(0, 7)}-15T12:00:00-05:00`))
+        : "todas las fechas";
+  const activeFilterCount = [responsibleFilter !== "TODOS", processFilter !== "TODOS", clientFilter !== "TODOS", typeFilter !== "TODOS"].filter(Boolean).length;
 
   return (
-    <section className="mx-auto max-w-5xl space-y-5">
-      <header className="flex flex-wrap items-end justify-between gap-4">
-        <div>
-          <p className="text-sm text-(--foreground-muted)">Trabajo jurídico</p>
-          <h1 className="mt-1 text-2xl font-semibold text-foreground">Agenda</h1>
-          <p className="mt-1 text-sm text-(--foreground-muted)">Tareas, eventos y actuaciones judiciales de tus procesos.</p>
-        </div>
-        <button type="button" onClick={() => void actualizar()} disabled={loading || sessionLoading} className="inline-flex items-center gap-2 rounded-lg border border-border bg-surface px-3 py-2 text-sm font-medium text-foreground hover:bg-surface-hover disabled:opacity-50"><RefreshCw className={`size-4 ${loading ? "animate-spin" : ""}`} />Actualizar</button>
-      </header>
+    <section className="mx-auto max-w-5xl space-y-5 pb-24">
+      <PageHeader
+        overline="Trabajo jurídico"
+        title="Agenda"
+        description="Tareas, eventos y actuaciones judiciales de tus procesos."
+        action={
+          <Button
+            variant="outline"
+            onClick={() => void actualizar()}
+            disabled={loading || sessionLoading}
+            icon={<RefreshCw className={`size-4 ${loading ? "animate-spin" : ""}`} />}
+          >
+            Actualizar
+          </Button>
+        }
+      />
 
       <div role="group" aria-label="Filtrar agenda" className="inline-flex flex-wrap gap-1 rounded-lg border border-border p-1">
-        {filters.map((item) => <button key={item.id} type="button" aria-pressed={filter === item.id} onClick={() => setFilter(item.id)} className={`rounded-md px-3 py-1.5 text-sm ${filter === item.id ? "bg-primary text-white" : "text-(--foreground-muted) hover:bg-surface-secondary"}`}>{item.label}</button>)}
+        {filters.map((item) => (
+          <button
+            key={item.id}
+            type="button"
+            aria-pressed={filter === item.id}
+            onClick={() => setFilter(item.id)}
+            className={`rounded-md px-3 py-1.5 text-sm transition-colors ${filter === item.id ? "bg-brand-900 text-white" : "text-(--foreground-muted) hover:bg-surface-secondary"}`}
+          >
+            {item.label}
+          </button>
+        ))}
       </div>
 
-      <div className="grid gap-2 rounded-lg border border-border bg-surface p-3 sm:grid-cols-2 lg:grid-cols-4">
+      <details className="rounded-lg border border-border bg-surface p-3">
+        <summary className="flex min-h-11 cursor-pointer items-center justify-between gap-3 font-medium"><span>Filtros por equipo y proceso</span><span className="text-sm text-(--foreground-muted)">{activeFilterCount ? `${activeFilterCount} activos` : "Opcionales"}</span></summary>
+        <div className="mt-3 grid gap-2 border-t border-border pt-3 sm:grid-cols-2 lg:grid-cols-4">
         <select aria-label="Filtrar por responsable" value={responsibleFilter} onChange={(event) => setResponsibleFilter(event.target.value)} className="h-10 rounded-md border border-border bg-surface-secondary px-3 text-sm"><option value="TODOS">Todos los responsables</option><option value="YO">Asignados a mí</option><option value="OTROS">Otros responsables</option></select>
         <select aria-label="Filtrar por proceso" value={processFilter} onChange={(event) => setProcessFilter(event.target.value)} className="h-10 rounded-md border border-border bg-surface-secondary px-3 text-sm"><option value="TODOS">Todos los procesos</option>{data.processes.map((process) => <option key={process.id} value={process.id}>{process.nombre}</option>)}</select>
         <select aria-label="Filtrar por cliente" value={clientFilter} onChange={(event) => setClientFilter(event.target.value)} className="h-10 rounded-md border border-border bg-surface-secondary px-3 text-sm"><option value="TODOS">Todos los clientes</option>{data.clients.map((client) => <option key={client.id} value={client.id}>{client.nombre_completo}</option>)}</select>
         <select aria-label="Filtrar por tipo de evento" value={typeFilter} onChange={(event) => setTypeFilter(event.target.value)} className="h-10 rounded-md border border-border bg-surface-secondary px-3 text-sm"><option value="TODOS">Todos los tipos</option><option value="AUDIENCIA">Audiencias</option><option value="REUNION">Reuniones</option><option value="FIRMA_CONTRATO">Firmas de contrato</option><option value="EVENTO">Eventos</option><option value="ACTUACION">Actuaciones judiciales</option></select>
-      </div>
+        </div>
+      </details>
 
-      <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-border bg-surface p-3"><div role="group" aria-label="Vista de agenda" className="flex gap-1">{(["DIA", "SEMANA", "MES", "LISTA"] as const).map((mode) => <button key={mode} type="button" aria-pressed={view === mode} onClick={() => setView(mode)} className={`rounded-md px-3 py-1.5 text-sm ${view === mode ? "bg-primary text-white" : "text-(--foreground-muted) hover:bg-surface-secondary"}`}>{mode === "DIA" ? "Día" : mode === "SEMANA" ? "Semana" : mode === "MES" ? "Mes" : "Lista"}</button>)}</div>{view === "MES" ? <input aria-label="Mes de agenda" type="month" value={selectedDate.slice(0, 7)} onChange={(event) => setSelectedDate(`${event.target.value}-01`)} className="h-9 rounded-md border border-border bg-surface-secondary px-3 text-sm" /> : view !== "LISTA" ? <input aria-label="Fecha de agenda" type="date" value={selectedDate} onChange={(event) => setSelectedDate(event.target.value)} className="h-9 rounded-md border border-border bg-surface-secondary px-3 text-sm" /> : null}</div>
+      <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-border bg-surface p-3"><div role="group" aria-label="Vista de agenda" className="flex gap-1">{(["DIA", "SEMANA", "MES", "LISTA"] as const).map((mode) => <button key={mode} type="button" aria-pressed={view === mode} onClick={() => setView(mode)} className={`rounded-md px-3 py-1.5 text-sm ${view === mode ? "bg-primary !text-white" : "text-(--foreground-muted) hover:bg-surface-secondary"}`}>{mode === "DIA" ? "Día" : mode === "SEMANA" ? "Semana" : mode === "MES" ? "Mes" : "Lista"}</button>)}</div>{view === "MES" ? <input aria-label="Mes de agenda" type="month" value={selectedDate.slice(0, 7)} onChange={(event) => setSelectedDate(`${event.target.value}-01`)} className="h-9 rounded-md border border-border bg-surface-secondary px-3 text-sm" /> : view !== "LISTA" ? <input aria-label="Fecha de agenda" type="date" value={selectedDate} onChange={(event) => setSelectedDate(event.target.value)} className="h-9 rounded-md border border-border bg-surface-secondary px-3 text-sm" /> : null}</div>
 
       {error && <div role="alert" className="flex items-center gap-2 rounded-lg border border-red-500/20 bg-red-500/5 p-4 text-sm text-red-700"><AlertCircle className="size-4 shrink-0" />{error}</div>}
 
+      {!loading && !sessionLoading && <p className="text-sm text-(--foreground-muted)">Rango consultado: <span className="font-medium text-foreground">{activeRangeLabel}</span></p>}
       {loading || sessionLoading ? <div className="flex min-h-48 items-center justify-center gap-3 text-sm text-(--foreground-muted)"><RefreshCw className="size-5 animate-spin" />Cargando agenda...</div> : view === "MES" ? <TaskMonthCalendar tasks={calendarItems} /> : taskItemsForView.length || eventsForView.length || actuacionesForView.length ? <div className="space-y-2">
         {eventsForView.map((event) => <Link key={`event-${event.id}`} href={`/gestion-procesos/abogado/procesos/${event.proceso_id}/agenda`} className="flex flex-wrap items-center justify-between gap-4 rounded-lg border border-amber-500/20 bg-amber-500/5 px-4 py-3 transition hover:bg-amber-500/10"><div className="flex min-w-0 items-start gap-3"><div className="mt-0.5 flex size-9 shrink-0 items-center justify-center rounded-lg bg-amber-500/10 text-amber-700"><CalendarDays className="size-4" /></div><div className="min-w-0"><p className="font-medium text-foreground">{etiquetaTipoEvento(event.tipo)}: {event.titulo}</p><p className="mt-1 text-xs text-(--foreground-muted)">{event.proceso}{event.cliente ? ` · ${event.cliente}` : ""}</p></div></div><span className="rounded-md bg-surface px-2 py-1 text-xs text-(--foreground-secondary)">{formatoFecha(event.fecha_inicio)}</span></Link>)}
         {actuacionesForView.map((item) => <Link key={`actuacion-${item.proceso_id}-${item.id}`} href={`/gestion-procesos/abogado/procesos/${item.proceso_id}/actividad`} className="flex flex-wrap items-center justify-between gap-4 rounded-lg border border-indigo-500/20 bg-indigo-500/5 px-4 py-3 transition hover:bg-indigo-500/10"><div className="flex min-w-0 items-start gap-3"><div className="mt-0.5 flex size-9 shrink-0 items-center justify-center rounded-lg bg-indigo-500/10 text-indigo-700"><CalendarDays className="size-4" /></div><div className="min-w-0"><p className="font-medium text-foreground">Actuación judicial: {item.titulo}</p><p className="mt-1 text-xs text-(--foreground-muted)">{item.proceso} · Radicado {item.radicado}{item.descripcion ? ` · ${item.descripcion}` : ""}</p></div></div><span className="rounded-md bg-surface px-2 py-1 text-xs text-(--foreground-secondary)">{new Date(item.fecha).toLocaleDateString("es-CO", { timeZone: "America/Bogota", weekday: "long", day: "2-digit", month: "short" })}</span></Link>)}

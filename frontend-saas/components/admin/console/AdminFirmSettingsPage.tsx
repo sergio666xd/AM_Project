@@ -4,6 +4,8 @@ import { useEffect, useState } from "react";
 import { Save } from "lucide-react";
 import { fetchApi } from "@/lib/api";
 import { useSession } from "@/context/SessionContext";
+import { PageHeader } from "@/components/ui/PageHeader";
+import { Button } from "@/components/ui/Button";
 
 type FirmSettings = {
   nombre: string; correo_contacto: string | null; correo_pqr: string | null;
@@ -11,6 +13,7 @@ type FirmSettings = {
   logo_url: string; sitio_web: string; zona_horaria: string; mostrar_contacto_publico: boolean;
   preferencias_notificacion: { email?: boolean; whatsapp?: boolean };
   parametros_generales: Record<string, unknown> & { contrato_abogado?: ContractAttorneySettings };
+  updated_at?: string;
 };
 
 type ContractAttorneySettings = {
@@ -30,6 +33,26 @@ const EMPTY: FirmSettings = {
   preferencias_notificacion: { email: true, whatsapp: true }, parametros_generales: { contrato_abogado: DEFAULT_CONTRACT_ATTORNEY },
 };
 
+function normalizeFirmSettings(data: Partial<FirmSettings>): FirmSettings {
+  return {
+    ...EMPTY,
+    ...data,
+    telefono: data.telefono ?? "",
+    whatsapp: data.whatsapp ?? "",
+    direccion: data.direccion ?? "",
+    ciudad: data.ciudad ?? "",
+    pais: data.pais ?? "Colombia",
+    logo_url: data.logo_url ?? "",
+    sitio_web: data.sitio_web ?? "",
+    preferencias_notificacion: { ...EMPTY.preferencias_notificacion, ...data.preferencias_notificacion },
+    parametros_generales: {
+      ...EMPTY.parametros_generales,
+      ...data.parametros_generales,
+      contrato_abogado: { ...DEFAULT_CONTRACT_ATTORNEY, ...data.parametros_generales?.contrato_abogado },
+    },
+  };
+}
+
 export default function AdminFirmSettingsPage() {
   const { token } = useSession();
   const [settings, setSettings] = useState<FirmSettings>(EMPTY);
@@ -42,7 +65,7 @@ export default function AdminFirmSettingsPage() {
     if (!token) return;
     let active = true;
     fetchApi("/api/admin/configuracion/firma", { method: "GET", token })
-      .then((data: FirmSettings) => { if (active) setSettings({ ...data, parametros_generales: { ...data.parametros_generales, contrato_abogado: { ...DEFAULT_CONTRACT_ATTORNEY, ...data.parametros_generales?.contrato_abogado } } }); })
+      .then((data: FirmSettings) => { if (active) setSettings(normalizeFirmSettings(data)); })
       .catch((cause: unknown) => { if (active) setError(cause instanceof Error ? cause.message : "No se pudo cargar la configuración de la firma."); })
       .finally(() => { if (active) setLoading(false); });
     return () => { active = false; };
@@ -53,8 +76,13 @@ export default function AdminFirmSettingsPage() {
     if (!token) return;
     setSaving(true); setError(""); setNotice("");
     try {
-      const result = await fetchApi("/api/admin/configuracion/firma", { method: "PUT", token, body: JSON.stringify(settings) });
-      setSettings(result);
+      const payload = {
+        ...settings,
+        correo_contacto: settings.correo_contacto?.trim() || null,
+        correo_pqr: settings.correo_pqr?.trim() || null,
+      };
+      const result = await fetchApi("/api/admin/configuracion/firma", { method: "PUT", token, body: JSON.stringify(payload) });
+      setSettings(normalizeFirmSettings(result));
       setNotice("Configuración de la firma guardada.");
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "No se pudo guardar la configuración.");
@@ -73,9 +101,10 @@ export default function AdminFirmSettingsPage() {
   }));
 
   return <section className="mx-auto max-w-5xl space-y-6">
-    <header><p className="text-xs font-semibold uppercase tracking-wide text-primary">Panel Administrativo · Firma</p><h1 className="mt-1 text-2xl font-semibold">Configuración de la firma</h1><p className="mt-1 text-sm text-foreground-muted">Identidad, contacto público y parámetros operativos de la firma. Las credenciales técnicas se administran aparte en Integraciones.</p></header>
+    <PageHeader overline="Panel Administrativo · Firma" title="Configuración de la firma" description="Identidad, contacto público y parámetros operativos de la firma. Las credenciales técnicas se administran aparte en Integraciones." />
     {error && <p role="alert" className="rounded-md border border-danger/30 bg-danger-light p-3 text-sm text-danger">{error}</p>}
     {notice && <p role="status" className="rounded-md border border-success/30 bg-success-light p-3 text-sm text-success">{notice}</p>}
+    {settings.updated_at && <p className="text-xs text-foreground-muted">Última actualización: {new Date(`${settings.updated_at.replace(/Z$/, "")}Z`).toLocaleString("es-CO", { timeZone: "America/Bogota" })}</p>}
     {loading ? <p className="py-12 text-center text-sm text-foreground-muted">Cargando configuración…</p> : <form onSubmit={save} className="space-y-5">
       <fieldset className="grid gap-4 rounded-lg border border-border bg-surface p-4 sm:grid-cols-2">
         <legend className="px-2 font-semibold">Identidad y presencia pública</legend>
@@ -112,7 +141,7 @@ export default function AdminFirmSettingsPage() {
         <div className="space-y-3 text-sm"><p className="font-medium">Canales habilitados para comunicaciones de la firma</p><label className="flex items-center gap-2"><input type="checkbox" checked={settings.preferencias_notificacion.email ?? true} onChange={(e) => setSettings((current) => ({ ...current, preferencias_notificacion: { ...current.preferencias_notificacion, email: e.target.checked } }))} />Correo</label><label className="flex items-center gap-2"><input type="checkbox" checked={settings.preferencias_notificacion.whatsapp ?? true} onChange={(e) => setSettings((current) => ({ ...current, preferencias_notificacion: { ...current.preferencias_notificacion, whatsapp: e.target.checked } }))} />WhatsApp</label></div>
         <p className="text-xs text-foreground-muted sm:col-span-2">Las preferencias de cada usuario y las credenciales SMTP/WhatsApp permanecen independientes. Los parámetros comerciales del SaaS se administran en Planes.</p>
       </fieldset>
-      <div className="flex justify-end"><button type="submit" disabled={saving} className="inline-flex h-10 items-center gap-2 rounded-md bg-primary px-4 text-sm font-semibold text-white disabled:opacity-50"><Save className="size-4" />{saving ? "Guardando…" : "Guardar configuración"}</button></div>
+      <div className="flex justify-end"><Button type="submit" variant="primary" loading={saving} icon={<Save className="size-4" />}>{saving ? "Guardando…" : "Guardar configuración"}</Button></div>
     </form>}
   </section>;
 }

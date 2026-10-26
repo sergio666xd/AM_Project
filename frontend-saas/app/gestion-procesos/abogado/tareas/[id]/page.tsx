@@ -8,8 +8,8 @@ import {
   Check,
   CheckCircle2,
   ChevronDown,
-  Clock,
   ExternalLink,
+  Clock,
   ListChecks,
   Mail,
   MessageCircle,
@@ -22,6 +22,9 @@ import {
 import { useParams, useRouter } from "next/navigation";
 import { fetchApi } from "@/lib/api";
 import { useSession } from "@/context/SessionContext";
+import { Button } from "@/components/ui/Button";
+import { Badge } from "@/components/ui/Badge";
+import { PageHeader } from "@/components/ui/PageHeader";
 
 type EstadoTarea = "PENDIENTE" | "EN_CURSO" | "COMPLETADA" | "CANCELADA";
 
@@ -86,6 +89,7 @@ type Radicado = {
 type ProcesoOption = {
   id: number;
   nombre: string;
+  clientes?: { id: number; nombre_completo: string }[];
   radicados: {
     id: number;
     numero: string;
@@ -135,6 +139,15 @@ function getPriorityClass(priority: PrioridadTarea) {
     case "BAJA":
       return "bg-surface-muted text-foreground-secondary";
   }
+}
+
+function RelationItem({ label, value, href }: { label: string; value?: string | null; href?: string }) {
+  return (
+    <div className="rounded-lg border border-border bg-surface-muted p-4">
+      <p className="text-xs font-medium text-foreground-muted">{label}</p>
+      {value && href ? <a href={href} className="mt-1 inline-flex items-center gap-1 font-semibold text-primary hover:underline">{value}<ExternalLink size={13} /></a> : <p className="mt-1 font-semibold text-foreground">{value || "Sin asociación"}</p>}
+    </div>
+  );
 }
 
 function getStatusClass(status: EstadoTarea) {
@@ -203,6 +216,12 @@ export default function TareaDetalleAbogadoPage() {
   const [error, setError] = useState("");
 
   const [editing, setEditing] = useState(false);
+  const [editingRelations, setEditingRelations] = useState(false);
+  const [savingRelations, setSavingRelations] = useState(false);
+  const [relationProcessId, setRelationProcessId] = useState("");
+  const [relationRadicadoId, setRelationRadicadoId] = useState("");
+  const [relationActuationId, setRelationActuationId] = useState("");
+  const [relationClientId, setRelationClientId] = useState("");
 
   const [titulo, setTitulo] = useState("");
   const [descripcion, setDescripcion] = useState("");
@@ -211,6 +230,15 @@ export default function TareaDetalleAbogadoPage() {
   const [fechaLimite, setFechaLimite] = useState("");
 
   const [newSubtask, setNewSubtask] = useState("");
+  const [editingSubtaskId, setEditingSubtaskId] = useState<number | null>(null);
+  const [changingStatus, setChangingStatus] = useState(false);
+  const [showSubtaskForm, setShowSubtaskForm] = useState(false);
+  const [subtaskDraftTitle, setSubtaskDraftTitle] = useState("");
+  const [subtaskDraftAssigned, setSubtaskDraftAssigned] = useState(false);
+  const [subtaskDraftClientId, setSubtaskDraftClientId] = useState("");
+  const [subtaskDraftEmail, setSubtaskDraftEmail] = useState(false);
+  const [subtaskDraftWhatsapp, setSubtaskDraftWhatsapp] = useState(false);
+  const [savingSubtask, setSavingSubtask] = useState(false);
   const [addingSubtask, setAddingSubtask] = useState(false);
   const [subtaskScope, setSubtaskScope] = useState<ScopeLevel>("HEREDAR");
   const [subtaskProcessId, setSubtaskProcessId] = useState("");
@@ -239,6 +267,26 @@ export default function TareaDetalleAbogadoPage() {
 
     return radicados.find((item) => item.id === tarea.radicado_id);
   }, [tarea, radicados]);
+
+  const procesoAsociado = procesos.find((item) => item.id === tarea?.proceso_id);
+  const clienteAsociado = clientes.find((item) => item.id === tarea?.cliente_id);
+  const relationProcess = procesos.find((item) => item.id === Number(relationProcessId));
+  const relationRadicadoOptions = relationProcessId
+    ? relationProcess?.radicados ?? []
+    : radicados.map((item) => ({
+        id: item.id,
+        numero: item.numero_radicado || item.numero || item.titulo || `Radicado #${item.id}`,
+        actuaciones: item.actuaciones ?? [],
+      }));
+  const relationActuationOptions = relationRadicadoOptions.find(
+    (item) => item.id === Number(relationRadicadoId),
+  )?.actuaciones ?? [];
+  const relationClientOptions = relationProcessId
+    ? relationProcess?.clientes ?? []
+    : clientes;
+  const subtaskClientOptions = tarea?.proceso_id
+    ? procesos.find((item) => item.id === tarea.proceso_id)?.clientes ?? []
+    : clientes;
 
   const subtaskScopeOptions = useMemo(() => {
     const options: { value: ScopeLevel; label: string }[] = [
@@ -342,6 +390,10 @@ export default function TareaDetalleAbogadoPage() {
       setReminderNotifyWhatsapp(Boolean(canalesRecordatorios.whatsapp));
 
       setTarea(taskData);
+      setRelationProcessId(taskData.proceso_id ? String(taskData.proceso_id) : "");
+      setRelationRadicadoId(taskData.radicado_id ? String(taskData.radicado_id) : "");
+      setRelationActuationId(taskData.actuacion_id ? String(taskData.actuacion_id) : "");
+      setRelationClientId(taskData.cliente_id ? String(taskData.cliente_id) : "");
 
       setTitulo(taskData.titulo ?? "");
       setDescripcion(taskData.descripcion ?? "");
@@ -371,10 +423,8 @@ export default function TareaDetalleAbogadoPage() {
       setSubtaskActuationId(
         taskData.actuacion_id ? String(taskData.actuacion_id) : "",
       );
-      setSubtaskAssignedToClient(Boolean(taskData.cliente_id));
-      setSubtaskClientId(
-        taskData.cliente_id ? String(taskData.cliente_id) : "",
-      );
+      setSubtaskAssignedToClient(false);
+      setSubtaskClientId("");
     } catch (err) {
       setError(
         err instanceof Error ? err.message : "No se pudo cargar la tarea.",
@@ -412,6 +462,25 @@ export default function TareaDetalleAbogadoPage() {
     }
   }
 
+  async function changeStatus(next: EstadoTarea) {
+    if (!tarea || !token || next === tarea.estado) return;
+    try {
+      setChangingStatus(true);
+      setError("");
+      const updated = await fetchApi(`/api/tareas/${tarea.id}`, {
+        method: "PUT",
+        token,
+        body: JSON.stringify({ estado: next }),
+      });
+      setTarea(updated);
+      setEstado(updated.estado);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "No se pudo cambiar el estado.");
+    } finally {
+      setChangingStatus(false);
+    }
+  }
+
   async function saveTask() {
     if (!tarea || !token) return;
 
@@ -446,6 +515,80 @@ export default function TareaDetalleAbogadoPage() {
       setError(err instanceof Error ? err.message : "No se pudo guardar.");
     } finally {
       setSaving(false);
+    }
+  }
+
+  function startEditingRelations() {
+    if (!tarea) return;
+    setRelationProcessId(tarea.proceso_id ? String(tarea.proceso_id) : "");
+    setRelationRadicadoId(tarea.radicado_id ? String(tarea.radicado_id) : "");
+    setRelationActuationId(tarea.actuacion_id ? String(tarea.actuacion_id) : "");
+    setRelationClientId(tarea.cliente_id ? String(tarea.cliente_id) : "");
+    setEditingRelations(true);
+  }
+
+  async function saveRelations() {
+    if (!tarea || !token) return;
+    try {
+      setSavingRelations(true);
+      setError("");
+      const updated = await fetchApi(`/api/tareas/${tarea.id}`, {
+        method: "PUT",
+        token,
+        body: JSON.stringify({
+          proceso_id: relationProcessId ? Number(relationProcessId) : null,
+          radicado_id: relationRadicadoId ? Number(relationRadicadoId) : null,
+          actuacion_id: relationActuationId ? Number(relationActuationId) : null,
+          cliente_id: relationClientId ? Number(relationClientId) : null,
+        }),
+      });
+      setTarea(updated);
+      setRelationProcessId(updated.proceso_id ? String(updated.proceso_id) : "");
+      setRelationRadicadoId(updated.radicado_id ? String(updated.radicado_id) : "");
+      setRelationActuationId(updated.actuacion_id ? String(updated.actuacion_id) : "");
+      setRelationClientId(updated.cliente_id ? String(updated.cliente_id) : "");
+      setEditingRelations(false);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "No se pudieron actualizar las asociaciones.");
+    } finally {
+      setSavingRelations(false);
+    }
+  }
+
+  function startEditingSubtask(subtask: Subtarea) {
+    setEditingSubtaskId(subtask.id);
+    setSubtaskDraftTitle(subtask.titulo);
+    setSubtaskDraftAssigned(subtask.asignada_cliente);
+    setSubtaskDraftClientId(subtask.cliente_id ? String(subtask.cliente_id) : "");
+    setSubtaskDraftEmail(subtask.notificar_email);
+    setSubtaskDraftWhatsapp(subtask.notificar_whatsapp);
+  }
+
+  async function saveSubtask(subtask: Subtarea) {
+    if (!tarea || !token || !subtaskDraftTitle.trim()) return;
+    try {
+      setSavingSubtask(true);
+      setError("");
+      const updated = await fetchApi(`/api/tareas/${tarea.id}/subtareas/${subtask.id}`, {
+        method: "PATCH",
+        token,
+        body: JSON.stringify({
+          titulo: subtaskDraftTitle.trim(),
+          asignada_cliente: subtaskDraftAssigned,
+          cliente_id: subtaskDraftAssigned && subtaskDraftClientId ? Number(subtaskDraftClientId) : null,
+          notificar_email: subtaskDraftAssigned && subtaskDraftEmail,
+          notificar_whatsapp: subtaskDraftAssigned && subtaskDraftWhatsapp,
+        }),
+      });
+      setTarea((current) => current ? {
+        ...current,
+        subtareas: current.subtareas.map((item) => item.id === updated.id ? updated : item),
+      } : current);
+      setEditingSubtaskId(null);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "No se pudo actualizar la subtarea.");
+    } finally {
+      setSavingSubtask(false);
     }
   }
 
@@ -518,8 +661,8 @@ export default function TareaDetalleAbogadoPage() {
       );
 
       setNewSubtask("");
-      setSubtaskAssignedToClient(Boolean(tarea.cliente_id));
-      setSubtaskClientId(tarea.cliente_id ? String(tarea.cliente_id) : "");
+      setSubtaskAssignedToClient(false);
+      setSubtaskClientId("");
       setSubtaskNotifyEmail(true);
       setSubtaskNotifyWhatsapp(true);
       await loadData();
@@ -768,40 +911,38 @@ export default function TareaDetalleAbogadoPage() {
   return (
     <div className="mx-auto max-w-6xl space-y-6">
       {/* HEADER */}
-      <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-        <button
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <Button
+          variant="ghost"
+          size="sm"
           onClick={() => router.push("/gestion-procesos/abogado/tareas")}
-          className="flex w-fit items-center gap-2 text-sm font-medium text-foreground-secondary transition hover:text-foreground"
+          icon={<ArrowLeft className="size-4" />}
         >
-          <ArrowLeft size={18} />
           Volver a tareas
-        </button>
+        </Button>
 
         <div className="flex items-center gap-2">
           {!editing && (
-            <button
+            <Button
+              variant="outline"
+              size="sm"
               onClick={() => setEditing(true)}
-              className="flex items-center gap-2 rounded-lg border border-border bg-surface px-4 py-2 text-sm font-medium text-foreground transition hover:bg-surface-hover"
+              icon={<Pencil className="size-4" />}
             >
-              <Pencil size={16} />
               Editar
-            </button>
+            </Button>
           )}
 
-          <button
+          <Button
+            variant={tarea.estado === "COMPLETADA" ? "outline" : "primary"}
+            size="sm"
             onClick={toggleCompleted}
-            className={`flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-semibold transition ${
-              tarea.estado === "COMPLETADA"
-                ? "border border-border bg-surface text-foreground"
-                : "bg-primary text-primary-foreground hover:bg-primary-hover"
-            }`}
+            icon={<CheckCircle2 className="size-4" />}
           >
-            <CheckCircle2 size={17} />
-
             {tarea.estado === "COMPLETADA"
               ? "Reabrir tarea"
               : "Marcar completada"}
-          </button>
+          </Button>
         </div>
       </div>
 
@@ -984,72 +1125,48 @@ export default function TareaDetalleAbogadoPage() {
 
           {/* RELACIÓN */}
           <section className="rounded-xl border border-border bg-surface p-6 shadow-sm">
-            <div className="mb-5">
-              <h2 className="font-semibold text-foreground">Relación</h2>
-
-              <p className="mt-1 text-sm text-foreground-muted">
-                Elementos asociados a esta tarea.
-              </p>
-            </div>
-
-            {tarea.radicado_id ? (
-              <a
-                href={`/gestion-procesos/abogado/procesos/${tarea.radicado_id}`}
-                className="group flex items-center justify-between rounded-lg border border-border bg-surface-muted p-4 transition hover:border-primary hover:bg-primary-light"
-              >
-                <div className="flex min-w-0 items-center gap-3">
-                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary-light text-primary">
-                    <ExternalLink size={18} />
-                  </div>
-
-                  <div className="min-w-0">
-                    <p className="text-xs font-medium text-foreground-muted">
-                      Radicado
-                    </p>
-
-                    <p className="truncate font-semibold text-foreground group-hover:text-primary">
-                      {radicado?.numero_radicado ||
-                        radicado?.numero ||
-                        `Radicado #${tarea.radicado_id}`}
-                    </p>
-
-                    {radicado?.titulo && (
-                      <p className="mt-0.5 truncate text-xs text-foreground-muted">
-                        {radicado.titulo}
-                      </p>
-                    )}
-
-                    {radicado?.asunto && (
-                      <p className="mt-0.5 truncate text-xs text-foreground-muted">
-                        {radicado.asunto}
-                      </p>
-                    )}
-                  </div>
-                </div>
-
-                <span className="ml-3 shrink-0 text-sm font-medium text-primary">
-                  Ver
-                </span>
-              </a>
-            ) : (
-              <div className="rounded-lg border border-border bg-surface-muted p-4 text-sm text-foreground-muted">
-                Tarea general, sin radicado asociado.
+            <div className="mb-5 flex flex-wrap items-start justify-between gap-3">
+              <div>
+                <h2 className="font-semibold text-foreground">Relación</h2>
+                <p className="mt-1 text-sm text-foreground-muted">Proceso, radicados y clientes asociados. Puedes cambiar o quitar cada asociación.</p>
               </div>
-            )}
-
-            {tarea.actuacion_id && (
-              <div className="mt-3 rounded-lg border border-border bg-surface-muted p-4">
-                <p className="text-xs font-medium text-foreground-muted">
-                  Actuación
-                </p>
-
-                <p className="mt-1 font-semibold text-foreground">
-                  Actuación #{tarea.actuacion_id}
-                </p>
+              {!editingRelations ? (
+                <button type="button" onClick={startEditingRelations} className="flex items-center gap-2 rounded-lg border border-border px-3 py-2 text-sm font-medium text-foreground hover:bg-surface-hover"><Pencil size={15} /> Editar relaciones</button>
+              ) : (
+                <button type="button" onClick={() => setEditingRelations(false)} className="flex items-center gap-2 rounded-lg border border-border px-3 py-2 text-sm font-medium text-foreground hover:bg-surface-hover"><X size={15} /> Cancelar</button>
+              )}
+            </div>
+            {editingRelations ? (
+              <div className="space-y-4">
+                <label className="block text-sm font-medium text-foreground">Proceso
+                  <select value={relationProcessId} onChange={(event) => { setRelationProcessId(event.target.value); setRelationRadicadoId(""); setRelationActuationId(""); setRelationClientId(""); }} className="mt-1 w-full rounded-lg border border-border bg-surface px-3 py-2.5 font-normal">
+                    <option value="">Sin proceso</option>{procesos.map((item) => <option key={item.id} value={item.id}>{item.nombre}</option>)}
+                  </select>
+                </label>
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <label className="block text-sm font-medium text-foreground">Radicado
+                    <select value={relationRadicadoId} onChange={(event) => { setRelationRadicadoId(event.target.value); setRelationActuationId(""); }} className="mt-1 w-full rounded-lg border border-border bg-surface px-3 py-2.5 font-normal"><option value="">Sin radicado</option>{relationRadicadoOptions.map((item) => <option key={item.id} value={item.id}>{item.numero}</option>)}</select>
+                  </label>
+                  <label className="block text-sm font-medium text-foreground">Actuación
+                    <select value={relationActuationId} onChange={(event) => setRelationActuationId(event.target.value)} disabled={!relationRadicadoId} className="mt-1 w-full rounded-lg border border-border bg-surface px-3 py-2.5 font-normal disabled:opacity-60"><option value="">Sin actuación</option>{relationActuationOptions.map((item) => <option key={item.id} value={item.id}>{item.actuacion || `Actuación #${item.id}`}</option>)}</select>
+                  </label>
+                </div>
+                <label className="block text-sm font-medium text-foreground">Cliente asignado a la tarea principal
+                  <select value={relationClientId} onChange={(event) => setRelationClientId(event.target.value)} className="mt-1 w-full rounded-lg border border-border bg-surface px-3 py-2.5 font-normal"><option value="">Sin cliente</option>{relationClientOptions.map((item) => <option key={item.id} value={item.id}>{item.nombre_completo}</option>)}</select>
+                </label>
+                <div className="flex justify-end"><button type="button" onClick={saveRelations} disabled={savingRelations} className="flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground disabled:opacity-60"><Save size={15} />{savingRelations ? "Guardando…" : "Guardar relaciones"}</button></div>
+              </div>
+            ) : (
+              <div className="grid gap-3 sm:grid-cols-2">
+                <RelationItem label="Proceso" value={procesoAsociado?.nombre} href={tarea.proceso_id ? `/gestion-procesos/abogado/procesos/${tarea.proceso_id}` : undefined} />
+                <RelationItem label="Radicado" value={radicado?.numero_radicado || radicado?.numero || radicado?.titulo || (tarea.radicado_id ? `Radicado #${tarea.radicado_id}` : undefined)} href={tarea.radicado_id ? `/gestion-procesos/abogado/radicados/${tarea.radicado_id}` : undefined} />
+                <RelationItem label="Actuación" value={tarea.actuacion_id ? (radicado?.actuaciones?.find((item) => item.id === tarea.actuacion_id)?.actuacion || `Actuación #${tarea.actuacion_id}`) : undefined} />
+                <RelationItem label="Cliente asignado a la tarea principal" value={clienteAsociado?.nombre_completo} href={tarea.cliente_id ? `/gestion-procesos/abogado/clientes/${tarea.cliente_id}` : undefined} />
+                {procesoAsociado && (procesoAsociado.radicados?.length ?? 0) > 0 && <div className="rounded-lg border border-border bg-surface-muted p-4 sm:col-span-2"><p className="text-xs font-medium text-foreground-muted">Radicados del proceso</p><div className="mt-2 flex flex-wrap gap-2">{procesoAsociado.radicados.map((item) => <a key={item.id} href={`/gestion-procesos/abogado/radicados/${item.id}`} className="rounded-full bg-primary/10 px-3 py-1 text-sm font-medium text-primary hover:bg-primary/20">{item.numero || `Radicado #${item.id}`}</a>)}</div></div>}
+                {procesoAsociado && (procesoAsociado.clientes?.length ?? 0) > 0 && <div className="rounded-lg border border-border bg-surface-muted p-4 sm:col-span-2"><p className="text-xs font-medium text-foreground-muted">Clientes relacionados por el proceso (no asignados automáticamente a la tarea)</p><div className="mt-2 flex flex-wrap gap-2">{procesoAsociado.clientes?.map((item) => <a key={item.id} href={`/gestion-procesos/abogado/clientes/${item.id}`} className="rounded-full bg-primary/10 px-3 py-1 text-sm font-medium text-primary hover:bg-primary/20">{item.nombre_completo}</a>)}</div></div>}
               </div>
             )}
           </section>
-
           {/* SUBTAREAS */}
           <section className="rounded-xl border border-border bg-surface p-6 shadow-sm">
             <div className="mb-5">
@@ -1066,40 +1183,28 @@ export default function TareaDetalleAbogadoPage() {
 
             <div className="space-y-2">
               {tarea.subtareas.map((subtask) => (
-                <div
-                  key={subtask.id}
-                  className="group flex items-center gap-3 rounded-lg border border-border px-3 py-3"
-                >
-                  <button
-                    onClick={() => toggleSubtask(subtask)}
-                    className={`flex h-5 w-5 shrink-0 items-center justify-center rounded border transition ${
-                      subtask.completada
-                        ? "border-success bg-success text-white"
-                        : "border-border-strong hover:border-primary"
-                    }`}
-                  >
-                    {subtask.completada && <Check size={13} />}
-                  </button>
-
-                  <span
-                    className={`min-w-0 flex-1 text-sm ${
-                      subtask.completada
-                        ? "text-foreground-muted line-through"
-                        : "text-foreground"
-                    }`}
-                  >
-                    {subtask.titulo}
-                  </span>
-
-                  <button
-                    onClick={() => deleteSubtask(subtask.id)}
-                    className="rounded p-1.5 text-foreground-muted opacity-0 transition hover:bg-danger-light hover:text-danger group-hover:opacity-100"
-                  >
-                    <Trash2 size={15} />
-                  </button>
+                <div key={subtask.id} className="rounded-lg border border-border px-3 py-3">
+                  {editingSubtaskId === subtask.id ? (
+                    <div className="space-y-3">
+                      <input value={subtaskDraftTitle} onChange={(event) => setSubtaskDraftTitle(event.target.value)} className="w-full rounded-md border border-border bg-surface px-3 py-2 text-sm" aria-label="Título de subtarea" />
+                      <label className="flex items-center gap-2 text-sm text-foreground"><input type="checkbox" checked={subtaskDraftAssigned} onChange={(event) => { setSubtaskDraftAssigned(event.target.checked); if (!event.target.checked) setSubtaskDraftClientId(""); }} />Asignar solo esta subtarea a un cliente</label>
+                      <p className="text-xs text-foreground-muted">La asignacion de esta subtarea no asigna la tarea principal al cliente.</p>
+                      {subtaskDraftAssigned && <div className="grid gap-3 sm:grid-cols-2">
+                        <label className="text-sm text-foreground">Cliente<select value={subtaskDraftClientId} onChange={(event) => setSubtaskDraftClientId(event.target.value)} className="mt-1 w-full rounded-md border border-border bg-surface px-3 py-2"><option value="">Seleccionar cliente</option>{subtaskClientOptions.map((client) => <option key={client.id} value={client.id}>{client.nombre_completo}</option>)}</select></label>
+                        <div className="flex flex-wrap gap-4 self-end pb-2"><label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={subtaskDraftEmail} onChange={(event) => setSubtaskDraftEmail(event.target.checked)} />Correo</label><label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={subtaskDraftWhatsapp} onChange={(event) => setSubtaskDraftWhatsapp(event.target.checked)} />WhatsApp</label></div>
+                      </div>}
+                      <div className="flex justify-end gap-2"><button type="button" onClick={() => setEditingSubtaskId(null)} className="rounded-md border border-border px-3 py-1.5 text-sm">Cancelar</button><button type="button" disabled={savingSubtask || !subtaskDraftTitle.trim() || (subtaskDraftAssigned && !subtaskDraftClientId)} onClick={() => void saveSubtask(subtask)} className="rounded-md bg-primary px-3 py-1.5 text-sm font-semibold text-primary-foreground disabled:opacity-60">{savingSubtask ? "Guardando…" : "Guardar"}</button></div>
+                    </div>
+                  ) : (
+                    <div className="flex items-center gap-3">
+                      <button onClick={() => toggleSubtask(subtask)} className={`flex h-5 w-5 shrink-0 items-center justify-center rounded border transition ${subtask.completada ? "border-success bg-success !text-white" : "border-border-strong hover:border-primary"}`}>{subtask.completada && <Check size={13} />}</button>
+                      <div className="min-w-0 flex-1"><p className={`text-sm ${subtask.completada ? "text-foreground-muted line-through" : "text-foreground"}`}>{subtask.titulo}</p>{subtask.asignada_cliente && <span className="mt-1 inline-flex rounded-full bg-primary/10 px-2 py-0.5 text-xs font-medium text-primary">Solo esta subtarea · {subtask.cliente_id ? clientes.find((client) => client.id === subtask.cliente_id)?.nombre_completo ?? "Cliente" : "Cliente asignado"}</span>}</div>
+                      <button type="button" onClick={() => startEditingSubtask(subtask)} aria-label="Editar subtarea" className="rounded p-1.5 text-foreground-muted transition hover:bg-surface-hover hover:text-primary"><Pencil size={15} /></button>
+                      <button type="button" onClick={() => { if (window.confirm("¿Eliminar esta subtarea?")) void deleteSubtask(subtask.id); }} aria-label="Eliminar subtarea" className="rounded p-1.5 text-foreground-muted transition hover:bg-danger-light hover:text-danger"><Trash2 size={15} /></button>
+                    </div>
+                  )}
                 </div>
               ))}
-
               {tarea.subtareas.length === 0 && (
                 <div className="rounded-lg border border-dashed border-border p-5 text-center text-sm text-foreground-muted">
                   No hay subtareas.
@@ -1107,6 +1212,16 @@ export default function TareaDetalleAbogadoPage() {
               )}
             </div>
 
+            {!showSubtaskForm ? (
+              <button
+                type="button"
+                onClick={() => setShowSubtaskForm(true)}
+                className="mt-4 inline-flex min-h-10 items-center gap-2 rounded-lg border border-dashed border-border-strong px-4 text-sm font-medium text-primary hover:bg-surface-hover"
+              >
+                <Plus size={16} />
+                Agregar subtarea
+              </button>
+            ) : (
             <form
               onSubmit={addSubtask}
               className="mt-5 space-y-3 rounded-lg border border-border bg-surface-muted p-4"
@@ -1228,8 +1343,9 @@ export default function TareaDetalleAbogadoPage() {
                       setSubtaskClientId(String(tarea.cliente_id));
                   }}
                 />
-                Asignar también al cliente
+                Asignar solo esta subtarea a un cliente
               </label>
+              <p className="text-xs text-foreground-muted">La asignacion de esta subtarea no asigna la tarea principal al cliente.</p>
               {subtaskAssignedToClient && (
                 <div className="grid gap-3 sm:grid-cols-2">
                   <label className="block text-sm font-medium text-foreground">
@@ -1240,16 +1356,10 @@ export default function TareaDetalleAbogadoPage() {
                       onChange={(event) =>
                         setSubtaskClientId(event.target.value)
                       }
-                      disabled={Boolean(tarea.cliente_id)}
                       className="mt-1 w-full rounded-md border border-border bg-surface px-3 py-2.5 font-normal disabled:opacity-70"
                     >
                       <option value="">Seleccionar cliente</option>
-                      {clientes
-                        .filter(
-                          (client) =>
-                            !tarea.cliente_id || client.id === tarea.cliente_id,
-                        )
-                        .map((client) => (
+                      {subtaskClientOptions.map((client) => (
                           <option key={client.id} value={client.id}>
                             {client.nombre_completo}
                           </option>
@@ -1285,7 +1395,14 @@ export default function TareaDetalleAbogadoPage() {
                   </fieldset>
                 </div>
               )}
-              <div className="flex justify-end">
+              <div className="flex justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={() => setShowSubtaskForm(false)}
+                  className="rounded-md border border-border px-3 py-2 text-sm font-medium text-foreground hover:bg-surface-hover"
+                >
+                  Cancelar
+                </button>
                 <button
                   type="submit"
                   disabled={
@@ -1305,6 +1422,7 @@ export default function TareaDetalleAbogadoPage() {
                 </button>
               </div>
             </form>
+            )}
           </section>
 
           {/* NOTIFICACIONES */}
@@ -1603,17 +1721,20 @@ export default function TareaDetalleAbogadoPage() {
 
           {/* ESTADO */}
           <section className="rounded-xl border border-border bg-surface p-5 shadow-sm">
-            <h2 className="mb-4 font-semibold text-foreground">
-              Estado actual
-            </h2>
-
-            <div
-              className={`rounded-lg px-4 py-3 text-center text-sm font-semibold ${getStatusClass(
-                tarea.estado,
-              )}`}
+            <label htmlFor="task-status" className="mb-3 block font-semibold text-foreground">
+              Estado
+            </label>
+            <select
+              id="task-status"
+              value={tarea.estado}
+              disabled={changingStatus}
+              onChange={(event) => void changeStatus(event.target.value as EstadoTarea)}
+              className={`h-11 w-full rounded-lg border-0 px-3 text-sm font-semibold disabled:opacity-60 ${getStatusClass(tarea.estado)}`}
             >
-              {getStatusLabel(tarea.estado)}
-            </div>
+              {(["PENDIENTE", "EN_CURSO", "COMPLETADA", "CANCELADA"] as EstadoTarea[]).map((status) => (
+                <option key={status} value={status}>{getStatusLabel(status)}</option>
+              ))}
+            </select>
           </section>
         </aside>
       </div>

@@ -1,9 +1,15 @@
 "use client";
 
 import { FormEvent, useEffect, useMemo, useState } from "react";
-import Link from "next/link";
-import { KeyRound, Mail, Pencil, Plus, RefreshCw, Search, Trash2, X } from "lucide-react";
-import { fetchApi } from "@/lib/api";
+import { KeyRound, Mail, PauseCircle, Pencil, PlayCircle, Plus, Trash2, UserCheck, UserRound, X } from "lucide-react";
+import { apiRequest, fetchApi } from "@/lib/api";
+import { ApiErrorState } from "@/components/ui/ApiErrorState";
+import { PageHeader } from "@/components/ui/PageHeader";
+import { Button } from "@/components/ui/Button";
+import { Badge } from "@/components/ui/Badge";
+import { DataTable, type DataTableColumn, type RowAction } from "@/components/ui/DataTable";
+import { SegmentedControl } from "@/components/ui/SegmentedControl";
+import { useSession } from "@/context/SessionContext";
 
 type Role = "ABOGADO_ADMIN" | "ABOGADO" | "CLIENTE" | "ADMIN";
 type Status = "ACTIVO" | "SUSPENDIDO" | "PENDIENTE_APROBACION" | "RECHAZADO";
@@ -38,11 +44,11 @@ const initialForm: FormState = {
   plan_id: "",
   creado_por_abogado_id: "",
 };
-const roleLabels: Record<Role, string> = {
-  ABOGADO_ADMIN: "Abogado de la firma",
-  ABOGADO: "Abogado SaaS · Plataforma",
-  CLIENTE: "Cliente",
-  ADMIN: "Administrador de plataforma",
+const scopeRole: Record<Scope, Role> = {
+  FIRMA: "ABOGADO_ADMIN",
+  CLIENTES: "CLIENTE",
+  SAAS: "ABOGADO",
+  ADMIN: "ADMIN",
 };
 const stateLabels: Record<Status, string> = {
   ACTIVO: "Activo",
@@ -52,10 +58,34 @@ const stateLabels: Record<Status, string> = {
 };
 
 async function loadOptions(token: string) {
+  const loadJson = async <T,>(endpoint: string, label: string): Promise<T> => {
+    let response: Response;
+    try {
+      response = await apiRequest(endpoint, { method: "GET", token });
+    } catch (cause) {
+      const detail = cause instanceof Error ? cause.message : "Error desconocido.";
+      throw new Error(`${label}: ${detail}`);
+    }
+
+    let data: unknown;
+    try {
+      data = await response.json();
+    } catch {
+      throw new Error(`${label}: el servidor devolvió una respuesta inválida.`);
+    }
+    return data as T;
+  };
+
   const [users, plans] = await Promise.all([
-    fetchApi("/api/admin/usuarios?incluir_administradores=true", { method: "GET", token }),
-    fetchApi("/api/admin/planes", { method: "GET", token }),
+    loadJson<unknown>("/api/admin/usuarios?incluir_administradores=true", "No fue posible cargar usuarios"),
+    loadJson<unknown>("/api/admin/planes", "No fue posible cargar planes"),
   ]);
+  if (!Array.isArray(users)) {
+    throw new Error("No fue posible cargar usuarios: la API devolvió un formato inesperado.");
+  }
+  if (!Array.isArray(plans)) {
+    throw new Error("No fue posible cargar planes: la API devolvió un formato inesperado.");
+  }
   return { users: users as User[], plans: plans as Plan[] };
 }
 
@@ -63,19 +93,16 @@ export default function AdminUsersPage() {
   const [users, setUsers] = useState<User[]>([]);
   const [plans, setPlans] = useState<Plan[]>([]);
   const [scope, setScope] = useState<Scope>("FIRMA");
-  const [role, setRole] = useState("TODOS");
   const [status, setStatus] = useState("TODOS");
-  const [search, setSearch] = useState("");
   const [loading, setLoading] = useState(true);
   const [working, setWorking] = useState(false);
   const [error, setError] = useState("");
+  const [loadError, setLoadError] = useState("");
   const [notice, setNotice] = useState("");
   const [formOpen, setFormOpen] = useState(false);
   const [editing, setEditing] = useState<User | null>(null);
   const [form, setForm] = useState<FormState>(initialForm);
-  const [selectedIds, setSelectedIds] = useState<number[]>([]);
-  const token =
-    typeof window === "undefined" ? "" : localStorage.getItem("token") || "";
+  const { token } = useSession();
 
   useEffect(() => {
     if (!token) return;
@@ -85,11 +112,12 @@ export default function AdminUsersPage() {
         if (active) {
           setUsers(result.users);
           setPlans(result.plans.filter((plan) => plan.activo));
+          setLoadError("");
         }
       })
       .catch((cause: unknown) => {
         if (active)
-          setError(
+          setLoadError(
             cause instanceof Error
               ? cause.message
               : "No fue posible cargar usuarios.",
@@ -106,13 +134,14 @@ export default function AdminUsersPage() {
   async function reload() {
     if (!token) return;
     setLoading(true);
-    setError("");
+    setLoadError("");
     try {
       const result = await loadOptions(token);
       setUsers(result.users);
       setPlans(result.plans.filter((plan) => plan.activo));
+      setLoadError("");
     } catch (cause) {
-      setError(
+      setLoadError(
         cause instanceof Error
           ? cause.message
           : "No fue posible cargar usuarios.",
@@ -125,22 +154,10 @@ export default function AdminUsersPage() {
   const visible = useMemo(
     () =>
       users.filter((user) => {
-        const inScope =
-          (scope === "SAAS" && user.rol === "ABOGADO") ||
-          (scope === "FIRMA" && user.rol === "ABOGADO_ADMIN") ||
-          (scope === "CLIENTES" && user.rol === "CLIENTE") ||
-          (scope === "ADMIN" && user.rol === "ADMIN");
-        const matchesRole = role === "TODOS" || user.rol === role;
         const matchesStatus = status === "TODOS" || user.estado === status;
-        const term = search.trim().toLowerCase();
-        const matchesSearch =
-          !term ||
-          `${user.nombre_completo} ${user.email} ${user.whatsapp_numero}`
-            .toLowerCase()
-            .includes(term);
-        return inScope && matchesRole && matchesStatus && matchesSearch;
+        return scopeRole[scope] === user.rol && matchesStatus;
       }),
-    [users, scope, role, status, search],
+    [users, scope, status],
   );
 
   function openCreate() {
@@ -303,8 +320,8 @@ export default function AdminUsersPage() {
     }
   }
 
-  async function bulkUserAction(action: "ACTIVATE" | "SUSPEND" | "DELETE") {
-    const selected = visible.filter((user) => selectedIds.includes(user.id) && user.rol !== "ADMIN");
+  async function bulkUserAction(action: "ACTIVATE" | "SUSPEND" | "DELETE", rows: User[]) {
+    const selected = rows.filter((user) => user.rol !== "ADMIN");
     const eligible = selected.filter((user) => action === "ACTIVATE" ? user.estado === "SUSPENDIDO" || user.estado === "RECHAZADO" : action === "SUSPEND" ? user.estado === "ACTIVO" : true);
     if (!eligible.length) return;
     if (!window.confirm(action === "DELETE" ? `¿Eliminar permanentemente ${eligible.length} cuentas? Los documentos asociados se conservarán en el inventario ADMIN y se desligarán de las cuentas eliminadas.` : `¿${action === "ACTIVATE" ? "Activar" : "Suspender"} ${eligible.length} cuentas?`)) return;
@@ -316,256 +333,127 @@ export default function AdminUsersPage() {
     const failed = outcomes.filter((result) => result.status === "rejected").length;
     setNotice(`${outcomes.length - failed} cuenta(s) procesadas${selected.length > eligible.length ? `; ${selected.length - eligible.length} omitidas por su estado` : ""}${failed ? `; ${failed} con error` : ""}.`);
     if (failed) setError(outcomes.filter((result): result is PromiseRejectedResult => result.status === "rejected").map((result) => result.reason instanceof Error ? result.reason.message : "Error al procesar una cuenta.").join(" "));
-    setSelectedIds([]);
     setWorking(false);
     await reload();
   }
 
+  const scopeCount = (target: Scope) => users.filter((user) => scopeRole[target] === user.rol).length;
+  const userColumns: DataTableColumn<User>[] = [
+    {
+      key: "nombre_completo",
+      header: "Nombre",
+      mobile: "title",
+      sortValue: (user) => user.nombre_completo,
+      render: (user) => (
+        <span className="flex min-w-0 items-center gap-3">
+          <span aria-hidden="true" className="hidden size-9 shrink-0 place-items-center rounded-full bg-primary-light text-xs font-semibold text-primary md:grid">
+            {user.nombre_completo.split(/\s+/).slice(0, 2).map((part) => part[0]).join("").toUpperCase()}
+          </span>
+          <span className="truncate">{user.nombre_completo}</span>
+        </span>
+      ),
+    },
+    { key: "email", header: "Correo", mobile: "subtitle", sortValue: (user) => user.email, render: (user) => <span className="block max-w-64 truncate" title={user.email}>{user.email}</span> },
+    { key: "whatsapp_numero", header: "WhatsApp", mobile: "meta", sortValue: (user) => user.whatsapp_numero, render: (user) => user.whatsapp_numero || <span className="text-foreground-muted">Sin registrar</span> },
+    ...(scope === "SAAS"
+      ? [{ key: "plan", header: "Plan", mobile: "meta" as const, sortValue: (user: User) => user.plan?.nombre, render: (user: User) => user.plan?.nombre || <span className="text-foreground-muted">Sin plan</span> }]
+      : []),
+    {
+      key: "estado",
+      header: "Estado",
+      mobile: "badge",
+      sortValue: (user) => stateLabels[user.estado],
+      render: (user) => <Badge tone={user.estado === "ACTIVO" ? "completed" : user.estado === "RECHAZADO" ? "rejected" : "pending"}>{stateLabels[user.estado]}</Badge>,
+    },
+    {
+      key: "seguridad",
+      header: "Acceso",
+      mobile: "badge",
+      sortValue: (user) => (user.debe_cambiar_password ? 1 : 0),
+      exportValue: (user) => (user.debe_cambiar_password ? "Debe cambiar contraseña" : "Normal"),
+      render: (user) => user.debe_cambiar_password ? <Badge tone="attention">Debe cambiar contraseña</Badge> : <span className="text-xs text-foreground-muted">Normal</span>,
+    },
+  ];
+
+  const userActions: RowAction<User>[] = [
+    { label: "Ver ficha", icon: <UserRound />, href: (user) => `/gestion-procesos/admin/usuarios/${user.id}` },
+    { label: "Editar datos", icon: <Pencil />, onSelect: (user) => openEdit(user), hidden: (user) => user.rol === "ADMIN" },
+    { label: "Enviar enlace para restablecer contraseña", icon: <Mail />, onSelect: (user) => sendPasswordReset(user), disabled: () => working },
+    { label: "Exigir cambio de contraseña", icon: <KeyRound />, onSelect: (user) => forcePasswordChange(user), hidden: (user) => user.rol === "ADMIN", disabled: (user) => working || Boolean(user.debe_cambiar_password) },
+    { label: "Revisar solicitud de registro", icon: <UserCheck />, href: () => "/gestion-procesos/admin/solicitudes", hidden: (user) => user.estado !== "PENDIENTE_APROBACION" },
+    { label: "Suspender acceso", icon: <PauseCircle />, separated: true, onSelect: (user) => changeStatus(user, "SUSPENDIDO"), hidden: (user) => user.rol === "ADMIN" || user.estado !== "ACTIVO", disabled: () => working },
+    { label: "Reactivar acceso", icon: <PlayCircle />, separated: true, onSelect: (user) => changeStatus(user, "ACTIVO"), hidden: (user) => user.rol === "ADMIN" || (user.estado !== "SUSPENDIDO" && user.estado !== "RECHAZADO"), disabled: () => working },
+    { label: "Eliminar cuenta", icon: <Trash2 />, tone: "danger", onSelect: (user) => deleteUser(user), hidden: (user) => user.rol === "ADMIN", disabled: () => working },
+  ];
+
   return (
-    <section className="mx-auto max-w-6xl space-y-5">
-      <header className="flex flex-wrap items-end justify-between gap-4">
-        <div>
-          <p className="text-xs font-semibold uppercase tracking-wide text-primary">
-            Panel Administrativo · Usuarios
-          </p>
-          <h1 className="mt-1 text-2xl font-semibold text-foreground">
-            Cuentas y acceso
-          </h1>
-          <p className="mt-1 text-sm text-foreground-muted">
-            SaaS, personal de la firma y clientes con alcance asignado.
-          </p>
-        </div>
-        <div className="flex gap-2">
-          <button
-            type="button"
-            onClick={() => void reload()}
-            aria-label="Actualizar usuarios"
-            className="grid size-10 place-items-center rounded-lg border border-border bg-surface hover:bg-surface-hover"
-          >
-            <RefreshCw className="size-4" />
-          </button>
-          {scope !== "ADMIN" && <button
-            type="button"
-            onClick={openCreate}
-            className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground"
-          >
-            <Plus className="size-4" />
-            Crear usuario
-          </button>}
-        </div>
-      </header>
-      {error && (
-        <p
-          role="alert"
-          className="rounded-lg border border-danger/30 bg-danger-light p-3 text-sm text-danger"
-        >
-          {error}
-        </p>
-      )}
-      {notice && (
-        <p
-          role="status"
-          className="rounded-lg border border-success/30 bg-success-light p-3 text-sm text-success"
-        >
-          {notice}
-        </p>
-      )}
-      <div
-        role="group"
-        aria-label="Ámbito de usuarios"
-        className="inline-flex flex-wrap gap-1 rounded-lg border border-border p-1"
-      >
-        {(
-          [
-            { id: "FIRMA", label: "Firma" },
-            { id: "CLIENTES", label: "Clientes" },
-            { id: "SAAS", label: "Abogados SaaS" },
-            { id: "ADMIN", label: "Administradores" },
-          ] as const
-        ).map((item) => (
-          <button
-            key={item.id}
-            type="button"
-            aria-pressed={scope === item.id}
-            onClick={() => setScope(item.id)}
-            className={`rounded-md px-3 py-1.5 text-sm ${scope === item.id ? "bg-primary text-white" : "text-foreground-muted hover:bg-surface-hover"}`}
-          >
-            {item.label}
-          </button>
-        ))}
-      </div>
-      <div className="grid gap-3 rounded-lg border border-border bg-surface p-3 md:grid-cols-[1fr_190px_190px]">
-        <label className="relative">
-          <span className="sr-only">Buscar usuarios</span>
-          <Search className="absolute left-3 top-2.5 size-4 text-foreground-muted" />
-          <input
-            value={search}
-            onChange={(event) => setSearch(event.target.value)}
-            placeholder="Buscar nombre, correo o WhatsApp"
-            className="w-full rounded-md border border-border bg-background py-2 pl-9 pr-3 text-sm"
-          />
-        </label>
-        <select
-          aria-label="Filtrar rol"
-          value={role}
-          onChange={(event) => setRole(event.target.value)}
-          className="rounded-md border border-border bg-background px-3 py-2 text-sm"
-        >
-          <option value="TODOS">Todos los perfiles</option>
-          {Object.entries(roleLabels).map(([key, label]) => (
-            <option key={key} value={key}>
-              {label}
-            </option>
-          ))}
-        </select>
-        <select
-          aria-label="Filtrar estado"
-          value={status}
-          onChange={(event) => setStatus(event.target.value)}
-          className="rounded-md border border-border bg-background px-3 py-2 text-sm"
-        >
-          <option value="TODOS">Todos los estados</option>
-          {Object.entries(stateLabels).map(([key, label]) => (
-            <option key={key} value={key}>
-              {label}
-            </option>
-          ))}
-        </select>
-      </div>
-      <div className="overflow-x-auto rounded-lg border border-border bg-surface">
-        <div className="flex flex-wrap items-center gap-2 border-b border-border p-3"><label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={visible.length > 0 && visible.every((user) => selectedIds.includes(user.id))} onChange={(event) => setSelectedIds((current) => event.target.checked ? [...new Set([...current, ...visible.map((user) => user.id)])] : current.filter((id) => !visible.some((user) => user.id === id)))} />Seleccionar resultados visibles</label><span className="text-sm text-foreground-muted">{selectedIds.length} seleccionadas</span><div className="ml-auto flex flex-wrap gap-2"><button type="button" disabled={working || !visible.some((user) => selectedIds.includes(user.id) && user.estado === "ACTIVO" && user.rol !== "ADMIN")} onClick={() => void bulkUserAction("SUSPEND")} className="rounded-md border border-border px-3 py-2 text-xs disabled:opacity-50">Suspender</button><button type="button" disabled={working || !visible.some((user) => selectedIds.includes(user.id) && ["SUSPENDIDO", "RECHAZADO"].includes(user.estado) && user.rol !== "ADMIN")} onClick={() => void bulkUserAction("ACTIVATE")} className="rounded-md border border-border px-3 py-2 text-xs disabled:opacity-50">Activar</button><button type="button" disabled={working || !selectedIds.some((id) => visible.some((user) => user.id === id && user.rol !== "ADMIN"))} onClick={() => void bulkUserAction("DELETE")} className="rounded-md border border-danger/30 px-3 py-2 text-xs text-danger disabled:opacity-50">Eliminar seleccionadas</button></div></div>
-        <table className="w-full min-w-230 text-left text-sm">
-          <thead className="border-b border-border bg-surface-secondary text-xs uppercase text-foreground-muted">
-            <tr>
-              <th className="px-4 py-3"><span className="sr-only">Selección</span></th>
-              <th className="px-4 py-3">Usuario</th>
-              <th className="px-4 py-3">Sector</th>
-              <th className="px-4 py-3">Plan</th>
-              <th className="px-4 py-3">Estado</th>
-              <th className="px-4 py-3">Seguridad</th>
-              <th className="px-4 py-3 text-right">Acciones</th>
-            </tr>
-          </thead>
-          <tbody>
-            {loading ? (
-              <tr>
-                <td
-                  colSpan={7}
-                  className="px-4 py-10 text-center text-foreground-muted"
-                >
-                  Cargando cuentas...
-                </td>
-              </tr>
-            ) : visible.length ? (
-              visible.map((user) => (
-                <tr
-                  key={user.id}
-                  className="border-b border-border last:border-0"
-                >
-                  <td className="px-4 py-3"><input type="checkbox" checked={selectedIds.includes(user.id)} onChange={() => setSelectedIds((current) => current.includes(user.id) ? current.filter((id) => id !== user.id) : [...current, user.id])} aria-label={`Seleccionar ${user.nombre_completo}`} /></td>
-                  <td className="px-4 py-3">
-                    <p className="font-medium text-foreground">
-                      <Link className="hover:text-primary hover:underline" href={`/gestion-procesos/admin/usuarios/${user.id}`}>{user.nombre_completo}</Link>
-                    </p>
-                    <p className="mt-0.5 text-xs text-foreground-muted">
-                      {user.email} · {user.whatsapp_numero || "Sin WhatsApp"}
-                    </p>
-                  </td>
-                  <td className="px-4 py-3 text-foreground-secondary">
-                    {roleLabels[user.rol]}
-                  </td>
-                  <td className="px-4 py-3 text-foreground-secondary">
-                    {user.plan?.nombre || "Sin plan"}
-                  </td>
-                  <td className="px-4 py-3">
-                    <span
-                      className={`rounded-md px-2 py-1 text-xs ${user.estado === "ACTIVO" ? "bg-success-light text-success" : user.estado === "RECHAZADO" ? "bg-danger-light text-danger" : "bg-warning-light text-warning"}`}
-                    >
-                      {stateLabels[user.estado]}
-                    </span>
-                  </td>
-                  <td className="px-4 py-3 text-xs text-foreground-muted">
-                    {user.debe_cambiar_password
-                      ? "Cambio requerido"
-                      : "Acceso normal"}
-                  </td>
-                  <td className="px-4 py-3">
-                    <div className="flex justify-end gap-1">
-                      <button
-                        type="button"
-                        disabled={working}
-                        onClick={() => void sendPasswordReset(user)}
-                        aria-label={`Enviar restablecimiento de contraseña a ${user.nombre_completo}`}
-                        title="Enviar enlace para restablecer contraseña"
-                        className="grid size-9 place-items-center rounded-md border border-border hover:bg-surface-hover disabled:opacity-50"
-                      >
-                        <Mail className="size-4" />
-                      </button>
-                      {user.rol !== "ADMIN" && <>
-                      <button
-                        type="button"
-                        onClick={() => openEdit(user)}
-                        aria-label={`Editar ${user.nombre_completo}`}
-                        className="grid size-9 place-items-center rounded-md border border-border hover:bg-surface-hover"
-                      >
-                        <Pencil className="size-4" />
-                      </button>
-                      <button
-                        type="button"
-                        disabled={working || user.debe_cambiar_password}
-                        onClick={() => void forcePasswordChange(user)}
-                        aria-label={`Forzar cambio de contraseña a ${user.nombre_completo}`}
-                        className="grid size-9 place-items-center rounded-md border border-border hover:bg-surface-hover disabled:opacity-50"
-                      >
-                        <KeyRound className="size-4" />
-                      </button>
-                      {user.estado === "PENDIENTE_APROBACION" ? <Link href="/gestion-procesos/admin/solicitudes" className="inline-flex h-9 items-center rounded-md border border-border px-2.5 text-xs hover:bg-surface-hover">Revisar solicitud</Link> : <button
-                        type="button"
-                        disabled={working}
-                        onClick={() =>
-                          void changeStatus(
-                            user,
-                            user.estado === "ACTIVO" ? "SUSPENDIDO" : "ACTIVO",
-                          )
-                        }
-                        className="rounded-md border border-border px-2.5 text-xs hover:bg-surface-hover disabled:opacity-50"
-                      >
-                        {user.estado === "ACTIVO" ? "Suspender" : "Activar"}
-                      </button>}
-                      <button type="button" disabled={working} onClick={() => void deleteUser(user)} aria-label={`Eliminar ${user.nombre_completo}`} title="Eliminar cuenta" className="grid size-9 place-items-center rounded-md border border-danger/30 text-danger hover:bg-danger-light disabled:opacity-50"><Trash2 className="size-4" /></button>
-                      </>}
-                    </div>
-                  </td>
-                </tr>
-              ))
-            ) : (
-              <tr>
-                <td
-                  colSpan={7}
-                  className="px-4 py-12 text-center text-sm text-foreground-muted"
-                >
-                  No hay cuentas para este filtro.
-                </td>
-              </tr>
-            )}
-          </tbody>
-        </table>
-      </div>
+    <section className="mx-auto max-w-7xl space-y-5">
+      <PageHeader
+        overline="Administración · Personas"
+        title="Usuarios"
+        description="Cuentas del equipo de la firma, clientes y administradores, con su estado de acceso."
+        action={scope !== "ADMIN" && <Button variant="primary" onClick={openCreate} icon={<Plus className="size-4" />}>{scope === "CLIENTES" ? "Nuevo cliente" : "Nuevo usuario"}</Button>}
+      />
+      {loadError && <ApiErrorState error={loadError} onRetry={() => void reload()} retrying={loading} compact />}
+      {error && <p role="alert" className="rounded-[var(--radius-lg)] border border-danger/30 bg-danger-light p-3 text-sm text-danger">{error}</p>}
+      {notice && <p role="status" className="rounded-[var(--radius-lg)] border border-success/30 bg-success-light p-3 text-sm text-success">{notice}</p>}
+
+      <SegmentedControl
+        label="Tipo de cuenta"
+        value={scope}
+        onChange={(value) => { setScope(value); setStatus("TODOS"); }}
+        options={[
+          { value: "FIRMA", label: "Equipo de la firma", count: scopeCount("FIRMA") },
+          { value: "CLIENTES", label: "Clientes", count: scopeCount("CLIENTES") },
+          { value: "ADMIN", label: "Administradores", count: scopeCount("ADMIN") },
+          ...(scopeCount("SAAS") > 0 || scope === "SAAS" ? [{ value: "SAAS" as const, label: "SaaS heredado", count: scopeCount("SAAS") }] : []),
+        ]}
+      />
+
+      <DataTable
+        caption="Usuarios"
+        rows={visible}
+        columns={userColumns}
+        rowKey={(user) => user.id}
+        rowHref={(user) => `/gestion-procesos/admin/usuarios/${user.id}`}
+        rowActions={userActions}
+        bulkActions={scope === "ADMIN" ? undefined : [
+          { label: "Activar", icon: <PlayCircle />, onRun: (rows) => bulkUserAction("ACTIVATE", rows) },
+          { label: "Suspender", icon: <PauseCircle />, onRun: (rows) => bulkUserAction("SUSPEND", rows) },
+          { label: "Eliminar", icon: <Trash2 />, tone: "danger", onRun: (rows) => bulkUserAction("DELETE", rows) },
+        ]}
+        rowTone={(user) => (user.estado === "SUSPENDIDO" ? "warning" : undefined)}
+        searchPlaceholder="Buscar por nombre, correo o WhatsApp"
+        initialSort={{ key: "nombre_completo", direction: "asc" }}
+        exportFilename={`usuarios-${scope.toLowerCase()}`}
+        storageKey={`admin-usuarios-${scope}`}
+        loading={loading}
+        onRefresh={() => void reload()}
+        activeFilterCount={status === "TODOS" ? 0 : 1}
+        toolbar={
+          <select aria-label="Filtrar por estado" value={status} onChange={(event) => setStatus(event.target.value)} className="h-10 rounded-[var(--radius-md)] border border-border bg-background px-3 text-sm text-foreground">
+            <option value="TODOS">Todos los estados</option>
+            {Object.entries(stateLabels).map(([key, label]) => <option key={key} value={key}>{label}</option>)}
+          </select>
+        }
+        emptyTitle={users.length === 0 ? "Aún no hay cuentas" : "No hay cuentas en esta sección"}
+        emptyDescription={status !== "TODOS" ? "Prueba con otro estado." : undefined}
+      />
 
       {formOpen && (
         <div
           role="dialog"
           aria-modal="true"
           aria-label={editing ? "Editar usuario" : "Crear usuario"}
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+          className="fixed inset-0 z-50 flex items-center justify-center bg-brand-950/40 backdrop-blur-sm p-4"
         >
           <form
             onSubmit={save}
-            className="max-h-[90vh] w-full max-w-xl space-y-4 overflow-y-auto rounded-xl border border-border bg-surface p-5 shadow-2xl"
+            className="max-h-[90vh] w-full max-w-xl space-y-4 overflow-y-auto rounded-[var(--radius-xl)] border border-border bg-surface p-5 shadow-2xl"
           >
             <header className="flex items-start justify-between">
               <div>
-                <p className="text-xs font-semibold uppercase tracking-wide text-primary">
+                <p className="text-xs font-semibold uppercase tracking-wide text-brand-700">
                   {scope === "SAAS"
                     ? "Abogados SaaS"
                     : scope === "FIRMA"
@@ -705,22 +593,10 @@ export default function AdminUsersPage() {
               </label>
             )}
             <footer className="flex justify-end gap-2 border-t border-border pt-4">
-              <button
-                type="button"
-                disabled={working}
-                onClick={() => setFormOpen(false)}
-                className="rounded-md border border-border px-3 py-2 text-sm"
-              >
-                Cancelar
-              </button>
-              <button
-                type="submit"
-                disabled={working}
-                className="inline-flex items-center gap-2 rounded-md bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground disabled:opacity-50"
-              >
-                {working && <RefreshCw className="size-4 animate-spin" />}
+              <Button variant="outline" onClick={() => setFormOpen(false)} disabled={working}>Cancelar</Button>
+              <Button type="submit" variant="primary" loading={working} icon={working ? undefined : undefined}>
                 {editing ? "Guardar cambios" : "Crear cuenta"}
-              </button>
+              </Button>
             </footer>
           </form>
         </div>

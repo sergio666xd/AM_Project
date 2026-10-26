@@ -269,6 +269,25 @@ export default function TareasPage() {
     }
   };
 
+  function abrirDetalleTarea(id: number) {
+    const query = new URLSearchParams();
+    if (busqueda) query.set("q", busqueda);
+    if (filtroEstado !== "TODAS") query.set("estado", filtroEstado);
+    if (filtroPrioridad !== "TODAS") query.set("prioridad", filtroPrioridad);
+    if (filtroNivel !== "TODAS") query.set("nivel", filtroNivel);
+    const listUrl = `/gestion-procesos/dashboard/tareas${query.size ? `?${query.toString()}` : ""}`;
+    router.push(`/gestion-procesos/dashboard/tareas/${id}?returnTo=${encodeURIComponent(listUrl)}`);
+  }
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    setBusqueda(params.get("q") ?? "");
+    setFiltroEstado(params.get("estado") ?? "TODAS");
+    setFiltroPrioridad(params.get("prioridad") ?? "TODAS");
+    setFiltroNivel(params.get("nivel") ?? "TODAS");
+    setMostrarFiltros(["q", "estado", "prioridad", "nivel"].some((key) => params.has(key)));
+  }, []);
+
   useEffect(() => {
     if (sessionLoading) return;
 
@@ -689,9 +708,7 @@ export default function TareasPage() {
               radicados={radicados}
               onComplete={completarTarea}
               onOpen={() =>
-                router.push(
-                  `/gestion-procesos/dashboard/tareas/${tarea.id}`
-                )
+                abrirDetalleTarea(tarea.id)
               }
             />
           ))
@@ -710,9 +727,7 @@ export default function TareasPage() {
               radicados={radicados}
               onComplete={completarTarea}
               onOpen={() =>
-                router.push(
-                  `/gestion-procesos/dashboard/tareas/${tarea.id}`
-                )
+                abrirDetalleTarea(tarea.id)
               }
             />
           ))

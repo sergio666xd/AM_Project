@@ -131,6 +131,23 @@ export default function RadicadosPage() {
   const [sortDirection, setSortDirection] =
     useState<SortDirection>("asc");
 
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    setSearch(params.get("q") ?? "");
+    const order = params.get("orden");
+    if (["numero", "demandante", "demandado", "despacho", "estado"].includes(order ?? "")) setSortColumn(order as SortColumn);
+    if (params.get("direccion") === "desc") setSortDirection("desc");
+  }, []);
+
+  function abrirDetalleRadicado(id: number) {
+    const query = new URLSearchParams();
+    if (search) query.set("q", search);
+    query.set("orden", sortColumn);
+    query.set("direccion", sortDirection);
+    const listUrl = `/gestion-procesos/dashboard/radicados?${query.toString()}`;
+    router.push(`/gestion-procesos/dashboard/radicados/${id}?returnTo=${encodeURIComponent(listUrl)}`);
+  }
+
   /*
    * Menú de acciones individuales.
    *
@@ -936,7 +953,7 @@ export default function RadicadosPage() {
               type="button"
               onClick={abrirModalAgregar}
               disabled={sinCupos}
-              className="inline-flex items-center justify-center gap-2 rounded-lg bg-[var(--primary)] px-3.5 py-2.5 text-sm font-medium text-white transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40"
+              className="inline-flex items-center justify-center gap-2 rounded-lg bg-[var(--primary)] px-3.5 py-2.5 text-sm font-medium !text-white transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40"
             >
               <FilePlus2 className="h-4 w-4" />
               <span>Agregar</span>
@@ -1031,7 +1048,7 @@ export default function RadicadosPage() {
               <button
                 type="button"
                 onClick={abrirModalAgregar}
-                className="mt-5 inline-flex items-center gap-2 rounded-lg bg-[var(--primary)] px-4 py-2.5 text-sm font-medium text-white transition hover:opacity-90"
+                className="mt-5 inline-flex items-center gap-2 rounded-lg bg-[var(--primary)] px-4 py-2.5 text-sm font-medium !text-white transition hover:opacity-90"
               >
                 <FilePlus2 className="h-4 w-4" />
                 Agregar radicado
@@ -1039,7 +1056,33 @@ export default function RadicadosPage() {
             )}
           </div>
         ) : (
-          <div className="overflow-x-auto">
+          <>
+          <div className="divide-y divide-[var(--border)] md:hidden">
+            {radicadosFiltrados.map((radicado) => {
+              const estado = obtenerEstadoVisual(radicado.estado_consulta);
+              const seleccionado = selectedIds.includes(radicado.id);
+              return (
+                <article key={radicado.id} className={`p-4 ${seleccionado ? "bg-[var(--primary)]/[0.04]" : ""}`}>
+                  <div className="flex items-start gap-3">
+                    <button type="button" onClick={() => toggleSeleccion(radicado.id)} aria-label={`${seleccionado ? "Quitar selección de" : "Seleccionar"} ${radicado.numero}`} aria-pressed={seleccionado} className={`mt-1 flex size-11 shrink-0 items-center justify-center rounded-lg border ${seleccionado ? "border-[var(--primary)] bg-[var(--primary)] !text-white" : "border-[var(--border)] bg-[var(--surface)] text-[var(--foreground-muted)]"}`}>
+                      {seleccionado ? <Check className="size-4" /> : null}
+                    </button>
+                    <div className="min-w-0 flex-1">
+                      <button type="button" onClick={() => abrirDetalleRadicado(radicado.id)} className="block min-h-11 max-w-full truncate text-left font-semibold text-[var(--primary)] hover:underline">{radicado.numero}</button>
+                      <p className="text-sm text-[var(--foreground)]">{radicado.demandante || "Demandante sin registrar"}</p>
+                      <p className="mt-1 text-sm text-[var(--foreground-muted)]">Demandado: {radicado.demandado || "—"}</p>
+                      <p className="mt-1 truncate text-xs text-[var(--foreground-muted)]">{radicado.despacho_departamento || "Despacho sin registrar"}</p>
+                      <div className="mt-3 flex items-center justify-between gap-3">
+                        <span className={`inline-flex whitespace-nowrap rounded-full px-2.5 py-1 text-xs font-medium ${estado.className}`}>{estado.label}</span>
+                        <button type="button" onClick={() => abrirDetalleRadicado(radicado.id)} className="inline-flex min-h-11 items-center gap-2 rounded-lg px-3 text-sm font-medium text-[var(--primary)] hover:bg-[var(--surface-secondary)]"><Eye className="size-4" /> Ver detalle</button>
+                      </div>
+                    </div>
+                  </div>
+                </article>
+              );
+            })}
+          </div>
+          <div className="hidden overflow-x-auto md:block">
             <table className="w-full min-w-[1000px] border-collapse">
               <thead>
                 <tr className="border-b border-[var(--border)] bg-[var(--surface-secondary)]/50">
@@ -1051,7 +1094,7 @@ export default function RadicadosPage() {
                       aria-label="Seleccionar todos"
                       className={`flex h-4 w-4 items-center justify-center rounded border transition ${
                         todosSeleccionados
-                          ? "border-[var(--primary)] bg-[var(--primary)] text-white"
+                          ? "border-[var(--primary)] bg-[var(--primary)] !text-white"
                           : "border-[var(--border)] bg-[var(--surface)]"
                       }`}
                     >
@@ -1161,7 +1204,7 @@ export default function RadicadosPage() {
                           aria-label={`Seleccionar ${radicado.numero}`}
                           className={`flex h-4 w-4 items-center justify-center rounded border transition ${
                             seleccionado
-                              ? "border-[var(--primary)] bg-[var(--primary)] text-white"
+                              ? "border-[var(--primary)] bg-[var(--primary)] !text-white"
                               : "border-[var(--border)] bg-[var(--surface)]"
                           }`}
                         >
@@ -1176,9 +1219,7 @@ export default function RadicadosPage() {
                         <button
                           type="button"
                           onClick={() =>
-                            router.push(
-                              `/gestion-procesos/dashboard/radicados/${radicado.id}`
-                            )
+                            abrirDetalleRadicado(radicado.id)
                           }
                           className="font-medium text-[var(--primary)] hover:underline"
                         >
@@ -1232,9 +1273,7 @@ export default function RadicadosPage() {
                           <button
                             type="button"
                             onClick={() =>
-                              router.push(
-                                `/gestion-procesos/dashboard/radicados/${radicado.id}`
-                              )
+                              abrirDetalleRadicado(radicado.id)
                             }
                             title="Ver detalle"
                             className="rounded-lg p-2 text-[var(--foreground-muted)] transition hover:bg-[var(--surface-secondary)] hover:text-[var(--foreground)]"
@@ -1264,6 +1303,7 @@ export default function RadicadosPage() {
               </tbody>
             </table>
           </div>
+          </>
         )}
       </div>
 
@@ -1467,7 +1507,7 @@ export default function RadicadosPage() {
                   !numeroNuevo.trim() ||
                   sinCupos
                 }
-                className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-[var(--primary)] px-4 py-2.5 text-sm font-medium text-white transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40 sm:w-auto"
+                className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-[var(--primary)] px-4 py-2.5 text-sm font-medium !text-white transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40 sm:w-auto"
               >
                 {adding ? (
                   <>

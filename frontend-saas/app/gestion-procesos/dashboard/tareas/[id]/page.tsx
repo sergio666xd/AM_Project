@@ -143,6 +143,12 @@ export default function TareaDetallePage() {
 
   const tareaId = Number(params.id);
 
+  function volverAListado() {
+    const returnTo = new URLSearchParams(window.location.search).get("returnTo");
+    const listPath = "/gestion-procesos/dashboard/tareas";
+    router.push(returnTo?.startsWith(`${listPath}?`) || returnTo === listPath ? returnTo : listPath);
+  }
+
   const { token, loading: sessionLoading } = useSession();
 
   const [tarea, setTarea] = useState<Tarea | null>(null);
@@ -603,7 +609,7 @@ export default function TareaDetallePage() {
       <div className="space-y-4">
         <button
           onClick={() =>
-            router.push("/dashboard/tareas")
+            volverAListado()
           }
           className="flex items-center gap-2 text-sm text-foreground-secondary hover:text-foreground"
         >
@@ -641,7 +647,7 @@ export default function TareaDetallePage() {
       <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
         <button
           onClick={() =>
-            router.push("/dashboard/tareas")
+            volverAListado()
           }
           className="flex w-fit items-center gap-2 text-sm font-medium text-foreground-secondary transition hover:text-foreground"
         >
@@ -916,7 +922,7 @@ export default function TareaDetallePage() {
 
             {tarea.radicado_id ? (
               <a
-                href={`/dashboard/radicados/${tarea.radicado_id}`}
+                href={`/gestion-procesos/dashboard/radicados/${tarea.radicado_id}`}
                 className="group flex items-center justify-between rounded-lg border border-border bg-surface-muted p-4 transition hover:border-primary hover:bg-primary-light"
               >
                 <div className="flex min-w-0 items-center gap-3">
@@ -1007,7 +1013,7 @@ export default function TareaDetallePage() {
                     }
                     className={`flex h-5 w-5 shrink-0 items-center justify-center rounded border transition ${
                       subtask.completada
-                        ? "border-success bg-success text-white"
+                        ? "border-success bg-success !text-white"
                         : "border-border-strong hover:border-primary"
                     }`}
                   >
