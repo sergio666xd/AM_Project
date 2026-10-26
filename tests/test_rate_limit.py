@@ -58,7 +58,8 @@ def test_client_ip_uses_vercel_forwarded_header_only_on_vercel(monkeypatch):
 
 
 def test_login_blocks_after_repeated_failures():
-    from app import main, security
+    from app import security
+    from app.routers import auth as main
 
     with _db() as db:
         db.add(models.Usuario(
@@ -88,7 +89,7 @@ def test_login_blocks_after_repeated_failures():
 def test_password_reset_requests_are_limited_per_email():
     from fastapi import BackgroundTasks
 
-    from app import main
+    from app.routers import auth as main
 
     with _db() as db:
         datos = schemas.SolicitudRecuperacionPassword(email="nadie@example.com")

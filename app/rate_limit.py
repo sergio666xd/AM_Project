@@ -17,6 +17,9 @@ from sqlalchemy.orm import Session
 from app import models
 
 RETENCION = timedelta(days=1)
+# Ventanas de los endpoints públicos que usan estos límites.
+VENTANA_INTENTOS = timedelta(hours=1)
+VENTANA_LOGIN = timedelta(minutes=15)
 
 
 def clave_intento(ambito: str, valor: str) -> str:

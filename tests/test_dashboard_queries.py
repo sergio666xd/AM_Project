@@ -38,7 +38,7 @@ def _seed(db, total_radicados):
 
 
 def _dashboard(total_radicados):
-    from app.main import obtener_dashboard
+    from app.routers.dashboard import obtener_dashboard
 
     engine = create_engine("sqlite:///:memory:")
     models.Base.metadata.create_all(engine)

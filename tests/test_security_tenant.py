@@ -2196,7 +2196,7 @@ def test_saas_notification_features_require_plan_but_internal_staff_do_not():
 
 
 def test_client_notification_preferences_require_one_available_channel():
-    main = importlib.import_module("app.main")
+    main = importlib.import_module("app.routers.auth")
     engine = create_engine("sqlite:///:memory:")
     models.Base.metadata.create_all(engine)
 

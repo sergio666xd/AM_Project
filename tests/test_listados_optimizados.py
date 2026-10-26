@@ -7,7 +7,7 @@ from sqlalchemy.orm import Session
 
 from app.timezone import utc_ahora
 from app import models
-from app.main import listar_mis_radicados, obtener_radicado
+from app.routers.radicados import listar_mis_radicados, obtener_radicado
 from app.routers.chat import _ack_entrega_push, confirmar_entrega_push, enviar_mensaje, listar_conversaciones, resolver_conversacion
 from app.routers.expedientes import listar_procesos
 from app import schemas
