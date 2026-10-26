@@ -10,9 +10,9 @@ from fastapi import FastAPI, BackgroundTasks, Depends, HTTPException, Request, s
 from starlette.background import BackgroundTask
 from fastapi.security import OAuth2PasswordRequestForm
 from fastapi.responses import StreamingResponse
-from sqlalchemy import or_, text
+from sqlalchemy import func, or_, text
 from sqlalchemy.exc import SQLAlchemyError
-from sqlalchemy.orm import Session, selectinload
+from sqlalchemy.orm import Session, contains_eager, selectinload
 from fastapi.middleware.cors import CORSMiddleware
 from datetime import timedelta
 from app.timezone import utc_ahora
@@ -1021,7 +1021,7 @@ def obtener_dashboard(
     # RADICADOS DEL USUARIO
     # ---------------------------------------------------------
     radicados = (
-        db.query(models.Radicado)
+        db.query(models.Radicado.id, models.Radicado.numero)
         .filter(models.Radicado.usuarios_vinculados.any(models.Usuario.id == usuario_actual.id))
         .all()
     )
@@ -1055,8 +1055,8 @@ def obtener_dashboard(
     # ---------------------------------------------------------
     # ACTUACIONES NUEVAS
     # ---------------------------------------------------------
-    actuaciones_nuevas = (
-        db.query(models.ConsultaRadicado)
+    total_actuaciones_nuevas = (
+        db.query(func.coalesce(func.sum(models.ConsultaRadicado.actuaciones_nuevas), 0))
         .join(
             models.Radicado,
             models.ConsultaRadicado.radicado_id == models.Radicado.id,
@@ -1065,12 +1065,7 @@ def obtener_dashboard(
             models.Radicado.usuarios_vinculados.any(models.Usuario.id == usuario_actual.id),
             models.ConsultaRadicado.actuaciones_nuevas > 0,
         )
-        .all()
-    )
-
-    total_actuaciones_nuevas = sum(
-        consulta.actuaciones_nuevas
-        for consulta in actuaciones_nuevas
+        .scalar()
     )
 
     # ---------------------------------------------------------
@@ -1092,17 +1087,35 @@ def obtener_dashboard(
     # ---------------------------------------------------------
     # PROCESOS QUE REQUIEREN ATENCIÓN
     # ---------------------------------------------------------
+    # Una sola consulta trae la última ejecución de cada radicado, en lugar de
+    # una consulta por radicado.
+    orden_reciente = (
+        func.row_number()
+        .over(
+            partition_by=models.ConsultaRadicado.radicado_id,
+            order_by=(models.ConsultaRadicado.inicio.desc(), models.ConsultaRadicado.id.desc()),
+        )
+        .label("orden_reciente")
+    )
+    recientes = (
+        db.query(models.ConsultaRadicado.id, orden_reciente)
+        .filter(models.ConsultaRadicado.radicado_id.in_([radicado.id for radicado in radicados]))
+        .subquery()
+    )
+    ultima_por_radicado = {
+        consulta.radicado_id: consulta
+        for consulta in (
+            db.query(models.ConsultaRadicado)
+            .join(recientes, recientes.c.id == models.ConsultaRadicado.id)
+            .filter(recientes.c.orden_reciente == 1)
+            .all()
+        )
+    } if radicados else {}
+
     procesos_atencion = []
 
     for radicado in radicados:
-        ultima_consulta = (
-            db.query(models.ConsultaRadicado)
-            .filter(
-                models.ConsultaRadicado.radicado_id == radicado.id
-            )
-            .order_by(models.ConsultaRadicado.inicio.desc())
-            .first()
-        )
+        ultima_consulta = ultima_por_radicado.get(radicado.id)
 
         if not ultima_consulta:
             procesos_atencion.append({
@@ -1143,6 +1156,7 @@ def obtener_dashboard(
         .filter(
             models.Radicado.usuarios_vinculados.any(models.Usuario.id == usuario_actual.id)
         )
+        .options(contains_eager(models.ConsultaRadicado.radicado))
         .order_by(models.ConsultaRadicado.inicio.desc())
         .limit(10)
         .all()

@@ -1088,8 +1088,13 @@ def listar_notificaciones_despacho(db: Session = Depends(get_db), usuario: model
         query = query.filter(
             models.Proceso.id.in_(lawyer_process_ids(db, usuario))
         )
-    filas = query.order_by(models.NotificacionProceso.created_at.desc()).all()
-    return [{"id": n.id, "proceso": db.query(models.Proceso.nombre).filter(models.Proceso.id == n.proceso_id).scalar(), "cliente": db.query(models.Usuario.nombre_completo).filter(models.Usuario.id == n.cliente_id).scalar(), "comentarios": n.comentarios, "asunto": n.asunto, "cuerpo": n.cuerpo, "created_at": n.created_at} for n in filas]
+    filas = (
+        query.outerjoin(models.Usuario, models.Usuario.id == models.NotificacionProceso.cliente_id)
+        .with_entities(models.NotificacionProceso, models.Proceso.nombre, models.Usuario.nombre_completo)
+        .order_by(models.NotificacionProceso.created_at.desc())
+        .all()
+    )
+    return [{"id": n.id, "proceso": proceso, "cliente": cliente, "comentarios": n.comentarios, "asunto": n.asunto, "cuerpo": n.cuerpo, "created_at": n.created_at} for n, proceso, cliente in filas]
 
 
 def _notificaciones_abogado(db: Session, usuario: models.Usuario) -> list[dict]:
@@ -1099,16 +1104,23 @@ def _notificaciones_abogado(db: Session, usuario: models.Usuario) -> list[dict]:
     }
     items: list[dict] = []
     if process_ids:
-        for process_id in process_ids:
-            process = db.query(models.Proceso).filter_by(id=process_id).first()
-            if process:
-                recent = db.query(models.EventoAuditoria.created_at).filter_by(tipo_recurso="proceso", recurso_id=str(process_id)).order_by(models.EventoAuditoria.created_at.desc()).first()
-                last_activity = recent[0] if recent else process.created_at
-                if last_activity and last_activity < utc_ahora() - timedelta(days=30):
-                    items.append({"id": f"proceso-inactivo:{process_id}", "categoria": "proceso", "tipo": "SIN_ACTIVIDAD",
-                                  "titulo": process.nombre, "descripcion": "El proceso no registra actividad reciente",
-                                  "fecha": last_activity, "href": f"/gestion-procesos/abogado/procesos/{process_id}/actividad",
-                                  "proceso_id": process_id, "leida": False})
+        latest_audit = dict(
+            db.query(models.EventoAuditoria.recurso_id, func.max(models.EventoAuditoria.created_at))
+            .filter(
+                models.EventoAuditoria.tipo_recurso == "proceso",
+                models.EventoAuditoria.recurso_id.in_([str(process_id) for process_id in process_ids]),
+            )
+            .group_by(models.EventoAuditoria.recurso_id)
+            .all()
+        )
+        processes = db.query(models.Proceso).filter(models.Proceso.id.in_(process_ids)).all()
+        for process in processes:
+            last_activity = latest_audit.get(str(process.id)) or process.created_at
+            if last_activity and last_activity < utc_ahora() - timedelta(days=30):
+                items.append({"id": f"proceso-inactivo:{process.id}", "categoria": "proceso", "tipo": "SIN_ACTIVIDAD",
+                              "titulo": process.nombre, "descripcion": "El proceso no registra actividad reciente",
+                              "fecha": last_activity, "href": f"/gestion-procesos/abogado/procesos/{process.id}/actividad",
+                              "proceso_id": process.id, "leida": False})
         tasks = db.query(models.Tarea).filter(
             models.Tarea.proceso_id.in_(process_ids),
             models.Tarea.estado.in_((models.EstadoTarea.PENDIENTE, models.EstadoTarea.EN_CURSO)),
@@ -1132,7 +1144,7 @@ def _notificaciones_abogado(db: Session, usuario: models.Usuario) -> list[dict]:
         review_documents = db.query(models.DocumentoProceso).filter(
             models.DocumentoProceso.proceso_id.in_(process_ids),
             models.DocumentoProceso.estado_revision.in_(("RECIBIDO", "EN_REVISION", "REQUIERE_CORRECCION")),
-        ).all()
+        ).options(selectinload(models.DocumentoProceso.cliente)).all()
         for document in review_documents:
             items.append({"id": f"revision-documento:{document.id}", "categoria": "documento", "tipo": document.estado_revision,
                           "titulo": document.nombre_archivo, "descripcion": f"Documento de {document.cliente.nombre_completo} pendiente de revisión",
@@ -1149,16 +1161,23 @@ def _notificaciones_abogado(db: Session, usuario: models.Usuario) -> list[dict]:
                           "fecha": event.fecha_inicio, "href": f"/gestion-procesos/abogado/procesos/{event.proceso_id}/agenda",
                           "proceso_id": event.proceso_id, "leida": False})
         notices = db.query(models.NotificacionProceso).filter(models.NotificacionProceso.proceso_id.in_(process_ids)).all()
+        notice_clients = dict(
+            db.query(models.Usuario.id, models.Usuario.nombre_completo)
+            .filter(models.Usuario.id.in_({notice.cliente_id for notice in notices}))
+            .all()
+        ) if notices else {}
         for notice in notices:
             items.append({"id": f"aviso-proceso:{notice.id}", "categoria": "proceso", "tipo": "AVISO_CLIENTE",
-                          "titulo": notice.asunto, "descripcion": f"Comunicación enviada a {db.query(models.Usuario.nombre_completo).filter_by(id=notice.cliente_id).scalar() or 'cliente'}",
+                          "titulo": notice.asunto, "descripcion": f"Comunicación enviada a {notice_clients.get(notice.cliente_id) or 'cliente'}",
                           "fecha": notice.created_at, "href": f"/gestion-procesos/abogado/procesos/{notice.proceso_id}/comunicaciones",
                           "proceso_id": notice.proceso_id, "leida": False})
-        process_rad_ids = [row[0] for row in db.query(models.ProcesoRadicado.radicado_id).filter(models.ProcesoRadicado.proceso_id.in_(process_ids)).all()]
-        if process_rad_ids:
-            failed = db.query(models.Radicado).filter(models.Radicado.id.in_(process_rad_ids), models.Radicado.estado_consulta == "ERROR").all()
+        process_by_radicado: dict[int, int] = {}
+        for proceso_id, radicado_id in db.query(models.ProcesoRadicado.proceso_id, models.ProcesoRadicado.radicado_id).filter(models.ProcesoRadicado.proceso_id.in_(process_ids)).all():
+            process_by_radicado.setdefault(radicado_id, proceso_id)
+        if process_by_radicado:
+            failed = db.query(models.Radicado).filter(models.Radicado.id.in_(process_by_radicado), models.Radicado.estado_consulta == "ERROR").all()
             for radicado in failed:
-                process_id = next((row.proceso_id for row in db.query(models.ProcesoRadicado).filter_by(radicado_id=radicado.id).all() if row.proceso_id in process_ids), None)
+                process_id = process_by_radicado[radicado.id]
                 items.append({"id": f"radicado:{radicado.id}", "categoria": "radicado", "tipo": "ERROR_CONSULTA",
                               "titulo": radicado.numero, "descripcion": "La última consulta judicial del radicado reportó un error",
                               "fecha": utc_ahora(), "href": f"/gestion-procesos/abogado/procesos/{process_id}/relaciones",
@@ -1167,18 +1186,28 @@ def _notificaciones_abogado(db: Session, usuario: models.Usuario) -> list[dict]:
         profile_requests = db.query(models.SolicitudEdicionPerfilCliente).filter(
             models.SolicitudEdicionPerfilCliente.estado == "PENDIENTE",
             models.SolicitudEdicionPerfilCliente.cliente_id.in_(allowed_clients),
-        ).all()
+        ).options(selectinload(models.SolicitudEdicionPerfilCliente.cliente)).all()
+        first_process_by_client: dict[int, int] = {}
+        if profile_requests:
+            for cliente_id, proceso_id in db.query(models.ProcesoCliente.cliente_id, models.ProcesoCliente.proceso_id).filter(
+                models.ProcesoCliente.cliente_id.in_({request.cliente_id for request in profile_requests})
+            ).all():
+                first_process_by_client.setdefault(cliente_id, proceso_id)
         for request in profile_requests:
-            client_process = db.query(models.ProcesoCliente.proceso_id).filter_by(cliente_id=request.cliente_id).first()
-            if client_process:
+            client_process_id = first_process_by_client.get(request.cliente_id)
+            if client_process_id:
                 items.append({"id": f"cliente:{request.id}", "categoria": "solicitud", "tipo": "PERFIL_CLIENTE",
                               "titulo": request.cliente.nombre_completo, "descripcion": "El cliente solicitó actualizar sus datos",
                               "fecha": request.solicitada_en, "href": "/gestion-procesos/abogado/solicitudes-perfil",
-                              "proceso_id": client_process[0], "leida": False})
+                              "proceso_id": client_process_id, "leida": False})
     read = {item.notificacion_id for item in db.query(models.LecturaNotificacionAbogado).filter_by(usuario_id=usuario.id).all()}
+    item_process_ids = {item["proceso_id"] for item in items if item.get("proceso_id")}
+    process_names = dict(
+        db.query(models.Proceso.id, models.Proceso.nombre).filter(models.Proceso.id.in_(item_process_ids)).all()
+    ) if item_process_ids else {}
     for item in items:
         item["leida"] = item["id"] in read
-        item["proceso"] = db.query(models.Proceso.nombre).filter_by(id=item["proceso_id"]).scalar() if item.get("proceso_id") else None
+        item["proceso"] = process_names.get(item["proceso_id"]) if item.get("proceso_id") else None
     return sorted(items, key=lambda item: item["fecha"] or datetime.min, reverse=True)[:500]
 
 
