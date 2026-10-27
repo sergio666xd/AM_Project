@@ -37,7 +37,7 @@ def _html_correo(cuerpo: str, firma: dict[str, str | bool] | None = None) -> str
     contenido = "<br>\n".join(lineas)
     anio = date.today().year
     firma = firma or {}
-    logo_url = escape(str(firma.get("logo_url") or _LOGO_URL), quote=True)
+    logo_url = escape(str(firma.get("logo_correo_url") or firma.get("logo_url") or _LOGO_URL), quote=True)
     nombre_firma = escape(str(firma.get("nombre") or "Alejandra Muñoz | Abogada y Asociados"))
     correo_contacto = escape(str(firma.get("correo_contacto") or "contacto@alejandramunozabogada.com"), quote=True)
     correo_pqr = escape(str(firma.get("correo_pqr") or "pqr@alejandramunozabogada.com"), quote=True)

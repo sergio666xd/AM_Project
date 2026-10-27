@@ -39,6 +39,7 @@ def _serializar_configuracion_firma(config: models.ConfiguracionFirma) -> dict:
         "ciudad": config.ciudad,
         "pais": config.pais,
         "logo_url": config.logo_url,
+        "logo_correo_url": config.logo_correo_url,
         "sitio_web": config.sitio_web,
         "zona_horaria": config.zona_horaria,
         "mostrar_contacto_publico": config.mostrar_contacto_publico,
@@ -69,7 +70,7 @@ def actualizar_configuracion_firma(
         ZoneInfo(datos.zona_horaria)
     except Exception as exc:
         raise HTTPException(status_code=400, detail="La zona horaria no es válida.") from exc
-    for field_name in ("logo_url", "sitio_web"):
+    for field_name in ("logo_url", "logo_correo_url", "sitio_web"):
         value = getattr(datos, field_name).strip()
         if value and urlsplit(value).scheme not in {"https", "http"}:
             raise HTTPException(status_code=400, detail=f"{field_name} debe usar una URL HTTP o HTTPS.")

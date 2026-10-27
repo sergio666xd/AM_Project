@@ -62,6 +62,7 @@ class ConfiguracionFirmaUpdate(BaseModel):
     ciudad: str = Field(default="", max_length=120)
     pais: str = Field(default="Colombia", max_length=120)
     logo_url: str = Field(default="", max_length=1000)
+    logo_correo_url: str = Field(default="", max_length=1000)
     sitio_web: str = Field(default="", max_length=1000)
     zona_horaria: str = Field(default="America/Bogota", max_length=80)
     mostrar_contacto_publico: bool = True
@@ -75,7 +76,7 @@ class ConfiguracionFirmaUpdate(BaseModel):
         # queda vacío; EmailStr espera null en ese caso.
         return None if isinstance(value, str) and not value.strip() else value
 
-    @field_validator("telefono", "whatsapp", "direccion", "ciudad", "pais", "logo_url", "sitio_web", mode="before")
+    @field_validator("telefono", "whatsapp", "direccion", "ciudad", "pais", "logo_url", "logo_correo_url", "sitio_web", mode="before")
     @classmethod
     def normalizar_texto_opcional(cls, value: Any) -> Any:
         # Estos campos son nullable en la tabla y pueden llegar como null desde
