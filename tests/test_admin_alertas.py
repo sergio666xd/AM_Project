@@ -1,4 +1,4 @@
-from datetime import datetime, timedelta
+from datetime import timedelta
 
 import pytest
 from fastapi import HTTPException
@@ -6,7 +6,11 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
 from app import models
-from app.routers.admin import actualizar_estado_alerta_admin, listar_alertas_admin
+from app.routers.admin.alertas import (
+    actualizar_estado_alerta_admin,
+    listar_alertas_admin,
+)
+from app.timezone import utc_ahora
 
 
 def test_admin_alerts_are_real_actionable_and_keep_dispositions():
@@ -32,7 +36,7 @@ def test_admin_alerts_are_real_actionable_and_keep_dispositions():
         task = models.Tarea(
             usuario_id=lawyer.id, proceso_id=process.id, titulo="Presentar recurso",
             estado=models.EstadoTarea.PENDIENTE,
-            fecha_limite=datetime.utcnow() - timedelta(days=1),
+            fecha_limite=utc_ahora() - timedelta(days=1),
         )
         db.add(task)
         db.add(models.EventoAuditoria(

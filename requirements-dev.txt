@@ -1,0 +1,5 @@
+# Dependencias para pruebas y CI.
+-r requirements.txt
+httpx
+pytest
+ruff

@@ -1,18 +1,17 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
+import { useLoadEffect } from "@/lib/useLoadEffect";
 import {
   AlertCircle,
   ArrowDown,
   ArrowLeft,
   ArrowUp,
   Bell,
-  Building2,
   CheckCircle2,
   Clock,
   FileText,
-  Loader2,
   RefreshCw,
   UserCheck,
   X,
@@ -21,9 +20,7 @@ import {
 import { fetchApi, iniciarWorkflowConsultaRadicado } from "@/lib/api";
 import { useSession } from "@/context/SessionContext";
 import { PageHeader } from "@/components/ui/PageHeader";
-import { StatCard } from "@/components/ui/StatCard";
 import { Button } from "@/components/ui/Button";
-import { Badge } from "@/components/ui/Badge";
 
 interface Actuacion {
   id: number;
@@ -222,7 +219,7 @@ export default function DetalleRadicadoPage() {
    * con su historial de actuaciones autorizado.
    */
 
-  async function cargarDetalle(authToken: string) {
+  const cargarDetalle = useCallback(async (authToken: string) => {
     try {
       setLoading(true);
       setError("");
@@ -248,30 +245,17 @@ export default function DetalleRadicadoPage() {
     } finally {
       setLoading(false);
     }
-  }
+  }, [id]);
 
-  useEffect(() => {
-    if (sessionLoading) {
-      return;
-    }
+  const cargarAlAbrir = useCallback(() => {
+    if (sessionLoading || !token || !id) return;
+    return cargarDetalle(token);
+  }, [id, token, sessionLoading, cargarDetalle]);
 
-    if (!token) {
-      return;
-    }
+  useLoadEffect(cargarAlAbrir);
 
-    if (!id) {
-      setError("No se especificó el radicado.");
-      setLoading(false);
-      return;
-    }
-
-    cargarDetalle(token);
-  }, [
-    id,
-    token,
-    sessionLoading,
-    router,
-  ]);
+  // Sin id en la URL no hay nada que cargar; el aviso se deriva al renderizar.
+  const mensajeError = id ? error : "No se especificó el radicado.";
 
   /*
    * ============================================================
@@ -356,13 +340,15 @@ export default function DetalleRadicadoPage() {
    *     N → ... → 3 → 2 → 1
    */
 
+  const actuacionesRadicado = radicado?.actuaciones;
+
   const actuacionesOrdenadas = useMemo(() => {
-    if (!radicado?.actuaciones) {
+    if (!actuacionesRadicado) {
       return [];
     }
 
     const actuaciones = [
-      ...radicado.actuaciones,
+      ...actuacionesRadicado,
     ];
 
     actuaciones.sort((a, b) => {
@@ -375,7 +361,7 @@ export default function DetalleRadicadoPage() {
 
     return actuaciones;
   }, [
-    radicado?.actuaciones,
+    actuacionesRadicado,
     ordenActuaciones,
   ]);
 
@@ -395,14 +381,14 @@ export default function DetalleRadicadoPage() {
    */
 
   const actuacionActual = useMemo(() => {
-    if (!radicado?.actuaciones?.length) {
+    if (!actuacionesRadicado?.length) {
       return null;
     }
 
-    return [...radicado.actuaciones].sort(
+    return [...actuacionesRadicado].sort(
       (a, b) => a.orden - b.orden
     )[0];
-  }, [radicado?.actuaciones]);
+  }, [actuacionesRadicado]);
 
   /*
    * ============================================================
@@ -441,7 +427,7 @@ export default function DetalleRadicadoPage() {
    * ============================================================
    */
 
-  if (loading) {
+  if (loading && id) {
     return (
       <div className="flex min-h-[400px] items-center justify-center">
         <div className="flex items-center gap-3 text-[var(--foreground-muted)]">
@@ -517,7 +503,7 @@ export default function DetalleRadicadoPage() {
           ERROR
       ========================================================= */}
 
-      {error && (
+      {mensajeError && (
         <div className="flex items-start justify-between gap-4 rounded-xl border border-risk/30 bg-risk/10 p-4 text-risk">
           <div className="flex items-start gap-3">
             <AlertCircle className="mt-0.5 h-5 w-5 shrink-0" />
@@ -528,7 +514,7 @@ export default function DetalleRadicadoPage() {
               </p>
 
               <p className="mt-1 text-sm opacity-90">
-                {error}
+                {mensajeError}
               </p>
             </div>
           </div>

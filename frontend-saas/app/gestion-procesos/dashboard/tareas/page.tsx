@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   Check,
@@ -14,6 +14,7 @@ import {
 } from "lucide-react";
 import { useSession } from "@/context/SessionContext";
 import { apiRequest } from "@/lib/api";
+import { useLoadEffect } from "@/lib/useLoadEffect";
 
 type EstadoTarea =
   | "PENDIENTE"
@@ -217,7 +218,7 @@ export default function TareasPage() {
   const [mostrarFiltros, setMostrarFiltros] = useState(false);
   const [mostrarModal, setMostrarModal] = useState(false);
 
-  const cargarDatos = async () => {
+  const cargarDatos = useCallback(async () => {
     if (!token) return;
 
     try {
@@ -267,7 +268,7 @@ export default function TareasPage() {
       setLoading(false);
       setActualizando(false);
     }
-  };
+  }, [token]);
 
   function abrirDetalleTarea(id: number) {
     const query = new URLSearchParams();
@@ -279,8 +280,11 @@ export default function TareasPage() {
     router.push(`/gestion-procesos/dashboard/tareas/${id}?returnTo=${encodeURIComponent(listUrl)}`);
   }
 
+  // Los filtros vienen de la URL; se leen después de hidratar porque la página
+  // se prerenderiza sin acceso a window.location.
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- sincroniza el estado con la URL tras hidratar.
     setBusqueda(params.get("q") ?? "");
     setFiltroEstado(params.get("estado") ?? "TODAS");
     setFiltroPrioridad(params.get("prioridad") ?? "TODAS");
@@ -288,15 +292,12 @@ export default function TareasPage() {
     setMostrarFiltros(["q", "estado", "prioridad", "nivel"].some((key) => params.has(key)));
   }, []);
 
-  useEffect(() => {
-    if (sessionLoading) return;
+  const cargarAlAbrir = useCallback(() => {
+    if (sessionLoading || !token) return;
+    return cargarDatos();
+  }, [sessionLoading, token, cargarDatos]);
 
-    if (!token) {
-      return;
-    }
-
-    cargarDatos();
-  }, [token, sessionLoading]);
+  useLoadEffect(cargarAlAbrir);
 
   const tareasFiltradas = useMemo(() => {
     const textoBusqueda = busqueda.toLowerCase().trim();

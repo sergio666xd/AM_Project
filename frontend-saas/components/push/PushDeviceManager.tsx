@@ -1,9 +1,10 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useState } from "react";
 import { BellRing, Loader2, Monitor, Smartphone, Tablet, Trash2 } from "lucide-react";
 import { useSession } from "@/context/SessionContext";
 import { fetchApi, apiRequest } from "@/lib/api";
+import { useLoadEffect } from "@/lib/useLoadEffect";
 
 interface PushDevice {
   id: number;
@@ -44,8 +45,10 @@ export default function PushDeviceManager({ showSilencingOptions = true }: PushD
   const [loading, setLoading] = useState(true);
   const [deleting, setDeleting] = useState<number | null>(null);
   const [error, setError] = useState("");
-  const [silenceEmail, setSilenceEmail] = useState(false);
-  const [silenceWhatsapp, setSilenceWhatsapp] = useState(false);
+  const savedSilenceEmail = Boolean(user?.silenciar_email_si_push);
+  const savedSilenceWhatsapp = Boolean(user?.silenciar_whatsapp_si_push);
+  const [silenceEmail, setSilenceEmail] = useState(savedSilenceEmail);
+  const [silenceWhatsapp, setSilenceWhatsapp] = useState(savedSilenceWhatsapp);
   const [savingSilence, setSavingSilence] = useState(false);
   const [silenceNotice, setSilenceNotice] = useState("");
 
@@ -62,16 +65,17 @@ export default function PushDeviceManager({ showSilencingOptions = true }: PushD
     }
   }, [token]);
 
-  useEffect(() => {
-    void loadDevices();
-  }, [loadDevices]);
+  useLoadEffect(loadDevices);
 
-  useEffect(() => {
-    if (user) {
-      setSilenceEmail(Boolean(user.silenciar_email_si_push));
-      setSilenceWhatsapp(Boolean(user.silenciar_whatsapp_si_push));
-    }
-  }, [user]);
+  // Reinicia los interruptores cuando cambian los valores guardados del usuario,
+  // durante el render y sin el render extra de un efecto.
+  const savedSilenceKey = user ? `${user.id}:${savedSilenceEmail}:${savedSilenceWhatsapp}` : null;
+  const [syncedSilenceKey, setSyncedSilenceKey] = useState(savedSilenceKey);
+  if (savedSilenceKey !== null && syncedSilenceKey !== savedSilenceKey) {
+    setSyncedSilenceKey(savedSilenceKey);
+    setSilenceEmail(savedSilenceEmail);
+    setSilenceWhatsapp(savedSilenceWhatsapp);
+  }
 
   async function removeDevice(id: number) {
     if (!token) return;

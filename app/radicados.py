@@ -1,4 +1,4 @@
-from datetime import datetime
+from app.timezone import utc_ahora
 
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
@@ -89,7 +89,7 @@ def iniciar_consulta_nuevo_radicado(
         radicado_id=radicado.id,
         tipo="AUTOMATICA_NUEVO",
         estado="ENCOLADA",
-        inicio=datetime.utcnow(),
+        inicio=utc_ahora(),
     )
     db.add(consulta)
     db.commit()

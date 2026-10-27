@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import {
   ArrowLeft,
   Bell,
@@ -21,6 +21,7 @@ import {
 import { useParams, useRouter } from "next/navigation";
 import { fetchApi } from "@/lib/api";
 import { useSession } from "@/context/SessionContext";
+import { useLoadEffect } from "@/lib/useLoadEffect";
 
 type EstadoTarea =
   | "PENDIENTE"
@@ -74,16 +75,6 @@ type Radicado = {
   titulo?: string;
   asunto?: string;
 };
-
-function formatDate(value?: string | null) {
-  if (!value) return "Sin fecha";
-
-  return new Date(value).toLocaleDateString("es-CO", { timeZone: "America/Bogota",
-    day: "2-digit",
-    month: "2-digit",
-    year: "numeric",
-  });
-}
 
 function formatDateTime(value?: string | null) {
   if (!value) return "Sin fecha";
@@ -192,7 +183,7 @@ export default function TareaDetallePage() {
     );
   }, [tarea, radicados]);
 
-  async function loadData() {
+  const loadData = useCallback(async () => {
     if (!token) return;
 
     try {
@@ -235,9 +226,9 @@ export default function TareaDetallePage() {
     } finally {
       setLoading(false);
     }
-  }
+  }, [tareaId, token]);
 
-  useEffect(() => {
+  const loadDataAlAbrir = useCallback(() => {
     if (
       sessionLoading ||
       !tareaId ||
@@ -247,8 +238,10 @@ export default function TareaDetallePage() {
       return;
     }
 
-    loadData();
-  }, [tareaId, token, sessionLoading]);
+    return loadData();
+  }, [sessionLoading, tareaId, token, loadData]);
+
+  useLoadEffect(loadDataAlAbrir);
 
   async function toggleCompleted() {
     if (!tarea || !token) return;

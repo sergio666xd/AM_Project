@@ -1,12 +1,13 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
-import { AlertCircle, FileSignature, RefreshCw, Search } from "lucide-react";
+import { useCallback, useMemo, useState } from "react";
+import { AlertCircle, RefreshCw, Search } from "lucide-react";
 import { useSession } from "@/context/SessionContext";
 import { fetchApi } from "@/lib/api";
 import ProcessContracts from "@/components/contracts/ProcessContracts";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { Button } from "@/components/ui/Button";
+import { useLoadEffect } from "@/lib/useLoadEffect";
 
 type ProcessOption = { id: number; nombre: string };
 type ClientOption = { id: number; nombre_completo: string; email: string };
@@ -57,7 +58,7 @@ export default function AllContractsPage() {
     }
   }, [token]);
 
-  useEffect(() => { void loadAll(); }, [loadAll]);
+  useLoadEffect(loadAll);
 
   const loadSelectedProcess = useCallback(async () => {
     if (!token || !selectedProcessId) return;
@@ -71,7 +72,7 @@ export default function AllContractsPage() {
     }
   }, [selectedProcessId, token]);
 
-  useEffect(() => { void loadSelectedProcess(); }, [loadSelectedProcess]);
+  useLoadEffect(loadSelectedProcess);
 
   const visibleContracts = useMemo(() => {
     const text = query.trim().toLocaleLowerCase("es-CO");

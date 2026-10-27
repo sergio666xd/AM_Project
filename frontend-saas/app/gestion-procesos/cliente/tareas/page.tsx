@@ -10,7 +10,6 @@ import TaskMonthCalendar, {
 } from "@/components/calendar/TaskMonthCalendar";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { Button } from "@/components/ui/Button";
-import { Badge } from "@/components/ui/Badge";
 
 type Task = CalendarTask & {
   proceso_id?: number | null;
@@ -235,7 +234,7 @@ export default function TareasClientePage() {
       href: `/gestion-procesos/cliente/tareas?tarea=${task.id}#tarea-${task.id}`,
     }));
   const upcomingByDate = Array.from(calendarTasks.reduce((groups, task) => {
-    if (!task.fecha_limite || task.estado === "COMPLETADA" || task.estado === "CANCELADA" || Date.parse(task.fecha_limite) < Date.now()) return groups;
+    if (!task.fecha_limite || task.estado === "COMPLETADA" || task.estado === "CANCELADA" || isOverdue(task.fecha_limite)) return groups;
     const dateParts = new Intl.DateTimeFormat("en", { timeZone: "America/Bogota", year: "numeric", month: "2-digit", day: "2-digit" }).formatToParts(new Date(task.fecha_limite));
     const part = (type: string) => dateParts.find((item) => item.type === type)?.value ?? "";
     const date = `${part("year")}-${part("month")}-${part("day")}`;

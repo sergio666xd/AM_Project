@@ -1,5 +1,5 @@
 import enum
-from datetime import datetime
+from app.timezone import utc_ahora
 from sqlalchemy import Boolean, CheckConstraint, Column, DateTime, Enum, ForeignKey, Index, Integer, JSON, Numeric, String, Table, Text, UniqueConstraint, event, select
 from sqlalchemy.orm import relationship, synonym
 from app.database import Base
@@ -88,7 +88,7 @@ class ConfiguracionFirma(Base):
     preferencias_notificacion = Column(JSON, nullable=False, default=lambda: {"email": True, "whatsapp": True})
     parametros_generales = Column(JSON, nullable=False, default=dict)
     actualizado_por_id = Column(Integer, ForeignKey("usuarios.id", ondelete="SET NULL"), nullable=True)
-    updated_at = Column(DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow)
+    updated_at = Column(DateTime, nullable=False, default=utc_ahora, onupdate=utc_ahora)
 
 
 class ConfiguracionIntegraciones(Base):
@@ -105,7 +105,7 @@ class ConfiguracionIntegraciones(Base):
     whatsapp_api_url_encrypted = Column(Text, nullable=True)
     whatsapp_token_encrypted = Column(Text, nullable=True)
     actualizado_por_id = Column(Integer, ForeignKey("usuarios.id", ondelete="SET NULL"), nullable=True)
-    updated_at = Column(DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow)
+    updated_at = Column(DateTime, nullable=False, default=utc_ahora, onupdate=utc_ahora)
 
 
 class ConfiguracionConsultas(Base):
@@ -115,7 +115,7 @@ class ConfiguracionConsultas(Base):
     activa = Column(Boolean, nullable=False, default=False)
     dias_habilitados = Column(JSON, nullable=False, default=lambda: [0, 1, 2, 3, 4])
     actualizado_por_id = Column(Integer, ForeignKey("usuarios.id", ondelete="SET NULL"), nullable=True)
-    updated_at = Column(DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow)
+    updated_at = Column(DateTime, nullable=False, default=utc_ahora, onupdate=utc_ahora)
     ejecucion_activa_id = Column(String(36), nullable=True)
     lease_hasta = Column(DateTime, nullable=True)
 
@@ -136,7 +136,7 @@ class PlantillaMensaje(Base):
     enlace_ejemplo = Column(String(1000), nullable=True)
     activo = Column(Boolean, nullable=False, default=True)
     actualizado_por_id = Column(Integer, ForeignKey("usuarios.id", ondelete="SET NULL"), nullable=True)
-    updated_at = Column(DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow)
+    updated_at = Column(DateTime, nullable=False, default=utc_ahora, onupdate=utc_ahora)
 
 
 class EventoAgenda(Base):
@@ -154,7 +154,7 @@ class EventoAgenda(Base):
     cliente_id = Column(Integer, ForeignKey("usuarios.id", ondelete="SET NULL"), nullable=True, index=True)
     contrato_id = Column(Integer, ForeignKey("contratos_servicios.id", ondelete="SET NULL"), nullable=True, index=True)
     creado_por_id = Column(Integer, ForeignKey("usuarios.id", ondelete="SET NULL"), nullable=True)
-    created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
+    created_at = Column(DateTime, nullable=False, default=utc_ahora)
     responsable = relationship("Usuario", foreign_keys=[responsable_id])
     proceso = relationship("Proceso", foreign_keys=[proceso_id])
     cliente = relationship("Usuario", foreign_keys=[cliente_id])
@@ -173,7 +173,7 @@ class EjecucionBarrido(Base):
     tipo = Column(String(20), nullable=False)
     estado = Column(String(24), nullable=False, default="EN_PROCESO")
     solicitada_por_id = Column(Integer, ForeignKey("usuarios.id", ondelete="SET NULL"), nullable=True)
-    inicio = Column(DateTime, nullable=False, default=datetime.utcnow)
+    inicio = Column(DateTime, nullable=False, default=utc_ahora)
     finalizacion = Column(DateTime, nullable=True)
     lease_hasta = Column(DateTime, nullable=True)
     total_radicados = Column(Integer, nullable=False, default=0)
@@ -194,7 +194,7 @@ class EjecucionRadicado(Base):
     radicado_id = Column(Integer, ForeignKey("radicados.id", ondelete="CASCADE"), nullable=False)
     consulta_id = Column(Integer, ForeignKey("consultas_radicados.id", ondelete="SET NULL"), nullable=True)
     estado = Column(String(24), nullable=False, default="EN_PROCESO")
-    inicio = Column(DateTime, nullable=False, default=datetime.utcnow)
+    inicio = Column(DateTime, nullable=False, default=utc_ahora)
     finalizacion = Column(DateTime, nullable=True)
     lease_hasta = Column(DateTime, nullable=True)
     actuaciones_nuevas = Column(Integer, nullable=False, default=0)
@@ -208,7 +208,7 @@ class ContenidoPagina(Base):
     slug = Column(String(80), primary_key=True)
     contenido = Column(JSON, nullable=False)
     actualizado_por_id = Column(Integer, ForeignKey("usuarios.id", ondelete="SET NULL"), nullable=True)
-    updated_at = Column(DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow)
+    updated_at = Column(DateTime, nullable=False, default=utc_ahora, onupdate=utc_ahora)
 
 
 class Usuario(Base):
@@ -240,7 +240,7 @@ class Usuario(Base):
     canal_notificacion_cliente = Column(String(16), nullable=True)
     silenciar_email_si_push = Column(Boolean, nullable=False, default=False)
     silenciar_whatsapp_si_push = Column(Boolean, nullable=False, default=False)
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, default=utc_ahora)
     ultimo_acceso = Column(DateTime, nullable=True)
 
     tareas = relationship(
@@ -278,7 +278,7 @@ class CodigoSeguridadUsuario(Base):
     reenviar_desde = Column(DateTime, nullable=False)
     intentos = Column(Integer, nullable=False, default=0)
     consumido_en = Column(DateTime, nullable=True)
-    creado_en = Column(DateTime, nullable=False, default=datetime.utcnow)
+    creado_en = Column(DateTime, nullable=False, default=utc_ahora)
 
 
 class SolicitudRegistro(Base):
@@ -288,7 +288,7 @@ class SolicitudRegistro(Base):
     usuario_id = Column(Integer, ForeignKey("usuarios.id"), unique=True, nullable=False)
     ruta_tarjeta_profesional = Column(String(255), nullable=True)
     notas_admin = Column(Text, nullable=True)
-    fecha_solicitud = Column(DateTime, default=datetime.utcnow)
+    fecha_solicitud = Column(DateTime, default=utc_ahora)
 
     usuario = relationship("Usuario", back_populates="solicitud_registro")
 
@@ -306,7 +306,7 @@ class SolicitudEdicionPerfilCliente(Base):
     domicilio_solicitado = Column(String(120), nullable=True)
     direccion_solicitada = Column(String(300), nullable=True)
     estado = Column(String(20), nullable=False, default="PENDIENTE", index=True)
-    solicitada_en = Column(DateTime, nullable=False, default=datetime.utcnow)
+    solicitada_en = Column(DateTime, nullable=False, default=utc_ahora)
     revisada_por_id = Column(Integer, ForeignKey("usuarios.id", ondelete="SET NULL"), nullable=True)
     revisada_en = Column(DateTime, nullable=True)
     comentario_revision = Column(Text, nullable=True)
@@ -321,7 +321,7 @@ class InteresSaas(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     email = Column(String(120), unique=True, index=True, nullable=False)
-    created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
+    created_at = Column(DateTime, nullable=False, default=utc_ahora)
 
 
 class Radicado(Base):
@@ -353,7 +353,7 @@ class Radicado(Base):
     
     alerta_enviada = Column(Boolean, default=True)
     detalle_pendiente = Column(Text, default="")
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, default=utc_ahora)
 
     tareas = relationship(
     "Tarea",
@@ -413,7 +413,7 @@ class Proceso(Base):
     abogado_id = Column(Integer, ForeignKey("usuarios.id"), nullable=False, index=True)
     nombre = Column(String(255), nullable=False)
     descripcion = Column(Text, nullable=True)
-    created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
+    created_at = Column(DateTime, nullable=False, default=utc_ahora)
     archivado_en = Column(DateTime(timezone=True), nullable=True, index=True)
     abogado = relationship("Usuario", back_populates="procesos", foreign_keys=[abogado_id])
     colaboradores = relationship(
@@ -436,7 +436,7 @@ class ProcesoColaborador(Base):
     abogado_id = Column(Integer, ForeignKey("usuarios.id", ondelete="CASCADE"), primary_key=True)
     asignado_por_id = Column(Integer, ForeignKey("usuarios.id", ondelete="SET NULL"), nullable=True)
     visible_cliente = Column(Boolean, nullable=False, default=False)
-    created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
+    created_at = Column(DateTime, nullable=False, default=utc_ahora)
 
     proceso = relationship("Proceso", back_populates="colaboradores")
     abogado = relationship("Usuario", foreign_keys=[abogado_id])
@@ -469,7 +469,7 @@ class SolicitudDocumento(Base):
     documentos_requeridos = Column(JSON, nullable=False, default=list)
     fecha_limite = Column(DateTime, nullable=True)
     atendida_en = Column(DateTime, nullable=True)
-    created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
+    created_at = Column(DateTime, nullable=False, default=utc_ahora)
     proceso = relationship("Proceso", back_populates="solicitudes_documento")
     cliente = relationship("Usuario", foreign_keys=[cliente_id])
     documentos = relationship("DocumentoProceso", back_populates="solicitud")
@@ -490,7 +490,7 @@ class DocumentoProceso(Base):
     comentario_revision = Column(Text, nullable=True)
     revisado_por_id = Column(Integer, ForeignKey("usuarios.id", ondelete="SET NULL"), nullable=True)
     revisado_en = Column(DateTime, nullable=True)
-    created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
+    created_at = Column(DateTime, nullable=False, default=utc_ahora)
     proceso = relationship("Proceso", back_populates="documentos")
     cliente = relationship("Usuario", foreign_keys=[cliente_id])
     solicitud = relationship("SolicitudDocumento", back_populates="documentos")
@@ -508,7 +508,7 @@ class NotificacionProceso(Base):
     comentarios = Column(Text, nullable=True)
     asunto = Column(String(255), nullable=False)
     cuerpo = Column(Text, nullable=False)
-    created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
+    created_at = Column(DateTime, nullable=False, default=utc_ahora)
 
 
 class ComunicacionProceso(Base):
@@ -523,7 +523,7 @@ class ComunicacionProceso(Base):
     canal = Column(String(16), nullable=False, default="INTERNO")
     asunto = Column(String(255), nullable=False)
     contenido = Column(Text, nullable=False)
-    created_at = Column(DateTime, nullable=False, default=datetime.utcnow, index=True)
+    created_at = Column(DateTime, nullable=False, default=utc_ahora, index=True)
     leido_en = Column(DateTime, nullable=True)
     proceso = relationship("Proceso")
     actor = relationship("Usuario", foreign_keys=[actor_id])
@@ -539,8 +539,8 @@ class ChatConversacion(Base):
     proceso_id = Column(Integer, ForeignKey("procesos.id", ondelete="CASCADE"), nullable=True, index=True)
     cliente_id = Column(Integer, ForeignKey("usuarios.id", ondelete="SET NULL"), nullable=True, index=True)
     creado_por_id = Column(Integer, ForeignKey("usuarios.id", ondelete="SET NULL"), nullable=True)
-    created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
-    updated_at = Column(DateTime, nullable=False, default=datetime.utcnow, index=True)
+    created_at = Column(DateTime, nullable=False, default=utc_ahora)
+    updated_at = Column(DateTime, nullable=False, default=utc_ahora, index=True)
     proceso = relationship("Proceso")
     cliente = relationship("Usuario", foreign_keys=[cliente_id])
     participantes = relationship("ChatParticipante", back_populates="conversacion", cascade="all, delete-orphan")
@@ -572,7 +572,7 @@ class ChatMensaje(Base):
     referencia_id = Column(Integer, nullable=True)
     referencia_titulo = Column(String(255), nullable=True)
     referencia_url = Column(String(500), nullable=True)
-    created_at = Column(DateTime, nullable=False, default=datetime.utcnow, index=True)
+    created_at = Column(DateTime, nullable=False, default=utc_ahora, index=True)
     conversacion = relationship("ChatConversacion", back_populates="mensajes")
     remitente = relationship("Usuario")
 
@@ -587,7 +587,7 @@ class ChatPresenciaPanel(Base):
     id = Column(Integer, primary_key=True)
     usuario_id = Column(Integer, ForeignKey("usuarios.id", ondelete="CASCADE"), nullable=False, index=True)
     session_id = Column(String(80), nullable=False)
-    last_seen_at = Column(DateTime, nullable=False, default=datetime.utcnow)
+    last_seen_at = Column(DateTime, nullable=False, default=utc_ahora)
     usuario = relationship("Usuario")
 
 
@@ -617,8 +617,8 @@ class ChatPushSubscription(Base):
     auth = Column(String(128), nullable=False)
     user_agent = Column(Text, nullable=False, default="")
     device_label = Column(String(120), nullable=False, default="")
-    created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
-    updated_at = Column(DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow)
+    created_at = Column(DateTime, nullable=False, default=utc_ahora)
+    updated_at = Column(DateTime, nullable=False, default=utc_ahora, onupdate=utc_ahora)
     usuario = relationship("Usuario")
 
 
@@ -629,7 +629,7 @@ class LecturaNotificacionAbogado(Base):
     id = Column(Integer, primary_key=True, index=True)
     usuario_id = Column(Integer, ForeignKey("usuarios.id", ondelete="CASCADE"), nullable=False, index=True)
     notificacion_id = Column(String(120), nullable=False, index=True)
-    leida_en = Column(DateTime, nullable=False, default=datetime.utcnow)
+    leida_en = Column(DateTime, nullable=False, default=utc_ahora)
 
 
 class LecturaNotificacionCliente(Base):
@@ -639,7 +639,7 @@ class LecturaNotificacionCliente(Base):
     id = Column(Integer, primary_key=True, index=True)
     usuario_id = Column(Integer, ForeignKey("usuarios.id", ondelete="CASCADE"), nullable=False, index=True)
     notificacion_id = Column(String(160), nullable=False, index=True)
-    leida_en = Column(DateTime, nullable=False, default=datetime.utcnow)
+    leida_en = Column(DateTime, nullable=False, default=utc_ahora)
 
 
 class EntregaNotificacion(Base):
@@ -667,7 +667,7 @@ class EntregaNotificacion(Base):
     estado = Column(String(20), nullable=False, default="PENDIENTE")
     intentos = Column(Integer, nullable=False, default=0)
     error = Column(Text, nullable=True)
-    created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
+    created_at = Column(DateTime, nullable=False, default=utc_ahora)
     enviado_en = Column(DateTime, nullable=True)
     lease_hasta = Column(DateTime, nullable=True)
 
@@ -719,7 +719,7 @@ class EventoAuditoria(Base):
     metodo = Column(String(16), nullable=True)
     metadata_json = Column(Text, nullable=True)
     error_tecnico = Column(Text, nullable=True)
-    created_at = Column(DateTime, nullable=False, default=datetime.utcnow, index=True)
+    created_at = Column(DateTime, nullable=False, default=utc_ahora, index=True)
 
 
 class LecturaNotificacionAdmin(Base):
@@ -729,7 +729,7 @@ class LecturaNotificacionAdmin(Base):
     id = Column(Integer, primary_key=True, index=True)
     usuario_id = Column(Integer, ForeignKey("usuarios.id", ondelete="CASCADE"), nullable=False, index=True)
     notificacion_id = Column(String(120), nullable=False, index=True)
-    leida_en = Column(DateTime, nullable=False, default=datetime.utcnow)
+    leida_en = Column(DateTime, nullable=False, default=utc_ahora)
 
 class Actuacion(Base):
     __tablename__ = "actuaciones"
@@ -781,7 +781,7 @@ class ConsultaRadicado(Base):
     inicio = Column(
         DateTime,
         nullable=False,
-        default=datetime.utcnow
+        default=utc_ahora
     )
 
     finalizacion = Column(
@@ -891,14 +891,14 @@ class Tarea(Base):
     created_at = Column(
         DateTime,
         nullable=False,
-        default=datetime.utcnow,
+        default=utc_ahora,
     )
 
     updated_at = Column(
         DateTime,
         nullable=False,
-        default=datetime.utcnow,
-        onupdate=datetime.utcnow,
+        default=utc_ahora,
+        onupdate=utc_ahora,
     )
 
     usuario = relationship(
@@ -1063,8 +1063,8 @@ class ContratoServicio(Base):
     anulado_en = Column(DateTime, nullable=True)
     motivo_anulacion = Column(Text, nullable=True)
     creado_por_id = Column(Integer, ForeignKey("usuarios.id", ondelete="SET NULL"), nullable=True)
-    created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
-    updated_at = Column(DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow)
+    created_at = Column(DateTime, nullable=False, default=utc_ahora)
+    updated_at = Column(DateTime, nullable=False, default=utc_ahora, onupdate=utc_ahora)
     proceso = relationship("Proceso", back_populates="contratos")
     cliente = relationship("Usuario", foreign_keys=[cliente_id])
     abogado = relationship("Usuario", foreign_keys=[abogado_id])
@@ -1087,7 +1087,7 @@ class ContratoServicioVersion(Base):
     parte_cliente_snapshot = Column(JSON, nullable=False, default=dict)
     hash_sha256 = Column(String(64), nullable=False)
     creado_por_id = Column(Integer, ForeignKey("usuarios.id", ondelete="SET NULL"), nullable=True)
-    created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
+    created_at = Column(DateTime, nullable=False, default=utc_ahora)
     contrato = relationship("ContratoServicio", back_populates="versiones")
 
 
@@ -1101,7 +1101,7 @@ class EntregaCorreoContrato(Base):
     estado = Column(String(16), nullable=False)
     error = Column(Text, nullable=True)
     creado_por_id = Column(Integer, ForeignKey("usuarios.id", ondelete="SET NULL"), nullable=True)
-    created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
+    created_at = Column(DateTime, nullable=False, default=utc_ahora)
 
 
 class CuentaCobro(Base):
@@ -1129,8 +1129,8 @@ class CuentaCobro(Base):
     anulada_en = Column(DateTime, nullable=True)
     motivo_anulacion = Column(Text, nullable=True)
     creado_por_id = Column(Integer, ForeignKey("usuarios.id", ondelete="SET NULL"), nullable=True)
-    created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
-    updated_at = Column(DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow)
+    created_at = Column(DateTime, nullable=False, default=utc_ahora)
+    updated_at = Column(DateTime, nullable=False, default=utc_ahora, onupdate=utc_ahora)
     lineas = relationship("CuentaCobroLinea", back_populates="cuenta", cascade="all, delete-orphan", order_by="CuentaCobroLinea.id")
 
 
@@ -1176,7 +1176,7 @@ class PagoFinanciero(Base):
     estado = Column(String(16), nullable=False, default="REGISTRADO", index=True)
     fecha_pago = Column(DateTime, nullable=False)
     registrado_por_id = Column(Integer, ForeignKey("usuarios.id", ondelete="SET NULL"), nullable=True)
-    created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
+    created_at = Column(DateTime, nullable=False, default=utc_ahora)
 
 
 class AplicacionPago(Base):
@@ -1191,7 +1191,7 @@ class AplicacionPago(Base):
     cuenta_id = Column(Integer, ForeignKey("cuentas_cobro.id", ondelete="RESTRICT"), nullable=False, index=True)
     importe = Column(Numeric(14, 2), nullable=False)
     creado_por_id = Column(Integer, ForeignKey("usuarios.id", ondelete="SET NULL"), nullable=True)
-    created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
+    created_at = Column(DateTime, nullable=False, default=utc_ahora)
 
 
 class AjusteCuentaCobro(Base):
@@ -1206,7 +1206,7 @@ class AjusteCuentaCobro(Base):
     importe = Column(Numeric(14, 2), nullable=False)
     motivo = Column(Text, nullable=False)
     creado_por_id = Column(Integer, ForeignKey("usuarios.id", ondelete="SET NULL"), nullable=True)
-    created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
+    created_at = Column(DateTime, nullable=False, default=utc_ahora)
 
 
 class ReversionPago(Base):
@@ -1219,7 +1219,7 @@ class ReversionPago(Base):
     pago_id = Column(Integer, ForeignKey("pagos_financieros.id", ondelete="RESTRICT"), nullable=False)
     motivo = Column(Text, nullable=False)
     revertido_por_id = Column(Integer, ForeignKey("usuarios.id", ondelete="SET NULL"), nullable=True)
-    created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
+    created_at = Column(DateTime, nullable=False, default=utc_ahora)
 
 
 class ConfiguracionCorreoFinanciero(Base):
@@ -1229,7 +1229,7 @@ class ConfiguracionCorreoFinanciero(Base):
     remitente_email = Column(String(320), nullable=True)
     reply_to = Column(String(320), nullable=True)
     actualizado_por_id = Column(Integer, ForeignKey("usuarios.id", ondelete="SET NULL"), nullable=True)
-    updated_at = Column(DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow)
+    updated_at = Column(DateTime, nullable=False, default=utc_ahora, onupdate=utc_ahora)
 
 
 class EntregaCorreoFinanciero(Base):
@@ -1247,4 +1247,15 @@ class EntregaCorreoFinanciero(Base):
     version_datos = Column(Integer, nullable=True)
     error = Column(Text, nullable=True)
     creado_por_id = Column(Integer, ForeignKey("usuarios.id", ondelete="SET NULL"), nullable=True)
-    created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
+    created_at = Column(DateTime, nullable=False, default=utc_ahora)
+
+class IntentoLimitado(Base):
+    """Intentos recientes de endpoints públicos, compartidos entre todas las instancias."""
+    __tablename__ = "intentos_limitados"
+    __table_args__ = (
+        Index("ix_intentos_limitados_clave_fecha", "clave", "creado_en"),
+    )
+
+    id = Column(Integer, primary_key=True)
+    clave = Column(String(80), nullable=False)
+    creado_en = Column(DateTime, nullable=False, default=utc_ahora, index=True)

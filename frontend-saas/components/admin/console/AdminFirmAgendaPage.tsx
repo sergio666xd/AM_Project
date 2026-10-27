@@ -127,6 +127,7 @@ export default function AdminFirmAgendaPage() {
   const [error, setError] = useState("");
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- el ancho de pantalla solo se conoce en el navegador, tras hidratar.
     if (window.matchMedia("(max-width: 767px)").matches) setView("LISTADO");
     setViewportReady(true);
   }, []);

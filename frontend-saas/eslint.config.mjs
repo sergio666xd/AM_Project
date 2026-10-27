@@ -12,6 +12,10 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // Código generado por Workflow DevKit.
+    ".workflow-data/**",
+    ".workflow-vitest/**",
+    "app/.well-known/workflow/**",
   ]),
 ]);
 

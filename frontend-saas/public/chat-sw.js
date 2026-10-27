@@ -2,8 +2,7 @@
  * Compatible with Chrome, Firefox, Edge, Safari (iOS 16.4+), Samsung Internet.
  */
 
-/* eslint-env serviceworker */
-/* global self, clients */
+/* global self */
 
 self.addEventListener("install", () => {
   // Tomar control inmediatamente sin esperar a que se cierre la pestaña anterior.

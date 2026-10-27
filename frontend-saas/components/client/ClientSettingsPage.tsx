@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useEffect, useState } from "react";
+import { FormEvent, useState } from "react";
 import { Bell, Mail, MessageCircle, ShieldCheck } from "lucide-react";
 import { useSession } from "@/context/SessionContext";
 import { fetchApi } from "@/lib/api";
@@ -11,16 +11,23 @@ import { Button } from "@/components/ui/Button";
 
 export default function ClientSettingsPage() {
   const { user, token, refreshUser } = useSession();
-  const [emailEnabled, setEmailEnabled] = useState(true);
-  const [whatsappEnabled, setWhatsappEnabled] = useState(false);
+  const savedEmail = user?.notificaciones_email !== false;
+  const savedWhatsapp = Boolean(user?.notificaciones_whatsapp);
+  const [emailEnabled, setEmailEnabled] = useState(savedEmail);
+  const [whatsappEnabled, setWhatsappEnabled] = useState(savedWhatsapp);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
 
-  useEffect(() => {
-    setEmailEnabled(user?.notificaciones_email !== false);
-    setWhatsappEnabled(Boolean(user?.notificaciones_whatsapp));
-  }, [user?.id, user?.notificaciones_email, user?.notificaciones_whatsapp]);
+  // Al cambiar las preferencias guardadas se reinicia el formulario durante el
+  // render, sin el render extra que provocaba hacerlo en un efecto.
+  const savedKey = `${user?.id}:${savedEmail}:${savedWhatsapp}`;
+  const [syncedKey, setSyncedKey] = useState(savedKey);
+  if (syncedKey !== savedKey) {
+    setSyncedKey(savedKey);
+    setEmailEnabled(savedEmail);
+    setWhatsappEnabled(savedWhatsapp);
+  }
 
   async function save(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();

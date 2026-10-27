@@ -9,14 +9,12 @@ import {
   Mail,
   MessageCircle,
   Save,
-  Settings,
 } from "lucide-react";
 
 import { useSession } from "@/context/SessionContext";
 import { SecurityChangeButton } from "@/components/security/SecurityChangeButton";
 import PushDeviceManager from "@/components/push/PushDeviceManager";
 import { PageHeader } from "@/components/ui/PageHeader";
-import { Button } from "@/components/ui/Button";
 
 const TIPOS_MENSAJE = [
   { id: "ACCESO", label: "Acceso y cuenta" },

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
 import {
@@ -22,6 +22,7 @@ import {
 
 import { fetchApi, iniciarWorkflowConsultaRadicado } from "@/lib/api";
 import { useSession } from "@/context/SessionContext";
+import { useLoadEffect } from "@/lib/useLoadEffect";
 
 interface Actuacion {
   id: number;
@@ -131,8 +132,11 @@ export default function RadicadosPage() {
   const [sortDirection, setSortDirection] =
     useState<SortDirection>("asc");
 
+  // La búsqueda y el orden vienen de la URL; se leen después de hidratar
+  // porque la página se prerenderiza sin acceso a window.location.
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- sincroniza el estado con la URL tras hidratar.
     setSearch(params.get("q") ?? "");
     const order = params.get("orden");
     if (["numero", "demandante", "demandado", "despacho", "estado"].includes(order ?? "")) setSortColumn(order as SortColumn);
@@ -194,7 +198,7 @@ export default function RadicadosPage() {
   /*
    * Cargar radicados
    */
-  async function cargarRadicados(authToken: string) {
+  const cargarRadicados = useCallback(async (authToken: string) => {
     try {
       setLoading(true);
       setError("");
@@ -211,19 +215,14 @@ export default function RadicadosPage() {
     } finally {
       setLoading(false);
     }
-  }
+  }, []);
 
-  useEffect(() => {
-    if (sessionLoading) {
-      return;
-    }
+  const cargarAlAbrir = useCallback(() => {
+    if (sessionLoading || !token) return;
+    return cargarRadicados(token);
+  }, [sessionLoading, token, cargarRadicados]);
 
-    if (!token) {
-      return;
-    }
-
-    cargarRadicados(token);
-  }, [token, sessionLoading, router]);
+  useLoadEffect(cargarAlAbrir);
 
   /*
    * Cerrar menú de acciones al hacer scroll o cambiar tamaño.

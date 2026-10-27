@@ -110,7 +110,8 @@ export default function AdminFirmSettingsPage() {
         <legend className="px-2 font-semibold">Identidad y presencia pública</legend>
         <label className="text-sm font-medium sm:col-span-2">Nombre de la firma<input required maxLength={180} className={input} value={settings.nombre} onChange={(e) => set("nombre", e.target.value)} /></label>
         <label className="text-sm font-medium sm:col-span-2">URL del logo<input type="url" className={input} value={settings.logo_url} onChange={(e) => set("logo_url", e.target.value)} placeholder="https://…" /></label>
-        {settings.logo_url && <div className="sm:col-span-2"><p className="mb-2 text-xs text-foreground-muted">Vista previa del logo</p><img src={settings.logo_url} alt={`Logo de ${settings.nombre}`} className="max-h-24 max-w-64 object-contain" /></div>}
+        {settings.logo_url && <div className="sm:col-span-2"><p className="mb-2 text-xs text-foreground-muted">Vista previa del logo</p>{/* eslint-disable-next-line @next/next/no-img-element -- vista previa de una URL de logo que escribe el usuario; next/image exigiría declarar cada dominio. */}
+          <img src={settings.logo_url} alt={`Logo de ${settings.nombre}`} className="max-h-24 max-w-64 object-contain" /></div>}
         <label className="text-sm font-medium sm:col-span-2">Sitio web<input type="url" className={input} value={settings.sitio_web} onChange={(e) => set("sitio_web", e.target.value)} placeholder="https://…" /></label>
       </fieldset>
       <fieldset className="grid gap-4 rounded-lg border border-border bg-surface p-4 sm:grid-cols-2">

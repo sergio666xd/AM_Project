@@ -1,6 +1,7 @@
 """Domain operations for manually managed charges and payments."""
 
 from datetime import datetime
+from app.timezone import utc_ahora
 from decimal import Decimal, InvalidOperation
 from enum import StrEnum
 from typing import Protocol
@@ -128,7 +129,7 @@ def emitir_cuenta(db: Session, cuenta: models.CuentaCobro) -> models.CuentaCobro
         raise HTTPException(status_code=409, detail="Solo se puede emitir una cuenta en borrador.")
     if not cuenta.lineas or cuenta.total <= 0:
         raise HTTPException(status_code=400, detail="La cuenta debe tener líneas con valor antes de emitir.")
-    now = datetime.utcnow()
+    now = utc_ahora()
     cuenta.numero = f"CC-{now:%Y}-{cuenta.id:08d}"
     cuenta.fecha_emision = now
     cuenta.estado = "EMITIDA"
@@ -156,7 +157,7 @@ def anular_cuenta(
     if active_allocations:
         raise HTTPException(status_code=409, detail="Revierte o reasigna primero los pagos aplicados a esta cuenta.")
     cuenta.estado = "ANULADA"
-    cuenta.anulada_en = datetime.utcnow()
+    cuenta.anulada_en = utc_ahora()
     cuenta.motivo_anulacion = motivo.strip()
     db.flush()
     return cuenta
@@ -197,7 +198,7 @@ def estado_cuenta(db: Session, cuenta: models.CuentaCobro, ahora: datetime | Non
         return "PAGADA"
     if saldo < _money(cuenta.total):
         return "PARCIAL"
-    if cuenta.fecha_vencimiento and cuenta.fecha_vencimiento < (ahora or datetime.utcnow()):
+    if cuenta.fecha_vencimiento and cuenta.fecha_vencimiento < (ahora or utc_ahora()):
         return "VENCIDA"
     return "PENDIENTE"
 
@@ -274,7 +275,7 @@ def registrar_pago_manual(
         metodo=method,
         referencia=(referencia or "").strip()[:120] or None,
         estado="REGISTRADO",
-        fecha_pago=fecha_pago or datetime.utcnow(),
+        fecha_pago=fecha_pago or utc_ahora(),
         registrado_por_id=actor.id,
     )
     try:

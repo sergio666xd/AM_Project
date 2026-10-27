@@ -5,7 +5,6 @@ import { apiRequest } from "@/lib/api";
 import {
   FormEvent,
   useCallback,
-  useEffect,
   useState,
 } from "react";
 
@@ -24,6 +23,7 @@ import {
   UserPlus,
   X,
 } from "lucide-react";
+import { useLoadEffect } from "@/lib/useLoadEffect";
 
 
 type Client = {
@@ -123,9 +123,7 @@ export default function ClientesPage() {
     }
   }, [headers]);
 
-  useEffect(() => {
-    void load();
-  }, [load]);
+  useLoadEffect(load);
 
 
   const clientColumns: DataTableColumn<Client>[] = [

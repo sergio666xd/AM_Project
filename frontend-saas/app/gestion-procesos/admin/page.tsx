@@ -9,7 +9,6 @@ import {
   BriefcaseBusiness,
   CalendarClock,
   FileText,
-  FolderOpen,
   RefreshCw,
   UserCheck,
   Users,

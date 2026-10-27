@@ -1,5 +1,4 @@
 const LOGIN_PATH = "/login";
-const ADMIN_LOGIN_PATH = "/login";
 
 export function safeInternalRedirect(value: string | null | undefined): string | null {
   if (!value || !value.startsWith("/") || value.startsWith("//") || value.includes("\\")) {

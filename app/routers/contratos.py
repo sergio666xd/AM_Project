@@ -9,7 +9,7 @@ import uuid
 from io import BytesIO
 import xml.etree.ElementTree as ET
 import zipfile
-from datetime import datetime
+from app.timezone import utc_ahora
 from pathlib import Path
 
 from botocore.exceptions import BotoCoreError, ClientError
@@ -350,12 +350,12 @@ def cambiar_estado_contrato(contract_id: int, datos: schemas.ContratoServicioEst
         raise HTTPException(status_code=400, detail="Indica el motivo para terminar o anular el contrato.")
     contract.estado = datos.estado
     if datos.estado == "LISTO_PARA_FIRMA":
-        contract.emitido_en = datetime.utcnow()
+        contract.emitido_en = utc_ahora()
     elif datos.estado == "TERMINADO":
-        contract.terminado_en = datetime.utcnow()
+        contract.terminado_en = utc_ahora()
         contract.motivo_terminacion = datos.motivo.strip()
     elif datos.estado == "ANULADO":
-        contract.anulado_en = datetime.utcnow()
+        contract.anulado_en = utc_ahora()
         contract.motivo_anulacion = datos.motivo.strip()
     _add_version(db, contract, actor, state=contract.estado)
     registrar_evento_auditoria(db, actor, "contrato.estado", "contrato_servicio", contract.id, {"estado": datos.estado, "motivo": datos.motivo})
@@ -476,7 +476,7 @@ def cargar_contrato_firmado(contract_id: int, archivo: UploadFile = File(...), d
         )
         db.add(document)
         contract.estado = "FIRMADO"
-        contract.firmado_en = datetime.utcnow()
+        contract.firmado_en = utc_ahora()
         for signature_event in signature_events:
             signature_event.estado = "COMPLETADO"
         _add_version(db, contract, actor, state="FIRMADO")

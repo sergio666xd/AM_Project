@@ -1,4 +1,5 @@
-from datetime import datetime, timedelta
+from datetime import timedelta
+from app.timezone import utc_ahora
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import or_
@@ -93,7 +94,7 @@ def _crear_recordatorios_sistema(db: Session, tarea: models.Tarea) -> list[int]:
     ids = []
     for anticipacion in (1440, 720):
         fecha_aviso = tarea.fecha_limite - timedelta(minutes=anticipacion)
-        if fecha_aviso <= datetime.utcnow():
+        if fecha_aviso <= utc_ahora():
             continue
         reminder = models.RecordatorioTarea(
             tarea_id=tarea.id,
@@ -152,7 +153,7 @@ def _notificar_cambio_tarea(
             f"Abrir enlace: Ver tareas | {url_tarea}"
         )
         emitir_notificacion_workflow(
-            db, destinatario, "TAREAS", f"TAREA_ACCION:{tarea.id}:{datetime.utcnow().timestamp()}",
+            db, destinatario, "TAREAS", f"TAREA_ACCION:{tarea.id}:{utc_ahora().timestamp()}",
             f"{accion.capitalize()}: {tarea.titulo}", cuerpo, emisor=actor, incluir_email=True,
             plantilla_clave="TAREA_ACCION",
             variables={"nombre": destinatario.nombre_completo, "actor": actor.nombre_completo,
@@ -591,7 +592,7 @@ def crear_tarea(
         fecha_limite=datos.fecha_limite,
     )
     if datos.estado == models.EstadoTarea.COMPLETADA:
-        tarea.completada_en = datetime.utcnow()
+        tarea.completada_en = utc_ahora()
     db.add(tarea)
     db.flush()
     reminder_ids = _crear_recordatorios_sistema(db, tarea)
@@ -619,7 +620,7 @@ def actualizar_tarea(
         if fields_set == {"estado"}:
             tarea.estado = models.EstadoTarea.COMPLETADA
             if tarea.completada_en is None:
-                tarea.completada_en = datetime.utcnow()
+                tarea.completada_en = utc_ahora()
             _descartar_recordatorios_tarea(db, tarea)
             recordatorio_ids = []
             registrar_evento_auditoria(db, usuario_actual, "tarea.completar", "tarea", tarea.id)
@@ -629,7 +630,7 @@ def actualizar_tarea(
             _notificar_cambio_tarea(db, tarea, usuario_actual, "completó la tarea", "El cliente marcó la tarea como finalizada.")
             return serializar_tarea_para_usuario(tarea, usuario_actual)
         nueva_fecha = normalizar_utc_naive(datos.fecha_limite)
-        if nueva_fecha is None or nueva_fecha <= datetime.utcnow():
+        if nueva_fecha is None or nueva_fecha <= utc_ahora():
             raise HTTPException(status_code=400, detail="El nuevo vencimiento debe ser una fecha y hora futura.")
         if tarea.fecha_limite == nueva_fecha:
             return serializar_tarea_para_usuario(tarea, usuario_actual)
@@ -660,7 +661,7 @@ def actualizar_tarea(
     if datos.estado is not None:
         reprogramar_recordatorios = tarea.estado != datos.estado
         tarea.estado = datos.estado
-        tarea.completada_en = datetime.utcnow() if datos.estado == models.EstadoTarea.COMPLETADA else None
+        tarea.completada_en = utc_ahora() if datos.estado == models.EstadoTarea.COMPLETADA else None
     if datos.prioridad is not None:
         tarea.prioridad = datos.prioridad
     if "fecha_limite" in fields_set:
@@ -792,14 +793,15 @@ def completar_tarea(
         tarea.completada_en = None
     else:
         tarea.estado = models.EstadoTarea.COMPLETADA
-        tarea.completada_en = datetime.utcnow()
+        tarea.completada_en = utc_ahora()
 
     if tarea.estado in (models.EstadoTarea.COMPLETADA, models.EstadoTarea.CANCELADA):
         _descartar_recordatorios_tarea(db, tarea)
         recordatorio_ids = []
     elif estado_anterior in (models.EstadoTarea.COMPLETADA, models.EstadoTarea.CANCELADA):
-        recordatorio_ids = _crear_recordatorios_sistema(db, tarea)
-        recordatorio_ids.extend(_versionar_recordatorios_pendientes(tarea))
+        # Versionar antes de crear: los recordatorios nuevos ya nacen en la version 1.
+        recordatorio_ids = _versionar_recordatorios_pendientes(tarea)
+        recordatorio_ids.extend(_crear_recordatorios_sistema(db, tarea))
     else:
         recordatorio_ids = _versionar_recordatorios_pendientes(tarea)
     registrar_evento_auditoria(db, usuario_actual, "tarea.completar", "tarea", tarea.id)
@@ -952,7 +954,7 @@ def actualizar_subtarea(
         subtarea.completada = datos.completada
 
         if datos.completada:
-            subtarea.completada_en = datetime.utcnow()
+            subtarea.completada_en = utc_ahora()
         else:
             subtarea.completada_en = None
 

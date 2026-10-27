@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { BookOpen, FileText, MessageCircle, Bell, FolderOpen, ArrowRight } from "lucide-react";
+import { BookOpen, FileText, MessageCircle, Bell, FolderOpen } from "lucide-react";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { Button } from "@/components/ui/Button";
 

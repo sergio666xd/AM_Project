@@ -1,14 +1,14 @@
 import os
+
 os.environ["DATABASE_URL"] = "sqlite:///:memory:"
 
-from datetime import datetime, timezone
 import pytest
 from fastapi import HTTPException
 from sqlalchemy import create_engine
-from sqlalchemy.orm import Session, sessionmaker
+from sqlalchemy.orm import sessionmaker
 
 from app import models, schemas, security
-from app.main import cambiar_password, obtener_mi_usuario
+from app.routers.auth import cambiar_password, obtener_mi_usuario
 
 
 def test_cambio_password_forzado_permite_acceso_me_y_retorna_nuevo_token():

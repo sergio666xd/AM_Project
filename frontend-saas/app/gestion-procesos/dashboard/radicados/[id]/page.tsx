@@ -1,7 +1,8 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
+import { useLoadEffect } from "@/lib/useLoadEffect";
 import {
   AlertCircle,
   ArrowDown,
@@ -209,7 +210,7 @@ export default function DetalleRadicadoPage() {
    * con su historial de actuaciones autorizado.
    */
 
-  async function cargarDetalle(authToken: string) {
+  const cargarDetalle = useCallback(async (authToken: string) => {
     try {
       setLoading(true);
       setError("");
@@ -235,25 +236,17 @@ export default function DetalleRadicadoPage() {
     } finally {
       setLoading(false);
     }
-  }
+  }, [id]);
 
-  useEffect(() => {
-    if (sessionLoading) {
-      return;
-    }
+  const cargarAlAbrir = useCallback(() => {
+    if (sessionLoading || !token || !id) return;
+    return cargarDetalle(token);
+  }, [id, token, sessionLoading, cargarDetalle]);
 
-    if (!token) {
-      return;
-    }
+  useLoadEffect(cargarAlAbrir);
 
-    if (!id) {
-      setError("No se especificó el radicado.");
-      setLoading(false);
-      return;
-    }
-
-    cargarDetalle(token);
-  }, [id, token, sessionLoading, router]);
+  // Sin id en la URL no hay nada que cargar; el aviso se deriva al renderizar.
+  const mensajeError = id ? error : "No se especificó el radicado.";
 
   /*
    * ============================================================
@@ -324,12 +317,14 @@ export default function DetalleRadicadoPage() {
    * Por defecto se muestran las más recientes primero.
    */
 
+  const actuacionesRadicado = radicado?.actuaciones;
+
   const actuacionesOrdenadas = useMemo(() => {
-    if (!radicado?.actuaciones) {
+    if (!actuacionesRadicado) {
       return [];
     }
 
-    const actuaciones = [...radicado.actuaciones];
+    const actuaciones = [...actuacionesRadicado];
 
     actuaciones.sort((a, b) => {
       const fechaA = obtenerTimestamp(a.fecha_actuacion);
@@ -351,7 +346,7 @@ export default function DetalleRadicadoPage() {
     });
 
     return actuaciones;
-  }, [radicado?.actuaciones, ordenActuaciones]);
+  }, [actuacionesRadicado, ordenActuaciones]);
 
   /*
    * ============================================================
@@ -363,16 +358,16 @@ export default function DetalleRadicadoPage() {
    */
 
   const actuacionActual = useMemo(() => {
-    if (!radicado?.actuaciones?.length) {
+    if (!actuacionesRadicado?.length) {
       return null;
     }
 
-    return [...radicado.actuaciones].sort(
+    return [...actuacionesRadicado].sort(
       (a, b) =>
         obtenerTimestamp(b.fecha_actuacion) -
         obtenerTimestamp(a.fecha_actuacion)
     )[0];
-  }, [radicado?.actuaciones]);
+  }, [actuacionesRadicado]);
 
   /*
    * ============================================================
@@ -411,7 +406,7 @@ export default function DetalleRadicadoPage() {
    * ============================================================
    */
 
-  if (loading) {
+  if (loading && id) {
     return (
       <div className="flex min-h-[400px] items-center justify-center">
         <div className="flex items-center gap-3 text-[var(--foreground-muted)]">
@@ -481,7 +476,7 @@ export default function DetalleRadicadoPage() {
           ERROR
       ========================================================= */}
 
-      {error && (
+      {mensajeError && (
         <div className="flex items-start justify-between gap-4 rounded-xl border border-red-500/20 bg-red-500/10 p-4 text-red-700 dark:text-red-300">
           <div className="flex items-start gap-3">
             <AlertCircle className="mt-0.5 h-5 w-5 shrink-0" />
@@ -492,7 +487,7 @@ export default function DetalleRadicadoPage() {
               </p>
 
               <p className="mt-1 text-sm opacity-90">
-                {error}
+                {mensajeError}
               </p>
             </div>
           </div>

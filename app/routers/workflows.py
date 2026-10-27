@@ -3,11 +3,12 @@ import hashlib
 import logging
 import os
 import smtplib
-from datetime import date, datetime, timedelta
+from datetime import date, datetime, timedelta, timezone
+from app.timezone import utc_ahora
 from uuid import uuid4
 
 from fastapi import APIRouter, Depends, Header, HTTPException, Query
-from sqlalchemy import and_, case, func, or_
+from sqlalchemy import and_, case, or_
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
@@ -144,7 +145,7 @@ def preparar_consulta_manual_workflow(
         radicado_id=radicado.id,
         tipo="MANUAL",
         estado="ENCOLADA",
-        inicio=datetime.utcnow(),
+        inicio=utc_ahora(),
     )
     db.add(consulta)
     db.commit()
@@ -197,12 +198,12 @@ def procesar_consulta_nuevo_workflow(
     consulta.estado = "EN_PROCESO"
     consulta.task_id = datos.launch_token
     consulta.error = None
-    consulta.inicio = datetime.utcnow()
+    consulta.inicio = utc_ahora()
     db.commit()
 
     resultado = ejecutar_consulta_api_radicado(db, radicado)
     estado_api = str(resultado.get("estado", ""))
-    ahora = datetime.utcnow()
+    ahora = utc_ahora()
     if estado_api.startswith("error"):
         consulta.estado = "ERROR"
         consulta.error = estado_api
@@ -353,7 +354,7 @@ def _enviar_push_actuacion(
         return
     if entrega and entrega.estado == "ERROR" and entrega.intentos >= MAX_INTENTOS_NOTIFICACION:
         return
-    now = datetime.utcnow()
+    now = utc_ahora()
     if entrega and entrega.estado == "ENVIANDO" and entrega.lease_hasta and entrega.lease_hasta > now:
         return
 
@@ -414,7 +415,7 @@ def _enviar_push_actuacion(
     )
     entrega.estado = "ENVIADA" if delivered else "ERROR"
     entrega.error = None if delivered else "Push no entregada; consulta los logs del proveedor y reintenta la preparación."
-    entrega.enviado_en = datetime.utcnow() if delivered else None
+    entrega.enviado_en = utc_ahora() if delivered else None
     entrega.lease_hasta = None
     db.commit()
 
@@ -622,7 +623,7 @@ def listar_entregas_notificacion_pendientes(
     _: None = Depends(verificar_token_workflow),
     db: Session = Depends(get_db),
 ):
-    ahora = datetime.utcnow()
+    ahora = utc_ahora()
     entrega_ids = (
         db.query(models.EntregaNotificacion.id)
         .filter(
@@ -675,7 +676,7 @@ def _marcar_recordatorio_completo_si_aplica(
     ).count()
     if pendientes == 0:
         if recordatorio.enviado_en is None:
-            recordatorio.enviado_en = datetime.utcnow()
+            recordatorio.enviado_en = utc_ahora()
 
 
 @router.post("/recordatorios/reconciliar")
@@ -729,7 +730,7 @@ def preparar_recordatorio_workflow(
         db.commit()
         return {"estado": "CANCELADO", "entrega_ids": []}
 
-    ahora = datetime.utcnow()
+    ahora = utc_ahora()
     momento = momento_programado(recordatorio, tarea)
     if momento is None:
         recordatorio.activo = False
@@ -753,7 +754,7 @@ def preparar_recordatorio_workflow(
     else:
         tarea_path = f"/gestion-procesos/abogado/tareas/{tarea.id}"
     mensaje = f"Recordatorio de tarea: {tarea.titulo}"
-    mensaje += f"\n\nAcción requerida: completa o revisa esta tarea antes de su vencimiento."
+    mensaje += "\n\nAcción requerida: completa o revisa esta tarea antes de su vencimiento."
     mensaje += f"\nEstado: {tarea.estado.value}\nPrioridad: {tarea.prioridad.value}"
     if tarea.proceso:
         mensaje += f"\nProceso: {tarea.proceso.nombre}"
@@ -827,7 +828,7 @@ def enviar_entrega_notificacion_workflow(
         raise HTTPException(status_code=409, detail="Las entregas Push se procesan desde el evento de actuación.")
     if entrega.estado == "ENVIADA":
         return {"estado": "ENVIADA", "repetida": True}
-    ahora = datetime.utcnow()
+    ahora = utc_ahora()
     if entrega.intentos >= MAX_INTENTOS_NOTIFICACION:
         entrega.estado = "ERROR"
         entrega.error = entrega.error or "Se agotaron los reintentos de entrega."
@@ -901,7 +902,7 @@ def enviar_entrega_notificacion_workflow(
 
     entrega.estado = "ENVIADA"
     entrega.error = None
-    entrega.enviado_en = datetime.utcnow()
+    entrega.enviado_en = utc_ahora()
     entrega.lease_hasta = None
     _marcar_recordatorio_completo_si_aplica(db, entrega)
     db.commit()
@@ -927,7 +928,6 @@ def reclamar_barrido(
     configuracion = _configuracion(db, bloquear=True)
     radicado_ids = sorted(set(datos.radicado_ids or []))
     consulta_seleccionada = datos.radicado_id is not None or bool(radicado_ids)
-    consulta_individual_registro = None
     if datos.tipo == "AUTOMATICA":
         if datos.hora_local not in {"12:00", "17:00"}:
             raise HTTPException(status_code=400, detail="Hora automática no permitida.")
@@ -989,7 +989,7 @@ def reclamar_barrido(
             "ejecucion": _serializar_ejecucion(existing),
         }
 
-    ahora = datetime.utcnow()
+    ahora = utc_ahora()
     activa = None if consulta_seleccionada else (
         db.query(models.EjecucionBarrido)
         .filter(
@@ -1103,7 +1103,7 @@ def listar_radicados_barrido(
         )
         radicados = radicados.filter(models.Radicado.id.in_(selected_ids))
     radicados = radicados.limit(limite).all()
-    ejecucion.lease_hasta = datetime.utcnow() + timedelta(minutes=30)
+    ejecucion.lease_hasta = utc_ahora() + timedelta(minutes=30)
     configuracion = db.query(models.ConfiguracionConsultas).filter_by(id=1).first()
     if configuracion and configuracion.ejecucion_activa_id == ejecucion.id:
         configuracion.lease_hasta = ejecucion.lease_hasta
@@ -1141,7 +1141,7 @@ def ejecutar_consulta_barrido_radicado(
             "actuaciones_nuevas": resultado_radicado.actuaciones_nuevas,
             "repetida": True,
         }
-    ahora = datetime.utcnow()
+    ahora = utc_ahora()
     if (
         resultado_radicado
         and resultado_radicado.estado == "EN_PROCESO"
@@ -1175,14 +1175,14 @@ def ejecutar_consulta_barrido_radicado(
             radicado_id=radicado.id,
             tipo=ejecucion.tipo,
             estado="EN_PROCESO",
-            inicio=datetime.utcnow(),
+            inicio=utc_ahora(),
         )
         db.add(consulta)
         db.flush()
         resultado_radicado.consulta_id = consulta.id
-    resultado_radicado.inicio = datetime.utcnow()
+    resultado_radicado.inicio = utc_ahora()
     resultado_radicado.estado = "EN_PROCESO"
-    resultado_radicado.lease_hasta = datetime.utcnow() + timedelta(minutes=10)
+    resultado_radicado.lease_hasta = utc_ahora() + timedelta(minutes=10)
     db.commit()
 
     reconciliar_historial = _reconciliacion_completa_vencida(db, radicado.id, ahora)
@@ -1192,7 +1192,7 @@ def ejecutar_consulta_barrido_radicado(
         reconciliar_historial=reconciliar_historial,
     )
     estado_api = str(resultado.get("estado", ""))
-    ahora = datetime.utcnow()
+    ahora = utc_ahora()
     if estado_api.startswith("error"):
         resultado_radicado.estado = "ERROR"
         resultado_radicado.error = estado_api
@@ -1252,7 +1252,7 @@ def finalizar_barrido(
         if ejecucion.errores or ejecucion.procesados < ejecucion.total_radicados
         else "COMPLETADA"
     )
-    ejecucion.finalizacion = datetime.utcnow()
+    ejecucion.finalizacion = utc_ahora()
     ejecucion.lease_hasta = None
     configuracion = db.query(models.ConfiguracionConsultas).filter_by(id=1).with_for_update().first()
     if configuracion and configuracion.ejecucion_activa_id == ejecucion.id:

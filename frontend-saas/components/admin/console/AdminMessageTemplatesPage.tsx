@@ -1,8 +1,9 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useState } from "react";
 import { Save, Search } from "lucide-react";
 import { fetchApi } from "@/lib/api";
+import { useLoadEffect } from "@/lib/useLoadEffect";
 import { useSession } from "@/context/SessionContext";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { Button } from "@/components/ui/Button";
@@ -32,7 +33,7 @@ export default function AdminMessageTemplatesPage() {
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
 
-  async function load() {
+  const load = useCallback(async () => {
     if (!token) return;
     setLoading(true); setError("");
     try {
@@ -41,9 +42,9 @@ export default function AdminMessageTemplatesPage() {
       setSelected((current) => rows.some((item) => item.clave === current) ? current : rows[0]?.clave ?? "");
     } catch (cause) { setError(cause instanceof Error ? cause.message : "No se pudieron cargar las plantillas."); }
     finally { setLoading(false); }
-  }
+  }, [token]);
 
-  useEffect(() => { void load(); }, [token]);
+  useLoadEffect(load);
   const template = items.find((item) => item.clave === selected);
   const visibleItems = items.filter((item) => `${item.nombre} ${item.clave}`.toLowerCase().includes(query.trim().toLowerCase()));
   function update(key: "asunto_email" | "cuerpo_email" | "cuerpo_whatsapp" | "titulo_push" | "cuerpo_push", value: string) {

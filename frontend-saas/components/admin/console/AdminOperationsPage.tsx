@@ -101,26 +101,6 @@ function sweepStatusPresentation(status: string) {
   return { label: status.replaceAll("_", " "), className: "bg-surface-secondary text-foreground-muted", description: status };
 }
 
-function Metric({
-  icon: Icon,
-  label,
-  value,
-  tone = "text-foreground",
-}: {
-  icon: typeof Activity;
-  label: string;
-  value: string | number;
-  tone?: string;
-}) {
-  return (
-    <div className="rounded-lg border border-border bg-surface p-4">
-      <Icon className={`size-4 ${tone}`} />
-      <p className="mt-3 text-xs text-foreground-muted">{label}</p>
-      <p className={`mt-1 text-lg font-semibold ${tone}`}>{value}</p>
-    </div>
-  );
-}
-
 type OperationsSection = "resumen" | "consultas" | "integraciones" | "notificaciones";
 const SECTION_COPY: Record<OperationsSection, { title: string; description: string }> = {
   resumen: { title: "Operación", description: "Estado general de servicios y colas." },
@@ -651,6 +631,7 @@ export default function AdminOperationsPage({ section = "resumen" }: { section?:
                 </div>
                 <div className="mx-auto max-w-xl overflow-hidden rounded-xl border border-[#e4e8ef] bg-white font-sans text-[#26364f] shadow-sm">
                   <div className="border-b-[3px] border-[#ccb56b] px-6 py-5 text-center">
+                    {/* eslint-disable-next-line @next/next/no-img-element -- reproduce el HTML del correo, que usa <img> plano. */}
                     <img src="https://www.alejandramunozabogada.com/AM_logo_Recurso%202_Landscape_web.png" alt="Alejandra Muñoz | Abogada y Asociados" className="mx-auto h-auto w-full max-w-[230px]" />
                   </div>
                   <div className="px-6 py-7 text-sm leading-6">

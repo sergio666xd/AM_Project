@@ -135,7 +135,10 @@ export default function ChatFloatingButton() {
   const composerRef = useRef<HTMLTextAreaElement>(null);
   const refocusComposerAfterSendRef = useRef(false);
   const selectedChatId = selected?.id ?? null;
-  selectedChatRef.current = selected;
+  // Mantiene la conversación activa al alcance de los callbacks de sondeo sin leer refs al renderizar.
+  useLayoutEffect(() => {
+    selectedChatRef.current = selected;
+  }, [selected]);
 
   const unreadChats = chats.filter((chat) => chat.no_leidos > 0).length;
   const processGroups = useMemo(() => {
