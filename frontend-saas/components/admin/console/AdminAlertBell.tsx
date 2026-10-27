@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { Bell, CheckCheck, ExternalLink } from "lucide-react";
+import { Bell, CheckCheck, ExternalLink, Trash2 } from "lucide-react";
 import { fetchApi } from "@/lib/api";
 
 type AlertItem = {
@@ -74,6 +74,32 @@ export function AdminAlertBell({ token }: { token: string | null }) {
     }
   }
 
+  // Borrar marca la alerta como eliminada: deja de verse aquí y en el centro de notificaciones.
+  async function removeAlerts(ids: string[]) {
+    if (!token || !ids.length) return;
+    setMarking(true);
+    setActionError("");
+    try {
+      await fetchApi("/api/admin/alertas/acciones", { method: "POST", token, body: JSON.stringify({ alerta_ids: ids, estado: "ELIMINADA" }) });
+      await refresh();
+    } catch {
+      setActionError("No fue posible borrar las alertas.");
+    } finally {
+      setMarking(false);
+    }
+  }
+
+  async function removeAll() {
+    if (!token) return;
+    try {
+      const alerts: AlertItem[] = await fetchApi("/api/admin/alertas?solo_activas=true", { method: "GET", token });
+      if (!alerts.length || !window.confirm(`¿Borrar las ${alerts.length} alertas activas?`)) return;
+      await removeAlerts(alerts.map((item) => item.id));
+    } catch {
+      setActionError("No fue posible borrar las alertas.");
+    }
+  }
+
   async function markRead(item: AlertItem) {
     if (!token || item.leida) return;
     try {
@@ -91,10 +117,10 @@ export function AdminAlertBell({ token }: { token: string | null }) {
         {unreadCount > 0 && <span className="absolute -right-1 -top-1 grid min-h-5 min-w-5 place-items-center rounded-full bg-danger px-1 text-[10px] font-bold text-white">{unreadCount}</span>}
       </button>
       {open && <section role="dialog" aria-label="Alertas activas" className="absolute right-0 top-12 z-50 w-[min(24rem,calc(100vw-2rem))] overflow-hidden rounded-xl border border-border bg-surface shadow-xl">
-        <header className="flex items-center justify-between gap-3 border-b border-border px-4 py-3"><div><h2 className="text-sm font-semibold">Alertas activas</h2><p className="text-xs text-foreground-muted">Las cinco más recientes</p></div>{unreadCount > 0 && <button type="button" disabled={marking} onClick={() => void markAllRead()} className="inline-flex items-center gap-1.5 rounded-md px-2 py-1 text-xs font-medium text-primary hover:bg-surface-hover disabled:opacity-50"><CheckCheck className="size-3.5" aria-hidden="true" />{marking ? "Marcando…" : "Marcar como leídas"}</button>}</header>
+        <header className="flex items-center justify-between gap-3 border-b border-border px-4 py-3"><div className="min-w-0"><h2 className="text-sm font-semibold">Alertas activas</h2><p className="truncate text-xs text-foreground-muted">Las 5 más recientes</p></div><div className="flex shrink-0 items-center gap-1">{unreadCount > 0 && <button type="button" disabled={marking} onClick={() => void markAllRead()} className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-md px-2 py-1 text-xs font-medium text-primary hover:bg-surface-hover disabled:opacity-50"><CheckCheck className="size-3.5" aria-hidden="true" />Marcar leídas</button>}{items.length > 0 && <button type="button" disabled={marking} onClick={() => void removeAll()} className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-md px-2 py-1 text-xs font-medium text-danger hover:bg-danger-light disabled:opacity-50"><Trash2 className="size-3.5" aria-hidden="true" />Borrar todas</button>}</div></header>
         {actionError && <p role="alert" className="px-4 pt-2 text-xs text-danger">{actionError}</p>}
         {items.length ? <ul className="max-h-96 divide-y divide-border overflow-y-auto">
-          {items.map((item) => <li key={item.id}><Link href={item.href} onClick={() => { void markRead(item); setOpen(false); }} className={`block px-4 py-3 hover:bg-surface-hover ${item.leida ? "opacity-70" : "bg-brand-50"}`}><span className="flex items-center justify-between gap-2"><span className="line-clamp-2 text-sm font-medium">{item.descripcion}</span><ExternalLink className="size-3.5 shrink-0 text-foreground-muted" /></span><span className="mt-1 flex justify-between gap-2 text-xs text-foreground-muted"><span className="capitalize">{item.categoria} · {item.tipo} · {item.prioridad}</span><span>{item.fecha ? new Date(item.fecha).toLocaleDateString("es-CO", { timeZone: "America/Bogota" }) : ""}</span></span></Link></li>)}
+          {items.map((item) => <li key={item.id} className="group relative"><Link href={item.href} onClick={() => { void markRead(item); setOpen(false); }} className={`block py-3 pl-4 pr-12 hover:bg-surface-hover ${item.leida ? "opacity-70" : "bg-brand-50"}`}><span className="flex items-center gap-2"><span className="line-clamp-2 text-sm font-medium">{item.descripcion}</span><ExternalLink className="size-3.5 shrink-0 text-foreground-muted" /></span><span className="mt-1 flex justify-between gap-2 text-xs text-foreground-muted"><span className="capitalize">{item.categoria} · {item.tipo} · {item.prioridad}</span><span>{item.fecha ? new Date(item.fecha).toLocaleDateString("es-CO", { timeZone: "America/Bogota" }) : ""}</span></span></Link><button type="button" disabled={marking} onClick={() => void removeAlerts([item.id])} aria-label={`Borrar alerta: ${item.descripcion}`} title="Borrar" className="absolute right-2 top-2.5 grid size-8 place-items-center rounded-md text-foreground-muted hover:bg-danger-light hover:text-danger disabled:opacity-50"><Trash2 className="size-4" aria-hidden="true" /></button></li>)}
         </ul> : <p className="px-4 py-8 text-center text-sm text-foreground-muted">No hay alertas activas.</p>}
         <Link href="/gestion-procesos/admin/notificaciones" onClick={() => setOpen(false)} className="block border-t border-border px-4 py-3 text-center text-sm font-semibold text-primary hover:bg-surface-hover">Abrir centro de notificaciones</Link>
       </section>}
