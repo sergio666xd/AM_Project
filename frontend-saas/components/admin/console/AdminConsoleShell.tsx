@@ -188,7 +188,7 @@ function NavSection({ section, pathname, onNavigate }: { section: NavSection; pa
         {section.title}
       </button>
       {open && (
-        <div className="space-y-0.5">
+        <div className="motion-rise-in space-y-0.5">
           {section.items.map((item) => {
             const Icon = item.icon;
             const active = isActive(pathname, item.href);
@@ -388,7 +388,7 @@ export default function AdminConsoleShell({ children }: { children: ReactNode })
 
           {userMenuOpen && (
             /* Con la barra colapsada el menú se abre a la derecha de la barra para no recortarse. */
-            <div className={`absolute z-50 overflow-hidden ${collapsed ? "bottom-3 left-full ml-2 w-64" : "bottom-full left-3 right-3 mb-2"} rounded-[var(--radius-lg)] border border-border bg-surface text-foreground shadow-lg`}>
+            <div className={`motion-lift-in absolute z-50 overflow-hidden ${collapsed ? "bottom-3 left-full ml-2 w-64" : "bottom-full left-3 right-3 mb-2"} rounded-[var(--radius-lg)] border border-border bg-surface text-foreground shadow-lg`}>
               <div className="border-b border-border px-4 py-3">
                 <p className="text-sm font-semibold text-foreground">{user?.nombre_completo || "Administrador"}</p>
                 {user?.email && <p className="mt-0.5 truncate text-xs text-foreground-muted">{user.email}</p>}
@@ -440,12 +440,12 @@ export default function AdminConsoleShell({ children }: { children: ReactNode })
       {/* Mobile backdrop */}
       {mobileOpen && (
         <button aria-label="Cerrar navegación" onClick={() => setMobileOpen(false)}
-          className="fixed inset-0 z-40 bg-brand-950/40 backdrop-blur-[2px] md:hidden" />
+          className="motion-fade-in fixed inset-0 z-40 bg-brand-950/40 backdrop-blur-[2px] md:hidden" />
       )}
 
       {/* Sidebar */}
       <aside
-        className={`fixed inset-y-0 left-0 z-50 flex ${sidebarWidth} flex-col bg-nav text-white transition-all duration-200 ${
+        className={`fixed inset-y-0 left-0 z-50 flex ${sidebarWidth} flex-col bg-nav text-white transition-all duration-[260ms] ease-[var(--ease-out)] motion-reduce:transition-none ${
           mobileOpen ? "translate-x-0" : "-translate-x-full md:translate-x-0"
         }`}
       >

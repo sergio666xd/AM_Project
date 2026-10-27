@@ -271,7 +271,7 @@ export default function Sidebar({ variant }: SidebarProps) {
           type="button"
           aria-label="Cerrar menú"
           onClick={() => setMobileOpen(false)}
-          className="fixed inset-0 z-40 bg-brand-950/40 backdrop-blur-[2px] md:hidden"
+          className="motion-fade-in fixed inset-0 z-40 bg-brand-950/40 backdrop-blur-[2px] md:hidden"
         />
       )}
 
@@ -279,7 +279,7 @@ export default function Sidebar({ variant }: SidebarProps) {
       <aside
         id="app-navigation"
         aria-label="Navegación principal"
-        className={`fixed inset-y-0 left-0 z-50 flex h-dvh w-[var(--sidebar-width)] flex-col bg-nav text-white transition-transform duration-200 ${
+        className={`fixed inset-y-0 left-0 z-50 flex h-dvh w-[var(--sidebar-width)] flex-col bg-nav text-white transition-transform duration-[260ms] ease-[var(--ease-out)] motion-reduce:transition-none ${
           mobileOpen ? "translate-x-0" : "-translate-x-full md:translate-x-0"
         }`}
       >
@@ -331,7 +331,7 @@ export default function Sidebar({ variant }: SidebarProps) {
           </button>
 
           {userMenuOpen && (
-            <div className="absolute bottom-full left-3 right-3 mb-2 overflow-hidden rounded-[var(--radius-lg)] border border-border bg-surface text-foreground shadow-lg">
+            <div className="motion-lift-in absolute bottom-full left-3 right-3 mb-2 overflow-hidden rounded-[var(--radius-lg)] border border-border bg-surface text-foreground shadow-lg">
               <div className="border-b border-border px-4 py-3">
                 <p className="text-sm font-semibold text-foreground">{user?.nombre_completo || "Cargando..."}</p>
                 <p className="text-xs text-foreground-muted">{roleLabel}</p>

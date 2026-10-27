@@ -453,7 +453,7 @@ export function DataTable<T>({
                   {rowActions && <th scope="col" className="w-12 px-2 py-3"><span className="sr-only">Acciones</span></th>}
                 </tr>
               </thead>
-              <tbody className="divide-y divide-border">
+              <tbody className="motion-stagger divide-y divide-border">
                 {pageRows.map((row) => {
                   const key = rowKey(row);
                   const isSelected = selected.has(key);
@@ -489,7 +489,7 @@ export function DataTable<T>({
           </div>
 
           {/* Móvil: tarjetas legibles con las acciones al alcance del pulgar. */}
-          <ul className="divide-y divide-border md:hidden">
+          <ul className="motion-stagger divide-y divide-border md:hidden">
             {pageRows.map((row) => {
               const key = rowKey(row);
               const isSelected = selected.has(key);

@@ -3,6 +3,7 @@
 import { useEffect, useId, useRef, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { X } from "lucide-react";
+import { usePresence } from "@/lib/usePresence";
 
 /**
  * Panel lateral para fichas de detalle. En escritorio se abre a la derecha
@@ -30,6 +31,7 @@ export function Drawer({
   const titleId = useId();
   const panelRef = useRef<HTMLDivElement>(null);
   const previousFocus = useRef<HTMLElement | null>(null);
+  const { mounted, closing } = usePresence(open, 180);
 
   useEffect(() => {
     if (!open) return;
@@ -62,18 +64,18 @@ export function Drawer({
     };
   }, [onClose, open]);
 
-  if (!open || typeof document === "undefined") return null;
+  if (!mounted || typeof document === "undefined") return null;
 
   return createPortal(
-    <div className="fixed inset-0 z-[70] flex justify-end" role="presentation">
-      <button type="button" aria-label="Cerrar" tabIndex={-1} onClick={onClose} className="absolute inset-0 bg-brand-950/40 backdrop-blur-[2px]" />
+    <div className={`fixed inset-0 z-[70] flex justify-end ${closing ? "pointer-events-none" : ""}`} role="presentation">
+      <button type="button" aria-label="Cerrar" tabIndex={-1} onClick={onClose} className={`absolute inset-0 bg-brand-950/40 backdrop-blur-[2px] ${closing ? "motion-fade-out" : "motion-fade-in"}`} />
       <div
         ref={panelRef}
         role="dialog"
         aria-modal="true"
         aria-labelledby={titleId}
         tabIndex={-1}
-        className={`relative flex h-full w-full flex-col bg-surface shadow-lg outline-none sm:border-l sm:border-border ${width === "lg" ? "sm:max-w-2xl" : "sm:max-w-lg"}`}
+        className={`relative flex h-full w-full flex-col bg-surface shadow-lg outline-none sm:border-l sm:border-border ${width === "lg" ? "sm:max-w-2xl" : "sm:max-w-lg"} ${closing ? "motion-slide-out-right" : "motion-slide-in-right"}`}
       >
         <header className="flex items-start gap-3 border-b border-border px-5 pb-4 pt-[max(env(safe-area-inset-top),16px)]">
           <div className="min-w-0 flex-1">

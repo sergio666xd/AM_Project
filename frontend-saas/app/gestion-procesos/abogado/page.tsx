@@ -368,7 +368,7 @@ export default function AbogadoPage() {
                 <Link key={`${item.radicado_id}-${item.tipo}`} href={item.href} className="flex items-center justify-between gap-4 border-b border-border px-5 py-3 last:border-0 hover:bg-surface-hover">
                   <div className="min-w-0"><p className="truncate font-medium text-foreground">{item.numero}</p><p className="mt-1 truncate text-sm text-foreground-muted">{item.motivo}</p></div>
                   {item.tipo === "ACTUACIONES_NUEVAS"
-                    ? <span className="shrink-0 rounded-full bg-red-500/10 px-2.5 py-1 text-xs font-semibold text-red-700">Actuaciones nuevas</span>
+                    ? <span className="inline-flex shrink-0 items-center gap-1.5 rounded-full bg-red-500/10 px-2.5 py-1 text-xs font-semibold text-red-700"><span aria-hidden="true" className="motion-attention size-1.5 rounded-full bg-red-600" />Actuaciones nuevas</span>
                     : <span className="shrink-0 rounded-full bg-amber-500/10 px-2.5 py-1 text-xs text-amber-700">Atención</span>}
                 </Link>
               )) : <div className="flex items-center gap-2 px-5 py-6 text-sm text-foreground-muted"><CheckCircle2 className="size-4 text-emerald-600" />No hay procesos que requieran atención.</div>}

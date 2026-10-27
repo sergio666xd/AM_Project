@@ -25,14 +25,14 @@ export function SegmentedControl<V extends string>({
       <div className="inline-flex shrink-0 gap-1 rounded-[var(--radius-lg)] border border-border bg-surface p-1">
         {options.map((option) => {
           const active = option.value === value;
-          const className = `inline-flex min-h-9 items-center gap-2 whitespace-nowrap rounded-[var(--radius-md)] px-3 text-sm font-medium transition-colors ${
+          const className = `inline-flex min-h-9 items-center gap-2 whitespace-nowrap rounded-[var(--radius-md)] px-3 text-sm font-medium motion-press ${
             active ? "bg-brand-900 text-white shadow-xs dark:bg-brand-800" : "text-foreground-secondary hover:bg-surface-hover hover:text-foreground"
           }`;
           const content = (
             <>
               {option.label}
               {option.count !== undefined && (
-                <span className={`rounded-full px-1.5 text-xs leading-5 ${active ? "bg-white/20 text-white" : "bg-surface-hover text-foreground-muted"}`}>
+                <span key={option.count} className={`motion-fade-in rounded-full px-1.5 text-xs leading-5 ${active ? "bg-white/20 text-white" : "bg-surface-hover text-foreground-muted"}`}>
                   {option.count}
                 </span>
               )}

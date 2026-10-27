@@ -2,6 +2,7 @@
 
 import { useEffect, useId, useRef, type ReactNode } from "react";
 import { X } from "lucide-react";
+import { usePresence } from "@/lib/usePresence";
 
 export function Modal({
   open,
@@ -23,6 +24,7 @@ export function Modal({
   const dialogRef = useRef<HTMLDivElement>(null);
   const onCloseRef = useRef(onClose);
   const sizeClass = { sm: "max-w-md", md: "max-w-xl", lg: "max-w-3xl" }[size];
+  const { mounted, closing } = usePresence(open, 120);
 
   useEffect(() => {
     onCloseRef.current = onClose;
@@ -64,12 +66,12 @@ export function Modal({
     };
   }, [open]);
 
-  if (!open) return null;
+  if (!mounted) return null;
 
   return (
-    <div className="fixed inset-0 z-[100] grid place-items-center overflow-y-auto p-4" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose(); }}>
-      <div aria-hidden="true" onMouseDown={onClose} className="fixed inset-0 bg-brand-950/40 backdrop-blur-[2px]" />
-      <div ref={dialogRef} role="dialog" aria-modal="true" aria-labelledby={titleId} aria-describedby={description ? descriptionId : undefined} tabIndex={-1} className={`relative z-[1] max-h-[calc(100vh-2rem)] w-full overflow-y-auto rounded-[var(--radius-xl)] border border-border bg-surface shadow-lg ${sizeClass}`}>
+    <div className={`fixed inset-0 z-[100] grid place-items-center overflow-y-auto p-4 ${closing ? "pointer-events-none" : ""}`} onMouseDown={(event) => { if (event.target === event.currentTarget) onClose(); }}>
+      <div aria-hidden="true" onMouseDown={onClose} className={`fixed inset-0 bg-brand-950/40 backdrop-blur-[2px] ${closing ? "motion-fade-out" : "motion-fade-in"}`} />
+      <div ref={dialogRef} role="dialog" aria-modal="true" aria-labelledby={titleId} aria-describedby={description ? descriptionId : undefined} tabIndex={-1} className={`relative z-[1] max-h-[calc(100vh-2rem)] w-full overflow-y-auto rounded-[var(--radius-xl)] border border-border bg-surface shadow-lg ${sizeClass} ${closing ? "motion-dialog-out" : "motion-dialog-in"}`}>
         <header className="flex items-start justify-between gap-4 border-b border-border px-5 py-4">
           <div>
             <h2 id={titleId} className="text-lg font-semibold text-foreground">{title}</h2>
