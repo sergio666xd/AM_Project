@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePortalPathname } from "@/lib/usePortalPathname";
 import { MoreHorizontal, type LucideIcon } from "lucide-react";
 
 export type MobileTab = { label: string; href: string; icon: LucideIcon; badge?: number };
@@ -20,7 +20,7 @@ function isTabActive(pathname: string, href: string, exact: boolean) {
  * El último botón abre el menú lateral con el resto de secciones.
  */
 export function MobileTabBar({ tabs, homeHref }: { tabs: MobileTab[]; homeHref: string }) {
-  const pathname = usePathname();
+  const pathname = usePortalPathname();
 
   return (
     <nav
