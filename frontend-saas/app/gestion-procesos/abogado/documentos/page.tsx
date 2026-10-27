@@ -428,7 +428,7 @@ export default function DocumentosPage() {
   );
 
   return (
-    <div className="mx-auto max-w-7xl space-y-5">
+    <div className="motion-swap mx-auto max-w-7xl space-y-5">
       <PageHeader
         overline="Expedientes"
         title="Documentos"
@@ -611,7 +611,7 @@ export default function DocumentosPage() {
       </Drawer>
 
       {documentoActivo && archivoPreview && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-3 sm:p-6" role="dialog" aria-modal="true" aria-labelledby="documento-preview-titulo" onMouseDown={(event) => { if (event.target === event.currentTarget) { setDocumentoActivo(null); setArchivoPreview(""); } }}>
+        <div className="motion-overlay fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-3 sm:p-6" role="dialog" aria-modal="true" aria-labelledby="documento-preview-titulo" onMouseDown={(event) => { if (event.target === event.currentTarget) { setDocumentoActivo(null); setArchivoPreview(""); } }}>
           <div className="flex max-h-[94vh] w-full max-w-6xl flex-col overflow-hidden rounded-2xl border" style={{ background: "var(--surface)", borderColor: "var(--border)", color: "var(--foreground)" }}>
             <header className="flex items-center justify-between gap-4 border-b p-4" style={{ borderColor: "var(--border)" }}>
               <div className="min-w-0"><h2 id="documento-preview-titulo" className="truncate font-semibold">{documentoActivo.nombre_archivo}</h2><p className="text-xs text-foreground-muted">{documentoActivo.proceso} · {documentoActivo.cliente}</p></div>
@@ -776,7 +776,7 @@ function SolicitudDocumentoModal({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-brand-950/40 p-4 backdrop-blur-xs"
+      className="motion-overlay fixed inset-0 z-50 flex items-center justify-center bg-brand-950/40 p-4 backdrop-blur-xs"
       onMouseDown={(event) => {
         if (event.target === event.currentTarget) {
           onClose();

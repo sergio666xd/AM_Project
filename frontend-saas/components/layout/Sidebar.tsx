@@ -250,7 +250,7 @@ export default function Sidebar({ variant }: SidebarProps) {
       >
         {active && (
           <span
-            className="absolute left-0 top-2 bottom-2 w-[3px] rounded-r-full bg-gold-400"
+            className="motion-indicator absolute left-0 top-2 bottom-2 w-[3px] rounded-r-full bg-gold-400"
             aria-hidden="true"
           />
         )}

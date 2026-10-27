@@ -387,7 +387,7 @@ export default function AdminUsersPage() {
   ];
 
   return (
-    <section className="mx-auto max-w-7xl space-y-5">
+    <section className="motion-swap mx-auto max-w-7xl space-y-5">
       <PageHeader
         overline="Administración · Personas"
         title="Usuarios"
@@ -445,7 +445,7 @@ export default function AdminUsersPage() {
           role="dialog"
           aria-modal="true"
           aria-label={editing ? "Editar usuario" : "Crear usuario"}
-          className="fixed inset-0 z-50 flex items-center justify-center bg-brand-950/40 backdrop-blur-sm p-4"
+          className="motion-overlay fixed inset-0 z-50 flex items-center justify-center bg-brand-950/40 backdrop-blur-sm p-4"
         >
           <form
             onSubmit={save}

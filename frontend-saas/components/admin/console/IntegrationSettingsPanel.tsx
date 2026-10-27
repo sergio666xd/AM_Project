@@ -86,7 +86,7 @@ export function IntegrationSettingsPanel({ token }: { token?: string | null }) {
         <h3 className="font-semibold">Credenciales de correo y WhatsApp</h3>
         <p className="mt-1 text-sm text-foreground-muted">Los secretos se cifran en la base de datos y nunca se muestran de vuelta. Los cambios rigen sin redeploy.</p>
       </div>
-      {loading ? <p className="text-sm text-foreground-muted">Cargando configuración…</p> : <>
+      {loading ? <p className="motion-delayed-in text-sm text-foreground-muted">Cargando configuración…</p> : <>
         <fieldset className="space-y-3">
           <legend className="mb-2 text-sm font-semibold">SMTP</legend>
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">

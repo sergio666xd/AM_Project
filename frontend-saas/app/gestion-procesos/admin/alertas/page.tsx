@@ -135,7 +135,7 @@ export default function AdminAlertsPage() {
   }
 
   return (
-    <div className="mx-auto max-w-7xl space-y-6">
+    <div className="motion-swap mx-auto max-w-7xl space-y-6">
       <PageHeader
         overline="Centro de atención"
         title="Alertas"

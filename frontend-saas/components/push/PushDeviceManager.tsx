@@ -117,7 +117,7 @@ export default function PushDeviceManager({ showSilencingOptions = true }: PushD
   const hasDevices = devices.length > 0;
 
   return (
-    <section className="space-y-4">
+    <section className="motion-swap space-y-4">
       <div className="flex items-start gap-3">
         <BellRing className="mt-0.5 size-5 text-[var(--primary)]" />
         <div>
@@ -171,7 +171,7 @@ export default function PushDeviceManager({ showSilencingOptions = true }: PushD
       )}
 
       {showSilencingOptions && hasDevices && (
-        <div className="space-y-3 rounded-lg border border-[var(--border)] bg-[var(--surface-secondary)] p-4">
+        <div className="motion-rise-in space-y-3 rounded-lg border border-[var(--border)] bg-[var(--surface-secondary)] p-4">
           <p className="text-sm font-medium text-[var(--foreground)]">
             Cuando tienes Push activo en al menos un dispositivo:
           </p>

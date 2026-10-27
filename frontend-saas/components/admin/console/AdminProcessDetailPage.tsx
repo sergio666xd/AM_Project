@@ -232,7 +232,7 @@ export default function AdminProcessDetailPage() {
   ];
 
   return (
-    <div className="mx-auto max-w-6xl space-y-5">
+    <div className="motion-swap mx-auto max-w-6xl space-y-5">
       <Link href="/gestion-procesos/admin/procesos" className="inline-flex items-center gap-2 text-sm font-medium text-foreground-muted hover:text-primary">
         <ArrowLeft aria-hidden="true" className="size-4" /> Procesos
       </Link>

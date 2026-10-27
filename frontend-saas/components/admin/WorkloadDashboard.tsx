@@ -23,7 +23,7 @@ export default function WorkloadDashboard() {
   }, [token, allowed]);
   if (!allowed) return <section><h1 className="text-2xl font-semibold">Sin acceso</h1><p className="mt-2 text-sm text-foreground-muted">Esta vista está disponible para administración y abogados administradores.</p></section>;
   if (error) return <p role="alert" className="rounded-xl border border-danger/30 bg-danger/5 p-4 text-sm text-danger">{error}</p>;
-  if (!data) return <p className="py-12 text-center text-sm text-foreground-muted"><RefreshCw className="mr-2 inline size-4 animate-spin" />Cargando métricas…</p>;
+  if (!data) return <p className="motion-delayed-in py-12 text-center text-sm text-foreground-muted"><RefreshCw className="mr-2 inline size-4 animate-spin" />Cargando métricas…</p>;
   const table = (title: string, rows: Rows) => {
     const base = user?.rol === "ADMIN" ? "/gestion-procesos/admin" : "/gestion-procesos/abogado";
     const href = `${base}/${title.startsWith("Procesos") ? "procesos" : "tareas"}`;

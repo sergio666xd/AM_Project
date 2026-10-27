@@ -109,7 +109,7 @@ function formatearEstado(estado: string | null | undefined) {
     return {
       label: "Consultando",
       className:
-        "bg-blue-500/10 text-blue-600 dark:text-blue-400",
+        "motion-breathe bg-blue-500/10 text-blue-600 dark:text-blue-400",
     };
   }
 
@@ -445,7 +445,7 @@ export default function DetalleRadicadoPage() {
    */
 
   return (
-    <div className="space-y-5">
+    <div className="motion-swap space-y-5">
       {/* ========================================================
           NOTIFICACIÓN
       ========================================================= */}
@@ -590,6 +590,9 @@ export default function DetalleRadicadoPage() {
                 </button>
               )}
             </div>
+
+            {/* Barra indeterminada mientras se consulta la Rama Judicial. */}
+            {consultando && <div aria-hidden="true" className="motion-progress h-0.5 bg-[var(--primary)]/10 text-[var(--primary)]" />}
 
             {/* ====================================================
                 INFORMACIÓN GENERAL

@@ -115,7 +115,7 @@ export default function ConfiguracionAbogadoPage() {
   }
 
   return (
-    <section className="mx-auto w-full max-w-5xl space-y-8 px-4 py-6 sm:px-6 lg:px-8">
+    <section className="motion-swap mx-auto w-full max-w-5xl space-y-8 px-4 py-6 sm:px-6 lg:px-8">
       {/* Encabezado */}
       <PageHeader
         overline="Mi cuenta"

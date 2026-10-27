@@ -334,7 +334,7 @@ export default function AdminOperationsPage({ section = "resumen" }: { section?:
   }
 
   return (
-    <section className="mx-auto max-w-6xl space-y-5">
+    <section className="motion-swap mx-auto max-w-6xl space-y-5">
       <PageHeader
           overline="Panel Administrativo · Global"
           title={section === "resumen" ? "Operación" : SECTION_COPY[section].title}
@@ -500,7 +500,7 @@ export default function AdminOperationsPage({ section = "resumen" }: { section?:
                             <tr className="border-t border-border bg-surface-secondary">
                               <td colSpan={8} className="p-3">
                                 {!sweepDetails || sweepDetails.ejecucion.id !== sweep.id ? (
-                                  <p className="text-sm text-foreground-muted">Cargando detalle...</p>
+                                  <p className="motion-delayed-in text-sm text-foreground-muted">Cargando detalle...</p>
                                 ) : sweepDetails.radicados.length === 0 ? (
                                   <p className="text-sm text-foreground-muted">La ejecución aún no registra radicados.</p>
                                 ) : (

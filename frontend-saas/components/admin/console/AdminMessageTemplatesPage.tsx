@@ -69,7 +69,7 @@ export default function AdminMessageTemplatesPage() {
     <PageHeader overline="Operación" title="Mensajes del sistema" description="Edita los textos de correo y WhatsApp. Los enlaces y botones se agregan automáticamente según el tipo de mensaje." />
     {error && <p role="alert" className="rounded-md border border-danger/30 bg-danger/5 p-3 text-sm text-danger">{error}</p>}
     {notice && <p role="status" className="rounded-md border border-success/30 bg-success/5 p-3 text-sm">{notice}</p>}
-    {loading ? <p className="py-10 text-center text-sm text-foreground-muted">Cargando mensajes…</p> : <div className="grid gap-5 xl:grid-cols-[260px_minmax(0,1fr)]">
+    {loading ? <p className="motion-delayed-in py-10 text-center text-sm text-foreground-muted">Cargando mensajes…</p> : <div className="grid gap-5 xl:grid-cols-[260px_minmax(0,1fr)]">
       <nav aria-label="Tipos de mensaje" className="space-y-2 rounded-lg border border-border bg-surface p-2">
         <label className="relative block">
           <span className="sr-only">Buscar plantilla por nombre o clave</span>

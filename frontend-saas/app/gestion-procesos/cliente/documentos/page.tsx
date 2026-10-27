@@ -241,7 +241,7 @@ export default function DocumentosClientePage() {
 				</div>
 			)}
 
-			{loading || sessionLoading ? <div className="flex min-h-40 items-center justify-center gap-3 text-sm text-(--foreground-muted)"><RefreshCw className="size-5 animate-spin" />Cargando documentos...</div> : <>
+			{loading || sessionLoading ? <div className="motion-delayed-in flex min-h-40 items-center justify-center gap-3 text-sm text-(--foreground-muted)"><RefreshCw className="size-5 animate-spin" />Cargando documentos...</div> : <>
 								<section className="space-y-3">
 					<div><h2 className="font-semibold text-foreground">Solicitudes de documentos</h2><p className="mt-1 text-sm text-(--foreground-muted)">Carga cada archivo solicitado y consulta el estado individual de su revisión.</p></div>
 					{data.solicitudes.length ? data.solicitudes.map((request) => (

@@ -177,7 +177,7 @@ export default function AdminUserDetailPage() {
   const pendingRequests = user.solicitudes.filter((request) => ["PENDIENTE", "PENDIENTE_APROBACION"].includes(request.estado));
 
   return (
-    <section className="mx-auto max-w-6xl space-y-5">
+    <section className="motion-swap mx-auto max-w-6xl space-y-5">
       <Link href="/gestion-procesos/admin/usuarios" className="inline-flex items-center gap-2 text-sm text-foreground-muted hover:text-brand-900"><ArrowLeft className="size-4" /> Volver a usuarios</Link>
       <PageHeader
         overline={`Ficha de cuenta · ${roleLabels[user.rol] || user.rol}`}

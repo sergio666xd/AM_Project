@@ -245,7 +245,7 @@ export default function TareasClientePage() {
   }, new Map<string, CalendarTask[]>())).sort(([left], [right]) => left.localeCompare(right)).slice(0, 6);
 
   return (
-    <section className="mx-auto max-w-5xl space-y-6 pb-24">
+    <section className="motion-swap mx-auto max-w-5xl space-y-6 pb-24">
       <PageHeader
         overline="Portal del cliente"
         title="Mis tareas"

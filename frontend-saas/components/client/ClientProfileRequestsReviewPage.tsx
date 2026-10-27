@@ -82,7 +82,7 @@ export default function ClientProfileRequestsReviewPage() {
   }
 
   return (
-    <div className="mx-auto max-w-6xl space-y-6">
+    <div className="motion-swap mx-auto max-w-6xl space-y-6">
       <PageHeader
         overline="Revisión de clientes"
         title="Solicitudes de edición de perfil"
@@ -128,7 +128,7 @@ export default function ClientProfileRequestsReviewPage() {
                 <tr>
                   <td colSpan={5} className="px-4 py-12 text-center text-muted">
                     <div className="flex items-center justify-center gap-2">
-                      <RefreshCw className="size-4 animate-spin text-brand-700" />
+                      <RefreshCw className="motion-delayed-in size-4 animate-spin text-brand-700" />
                       <span>Cargando solicitudes…</span>
                     </div>
                   </td>

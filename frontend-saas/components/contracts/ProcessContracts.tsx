@@ -376,7 +376,7 @@ export default function ProcessContracts({ processId, clients, onChange, initial
   const canEdit = selected?.estado === "BORRADOR";
 
   return (
-    <div className="space-y-4">
+    <div className="motion-swap space-y-4">
       <style jsx global>{`
       `}</style>
       <div className="contract-editing space-y-4">

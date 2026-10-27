@@ -14,7 +14,7 @@ export default function ContenidoPublicoError({
   }, [error]);
 
   return (
-    <main className="mx-auto max-w-3xl space-y-4 px-6 py-12">
+    <main className="motion-swap mx-auto max-w-3xl space-y-4 px-6 py-12">
       <h1 className="text-2xl font-semibold text-foreground">No se pudo mostrar Contenido público</h1>
       <p className="text-sm text-foreground-secondary">
         La página detectó un error al renderizarse. Intenta cargarla de nuevo; el código de diagnóstico ayuda a encontrar la causa.

@@ -634,7 +634,7 @@ export default function TareaDetallePage() {
       : 0;
 
   return (
-    <div className="mx-auto max-w-6xl space-y-6">
+    <div className="motion-swap mx-auto max-w-6xl space-y-6">
       {/* HEADER */}
 
       <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
@@ -1121,7 +1121,7 @@ export default function TareaDetallePage() {
             {/* NUEVO RECORDATORIO */}
 
             {showReminderForm && (
-              <div className="mt-5 rounded-lg border border-border bg-surface-muted p-4">
+              <div className="motion-rise-in mt-5 rounded-lg border border-border bg-surface-muted p-4">
                 <div className="mb-4 flex items-center gap-2">
                   <MessageCircle
                     size={18}
@@ -1433,7 +1433,7 @@ export default function TareaDetallePage() {
 
             <div className="mt-4 h-2 overflow-hidden rounded-full bg-surface-muted">
               <div
-                className="h-full rounded-full bg-primary transition-all"
+                className="motion-grow-x h-full rounded-full bg-primary transition-all"
                 style={{
                   width: `${progress}%`,
                 }}

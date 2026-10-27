@@ -1,6 +1,7 @@
 "use client";
 
 import type { ReactNode } from "react";
+import { AnimatedNumber } from "./AnimatedNumber";
 
 export type SummaryItem = {
   key: string;
@@ -40,7 +41,7 @@ export function SummaryStrip({
               {item.icon && <span aria-hidden="true" className="[&>svg]:size-4">{item.icon}</span>}
               {item.label}
             </span>
-            <span className={`mt-1 block text-2xl font-semibold tabular-nums ${toneClass[item.tone ?? "default"]}`}>{item.value}</span>
+            <span className={`mt-1 block text-2xl font-semibold tabular-nums ${toneClass[item.tone ?? "default"]}`}>{typeof item.value === "number" ? <AnimatedNumber value={item.value} /> : item.value}</span>
           </>
         );
         const className = `min-w-[9.5rem] snap-start rounded-[var(--radius-lg)] border bg-surface p-3 text-left shadow-[var(--shadow-xs)] transition-colors sm:min-w-0 ${

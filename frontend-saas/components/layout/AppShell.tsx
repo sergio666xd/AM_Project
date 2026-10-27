@@ -31,6 +31,7 @@ export default function AppShell({
       className={`${isChatPage ? "h-dvh overflow-hidden" : "min-h-screen"} bg-background text-foreground`}
       style={isChatPage && chatViewport.height ? { height: `${chatViewport.height}px` } : undefined}
       data-area={variant}
+      data-panel
     >
       <ChatPresenceHeartbeat />
       {variant !== "saas" && <PushNotificationPrompt />}

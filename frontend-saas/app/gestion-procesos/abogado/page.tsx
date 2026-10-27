@@ -243,7 +243,7 @@ export default function AbogadoPage() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="motion-swap space-y-6">
       <PageHeader
         overline={isSaasLawyer ? "Cuenta SaaS" : "Despacho"}
         title={isSaasLawyer ? "Espacio de trabajo" : user?.rol === "ADMIN" ? "Gestión de la firma" : "Panel del abogado"}

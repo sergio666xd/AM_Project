@@ -320,7 +320,7 @@ export default function ProcesosPage() {
   }
 
   return (
-    <div className="mx-auto max-w-7xl space-y-5">
+    <div className="motion-swap mx-auto max-w-7xl space-y-5">
       {/* TOAST */}
       {notice && <OperationResult title={notice} description={noticeHref ? "El expediente quedó creado y puedes continuar con sus datos." : undefined} actionHref={noticeHref ?? undefined} actionLabel={noticeHref ? "Abrir expediente" : undefined} onDismiss={() => { setNotice(""); setNoticeHref(null); }} />}
 
@@ -400,7 +400,7 @@ export default function ProcesosPage() {
 
       {/* MODAL CREAR PROCESO */}
       {showCreateModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-brand-950/40 p-4 backdrop-blur-xs">
+        <div className="motion-overlay fixed inset-0 z-50 flex items-center justify-center bg-brand-950/40 p-4 backdrop-blur-xs">
           <div
             role="dialog"
             aria-modal="true"

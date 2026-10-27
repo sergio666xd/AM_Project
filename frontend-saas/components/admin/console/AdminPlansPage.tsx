@@ -246,7 +246,7 @@ export default function AdminPlansPage() {
   }
 
   return (
-    <section className="mx-auto max-w-6xl space-y-5">
+    <section className="motion-swap mx-auto max-w-6xl space-y-5">
       <PageHeader
           overline="Panel Administrativo · SaaS individual"
           title="Planes"
@@ -392,7 +392,7 @@ export default function AdminPlansPage() {
           role="dialog"
           aria-modal="true"
           aria-label={editing ? "Editar plan" : "Crear plan"}
-          className="fixed inset-0 z-50 flex items-center justify-center bg-brand-950/40 backdrop-blur-sm p-4"
+          className="motion-overlay fixed inset-0 z-50 flex items-center justify-center bg-brand-950/40 backdrop-blur-sm p-4"
         >
           <form
             onSubmit={save}

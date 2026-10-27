@@ -55,7 +55,7 @@ export default function ClientSettingsPage() {
   }
 
   return (
-    <section className="mx-auto max-w-3xl space-y-6 pb-24">
+    <section className="motion-swap mx-auto max-w-3xl space-y-6 pb-24">
       <PageHeader
         overline="Portal del cliente"
         title="Configuración"
