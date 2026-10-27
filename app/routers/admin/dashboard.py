@@ -47,6 +47,7 @@ def _dashboard_activity_description(action: str, resource_type: str) -> tuple[st
         "proceso.restaurar": "restauró un proceso",
         "documento.cargar": "cargó un documento",
         "documento.solicitar": "solicitó un documento",
+        "documento.solicitud_eliminar": "eliminó una solicitud de documento",
         "tarea.crear": "creó una tarea",
         "tarea.actualizar": "actualizó una tarea",
         "tarea.completar": "completó una tarea",

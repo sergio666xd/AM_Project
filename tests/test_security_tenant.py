@@ -95,6 +95,7 @@ from app.routers.expedientes.comun import _cliente_asignado
 from app.routers.expedientes.documentos import (
     cargar_documento_cliente,
     descargar_documento,
+    eliminar_solicitud_documento,
     listar_documentos_despacho,
 )
 from app.routers.expedientes.procesos import (
@@ -2702,6 +2703,70 @@ def test_document_download_is_limited_to_assigned_active_processes(monkeypatch):
                 descargar_documento(document_id, db=db, usuario=actor)
             assert error.value.status_code == 404
         assert requested_keys == ["process/assigned.pdf"]
+
+
+def test_document_request_delete_keeps_uploaded_files_and_respects_scope():
+    engine = create_engine("sqlite:///:memory:")
+    models.Base.metadata.create_all(engine)
+
+    with Session(engine) as db:
+        owner = models.Usuario(
+            email="delete-owner@example.test", password_hash="hash",
+            nombre_completo="Owner", whatsapp_numero="0000000501",
+            rol=models.RolUsuario.ABOGADO_ADMIN, estado=models.EstadoUsuario.ACTIVO,
+        )
+        outsider = models.Usuario(
+            email="delete-outsider@example.test", password_hash="hash",
+            nombre_completo="Outsider", whatsapp_numero="0000000502",
+            rol=models.RolUsuario.ABOGADO_ADMIN, estado=models.EstadoUsuario.ACTIVO,
+        )
+        db.add_all([owner, outsider])
+        db.flush()
+        client = models.Usuario(
+            email="delete-client@example.test", password_hash="hash",
+            nombre_completo="Client", whatsapp_numero="0000000503",
+            rol=models.RolUsuario.CLIENTE, estado=models.EstadoUsuario.ACTIVO,
+            creado_por_abogado_id=owner.id,
+        )
+        process = models.Proceso(abogado_id=owner.id, nombre="Delete process")
+        db.add_all([client, process])
+        db.flush()
+        db.add(models.ProcesoCliente(proceso_id=process.id, cliente_id=client.id))
+        request = models.SolicitudDocumento(
+            proceso_id=process.id, cliente_id=client.id, titulo="Request to delete"
+        )
+        db.add(request)
+        db.flush()
+        document = models.DocumentoProceso(
+            proceso_id=process.id, cliente_id=client.id,
+            solicitud_id=request.id, solicitud_item_id="item-1",
+            nombre_archivo="kept.pdf", ruta_archivo="process/kept.pdf",
+            mime_type="application/pdf",
+        )
+        db.add(document)
+        db.commit()
+        request_id = request.id
+
+        for actor in [client, outsider]:
+            with pytest.raises(HTTPException) as error:
+                eliminar_solicitud_documento(request_id, db=db, usuario=actor)
+            assert error.value.status_code in {403, 404}
+        assert db.get(models.SolicitudDocumento, request_id) is not None
+
+        result = eliminar_solicitud_documento(request_id, db=db, usuario=owner)
+        assert result["archivos_conservados"] == 1
+        db.expire_all()
+        assert db.get(models.SolicitudDocumento, request_id) is None
+        kept = db.get(models.DocumentoProceso, document.id)
+        assert kept is not None
+        assert kept.solicitud_id is None and kept.solicitud_item_id is None
+        assert db.query(models.EventoAuditoria).filter_by(
+            accion="documento.solicitud_eliminar", recurso_id=str(request_id)
+        ).count() == 1
+
+        with pytest.raises(HTTPException) as error:
+            eliminar_solicitud_documento(request_id, db=db, usuario=owner)
+        assert error.value.status_code == 404
 
 
 def test_document_upload_type_is_checked_against_file_signature():

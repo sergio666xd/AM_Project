@@ -285,6 +285,31 @@ def solicitar_documento(proceso_id: int, datos: schemas.SolicitudDocumentoCreate
     return {"id": solicitud.id, "documentos_requeridos": required_items, "mensaje": "Solicitud enviada al cliente."}
 
 
+@router.delete("/solicitudes-documento/{solicitud_id}")
+def eliminar_solicitud_documento(solicitud_id: int, db: Session = Depends(get_db), usuario: models.Usuario = Depends(security.obtener_usuario_actual)):
+    """Elimina una solicitud; los archivos ya cargados se conservan en el proceso sin solicitud asociada."""
+    _abogado(usuario)
+    solicitud = db.query(models.SolicitudDocumento).filter(models.SolicitudDocumento.id == solicitud_id).first()
+    if not solicitud:
+        raise HTTPException(status_code=404, detail="Solicitud no encontrada.")
+    try:
+        _proceso_abogado(solicitud.proceso_id, usuario, db)
+    except HTTPException as exc:
+        if exc.status_code == 404:
+            raise HTTPException(status_code=404, detail="Solicitud no encontrada.") from exc
+        raise
+    archivos_conservados = db.query(models.DocumentoProceso).filter(
+        models.DocumentoProceso.solicitud_id == solicitud.id
+    ).update(
+        {models.DocumentoProceso.solicitud_id: None, models.DocumentoProceso.solicitud_item_id: None},
+        synchronize_session=False,
+    )
+    registrar_evento_auditoria(db, usuario, "documento.solicitud_eliminar", "solicitud_documento", solicitud.id)
+    db.delete(solicitud)
+    db.commit()
+    return {"id": solicitud_id, "archivos_conservados": archivos_conservados, "mensaje": "Solicitud eliminada."}
+
+
 @router.post("/solicitudes-documento/{solicitud_id}/archivo", status_code=status.HTTP_201_CREATED)
 def cargar_documento_cliente(solicitud_id: int, archivo: UploadFile = File(...), item_id: str | None = Form(default=None), db: Session = Depends(get_db), usuario: models.Usuario = Depends(security.obtener_usuario_actual)):
     if usuario.rol != models.RolUsuario.CLIENTE: raise HTTPException(status_code=403, detail="Solo el cliente puede cargar este documento.")
