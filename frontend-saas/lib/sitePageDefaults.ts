@@ -37,7 +37,7 @@ export const SITE_PAGE_DEFAULTS = {
   },
   "quienes-somos": {
     route: "/quienes-somos",
-    seo: { title: "Quiénes somos | Asesoría jurídica", description: "Conozca el equipo y la forma de trabajo de Alejandra Muñoz Abogada y Asociados: derecho claro, preventivo y cercano.", keywords: "firma jurídica, abogada, asesoría legal Colombia", noIndex: false },
+    seo: { title: "Quiénes somos | Asesoría jurídica", description: "Conozca el equipo y la forma de trabajo de Alejandra Muñoz Abogada y Asociados: derecho claro, preventivo y cercano.", keywords: "asesoría jurídica, abogada, asesoría legal Colombia", noIndex: false },
     eyebrow: "Quiénes somos",
     title: "Quiénes somos",
     intro: "Somos un equipo jurídico comprometido con hacer el derecho más claro, preventivo y cercano.",
