@@ -35,7 +35,7 @@ export default async function PolizaJuridicaPage() {
                 <ShieldCheck className="size-4 text-gold-400" aria-hidden="true" />
                 {renderRichText(content.eyebrow)}
               </span>
-              <h1 className="max-w-4xl text-4xl sm:text-5xl lg:text-6xl font-bold tracking-tight text-white leading-[1.12]">
+              <h1 className="max-w-4xl text-4xl sm:text-5xl lg:text-6xl font-display font-medium tracking-[-0.01em] text-white leading-[1.12]">
                 {renderRichText(content.title)}
               </h1>
               <p className="max-w-2xl text-lg sm:text-xl leading-relaxed text-neutral-300">
@@ -58,7 +58,7 @@ export default async function PolizaJuridicaPage() {
               <span className="grid size-14 place-items-center rounded-2xl bg-gold-400/20 text-gold-300">
                 <Scale className="size-7" aria-hidden="true" />
               </span>
-              <h2 className="text-xl sm:text-2xl font-bold text-white">
+              <h2 className="text-xl sm:text-2xl font-display font-medium text-white">
                 {renderRichText(content.asideTitle)}
               </h2>
               <p className="text-sm sm:text-base leading-relaxed text-neutral-300">
@@ -74,7 +74,7 @@ export default async function PolizaJuridicaPage() {
             <span className="inline-block text-xs font-bold uppercase tracking-widest text-gold-600">
               {renderRichText(content.coverageEyebrow)}
             </span>
-            <h2 className="text-3xl sm:text-4xl font-bold tracking-tight text-foreground">
+            <h2 className="text-3xl sm:text-4xl font-display font-medium tracking-[-0.01em] text-foreground">
               {renderRichText(content.coverageTitle)}
             </h2>
             <p className="text-base leading-relaxed text-foreground-muted">
@@ -117,7 +117,7 @@ export default async function PolizaJuridicaPage() {
               <span className="inline-block text-xs font-bold uppercase tracking-widest text-gold-600">
                 {renderRichText(content.closingEyebrow)}
               </span>
-              <h2 className="text-2xl sm:text-3xl font-bold tracking-tight text-foreground">
+              <h2 className="text-2xl sm:text-3xl font-display font-medium tracking-[-0.01em] text-foreground">
                 {renderRichText(content.closingTitle)}
               </h2>
               <p className="text-base leading-relaxed text-foreground-muted">

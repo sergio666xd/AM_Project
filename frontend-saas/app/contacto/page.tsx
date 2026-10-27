@@ -1,5 +1,5 @@
 import { renderRichText } from "@/components/marketing/RichText";
-import { Clock, Mail, MapPin, MessageCircle, ShieldCheck, type LucideIcon } from "lucide-react";
+import { Clock, Mail, MapPin, MessageCircle, type LucideIcon } from "lucide-react";
 import { MarketingLayout } from "@/components/marketing/MarketingLayout";
 import { ContactForm } from "@/components/marketing/ContactForm";
 import { loadPublicPageContent } from "@/lib/publicPageContent";
@@ -47,7 +47,7 @@ export default async function Contacto() {
               <span className="inline-block text-xs font-bold uppercase tracking-widest text-gold-400">
                 {renderRichText(content.eyebrow)}
               </span>
-              <h1 className="text-3xl sm:text-4xl lg:text-5xl font-bold tracking-tight text-white">
+              <h1 className="text-3xl sm:text-4xl lg:text-5xl font-display font-medium tracking-[-0.01em] text-white">
                 {renderRichText(content.title)}
               </h1>
               <p className="text-base sm:text-lg text-neutral-300 leading-relaxed">
@@ -116,17 +116,6 @@ export default async function Contacto() {
                   })}
                 </div>
               </div>
-
-              {/* Legal credentials card */}
-              <div className="rounded-2xl border border-gold-400/30 bg-gold-400/10 p-6 space-y-3">
-                <div className="flex items-center gap-2 text-brand-900 font-bold text-sm">
-                  <ShieldCheck className="size-5 text-gold-600" aria-hidden="true" />
-                  <span>Acreditación Profesional</span>
-                </div>
-                <p className="text-xs text-foreground-muted leading-relaxed">
-                  Yeinny Alejandra Muñoz Marín · Abogada Titular con Tarjeta Profesional No. 375.092 expedida por el Consejo Superior de la Judicatura de Colombia.
-                </p>
-              </div>
             </div>
           </div>
         </section>
@@ -137,7 +126,7 @@ export default async function Contacto() {
             <span className="text-xs font-bold uppercase tracking-widest text-gold-600">
               {renderRichText(content.faqEyebrow)}
             </span>
-            <h2 className="text-2xl sm:text-3xl font-bold tracking-tight text-foreground">
+            <h2 className="text-2xl sm:text-3xl font-display font-medium tracking-[-0.01em] text-foreground">
               Preguntas Frecuentes
             </h2>
             <p className="text-sm text-foreground-muted">

@@ -1,9 +1,14 @@
 import type { Metadata, Viewport } from "next";
+import { Figtree, JetBrains_Mono, Newsreader } from "next/font/google";
 import { SessionProvider } from "@/context/SessionContext";
 import { ToastProvider } from "@/components/ui/ToastProvider";
 import { SITE_URL } from "@/lib/siteUrl";
 
 import "./globals.css";
+
+const figtree = Figtree({ subsets: ["latin"], variable: "--font-figtree", display: "swap" });
+const newsreader = Newsreader({ subsets: ["latin"], variable: "--font-newsreader", display: "swap" });
+const jetbrains = JetBrains_Mono({ subsets: ["latin"], variable: "--font-jetbrains", display: "swap" });
 
 export const metadata: Metadata = {
   metadataBase: SITE_URL,
@@ -23,5 +28,5 @@ export const viewport: Viewport = {
 };
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
-  return <html lang="es" suppressHydrationWarning><body><SessionProvider><ToastProvider>{children}</ToastProvider></SessionProvider></body></html>;
+  return <html lang="es" suppressHydrationWarning className={`${figtree.variable} ${newsreader.variable} ${jetbrains.variable}`}><body><SessionProvider><ToastProvider>{children}</ToastProvider></SessionProvider></body></html>;
 }

@@ -17,7 +17,7 @@ export function MarketingContactCta() {
         <span className="inline-flex items-center gap-1.5 rounded-full border border-gold-400/40 bg-gold-400/10 px-3.5 py-1 text-xs font-bold uppercase tracking-widest text-gold-300">
           Atención jurídica personalizada
         </span>
-        <h2 id="firm-contact-heading" className="text-3xl sm:text-4xl font-bold tracking-tight text-white">
+        <h2 id="firm-contact-heading" className="text-3xl sm:text-4xl font-display font-medium tracking-[-0.01em] text-white">
           ¿Tiene un asunto legal o requiere asesoría preventiva?
         </h2>
         <p className="mx-auto max-w-2xl text-base sm:text-lg leading-relaxed text-neutral-300">
@@ -45,7 +45,7 @@ export function MarketingContactCta() {
         </div>
 
         <p className="text-xs text-neutral-400 pt-2">
-          Atención en Sabaneta, Antioquia y representación en toda Colombia · T.P. 375.092 C.S. de la J.
+          Atención en Sabaneta, Antioquia y representación en toda Colombia
         </p>
       </div>
     </section>

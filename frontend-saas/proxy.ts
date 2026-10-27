@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { ADMIN_PORTAL_HOST, USER_PORTAL_HOST, isLocalPortalHost } from "@/lib/portalHosts";
+import { ADMIN_PORTAL_HOST, USER_PORTAL_HOST, isLocalPortalHost, isPreviewHost } from "@/lib/portalHosts";
 
 const PUBLIC_HOSTS = new Set(["alejandramunozabogada.com", "www.alejandramunozabogada.com"]);
 const PUBLIC_SITE_HOST = "www.alejandramunozabogada.com";
@@ -72,9 +72,19 @@ function internalRoute(area: string, path: string) {
 }
 
 export function proxy(request: NextRequest) {
-  const host = request.nextUrl.hostname.toLowerCase();
+  // El encabezado Host refleja el dominio real (incluidos los previews de
+  // Vercel); nextUrl.hostname puede ser el del servidor en local.
+  const host = (request.headers.get("host") || request.nextUrl.hostname).split(":")[0].toLowerCase();
   const pathname = request.nextUrl.pathname;
   const local = isLocalPortalHost(host);
+
+  // Vista previa: sin subdominios. El sitio público queda en "/" y los paneles
+  // se abren en /gestion-procesos/...; solo se traducen las rutas cortas de ingreso.
+  if (isPreviewHost(host)) {
+    if (pathname === "/login") return rewrite(request, CLIENT_LOGIN_PATH);
+    if (pathname in AUTH_ROUTES) return rewrite(request, AUTH_ROUTES[pathname]);
+    return NextResponse.next();
+  }
   const role = roleFor(request);
   const adminHost = host === ADMIN_PORTAL_HOST || host === "admin.localhost" || ((host === "localhost" || host === "127.0.0.1") && role === "ADMIN");
   const userHost = host === USER_PORTAL_HOST || host === "panel.localhost" || ((host === "localhost" || host === "127.0.0.1") && !adminHost);

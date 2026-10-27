@@ -23,6 +23,33 @@ def obtener_configuracion_publica(db: Session = Depends(get_db)):
     return {"mostrar_planes": configuracion.mostrar_planes if configuracion else True}
 
 
+@router.get("/api/contacto-publico")
+def obtener_contacto_publico(db: Session = Depends(get_db)):
+    """Datos de contacto que el sitio público muestra, tomados de la configuración del panel.
+
+    Si la administración desactiva "mostrar_contacto_publico", solo se expone el nombre.
+    """
+    config = db.query(models.ConfiguracionFirma).filter_by(id=1).first()
+    if config is None:
+        config = models.ConfiguracionFirma(id=1)
+        db.add(config)
+        db.commit()
+        db.refresh(config)
+    datos = {"nombre": config.nombre, "mostrar_contacto": bool(config.mostrar_contacto_publico)}
+    if not config.mostrar_contacto_publico:
+        return datos
+    return {
+        **datos,
+        "correo_contacto": config.correo_contacto,
+        "correo_pqr": config.correo_pqr,
+        "telefono": config.telefono,
+        "whatsapp": config.whatsapp,
+        "direccion": config.direccion,
+        "ciudad": config.ciudad,
+        "pais": config.pais,
+    }
+
+
 @router.get("/api/contenido-publico/{slug}")
 def obtener_contenido_publico(slug: str, db: Session = Depends(get_db)):
     if slug not in PUBLIC_CONTENT_PAGES:

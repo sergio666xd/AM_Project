@@ -133,7 +133,7 @@ export function PracticeAreasExplorer({ areas }: PracticeAreasExplorerProps) {
                     <Icon className="size-7" aria-hidden="true" />
                   </span>
                   <div>
-                    <h2 className="text-2xl sm:text-3xl font-bold text-foreground">
+                    <h2 className="text-2xl sm:text-3xl font-display font-medium text-foreground">
                       {area.title}
                     </h2>
                     <p className="mt-2 text-sm sm:text-base leading-relaxed text-foreground-muted max-w-2xl">

@@ -40,7 +40,7 @@ export default function GestionProcesosPage() {
               <span className="inline-block text-xs font-bold uppercase tracking-widest text-gold-400">
                 Plataforma SaaS para profesionales del derecho
               </span>
-              <h1 className="text-4xl sm:text-5xl font-bold tracking-tight text-white leading-tight">
+              <h1 className="text-4xl sm:text-5xl font-display font-medium tracking-[-0.01em] text-white leading-tight">
                 Gestión de Procesos
               </h1>
               <p className="max-w-xl text-lg leading-relaxed text-neutral-300">
@@ -59,7 +59,7 @@ export default function GestionProcesosPage() {
             <span className="text-xs font-bold uppercase tracking-widest text-gold-600">
               Ventajas de la plataforma
             </span>
-            <h2 id="saas-benefits-heading" className="text-3xl font-bold tracking-tight text-foreground">
+            <h2 id="saas-benefits-heading" className="text-3xl font-display font-medium tracking-[-0.01em] text-foreground">
               Funciones diseñadas para litigantes
             </h2>
           </div>
@@ -78,7 +78,7 @@ export default function GestionProcesosPage() {
 
           <p className="mt-8 flex items-center gap-2 text-xs text-foreground-muted">
             <ShieldCheck className="size-4 text-gold-600 shrink-0" aria-hidden="true" />
-            La información y expedientes de cada cuenta SaaS se mantienen 100% aislados por usuario y firma.
+            La información y expedientes de cada cuenta SaaS se mantienen 100% aislados por usuario y despacho.
           </p>
         </section>
 
@@ -87,10 +87,10 @@ export default function GestionProcesosPage() {
           <div className="mx-auto flex max-w-7xl flex-col gap-6 sm:flex-row sm:items-center sm:justify-between">
             <div className="max-w-3xl space-y-2">
               <span className="text-xs font-bold uppercase tracking-widest text-gold-600">
-                Servicios jurídicos de la firma
+                Servicios jurídicos
               </span>
-              <h2 id="firm-services-heading" className="text-2xl sm:text-3xl font-bold tracking-tight text-foreground">
-                La asesoría profesional de la firma está disponible
+              <h2 id="firm-services-heading" className="text-2xl sm:text-3xl font-display font-medium tracking-[-0.01em] text-foreground">
+                La asesoría jurídica profesional está disponible
               </h2>
               <p className="text-sm leading-relaxed text-foreground-muted">
                 Estos servicios de representación y consultoría legal son independientes del software de Gestión de Procesos.
@@ -108,7 +108,7 @@ export default function GestionProcesosPage() {
                 href="/contacto"
                 className="inline-flex min-h-11 items-center justify-center rounded-xl border border-border bg-surface px-5 py-2.5 text-sm font-semibold text-brand-900 hover:bg-surface-hover transition-colors"
               >
-                Contactar a la firma
+                Contactar
               </Link>
             </div>
           </div>

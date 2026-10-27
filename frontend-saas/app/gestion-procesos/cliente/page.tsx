@@ -4,9 +4,10 @@ import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import {
   Bell,
-  CalendarDays,
+  CheckCircle2,
   CheckSquare,
-  FileText,
+  ClipboardCheck,
+  Upload,
   FolderOpen,
   MessageSquare,
   RefreshCw,
@@ -17,8 +18,6 @@ import { fetchApi } from "@/lib/api";
 import { ApiErrorState } from "@/components/ui/ApiErrorState";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { PageHeader } from "@/components/ui/PageHeader";
-import { StatCard } from "@/components/ui/StatCard";
-import { AttentionPanel } from "@/components/ui/AttentionPanel";
 import { Button } from "@/components/ui/Button";
 import { Badge } from "@/components/ui/Badge";
 
@@ -77,6 +76,11 @@ const dateText = (value?: string | null) =>
         timeZone: "America/Bogota",
       }).format(new Date(value))
     : "Sin fecha";
+
+const monthText = (value: string) =>
+  new Intl.DateTimeFormat("es-CO", { month: "short", timeZone: "America/Bogota" }).format(new Date(value)).replace(".", "");
+const dayText = (value: string) =>
+  new Intl.DateTimeFormat("es-CO", { day: "numeric", timeZone: "America/Bogota" }).format(new Date(value));
 
 const isUpcoming = (value: string) => Date.parse(value) >= Date.now();
 
@@ -161,11 +165,13 @@ export default function ClienteHomePage() {
   const nextEvents = agenda.eventos.filter((event) => isUpcoming(event.fecha_inicio)).slice(0, 3);
   const attention = [
     ...pendingDocs.slice(0, 3).map((item) => ({
+      kind: "documento" as const,
       title: item.titulo,
       detail: `Documento solicitado · ${item.proceso}`,
       href: `/gestion-procesos/cliente/documentos#solicitud-${item.id}`,
     })),
     ...pendingTasks.slice(0, 3).map((item) => ({
+      kind: "tarea" as const,
       title: item.titulo,
       detail: taskAssignedToClient(item)
         ? item.descripcion || "Tarea principal asignada por el despacho"
@@ -177,12 +183,9 @@ export default function ClienteHomePage() {
   return (
     <section className="mx-auto max-w-6xl space-y-6 pb-24">
       <PageHeader
-        overline="Portal del cliente · Alejandra Muñoz"
+        overline="Portal del cliente"
         title={`Hola, ${user?.nombre_completo?.split(" ")[0] || "bienvenido"}`}
-        description={`${new Intl.DateTimeFormat("es-CO", {
-          dateStyle: "full",
-          timeZone: "America/Bogota",
-        }).format(new Date())} · Aquí puedes consultar tus procesos y pendientes.`}
+        description="Aquí ves en qué va tu proceso y lo que necesitamos de ti."
         action={
           <div className="flex items-center gap-2">
             <Link href="/gestion-procesos/cliente/notificaciones">
@@ -245,120 +248,93 @@ export default function ClienteHomePage() {
         />
       ) : (
         <>
-          {/* STAT CARDS */}
-          <div className="grid grid-cols-2 gap-2 sm:gap-3 lg:grid-cols-4">
-            <StatCard
-              label="Mis procesos"
-              value={processes.length}
-              icon={FolderOpen}
-              href="/gestion-procesos/cliente/procesos"
-            />
-            <StatCard
-              label="Tareas pendientes"
-              value={pendingTasks.length}
-              icon={CheckSquare}
-              tone={pendingTasks.length > 0 ? "warning" : "default"}
-              href="/gestion-procesos/cliente/tareas"
-            />
-            <StatCard
-              label="Documentos por entregar"
-              value={pendingDocs.length}
-              icon={FileText}
-              tone={pendingDocs.length > 0 ? "danger" : "default"}
-              href="/gestion-procesos/cliente/documentos"
-            />
-            <StatCard
-              label="Próximos eventos"
-              value={agenda.eventos.length}
-              icon={CalendarDays}
-              href="/gestion-procesos/cliente/calendario"
-            />
-          </div>
+          {/* Lo que la firma necesita del cliente va primero. */}
+          {attention.length > 0 ? (
+            <section aria-labelledby="pendientes-titulo" className="rounded-[var(--radius-xl)] border border-gold-200 bg-gold-50 p-4 sm:p-6 dark:border-gold-600/30 dark:bg-gold-600/10">
+              <div className="mb-3 flex items-center gap-2">
+                <ClipboardCheck aria-hidden="true" className="size-5 text-gold-600 dark:text-gold-400" />
+                <h2 id="pendientes-titulo" className="font-semibold text-foreground">
+                  {attention.length === 1 ? "Necesitamos 1 cosa de ti" : `Necesitamos ${attention.length} cosas de ti`}
+                </h2>
+              </div>
+              <ul className="flex flex-col gap-2">
+                {attention.map((item, index) => (
+                  <li key={`${item.href}-${index}`} className="flex flex-col gap-3 rounded-[var(--radius-lg)] bg-surface p-4 sm:flex-row sm:items-center">
+                    <div className="min-w-0 flex-1">
+                      <p className="font-semibold text-foreground">{item.title}</p>
+                      <p className="mt-0.5 text-sm text-foreground-muted">{item.detail}</p>
+                    </div>
+                    <Link
+                      href={item.href}
+                      className="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-[var(--radius-md)] bg-brand-900 px-4 text-sm font-semibold !text-white hover:bg-brand-800 sm:w-auto"
+                    >
+                      {item.kind === "documento" ? <Upload aria-hidden="true" className="size-4" /> : <CheckSquare aria-hidden="true" className="size-4" />}
+                      {item.kind === "documento" ? "Subir documento" : "Ver tarea"}
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            </section>
+          ) : processes.length > 0 ? (
+            <p className="flex items-center gap-2 rounded-[var(--radius-lg)] bg-success-light px-4 py-3 text-sm text-foreground">
+              <CheckCircle2 aria-hidden="true" className="size-4 shrink-0 text-success" />
+              No tienes documentos ni tareas pendientes. Te avisaremos si necesitamos algo.
+            </p>
+          ) : null}
 
-          {/* ATTENTION PANEL */}
-          {attention.length > 0 && (
-            <AttentionPanel
-              title="Tienes pendientes que requieren tu atención"
-              items={attention.map((item, index) => ({
-                id: `${item.href}-${index}`,
-                label: item.title,
-                detail: item.detail,
-                href: item.href,
-                tone: "warning" as const,
-              }))}
-            />
-          )}
-
-          {/* MAIN GRID */}
-          <div className="grid gap-6 lg:grid-cols-[1.5fr_1fr]">
-            {/* PROCESOS */}
-            <section className="space-y-4">
+          <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_340px]">
+            <section className="space-y-4" aria-labelledby="procesos-titulo">
               <div className="flex items-center justify-between">
-                <div>
-                  <h2 className="text-lg font-semibold text-foreground">Mis procesos</h2>
-                  <p className="text-xs text-muted">Expedientes activos compartidos contigo</p>
-                </div>
-                <Link
-                  className="inline-flex items-center gap-1 text-xs font-semibold text-brand-700 hover:text-brand-900 dark:text-brand-300"
-                  href="/gestion-procesos/cliente/procesos"
-                >
-                  Ver todos
-                  <ArrowRight className="size-3.5" />
-                </Link>
+                <h2 id="procesos-titulo" className="text-[17px] font-semibold text-foreground">{processes.length === 1 ? "Tu proceso" : "Tus procesos"}</h2>
+                {processes.length > 1 && (
+                  <Link className="inline-flex min-h-9 items-center gap-1 text-sm font-semibold text-primary hover:underline" href="/gestion-procesos/cliente/procesos">
+                    Ver todos <ArrowRight aria-hidden="true" className="size-3.5" />
+                  </Link>
+                )}
               </div>
 
               {processes.length > 0 ? (
-                <div className="space-y-3">
-                  {processes.map((process) => (
+                processes.slice(0, 3).map((process) => (
+                  <article key={process.id} className="rounded-[var(--radius-xl)] border border-border bg-surface p-4 sm:p-6">
+                    <div className="flex flex-wrap items-start justify-between gap-2">
+                      <h3 className="font-display text-[22px] font-medium leading-snug text-foreground sm:text-2xl">{process.nombre}</h3>
+                      <Badge tone="normal">{process.estado_visible}</Badge>
+                    </div>
+                    <p className="mt-1 text-sm text-foreground-muted">Abogada: {process.responsable?.nombre_completo || "Despacho"}</p>
+                    <p className="mt-4 max-w-[62ch] text-base leading-relaxed text-foreground">{process.explicacion_estado}</p>
+                    {process.proxima_actividad && (
+                      <div className="mt-5 flex items-center gap-4 rounded-[var(--radius-lg)] bg-primary-light p-4">
+                        <span className="flex w-14 shrink-0 flex-col items-center rounded-[var(--radius-md)] bg-surface py-1.5">
+                          <span className="text-[10px] font-semibold uppercase text-primary">{monthText(process.proxima_actividad)}</span>
+                          <span className="font-display text-2xl leading-none text-foreground">{dayText(process.proxima_actividad)}</span>
+                        </span>
+                        <div className="min-w-0">
+                          <p className="font-semibold text-foreground">{process.proxima_actividad_titulo || "Próxima actividad"}</p>
+                          <p className="text-sm text-foreground-secondary">{dateText(process.proxima_actividad)}</p>
+                        </div>
+                      </div>
+                    )}
+                    <div className="mt-4 flex flex-wrap gap-x-4 gap-y-1 text-sm text-foreground-muted">
+                      <span>{process.tareas_pendientes} {process.tareas_pendientes === 1 ? "tarea pendiente" : "tareas pendientes"}</span>
+                      <span>{process.documentos_pendientes} {process.documentos_pendientes === 1 ? "documento por entregar" : "documentos por entregar"}</span>
+                    </div>
                     <Link
-                      key={process.id}
                       href={`/gestion-procesos/cliente/procesos/${process.id}`}
-                      className="group block rounded-xl border border-border bg-surface p-4 shadow-xs transition hover:border-brand-500/50 hover:bg-surface-hover/70"
+                      className="mt-4 inline-flex min-h-11 items-center gap-2 rounded-[var(--radius-md)] border border-border px-4 text-sm font-semibold text-foreground hover:bg-surface-hover"
                     >
-                      <div className="flex flex-wrap items-start justify-between gap-3">
-                        <div>
-                          <h3 className="font-semibold text-foreground group-hover:text-brand-900 dark:group-hover:text-brand-200">
-                            {process.nombre}
-                          </h3>
-                          <p className="mt-1 text-xs text-muted">
-                            <span className="font-medium text-foreground">{process.estado_visible}</span> · {process.explicacion_estado}
-                          </p>
-                        </div>
-                        <Badge tone="normal">
-                          {process.radicados.length} radicado{process.radicados.length === 1 ? "" : "s"}
-                        </Badge>
-                      </div>
-
-                      <div className="mt-3.5 grid gap-2 text-xs text-muted sm:grid-cols-3 border-t border-border/60 pt-3">
-                        <span>Abogado: {process.responsable?.nombre_completo || "Despacho"}</span>
-                        <span>{process.tareas_pendientes} tarea(s) pendiente(s)</span>
-                        <span>{process.documentos_pendientes} documento(s) por entregar</span>
-                      </div>
-
-                      {process.proxima_actividad && (
-                        <div className="mt-2.5 rounded-lg bg-surface-secondary/70 px-3 py-2 text-xs text-foreground">
-                          <span className="font-semibold text-brand-900 dark:text-brand-200">Próxima acción: </span>
-                          <span>{process.proxima_actividad_titulo || "Actividad"}</span> ·{" "}
-                          <span className="text-muted">{dateText(process.proxima_actividad)}</span>
-                        </div>
-                      )}
+                      Ver detalle del proceso <ArrowRight aria-hidden="true" className="size-4" />
                     </Link>
-                  ))}
-                </div>
+                  </article>
+                ))
               ) : (
-                <div className="rounded-xl border border-dashed border-border bg-surface">
+                <div className="rounded-[var(--radius-xl)] border border-dashed border-border bg-surface">
                   <EmptyState
                     title="Aún no tienes procesos compartidos"
                     description="Cuando el despacho te vincule a un expediente, podrás consultar aquí su estado, documentos y próximas actividades."
                     icon={FolderOpen}
                     action={
                       <Link href="/gestion-procesos/cliente/chat">
-                        <Button
-                          variant="outline"
-                          icon={<MessageSquare className="size-4" />}
-                        >
-                          Escribir al despacho
-                        </Button>
+                        <Button variant="outline" icon={<MessageSquare className="size-4" />}>Escribir al despacho</Button>
                       </Link>
                     }
                   />
@@ -366,62 +342,59 @@ export default function ClienteHomePage() {
               )}
             </section>
 
-            {/* ASIDE */}
-            <aside className="space-y-5">
-              {/* PRÓXIMOS EVENTOS */}
-              <section className="rounded-xl border border-border bg-surface p-4 shadow-xs">
-                <div className="flex items-center justify-between border-b border-border pb-3">
-                  <h2 className="font-semibold text-foreground">Próximos eventos</h2>
-                  <Link
-                    className="text-xs font-semibold text-brand-700 hover:text-brand-900 dark:text-brand-300"
-                    href="/gestion-procesos/cliente/calendario"
-                  >
-                    Abrir calendario
-                  </Link>
-                </div>
+            <aside className="space-y-6">
+              <section className="rounded-[var(--radius-xl)] border border-border bg-surface p-4 sm:p-5">
+                <h2 className="text-[17px] font-semibold text-foreground">¿Tienes dudas?</h2>
+                <p className="mt-1 text-sm text-foreground-secondary">Escríbele a tu abogada. Responde en horario hábil.</p>
+                <Link
+                  href="/gestion-procesos/cliente/chat"
+                  className="mt-4 inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-[var(--radius-md)] bg-brand-900 px-4 text-sm font-semibold !text-white hover:bg-brand-800"
+                >
+                  <MessageSquare aria-hidden="true" className="size-4" /> Escribir mensaje
+                </Link>
+              </section>
 
+              <section>
+                <div className="mb-3 flex items-center justify-between">
+                  <h2 className="text-[17px] font-semibold text-foreground">Próximas fechas</h2>
+                  <Link className="text-sm font-semibold text-primary hover:underline" href="/gestion-procesos/cliente/calendario">Calendario</Link>
+                </div>
                 {nextEvents.length > 0 ? (
-                  <ul className="divide-y divide-border">
+                  <ul className="divide-y divide-border overflow-hidden rounded-[var(--radius-lg)] border border-border bg-surface">
                     {nextEvents.map((event) => (
-                      <li key={event.id} className="py-3 first:pt-3 last:pb-0">
-                        <p className="font-medium text-foreground text-sm">{event.titulo}</p>
-                        <p className="text-xs text-muted mt-0.5">
-                          {event.proceso} · {dateText(event.fecha_inicio)}
-                        </p>
+                      <li key={event.id} className="flex items-start gap-3 px-4 py-3">
+                        <span className="flex w-11 shrink-0 flex-col items-center rounded-[var(--radius-sm)] bg-surface-hover py-1">
+                          <span className="text-[10px] font-semibold uppercase text-foreground-muted">{monthText(event.fecha_inicio)}</span>
+                          <span className="font-display text-lg leading-none text-foreground">{dayText(event.fecha_inicio)}</span>
+                        </span>
+                        <div className="min-w-0">
+                          <p className="text-sm font-semibold text-foreground">{event.titulo}</p>
+                          <p className="truncate text-xs text-foreground-muted">{event.proceso}</p>
+                        </div>
                       </li>
                     ))}
                   </ul>
                 ) : (
-                  <p className="mt-3 text-xs text-muted">No tienes eventos próximos programados.</p>
+                  <p className="rounded-[var(--radius-lg)] border border-border bg-surface px-4 py-5 text-sm text-foreground-muted">No tienes fechas próximas.</p>
                 )}
               </section>
 
-              {/* ACTIVIDAD RECIENTE */}
-              <section className="rounded-xl border border-border bg-surface p-4 shadow-xs">
-                <h2 className="font-semibold text-foreground border-b border-border pb-3">Actividad reciente</h2>
+              <section>
+                <h2 className="mb-3 text-[17px] font-semibold text-foreground">Últimas novedades</h2>
                 {activity.length > 0 ? (
-                  <ul className="divide-y divide-border">
+                  <ul className="space-y-3">
                     {activity.slice(0, 5).map((entry) => (
-                      <li key={entry.id} className="py-3 first:pt-3 last:pb-0">
-                        <Link
-                          href={entry.href}
-                          className="font-medium text-sm text-foreground hover:text-brand-700 dark:hover:text-brand-300"
-                        >
-                          {entry.titulo}
-                        </Link>
-                        <p className="text-[11px] text-muted mt-0.5">
-                          {entry.proceso} · {dateText(entry.fecha)}
-                        </p>
-                        {entry.descripcion && (
-                          <p className="mt-1 line-clamp-2 text-xs text-muted">
-                            {entry.descripcion}
-                          </p>
-                        )}
+                      <li key={entry.id} className="flex gap-3">
+                        <span aria-hidden="true" className="mt-2 size-2 shrink-0 rounded-full bg-primary" />
+                        <div className="min-w-0">
+                          <Link href={entry.href} className="text-sm font-medium text-foreground hover:text-primary">{entry.titulo}</Link>
+                          <p className="text-xs text-foreground-muted">{entry.proceso} · {dateText(entry.fecha)}</p>
+                        </div>
                       </li>
                     ))}
                   </ul>
                 ) : (
-                  <p className="mt-3 text-xs text-muted">Aún no hay actividad compartida en tus expedientes.</p>
+                  <p className="text-sm text-foreground-muted">Aún no hay novedades en tus procesos.</p>
                 )}
               </section>
             </aside>

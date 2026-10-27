@@ -33,7 +33,7 @@ export function LegalPage({
             <ShieldCheck className="size-4 text-gold-500" aria-hidden="true" />
             Marco Legal y Cumplimiento Normativo
           </span>
-          <h1 className="text-3xl sm:text-4xl lg:text-5xl font-bold tracking-tight text-foreground">
+          <h1 className="text-3xl sm:text-4xl lg:text-5xl font-display font-medium tracking-[-0.01em] text-foreground">
             {renderRichText(title)}
           </h1>
           <p className="text-xs text-foreground-muted">
@@ -76,7 +76,7 @@ export function LegalPage({
               tabIndex={-1}
               className="scroll-mt-28 space-y-3 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-700 rounded-lg p-2"
             >
-              <h2 className="text-xl sm:text-2xl font-bold text-foreground">
+              <h2 className="text-xl sm:text-2xl font-display font-medium text-foreground">
                 {renderRichText(section.title)}
               </h2>
               <div className="space-y-3">
@@ -109,7 +109,7 @@ export function LegalPage({
             href="/contacto"
             className="font-bold text-brand-900 hover:text-gold-600 underline transition-colors shrink-0"
           >
-            Comuníquese con la firma
+            Comuníquese con nosotros
           </Link>
         </div>
       </main>
