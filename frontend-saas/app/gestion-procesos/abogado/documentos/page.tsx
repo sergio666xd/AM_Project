@@ -12,6 +12,7 @@ import { SegmentedControl } from "@/components/ui/SegmentedControl";
 import { SummaryStrip } from "@/components/ui/SummaryStrip";
 import { formatDate, formatDateTime, reviewStatusLabel, toDate } from "@/lib/labels";
 import { Button } from "@/components/ui/Button";
+import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 
 import { FormEvent, useCallback, useEffect, useState } from "react";
 import {
@@ -22,6 +23,7 @@ import {
   FileText,
   FolderOpen,
   Plus,
+  Trash2,
   X,
 } from "lucide-react";
 
@@ -116,6 +118,7 @@ export default function DocumentosPage() {
   const [fileFilter, setFileFilter] = useState<string | null>("POR_REVISAR");
   const [tab, setTab] = useState<"archivos" | "solicitudes" | "contratos">("archivos");
   const [requestDetailId, setRequestDetailId] = useState<number | null>(null);
+  const [requestToDelete, setRequestToDelete] = useState<Request | null>(null);
   const [selectedProcessId, setSelectedProcessId] = useState<number | null>(null);
 
   const [loading, setLoading] = useState(true);
@@ -294,6 +297,21 @@ export default function DocumentosPage() {
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "No fue posible guardar la revisión.");
     } finally { setGuardandoRevision(false); }
+  };
+
+  const eliminarSolicitud = async () => {
+    if (!requestToDelete) return;
+    const response = await apiRequest(`/api/expedientes/solicitudes-documento/${requestToDelete.id}`, {
+      method: "DELETE", headers: headers(),
+    });
+    const result = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      setError(result.detail || "No fue posible eliminar la solicitud.");
+      throw new Error(result.detail || "No fue posible eliminar la solicitud.");
+    }
+    if (requestDetailId === requestToDelete.id) setRequestDetailId(null);
+    setNotice(result.archivos_conservados ? "Solicitud eliminada. Los archivos ya cargados se conservan en el proceso." : "Solicitud eliminada.");
+    await load();
   };
 
   useEffect(() => {
@@ -500,6 +518,7 @@ export default function DocumentosPage() {
           rowActions={[
             { label: "Ver documentos solicitados", icon: <Eye />, onSelect: (item) => setRequestDetailId(item.id) },
             { label: "Ir al proceso", icon: <FolderOpen />, href: (item) => `/gestion-procesos/abogado/procesos/${item.proceso_id}` },
+            { label: "Eliminar solicitud", icon: <Trash2 />, tone: "danger", separated: true, onSelect: (item) => setRequestToDelete(item) },
           ]}
           rowTone={(item) => (pendingRequest(item) ? "warning" : undefined)}
           searchPlaceholder="Buscar solicitud o documento"
@@ -608,6 +627,16 @@ export default function DocumentosPage() {
           </div>
         </div>
       )}
+
+      <ConfirmDialog
+        open={Boolean(requestToDelete)}
+        onClose={() => setRequestToDelete(null)}
+        onConfirm={eliminarSolicitud}
+        title="Eliminar solicitud"
+        description={requestToDelete ? `Se eliminará "${requestToDelete.titulo}" y el cliente dejará de verla. Los archivos que ya cargó se conservan en el proceso.` : ""}
+        confirmLabel="Eliminar"
+        destructive
+      />
 
       {/* MODAL */}
       {mostrarModal && (
