@@ -17,12 +17,26 @@ PREFERENCIA_PLAN_WHATSAPP = {
 def abogados_notificables_para_radicado(
     radicado: models.Radicado,
 ) -> list[models.Usuario]:
+    ambito = (radicado.ambito_key or "").strip()
+    # Además de quienes tienen el radicado en su lista, cuentan el responsable y
+    # los colaboradores de los procesos activos del mismo ámbito que lo usan.
+    abogados_procesos = [
+        abogado
+        for enlace in radicado.procesos
+        if enlace.proceso is not None
+        and enlace.proceso.archivado_en is None
+        and enlace.proceso.abogado is not None
+        and _ambito_proceso(enlace.proceso) == ambito
+        for abogado in [
+            enlace.proceso.abogado,
+            *(colaborador.abogado for colaborador in enlace.proceso.colaboradores),
+        ]
+    ]
     candidatos = {
         usuario.id: usuario
-        for usuario in [*radicado.usuarios_vinculados, radicado.creador]
+        for usuario in [*radicado.usuarios_vinculados, radicado.creador, *abogados_procesos]
         if usuario is not None
     }
-    ambito = (radicado.ambito_key or "").strip()
 
     if ambito == "FIRMA":
         return sorted(

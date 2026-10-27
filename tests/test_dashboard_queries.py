@@ -33,6 +33,9 @@ def _seed(db, total_radicados):
             actuaciones_nuevas=0 if ultima == "ERROR" else 2,
             inicio=base + timedelta(hours=1),
         ))
+        if ultima == "COMPLETADA":
+            # Las novedades siguen pendientes hasta que el abogado abre el detalle.
+            db.add(models.NovedadRadicadoUsuario(usuario_id=lawyer.id, radicado_id=radicado.id, actuaciones_nuevas=2))
     db.commit()
     return lawyer
 

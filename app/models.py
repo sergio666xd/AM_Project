@@ -632,6 +632,21 @@ class LecturaNotificacionAbogado(Base):
     leida_en = Column(DateTime, nullable=False, default=utc_ahora)
 
 
+class NovedadRadicadoUsuario(Base):
+    """Actuaciones nuevas de un radicado que el usuario aún no revisa en el detalle."""
+    __tablename__ = "novedades_radicado_usuario"
+    __table_args__ = (UniqueConstraint("usuario_id", "radicado_id", name="uq_novedad_radicado_usuario"),)
+
+    id = Column(Integer, primary_key=True, index=True)
+    usuario_id = Column(Integer, ForeignKey("usuarios.id", ondelete="CASCADE"), nullable=False, index=True)
+    radicado_id = Column(Integer, ForeignKey("radicados.id", ondelete="CASCADE"), nullable=False, index=True)
+    actuaciones_nuevas = Column(Integer, nullable=False, default=0)
+    desde = Column(DateTime, nullable=False, default=utc_ahora)
+    actualizado_en = Column(DateTime, nullable=False, default=utc_ahora)
+
+    radicado = relationship("Radicado")
+
+
 class LecturaNotificacionCliente(Base):
     __tablename__ = "lecturas_notificacion_cliente"
     __table_args__ = (UniqueConstraint("usuario_id", "notificacion_id", name="uq_lectura_notificacion_cliente"),)

@@ -11,6 +11,7 @@ from app.database import get_db
 from app.firm_access import (
     lawyer_process_ids,
 )
+from app.novedades_radicado import descripcion_novedades, novedades_pendientes, ruta_detalle_radicado
 from app.routers.expedientes.comun import _abogado, _staff_scope, _timeline_proceso
 from app.routers.expedientes.notificaciones import _notificaciones_abogado
 from app.routers.expedientes.procesos import listar_procesos
@@ -44,6 +45,11 @@ def dashboard_abogado(db: Session = Depends(get_db), usuario: models.Usuario = D
     pending_documents = sum(item["documentos_pendientes"] for item in procesos)
     notices = _notificaciones_abogado(db, usuario)
     attention = []
+    # Las actuaciones nuevas van primero: siguen ahí hasta que el abogado abre el radicado.
+    for novedad in novedades_pendientes(db, usuario):
+        attention.append({"tipo": "RADICADO", "titulo": novedad.radicado.numero,
+                          "descripcion": descripcion_novedades(novedad.actuaciones_nuevas),
+                          "fecha": novedad.actualizado_en, "href": ruta_detalle_radicado(usuario, novedad.radicado_id)})
     for task in sorted(overdue + upcoming, key=lambda item: item.fecha_limite or datetime.max)[:12]:
         attention.append({"tipo": "TAREA", "titulo": task.titulo, "descripcion": "Vencida" if task in overdue else "Próxima a vencer",
                           "fecha": task.fecha_limite, "href": f"/gestion-procesos/abogado/procesos/{task.proceso_id}/tareas" if task.proceso_id else "/gestion-procesos/abogado/tareas"})
@@ -62,7 +68,7 @@ def dashboard_abogado(db: Session = Depends(get_db), usuario: models.Usuario = D
     return {
         "resumen": {"procesos_activos": len(procesos), "tareas_pendientes": len(active_tasks), "tareas_vencidas": len(overdue),
                     "documentos_pendientes": pending_documents, "solicitudes_clientes": sum(1 for item in notices if item["categoria"] in {"documento", "solicitud"}),
-                    "consultas_con_error": sum(1 for item in notices if item["categoria"] == "radicado"), "proximos_eventos": len(upcoming) + len(upcoming_events),
+                    "consultas_con_error": sum(1 for item in notices if item["tipo"] == "ERROR_CONSULTA"), "proximos_eventos": len(upcoming) + len(upcoming_events),
                     "procesos_sin_actividad": sum(1 for item in procesos if item.get("inactivo")),
                     "procesos_sin_responsable": sum(1 for item in procesos if not item.get("responsable_asignado"))},
         "atencion": attention[:30],

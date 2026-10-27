@@ -6,6 +6,7 @@ from sqlalchemy.orm import Session, contains_eager
 
 from app import models
 from app.database import get_db
+from app.novedades_radicado import descripcion_novedades, novedades_pendientes, ruta_detalle_radicado
 from app.security import obtener_usuario_actual
 
 router = APIRouter()
@@ -52,20 +53,11 @@ def obtener_dashboard(
     )
 
     # ---------------------------------------------------------
-    # ACTUACIONES NUEVAS
+    # ACTUACIONES NUEVAS SIN REVISAR
     # ---------------------------------------------------------
-    total_actuaciones_nuevas = (
-        db.query(func.coalesce(func.sum(models.ConsultaRadicado.actuaciones_nuevas), 0))
-        .join(
-            models.Radicado,
-            models.ConsultaRadicado.radicado_id == models.Radicado.id,
-        )
-        .filter(
-            models.Radicado.usuarios_vinculados.any(models.Usuario.id == usuario_actual.id),
-            models.ConsultaRadicado.actuaciones_nuevas > 0,
-        )
-        .scalar()
-    )
+    # Se acumulan en cada consulta y solo se quitan al abrir el detalle del radicado.
+    novedades = novedades_pendientes(db, usuario_actual)
+    total_actuaciones_nuevas = sum(novedad.actuaciones_nuevas for novedad in novedades)
 
     # ---------------------------------------------------------
     # CONSULTAS CON ERROR
@@ -111,17 +103,30 @@ def obtener_dashboard(
         )
     } if radicados else {}
 
-    procesos_atencion = []
+    procesos_atencion = [
+        {
+            "radicado_id": novedad.radicado_id,
+            "numero": novedad.radicado.numero,
+            "motivo": descripcion_novedades(novedad.actuaciones_nuevas),
+            "tipo": "ACTUACIONES_NUEVAS",
+            "href": ruta_detalle_radicado(usuario_actual, novedad.radicado_id),
+        }
+        for novedad in novedades
+    ]
+    radicados_con_novedades = {novedad.radicado_id for novedad in novedades}
 
     for radicado in radicados:
         ultima_consulta = ultima_por_radicado.get(radicado.id)
 
+        if radicado.id in radicados_con_novedades:
+            continue
         if not ultima_consulta:
             procesos_atencion.append({
                 "radicado_id": radicado.id,
                 "numero": radicado.numero,
                 "motivo": "Sin consultas realizadas",
                 "tipo": "SIN_CONSULTA",
+                "href": ruta_detalle_radicado(usuario_actual, radicado.id),
             })
 
         elif ultima_consulta.estado == "ERROR":
@@ -130,17 +135,7 @@ def obtener_dashboard(
                 "numero": radicado.numero,
                 "motivo": "La última consulta presentó un error",
                 "tipo": "ERROR",
-            })
-
-        elif ultima_consulta.actuaciones_nuevas > 0:
-            procesos_atencion.append({
-                "radicado_id": radicado.id,
-                "numero": radicado.numero,
-                "motivo": (
-                    f"{ultima_consulta.actuaciones_nuevas} "
-                    "actuación(es) nueva(s)"
-                ),
-                "tipo": "ACTUACIONES_NUEVAS",
+                "href": ruta_detalle_radicado(usuario_actual, radicado.id),
             })
 
     # ---------------------------------------------------------

@@ -12,10 +12,14 @@ from app.firm_access import (
     lawyer_process_ids,
     lawyer_scope_id,
 )
+from app.novedades_radicado import descripcion_novedades, novedades_pendientes, ruta_detalle_radicado
 from app.routers.expedientes.comun import _abogado
 from app.timezone import utc_ahora
 
 router = APIRouter(prefix="/api/expedientes", tags=["Expedientes"])
+
+# Los avisos de actuaciones nuevas solo se quitan al abrir el detalle del radicado.
+PREFIJO_AVISO_ACTUACIONES = "actuaciones-radicado:"
 
 
 @router.get("/notificaciones")
@@ -141,13 +145,26 @@ def _notificaciones_abogado(db: Session, usuario: models.Usuario) -> list[dict]:
                               "titulo": request.cliente.nombre_completo, "descripcion": "El cliente solicitó actualizar sus datos",
                               "fecha": request.solicitada_en, "href": "/gestion-procesos/abogado/solicitudes-perfil",
                               "proceso_id": client_process_id, "leida": False})
+    pendientes = novedades_pendientes(db, usuario)
+    proceso_por_radicado: dict[int, int] = {}
+    if pendientes and process_ids:
+        for proceso_id, radicado_id in db.query(models.ProcesoRadicado.proceso_id, models.ProcesoRadicado.radicado_id).filter(
+            models.ProcesoRadicado.proceso_id.in_(process_ids),
+            models.ProcesoRadicado.radicado_id.in_([novedad.radicado_id for novedad in pendientes]),
+        ).all():
+            proceso_por_radicado.setdefault(radicado_id, proceso_id)
+    for novedad in pendientes:
+        items.append({"id": f"{PREFIJO_AVISO_ACTUACIONES}{novedad.radicado_id}", "categoria": "radicado", "tipo": "ACTUACIONES_NUEVAS",
+                      "titulo": novedad.radicado.numero, "descripcion": descripcion_novedades(novedad.actuaciones_nuevas),
+                      "fecha": novedad.actualizado_en, "href": ruta_detalle_radicado(usuario, novedad.radicado_id),
+                      "proceso_id": proceso_por_radicado.get(novedad.radicado_id), "leida": False})
     read = {item.notificacion_id for item in db.query(models.LecturaNotificacionAbogado).filter_by(usuario_id=usuario.id).all()}
     item_process_ids = {item["proceso_id"] for item in items if item.get("proceso_id")}
     process_names = dict(
         db.query(models.Proceso.id, models.Proceso.nombre).filter(models.Proceso.id.in_(item_process_ids)).all()
     ) if item_process_ids else {}
     for item in items:
-        item["leida"] = item["id"] in read
+        item["leida"] = item["id"] in read and not item["id"].startswith(PREFIJO_AVISO_ACTUACIONES)
         item["proceso"] = process_names.get(item["proceso_id"]) if item.get("proceso_id") else None
     return sorted(items, key=lambda item: item["fecha"] or datetime.min, reverse=True)[:500]
 
@@ -160,7 +177,7 @@ def centro_notificaciones_abogado(db: Session = Depends(get_db), usuario: models
 @router.post("/notificaciones/leer")
 def leer_notificaciones_abogado(datos: schemas.NotificacionesAbogadoLeidasUpdate, db: Session = Depends(get_db), usuario: models.Usuario = Depends(security.obtener_usuario_actual)):
     _abogado(usuario)
-    current_ids = {item["id"] for item in _notificaciones_abogado(db, usuario)}
+    current_ids = {item["id"] for item in _notificaciones_abogado(db, usuario) if not item["id"].startswith(PREFIJO_AVISO_ACTUACIONES)}
     ids = list(dict.fromkeys(item for item in datos.ids if item in current_ids))
     existing = {item.notificacion_id for item in db.query(models.LecturaNotificacionAbogado).filter_by(usuario_id=usuario.id).all()}
     db.add_all(models.LecturaNotificacionAbogado(usuario_id=usuario.id, notificacion_id=item) for item in ids if item not in existing)
@@ -171,7 +188,7 @@ def leer_notificaciones_abogado(datos: schemas.NotificacionesAbogadoLeidasUpdate
 @router.post("/notificaciones/leer-todas")
 def leer_todas_notificaciones_abogado(db: Session = Depends(get_db), usuario: models.Usuario = Depends(security.obtener_usuario_actual)):
     _abogado(usuario)
-    current_ids = {item["id"] for item in _notificaciones_abogado(db, usuario)}
+    current_ids = {item["id"] for item in _notificaciones_abogado(db, usuario) if not item["id"].startswith(PREFIJO_AVISO_ACTUACIONES)}
     existing = {item.notificacion_id for item in db.query(models.LecturaNotificacionAbogado).filter_by(usuario_id=usuario.id).all()}
     nuevos = current_ids - existing
     db.add_all(models.LecturaNotificacionAbogado(usuario_id=usuario.id, notificacion_id=item) for item in nuevos)
