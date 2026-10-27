@@ -82,6 +82,8 @@ class ConfiguracionFirma(Base):
     ciudad = Column(String(120), nullable=True, default="Sabaneta, Antioquia")
     pais = Column(String(120), nullable=True, default="Colombia")
     logo_url = Column(String(1000), nullable=True, default="https://www.alejandramunozabogada.com/AM_logo_Recurso%202_Landscape_web.png")
+    # Logo del encabezado de los correos; si está vacío se usa logo_url.
+    logo_correo_url = Column(String(1000), nullable=True)
     sitio_web = Column(String(1000), nullable=True, default="https://www.alejandramunozabogada.com")
     zona_horaria = Column(String(80), nullable=False, default="America/Bogota")
     mostrar_contacto_publico = Column(Boolean, nullable=False, default=True)

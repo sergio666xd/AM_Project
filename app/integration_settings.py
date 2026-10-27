@@ -62,6 +62,7 @@ def get_firm_settings() -> dict[str, str | bool]:
             "whatsapp": config.whatsapp if config else "3508809878",
             "direccion": config.direccion if config else "Sabaneta, Antioquia, Colombia",
             "logo_url": config.logo_url if config else "https://www.alejandramunozabogada.com/AM_logo_Recurso%202_Landscape_web.png",
+            "logo_correo_url": config.logo_correo_url if config else "",
             "sitio_web": config.sitio_web if config else "https://www.alejandramunozabogada.com",
             "mostrar_contacto_publico": config.mostrar_contacto_publico if config else True,
         }

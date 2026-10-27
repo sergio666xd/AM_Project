@@ -10,7 +10,7 @@ import { Button } from "@/components/ui/Button";
 type FirmSettings = {
   nombre: string; correo_contacto: string | null; correo_pqr: string | null;
   telefono: string; whatsapp: string; direccion: string; ciudad: string; pais: string;
-  logo_url: string; sitio_web: string; zona_horaria: string; mostrar_contacto_publico: boolean;
+  logo_url: string; logo_correo_url: string; sitio_web: string; zona_horaria: string; mostrar_contacto_publico: boolean;
   preferencias_notificacion: { email?: boolean; whatsapp?: boolean };
   parametros_generales: Record<string, unknown> & { contrato_abogado?: ContractAttorneySettings };
   updated_at?: string;
@@ -28,7 +28,7 @@ const DEFAULT_CONTRACT_ATTORNEY: ContractAttorneySettings = {
 
 const EMPTY: FirmSettings = {
   nombre: "", correo_contacto: "", correo_pqr: "", telefono: "", whatsapp: "",
-  direccion: "", ciudad: "", pais: "Colombia", logo_url: "", sitio_web: "",
+  direccion: "", ciudad: "", pais: "Colombia", logo_url: "", logo_correo_url: "", sitio_web: "",
   zona_horaria: "America/Bogota", mostrar_contacto_publico: true,
   preferencias_notificacion: { email: true, whatsapp: true }, parametros_generales: { contrato_abogado: DEFAULT_CONTRACT_ATTORNEY },
 };
@@ -43,6 +43,7 @@ function normalizeFirmSettings(data: Partial<FirmSettings>): FirmSettings {
     ciudad: data.ciudad ?? "",
     pais: data.pais ?? "Colombia",
     logo_url: data.logo_url ?? "",
+    logo_correo_url: data.logo_correo_url ?? "",
     sitio_web: data.sitio_web ?? "",
     preferencias_notificacion: { ...EMPTY.preferencias_notificacion, ...data.preferencias_notificacion },
     parametros_generales: {
@@ -112,6 +113,10 @@ export default function AdminFirmSettingsPage() {
         <label className="text-sm font-medium sm:col-span-2">URL del logo<input type="url" className={input} value={settings.logo_url} onChange={(e) => set("logo_url", e.target.value)} placeholder="https://…" /></label>
         {settings.logo_url && <div className="sm:col-span-2"><p className="mb-2 text-xs text-foreground-muted">Vista previa del logo</p>{/* eslint-disable-next-line @next/next/no-img-element -- vista previa de una URL de logo que escribe el usuario; next/image exigiría declarar cada dominio. */}
           <img src={settings.logo_url} alt={`Logo de ${settings.nombre}`} className="max-h-24 max-w-64 object-contain" /></div>}
+        <label className="text-sm font-medium sm:col-span-2">URL del logo para correos<input type="url" className={input} value={settings.logo_correo_url} onChange={(e) => set("logo_correo_url", e.target.value)} placeholder={settings.logo_url || "https://…"} />
+          <span className="mt-1 block text-xs font-normal text-foreground-muted">Encabezado de los correos enviados. Si queda vacío, se usa la URL del logo.</span></label>
+        {settings.logo_correo_url && <div className="sm:col-span-2"><p className="mb-2 text-xs text-foreground-muted">Vista previa del logo para correos</p>{/* eslint-disable-next-line @next/next/no-img-element -- vista previa de una URL de logo que escribe el usuario; next/image exigiría declarar cada dominio. */}
+          <img src={settings.logo_correo_url} alt={`Logo de correos de ${settings.nombre}`} className="max-h-24 max-w-64 object-contain" /></div>}
         <label className="text-sm font-medium sm:col-span-2">Sitio web<input type="url" className={input} value={settings.sitio_web} onChange={(e) => set("sitio_web", e.target.value)} placeholder="https://…" /></label>
       </fieldset>
       <fieldset className="grid gap-4 rounded-lg border border-border bg-surface p-4 sm:grid-cols-2">
