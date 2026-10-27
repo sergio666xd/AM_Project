@@ -101,6 +101,7 @@ def emitir_notificacion_workflow(
     enlace_texto: str | None = None,
     enlace_url: str | None = None,
     excluir_canales: tuple[str, ...] = (),
+    registrar_omitida: bool = False,
 ) -> list[int]:
     if not plantilla_clave:
         raise ValueError("Toda notificación debe usar una plantilla persistida en la base de datos.")
@@ -120,7 +121,7 @@ def emitir_notificacion_workflow(
         excluded = {canal.upper() for canal in excluir_canales}
         canales = tuple(canal for canal in canales if canal.upper() not in excluded)
     if not canales:
-        if usuario.rol == models.RolUsuario.CLIENTE:
+        if usuario.rol == models.RolUsuario.CLIENTE or registrar_omitida:
             asunto_guardado, cuerpo_guardado = render_message(
                 db, plantilla_clave, variables or {}, canal="EMAIL",
                 link_label=enlace_texto, link_url=enlace_url,
@@ -147,7 +148,11 @@ def emitir_notificacion_workflow(
                     asunto=asunto_guardado,
                     cuerpo=cuerpo_guardado,
                     estado="OMITIDA",
-                    error="El canal obligatorio no está disponible para este contacto o plan.",
+                    error=(
+                        "El canal obligatorio no está disponible para este contacto o plan."
+                        if usuario.rol == models.RolUsuario.CLIENTE
+                        else "El usuario no tiene correo, WhatsApp ni Push habilitados para este aviso."
+                    ),
                 )
                 db.add(existente)
                 db.flush()

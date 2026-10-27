@@ -15,6 +15,7 @@ from app.firm_access import (
     lawyer_scope_id,
     require_roles,
 )
+from app.novedades_radicado import marcar_radicado_revisado
 from app.radicados import (
     iniciar_consulta_nuevo_radicado,
     obtener_o_vincular_radicado,
@@ -133,7 +134,10 @@ def obtener_radicado(
     usuario_actual: models.Usuario = Depends(security.obtener_usuario_actual),
     db: Session = Depends(get_db),
 ):
-    """Retorna un radicado visible con su historial de actuaciones autorizado."""
+    """Retorna un radicado visible con su historial de actuaciones autorizado.
+
+    Abrir el detalle es lo que quita el estado de actuaciones nuevas del usuario.
+    """
     limite = _limite_actuaciones_visibles(usuario_actual)
     radicado = (
         radicados_visibles(usuario_actual, db)
@@ -143,7 +147,10 @@ def obtener_radicado(
     )
     if not radicado:
         raise HTTPException(status_code=404, detail="Radicado no encontrado en tu alcance.")
-    return serializar_radicado(radicado, limite)
+    return {
+        **serializar_radicado(radicado, limite),
+        "actuaciones_nuevas_sin_revisar": marcar_radicado_revisado(db, usuario_actual, radicado.id),
+    }
 
 
 def serializar_radicado(radicado: models.Radicado, limite_actuaciones: int | None) -> dict:

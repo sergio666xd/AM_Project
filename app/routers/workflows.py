@@ -31,6 +31,7 @@ from app.reminder_workflow import (
     procesar_recordatorios_tareas,
 )
 from app.monthly_summary import enviar_resumen_mensual
+from app.novedades_radicado import registrar_novedades_radicado, ruta_detalle_radicado
 from app.whatsapp import enviar_mensaje_whatsapp
 from app.workflow_service import user_portal_url
 from app.web_push import send_web_push
@@ -323,12 +324,8 @@ def _cuerpo_novedades(secciones: list[dict]) -> str:
 def _url_radicado(usuario: models.Usuario, radicado_id: int, proceso_id: int | None = None) -> str:
     if usuario.rol == models.RolUsuario.CLIENTE:
         ruta = f"/gestion-procesos/cliente/procesos/{proceso_id}#radicado-{radicado_id}" if proceso_id else "/gestion-procesos/cliente/procesos"
-    elif usuario.rol == models.RolUsuario.ABOGADO:
-        ruta = f"/gestion-procesos/dashboard/radicados/{radicado_id}"
-    elif usuario.rol == models.RolUsuario.ADMIN:
-        ruta = f"/gestion-procesos/admin/radicados?detalle={radicado_id}"
     else:
-        ruta = f"/gestion-procesos/abogado/radicados/{radicado_id}"
+        ruta = ruta_detalle_radicado(usuario, radicado_id)
     return user_portal_url(usuario, ruta)
 
 
@@ -458,7 +455,38 @@ def preparar_notificaciones_actuaciones(
             if link.proceso and link.proceso.archivado_en is None
         ]
         lawyers = abogados_notificables_para_radicado(radicado)
+        if not lawyers:
+            logger.warning(
+                "El radicado %s tiene %s actuación(es) nueva(s) pero ningún abogado activo a quien avisar.",
+                radicado.id, len(nuevas),
+            )
         for lawyer in lawyers:
+            if (
+                not canales_habilitados(lawyer, "ACTUACIONES", emisor=lawyer, db=db)
+                and not db.query(models.ChatPushSubscription.id).filter_by(usuario_id=lawyer.id).first()
+            ):
+                # Sin correo, WhatsApp ni Push el aviso queda registrado como omitido,
+                # para que el intento sea visible en Alertas.
+                omitida = _cuerpo_novedades([{
+                    "proceso": processes[0].nombre if processes else None,
+                    "radicado": radicado.numero,
+                    "detalle_url": _url_radicado(lawyer, radicado.id),
+                    "actuaciones": {actuacion["id"]: actuacion for actuacion in nuevas},
+                }])
+                emitir_notificacion_workflow(
+                    db,
+                    lawyer,
+                    "ACTUACIONES",
+                    f"ACTUACIONES:{ejecucion.id}:{radicado.id}",
+                    "Novedades judiciales",
+                    omitida,
+                    emisor=lawyer,
+                    iniciar_workflow=False,
+                    actuacion_ids=[actuacion["id"] for actuacion in nuevas],
+                    plantilla_clave="ACTUACIONES_DIGEST",
+                    variables={"nombre": lawyer.nombre_completo, "novedades": omitida},
+                    registrar_omitida=True,
+                )
             if processes:
                 for proceso in processes:
                     for actuacion in nuevas:
@@ -1207,6 +1235,7 @@ def ejecutar_consulta_barrido_radicado(
         consulta.estado = "COMPLETADA"
         consulta.finalizacion = ahora
         consulta.actuaciones_nuevas = resultado_radicado.actuaciones_nuevas
+        registrar_novedades_radicado(db, radicado, resultado_radicado.actuaciones_nuevas)
         consulta.detalle = (
             DETALLE_RECONCILIACION_COMPLETA
             if resultado.get("reconciliacion_completa")

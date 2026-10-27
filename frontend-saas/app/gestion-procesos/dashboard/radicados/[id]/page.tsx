@@ -44,6 +44,7 @@ interface RadicadoDetalle {
   consultado_en: string;
   alerta_enviada: boolean;
   detalle_pendiente: string;
+  actuaciones_nuevas_sin_revisar?: number;
   actuaciones: Actuacion[];
 }
 
@@ -347,6 +348,26 @@ export default function DetalleRadicadoPage() {
 
     return actuaciones;
   }, [actuacionesRadicado, ordenActuaciones]);
+
+  /*
+   * Actuaciones nuevas desde la última vez que el usuario abrió el
+   * detalle: son las de menor "orden" (orden 1 = la más reciente).
+   * Abrir el detalle es lo que quita el aviso de "actuaciones nuevas".
+   */
+
+  const idsActuacionesNuevas = useMemo(() => {
+    const cantidad = radicado?.actuaciones_nuevas_sin_revisar ?? 0;
+    if (!actuacionesRadicado?.length || cantidad <= 0) {
+      return new Set<number>();
+    }
+
+    return new Set(
+      [...actuacionesRadicado]
+        .sort((a, b) => a.orden - b.orden)
+        .slice(0, cantidad)
+        .map((act) => act.id)
+    );
+  }, [actuacionesRadicado, radicado?.actuaciones_nuevas_sin_revisar]);
 
   /*
    * ============================================================
@@ -792,6 +813,13 @@ export default function DetalleRadicadoPage() {
 
                 <p className="mt-1 text-sm text-[var(--foreground-muted)]">
                   Registro de actuaciones asociadas al proceso.
+                  {idsActuacionesNuevas.size > 0 && (
+                    <span className="ml-1 font-medium text-red-700 dark:text-red-400">
+                      {idsActuacionesNuevas.size === 1
+                        ? "1 actuación nueva desde tu última revisión."
+                        : `${idsActuacionesNuevas.size} actuaciones nuevas desde tu última revisión.`}
+                    </span>
+                  )}
                 </p>
               </div>
 
@@ -902,6 +930,12 @@ export default function DetalleRadicadoPage() {
                         {/* Actuación */}
                         <td className="max-w-[260px] px-4 py-4 align-top">
                           <div className="flex flex-col items-start gap-2">
+                            {idsActuacionesNuevas.has(act.id) && (
+                              <span className="rounded-full border border-red-500/20 bg-red-500/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-red-700 dark:text-red-400">
+                                Nueva
+                              </span>
+                            )}
+
                             <span className="break-words text-sm font-medium text-[var(--foreground)]">
                               {act.actuacion ||
                                 "No registrada"}

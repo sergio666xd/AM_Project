@@ -76,6 +76,9 @@ function greeting() {
 /** Une las alertas del panel y las actuaciones recientes en una sola bandeja ordenada por urgencia. */
 function buildInbox(dashboard: FirmDashboardData): InboxItem[] {
   const items: InboxItem[] = dashboard.atencion.map((item, index) => {
+    if (item.tipo === "RADICADO") {
+      return { key: `r-${index}`, kind: "Actuaciones nuevas", icon: Gavel, tone: "danger", title: item.titulo, context: item.descripcion, date: item.fecha, href: item.href, action: "Ver actuaciones", primary: true, rank: 0 };
+    }
     if (item.tipo === "TAREA") {
       const overdue = item.descripcion === "Vencida";
       return { key: `t-${index}`, kind: overdue ? "Tarea vencida" : "Vence pronto", icon: AlarmClock, tone: overdue ? "danger" : "warning", title: item.titulo, context: item.descripcion, date: item.fecha, href: item.href, action: "Abrir tarea", primary: overdue, rank: overdue ? 0 : 2 };

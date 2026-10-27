@@ -514,6 +514,7 @@ class RadicadoOut(BaseModel):
     consultado_en: str
     alerta_enviada: bool
     detalle_pendiente: str
+    actuaciones_nuevas_sin_revisar: int = 0
     actuaciones: list[ActuacionOut] = []
 
     model_config = ConfigDict(from_attributes=True)
