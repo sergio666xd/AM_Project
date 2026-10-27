@@ -95,7 +95,6 @@ const sections: NavSection[] = [
     items: [
       { label: "Usuarios", href: "/gestion-procesos/admin/usuarios", icon: Users },
       { label: "Solicitudes de perfil", href: "/gestion-procesos/admin/solicitudes-perfil", icon: UserRound },
-      { label: "Registros pendientes", href: "/gestion-procesos/admin/solicitudes", icon: UserCheck },
       { label: "Chat del equipo", href: "/gestion-procesos/admin/chat", icon: MessageCircle },
     ],
   },
@@ -118,8 +117,9 @@ const sections: NavSection[] = [
     ],
   },
   {
-    title: "SaaS heredado",
+    title: "Heredado (solo consulta)",
     items: [
+      { label: "Registros pendientes", href: "/gestion-procesos/admin/solicitudes", icon: UserCheck },
       { label: "Planes", href: "/gestion-procesos/admin/planes", icon: CreditCard },
       { label: "Procesos SaaS", href: "/gestion-procesos/admin/saas/procesos", icon: FolderOpen },
       { label: "Radicados SaaS", href: "/gestion-procesos/admin/saas/radicados", icon: Scale },
@@ -182,7 +182,7 @@ function NavSection({ section, pathname, onNavigate }: { section: NavSection; pa
       <button
         type="button"
         onClick={() => setOpen((prev) => !prev)}
-        className="flex w-full items-center gap-1 px-3 pb-1 pt-5 text-[11px] font-semibold uppercase tracking-wider text-foreground-muted hover:text-foreground-secondary"
+        className="flex min-h-9 w-full items-center gap-1 px-3 pt-3 text-[11px] font-semibold uppercase tracking-[0.14em] text-white/40 hover:text-white/70"
       >
         <ChevronRight className={`size-3 transition-transform ${open ? "rotate-90" : ""}`} />
         {section.title}
@@ -204,43 +204,40 @@ function NavSection({ section, pathname, onNavigate }: { section: NavSection; pa
                     if (isCMS) { event.preventDefault(); window.location.assign(item.href); }
                   }}
                   aria-current={active ? "page" : undefined}
-                  className={`group relative flex items-center gap-3 rounded-[var(--radius-md)] px-3 py-2 text-[13px] font-medium transition-all ${
+                  className={`group relative flex min-h-10 items-center gap-3 rounded-[var(--radius-md)] px-3 text-sm font-medium transition-colors ${
                     active
-                      ? "bg-brand-900 text-white font-semibold shadow-xs dark:bg-brand-800 dark:text-white dark:ring-1 dark:ring-brand-700/50"
-                      : "text-foreground-secondary hover:bg-surface-hover hover:text-foreground"
+                      ? "bg-white/[0.12] font-semibold text-white"
+                      : "text-white/70 hover:bg-white/[0.06] hover:text-white"
                   }`}
                 >
                   {active && (
                     <span
-                      className="absolute left-0 top-1.5 bottom-1.5 w-1 rounded-r-full bg-gold-400"
+                      className="absolute left-0 top-2 bottom-2 w-[3px] rounded-r-full bg-gold-400"
                       aria-hidden="true"
                     />
                   )}
                   <Icon
-                    className={`size-4 shrink-0 transition-colors ${
-                      active ? "text-gold-400 dark:text-gold-300" : "text-foreground-muted group-hover:text-foreground"
-                    }`}
+                    className={`size-[18px] shrink-0 transition-colors ${active ? "text-gold-400" : "text-white/60 group-hover:text-white"}`}
                     aria-hidden="true"
                   />
                   <span className="truncate">{item.label}</span>
-                  {active && <ChevronRight className="ml-auto size-3.5 text-gold-400/80 dark:text-gold-300/80" />}
                 </Link>
 
                 {/* Sub-navigation for Operations */}
                 {item.href === "/gestion-procesos/admin/operacion" && (pathname.startsWith("/gestion-procesos/admin/operacion") || pathname.startsWith("/operacion")) && (
-                  <div className="ml-5 space-y-0.5 border-l-2 border-brand-200 dark:border-brand-800 py-1 pl-3">
+                  <div className="ml-5 space-y-0.5 border-l border-white/15 py-1 pl-3">
                     {operationsChildren.map(({ label, href: childHref, icon: ChildIcon }) => {
                       const childActive2 = normalizePath(pathname) === normalizePath(childHref);
                       return (
                         <Link key={childHref} href={childHref} onClick={onNavigate}
                           aria-current={childActive2 ? "page" : undefined}
-                          className={`group flex items-center gap-2 rounded-[var(--radius-sm)] px-2.5 py-1.5 text-xs font-medium transition-all ${
+                          className={`group flex min-h-9 items-center gap-2 rounded-[var(--radius-sm)] px-2.5 text-[13px] font-medium transition-colors ${
                             childActive2
-                              ? "bg-brand-900 text-white font-semibold shadow-xs dark:bg-brand-800 dark:text-white"
-                              : "text-foreground-muted hover:bg-surface-hover hover:text-foreground-secondary"
+                              ? "bg-white/[0.12] font-semibold text-white"
+                              : "text-white/60 hover:bg-white/[0.06] hover:text-white"
                           }`}
                         >
-                          <ChildIcon className={`size-3.5 shrink-0 ${childActive2 ? "text-gold-400 dark:text-gold-300" : "text-foreground-muted group-hover:text-foreground-secondary"}`} />
+                          <ChildIcon className={`size-3.5 shrink-0 ${childActive2 ? "text-gold-400" : "text-white/50 group-hover:text-white"}`} />
                           <span className="truncate">{label}</span>
                         </Link>
                       );
@@ -306,28 +303,26 @@ export default function AdminConsoleShell({ children }: { children: ReactNode })
     return (
       <>
         {/* Brand header */}
-        <div className="flex h-[var(--header-height)] items-center justify-between border-b border-border px-4">
+        <div className="flex h-[var(--header-height)] items-center justify-between px-4">
           <Link href="/gestion-procesos/admin" className="flex items-center gap-2 min-w-0">
-            <Image src={logoSrc} alt="AM Abogada" width={130} height={34} className="h-7 w-auto shrink-0" />
+            <Image src="/AM_logo_Full_White.svg" alt="Alejandra Muñoz | Administración" width={36} height={36} className="size-9 shrink-0" />
             {!collapsed && (
-              <span className="rounded-[var(--radius-sm)] bg-brand-900 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-white">
-                Admin
-              </span>
+              <span className="min-w-0 leading-tight"><span className="block truncate font-display text-[17px] text-white">Alejandra Muñoz</span><span className="block truncate text-[10px] font-semibold uppercase tracking-[0.14em] text-gold-400">Administración</span></span>
             )}
           </Link>
           <button
             type="button"
             aria-label="Cerrar menú"
             onClick={() => setMobileOpen(false)}
-            className="grid size-8 place-items-center rounded-[var(--radius-sm)] text-foreground-muted hover:bg-surface-hover md:hidden"
+            className="grid size-11 place-items-center rounded-[var(--radius-md)] text-white/70 hover:bg-white/10 md:hidden"
           >
-            <X className="size-4" />
+            <X className="size-5" />
           </button>
           <button
             type="button"
             aria-label={collapsed ? "Expandir sidebar" : "Colapsar sidebar"}
             onClick={() => setCollapsed((prev) => !prev)}
-            className="hidden size-8 place-items-center rounded-[var(--radius-sm)] text-foreground-muted hover:bg-surface-hover md:grid"
+            className="hidden size-9 place-items-center rounded-[var(--radius-sm)] text-white/60 hover:bg-white/10 hover:text-white md:grid"
           >
             {collapsed ? <PanelLeftOpen className="size-4" /> : <PanelLeftClose className="size-4" />}
           </button>
@@ -347,17 +342,17 @@ export default function AdminConsoleShell({ children }: { children: ReactNode })
                   aria-current={active ? "page" : undefined}
                   className={`group relative flex size-10 mx-auto items-center justify-center rounded-[var(--radius-md)] transition-all ${
                     active
-                      ? "bg-brand-900 text-white font-semibold shadow-xs dark:bg-brand-800 dark:text-white"
-                      : "text-foreground-secondary hover:bg-surface-hover hover:text-foreground"
+                      ? "bg-white/[0.12] text-white"
+                      : "text-white/60 hover:bg-white/[0.06] hover:text-white"
                   }`}
                 >
                   {active && (
                     <span
-                      className="absolute left-0 top-1.5 bottom-1.5 w-1 rounded-r-full bg-gold-400"
+                      className="absolute left-0 top-2 bottom-2 w-[3px] rounded-r-full bg-gold-400"
                       aria-hidden="true"
                     />
                   )}
-                  <Icon className={`size-4 ${active ? "text-gold-400 dark:text-gold-300" : "text-foreground-muted group-hover:text-foreground"}`} />
+                  <Icon className={`size-[18px] ${active ? "text-gold-400" : ""}`} />
                 </Link>
               );
             })}
@@ -371,28 +366,28 @@ export default function AdminConsoleShell({ children }: { children: ReactNode })
         )}
 
         {/* User section */}
-        <div ref={userMenuRef} className="relative border-t border-border p-3">
+        <div ref={userMenuRef} className="relative border-t border-white/10 p-3">
           <button
             type="button"
             onClick={() => setUserMenuOpen((prev) => !prev)}
-            className="flex w-full items-center gap-3 rounded-[var(--radius-md)] px-2 py-2 text-left transition-colors hover:bg-surface-hover"
+            className="flex w-full items-center gap-3 rounded-[var(--radius-md)] px-2 py-2 text-left transition-colors hover:bg-white/[0.06]"
           >
-            <div className="grid size-8 shrink-0 place-items-center rounded-full bg-brand-900 text-xs font-bold text-white">
+            <div className="grid size-9 shrink-0 place-items-center rounded-full bg-white/10 text-xs font-bold text-white">
               {userInitials}
             </div>
             {!collapsed && (
               <>
                 <div className="min-w-0 flex-1">
-                  <p className="truncate text-sm font-semibold text-foreground">{user?.nombre_completo || "Administrador"}</p>
-                  <p className="truncate text-xs text-foreground-muted">Administrador</p>
+                  <p className="truncate text-sm font-semibold text-white">{user?.nombre_completo || "Administrador"}</p>
+                  <p className="truncate text-xs text-white/55">Administrador</p>
                 </div>
-                <ChevronDown className={`size-3.5 shrink-0 text-foreground-muted transition-transform ${userMenuOpen ? "rotate-180" : ""}`} />
+                <ChevronDown className={`size-3.5 shrink-0 text-white/50 transition-transform ${userMenuOpen ? "rotate-180" : ""}`} />
               </>
             )}
           </button>
 
           {userMenuOpen && (
-            <div className="absolute bottom-full left-3 right-3 mb-2 overflow-hidden rounded-[var(--radius-lg)] border border-border bg-surface shadow-md">
+            <div className="absolute bottom-full left-3 right-3 mb-2 overflow-hidden rounded-[var(--radius-lg)] border border-border bg-surface text-foreground shadow-lg">
               <div className="border-b border-border px-4 py-3">
                 <p className="text-sm font-semibold text-foreground">{user?.nombre_completo || "Administrador"}</p>
                 {user?.email && <p className="mt-0.5 truncate text-xs text-foreground-muted">{user.email}</p>}
@@ -449,7 +444,7 @@ export default function AdminConsoleShell({ children }: { children: ReactNode })
 
       {/* Sidebar */}
       <aside
-        className={`fixed inset-y-0 left-0 z-50 flex ${sidebarWidth} flex-col border-r border-border bg-surface transition-all duration-200 ${
+        className={`fixed inset-y-0 left-0 z-50 flex ${sidebarWidth} flex-col bg-nav text-white transition-all duration-200 ${
           mobileOpen ? "translate-x-0" : "-translate-x-full md:translate-x-0"
         }`}
       >

@@ -53,7 +53,7 @@ export function StatCard({
       )}
       <div className="min-w-0 flex-1">
         <p className="text-xs font-medium leading-snug text-foreground-muted">{label}</p>
-        <p className="mt-0.5 text-xl font-bold tracking-tight text-foreground">{value}</p>
+        <p className="mt-0.5 font-display text-[26px] font-medium leading-tight tabular-nums text-foreground">{value}</p>
         {detail && (
           <p className="mt-0.5 text-xs text-foreground-muted">{detail}</p>
         )}

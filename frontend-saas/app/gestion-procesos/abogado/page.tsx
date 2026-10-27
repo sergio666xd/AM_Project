@@ -25,6 +25,7 @@ import TaskMonthCalendar, { type CalendarTask } from "@/components/calendar/Task
 import { PageHeader } from "@/components/ui/PageHeader";
 import { StatCard } from "@/components/ui/StatCard";
 import { Button } from "@/components/ui/Button";
+import { HoyPanel, type FirmDashboardData } from "@/components/lawyer/HoyPanel";
 
 
 interface SummaryData {
@@ -51,13 +52,6 @@ interface SaasDashboardData {
     actuaciones_nuevas: number;
     inicio: string | null;
   }[];
-}
-
-interface FirmDashboardData {
-  resumen: { procesos_activos: number; tareas_pendientes: number; tareas_vencidas: number; documentos_pendientes: number; solicitudes_clientes: number; consultas_con_error: number; proximos_eventos: number; procesos_sin_actividad: number; procesos_sin_responsable: number };
-  atencion: { tipo: string; titulo: string; descripcion: string; fecha?: string | null; href: string }[];
-  actividad_reciente: { id: string; tipo: string; titulo: string; descripcion: string; actor?: string | null; proceso: string; fecha: string; href: string; visibilidad: string }[];
-  acciones: { label: string; href: string }[];
 }
 
 async function requestOverview(isSaasLawyer: boolean) {
@@ -232,6 +226,19 @@ export default function AbogadoPage() {
           Cargando panel...
         </div>
       </div>
+    );
+  }
+
+  const isEmptyFirm = data.processes === 0 && data.clients === 0 && data.tasks === 0;
+  if (!isSaasLawyer && firmDashboard && !isEmptyFirm && !error) {
+    return (
+      <HoyPanel
+        dashboard={firmDashboard}
+        firstName={user?.nombre_completo?.split(" ")[0] || ""}
+        calendarTasks={calendarTasks}
+        loading={loading}
+        onReload={() => void load()}
+      />
     );
   }
 
