@@ -28,15 +28,15 @@ export function PageHeader({
     <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
       <div className="min-w-0">
         {overline && (
-          <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-brand-700">
+          <p className="mb-1 text-xs font-semibold uppercase tracking-[0.12em] text-gold-600 dark:text-gold-400">
             {overline}
           </p>
         )}
-        <h1 className="text-2xl font-bold tracking-tight text-foreground">
+        <h1 className="font-display text-[28px] font-medium leading-tight tracking-[-0.01em] text-foreground sm:text-[34px]">
           {title}
         </h1>
         {description && (
-          <p className="mt-1 text-sm text-foreground-muted">{description}</p>
+          <p className="mt-1 max-w-[62ch] text-[15px] text-foreground-secondary">{description}</p>
         )}
         {children}
       </div>

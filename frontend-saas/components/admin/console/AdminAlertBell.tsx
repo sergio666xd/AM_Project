@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { Bell, ExternalLink, X } from "lucide-react";
+import { Bell, CheckCheck, ExternalLink, Trash2 } from "lucide-react";
 import { fetchApi } from "@/lib/api";
 
 type AlertItem = {
@@ -22,16 +22,16 @@ type AlertItem = {
 export function AdminAlertBell({ token }: { token: string | null }) {
   const [items, setItems] = useState<AlertItem[]>([]);
   const [open, setOpen] = useState(false);
-  const [discarding, setDiscarding] = useState(false);
-  const [actionMessage, setActionMessage] = useState("");
+  const [marking, setMarking] = useState(false);
   const [actionError, setActionError] = useState("");
   const rootRef = useRef<HTMLDivElement>(null);
 
   const refresh = useCallback(async () => {
     if (!token || document.visibilityState !== "visible") return;
     try {
-      const alerts: AlertItem[] = await fetchApi("/api/admin/alertas?limite=5", { method: "GET", token });
-      setItems(alerts.filter((item) => item.estado !== "ELIMINADA"));
+      // La campana solo muestra alertas activas; atendidas y descartadas quedan en el centro de notificaciones.
+      const alerts: AlertItem[] = await fetchApi("/api/admin/alertas?limite=5&solo_activas=true", { method: "GET", token });
+      setItems(alerts);
     } catch {
       // The bell is a convenience; the alerts page reports loading errors.
     }
@@ -58,30 +58,45 @@ export function AdminAlertBell({ token }: { token: string | null }) {
     };
   }, [refresh, token]);
 
-  async function discardAll() {
+  // Marcar como leídas limpia el contador. Descartar o atender se hace desde el
+  // centro de notificaciones, porque los errores deben resolverse en su recurso.
+  async function markAllRead() {
     if (!token) return;
-    setDiscarding(true);
-    setActionMessage("");
+    setMarking(true);
     setActionError("");
     try {
-      const alerts: AlertItem[] = await fetchApi("/api/admin/alertas", { method: "GET", token });
-      const discardable = alerts.filter((item) => item.estado === "ACTIVA" && item.descartable);
-      if (!discardable.length) {
-        setActionMessage("No hay alertas activas que se puedan descartar.");
-        return;
-      }
-      if (!window.confirm("Descartar las " + discardable.length + " alertas que permiten esta accion?")) return;
-      await fetchApi("/api/admin/alertas/acciones", {
-        method: "POST", token,
-        body: JSON.stringify({ alerta_ids: discardable.map((item) => item.id), estado: "DESCARTADA" }),
-      });
-      const pendientesNoDescartables = alerts.filter((item) => item.estado === "ACTIVA" && !item.descartable).length;
-      setActionMessage(discardable.length + " alertas descartadas." + (pendientesNoDescartables ? " " + pendientesNoDescartables + " deben resolverse desde su recurso." : ""));
+      await fetchApi("/api/admin/notificaciones/leer-todas", { method: "POST", token });
+      setItems((current) => current.map((alert) => ({ ...alert, leida: true })));
+    } catch {
+      setActionError("No fue posible marcar las alertas como leídas.");
+    } finally {
+      setMarking(false);
+    }
+  }
+
+  // Borrar marca la alerta como eliminada: deja de verse aquí y en el centro de notificaciones.
+  async function removeAlerts(ids: string[]) {
+    if (!token || !ids.length) return;
+    setMarking(true);
+    setActionError("");
+    try {
+      await fetchApi("/api/admin/alertas/acciones", { method: "POST", token, body: JSON.stringify({ alerta_ids: ids, estado: "ELIMINADA" }) });
       await refresh();
     } catch {
-      setActionError("No fue posible descartar las alertas.");
+      setActionError("No fue posible borrar las alertas.");
     } finally {
-      setDiscarding(false);
+      setMarking(false);
+    }
+  }
+
+  async function removeAll() {
+    if (!token) return;
+    try {
+      const alerts: AlertItem[] = await fetchApi("/api/admin/alertas?solo_activas=true", { method: "GET", token });
+      if (!alerts.length || !window.confirm(`¿Borrar las ${alerts.length} alertas activas?`)) return;
+      await removeAlerts(alerts.map((item) => item.id));
+    } catch {
+      setActionError("No fue posible borrar las alertas.");
     }
   }
 
@@ -97,17 +112,16 @@ export function AdminAlertBell({ token }: { token: string | null }) {
 
   return (
     <div className="relative" ref={rootRef}>
-      <button type="button" aria-label="Abrir alertas recientes" aria-expanded={open} aria-haspopup="dialog" onClick={() => setOpen((current) => !current)} className="relative grid size-10 place-items-center rounded-lg border border-border text-foreground-secondary hover:bg-surface-hover">
+      <button type="button" aria-label="Abrir alertas activas" aria-expanded={open} aria-haspopup="dialog" onClick={() => setOpen((current) => !current)} className="relative grid size-10 place-items-center rounded-lg border border-border text-foreground-secondary hover:bg-surface-hover">
         <Bell className="size-5" />
         {unreadCount > 0 && <span className="absolute -right-1 -top-1 grid min-h-5 min-w-5 place-items-center rounded-full bg-danger px-1 text-[10px] font-bold text-white">{unreadCount}</span>}
       </button>
-      {open && <section role="dialog" aria-label="Alertas recientes" className="absolute right-0 top-12 z-50 w-[min(24rem,calc(100vw-2rem))] overflow-hidden rounded-xl border border-border bg-surface shadow-xl">
-        <header className="flex items-center justify-between border-b border-border px-4 py-3"><div><h2 className="text-sm font-semibold">Alertas recientes</h2><p className="text-xs text-foreground-muted">Las cinco mas recientes</p></div><button type="button" disabled={discarding} onClick={() => void discardAll()} className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs font-medium hover:bg-surface-hover disabled:opacity-50"><X className="size-3.5" />{discarding ? "Procesando" : "Descartar todas"}</button></header>
+      {open && <section role="dialog" aria-label="Alertas activas" className="absolute right-0 top-12 z-50 w-[min(24rem,calc(100vw-2rem))] overflow-hidden rounded-xl border border-border bg-surface shadow-xl">
+        <header className="flex items-center justify-between gap-3 border-b border-border px-4 py-3"><div className="min-w-0"><h2 className="text-sm font-semibold">Alertas activas</h2><p className="truncate text-xs text-foreground-muted">Las 5 más recientes</p></div><div className="flex shrink-0 items-center gap-1">{unreadCount > 0 && <button type="button" disabled={marking} onClick={() => void markAllRead()} className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-md px-2 py-1 text-xs font-medium text-primary hover:bg-surface-hover disabled:opacity-50"><CheckCheck className="size-3.5" aria-hidden="true" />Marcar leídas</button>}{items.length > 0 && <button type="button" disabled={marking} onClick={() => void removeAll()} className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-md px-2 py-1 text-xs font-medium text-danger hover:bg-danger-light disabled:opacity-50"><Trash2 className="size-3.5" aria-hidden="true" />Borrar todas</button>}</div></header>
         {actionError && <p role="alert" className="px-4 pt-2 text-xs text-danger">{actionError}</p>}
-        {actionMessage && <p role="status" className="px-4 pt-2 text-xs text-foreground-muted">{actionMessage}</p>}
         {items.length ? <ul className="max-h-96 divide-y divide-border overflow-y-auto">
-          {items.map((item) => <li key={item.id}><Link href={item.href} onClick={() => { void markRead(item); setOpen(false); }} className={`block px-4 py-3 hover:bg-surface-hover ${item.leida ? "opacity-70" : "bg-brand-50"}`}><span className="flex items-center justify-between gap-2"><span className="line-clamp-2 text-sm font-medium">{item.descripcion}</span><ExternalLink className="size-3.5 shrink-0 text-foreground-muted" /></span><span className="mt-1 flex justify-between gap-2 text-xs text-foreground-muted"><span>{item.categoria} · {item.estado === "ACTIVA" ? item.tipo : item.estado === "ATENDIDA" ? "Atendida" : "Descartada"} · {item.prioridad}</span><span>{item.fecha ? new Date(item.fecha).toLocaleDateString("es-CO", { timeZone: "America/Bogota" }) : ""}</span></span></Link></li>)}
-        </ul> : <p className="px-4 py-8 text-center text-sm text-foreground-muted">No hay alertas recientes.</p>}
+          {items.map((item) => <li key={item.id} className="group relative"><Link href={item.href} onClick={() => { void markRead(item); setOpen(false); }} className={`block py-3 pl-4 pr-12 hover:bg-surface-hover ${item.leida ? "opacity-70" : "bg-brand-50"}`}><span className="flex items-center gap-2"><span className="line-clamp-2 text-sm font-medium">{item.descripcion}</span><ExternalLink className="size-3.5 shrink-0 text-foreground-muted" /></span><span className="mt-1 flex justify-between gap-2 text-xs text-foreground-muted"><span className="capitalize">{item.categoria} · {item.tipo} · {item.prioridad}</span><span>{item.fecha ? new Date(item.fecha).toLocaleDateString("es-CO", { timeZone: "America/Bogota" }) : ""}</span></span></Link><button type="button" disabled={marking} onClick={() => void removeAlerts([item.id])} aria-label={`Borrar alerta: ${item.descripcion}`} title="Borrar" className="absolute right-2 top-2.5 grid size-8 place-items-center rounded-md text-foreground-muted hover:bg-danger-light hover:text-danger disabled:opacity-50"><Trash2 className="size-4" aria-hidden="true" /></button></li>)}
+        </ul> : <p className="px-4 py-8 text-center text-sm text-foreground-muted">No hay alertas activas.</p>}
         <Link href="/gestion-procesos/admin/notificaciones" onClick={() => setOpen(false)} className="block border-t border-border px-4 py-3 text-center text-sm font-semibold text-primary hover:bg-surface-hover">Abrir centro de notificaciones</Link>
       </section>}
     </div>

@@ -49,8 +49,9 @@ export default function AppShell({
               >
                 <Menu aria-hidden="true" className="size-5" />
               </button>
-              <Image src="/AM_logo_Full_Black.svg" alt="AM" width={120} height={32} className="h-6 w-auto dark:hidden" />
-              <Image src="/AM_logo_Full_White.svg" alt="AM" width={120} height={32} className="hidden h-6 w-auto dark:block" />
+              <Image src="/AM_logo_Full_Black.svg" alt="" width={32} height={32} className="size-8 dark:hidden" />
+              <Image src="/AM_logo_Full_White.svg" alt="" width={32} height={32} className="hidden size-8 dark:block" />
+              <span className="truncate font-display text-[17px] text-foreground">Alejandra Muñoz</span>
             </div>
             <div className="hidden min-w-0 md:block"><Breadcrumbs /></div>
             <GlobalSearch />

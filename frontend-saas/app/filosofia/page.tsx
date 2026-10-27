@@ -25,7 +25,7 @@ export default async function Filosofia() {
               <span className="inline-block text-xs font-bold uppercase tracking-widest text-gold-400">
                 {renderRichText(content.eyebrow)}
               </span>
-              <h1 className="text-3xl sm:text-4xl lg:text-5xl font-bold tracking-tight text-white leading-tight">
+              <h1 className="text-3xl sm:text-4xl lg:text-5xl font-display font-medium tracking-[-0.01em] text-white leading-tight">
                 {renderRichText(content.title)}
               </h1>
               <p className="text-lg sm:text-xl leading-relaxed text-neutral-300">
@@ -39,7 +39,7 @@ export default async function Filosofia() {
                   <span className="text-xs font-bold uppercase tracking-widest text-gold-400">
                     {renderRichText(value.number)}
                   </span>
-                  <h2 className="text-xl sm:text-2xl font-bold text-white">
+                  <h2 className="text-xl sm:text-2xl font-display font-medium text-white">
                     {renderRichText(value.title)}
                   </h2>
                   <p className="text-sm leading-relaxed text-neutral-300">
@@ -57,7 +57,7 @@ export default async function Filosofia() {
             <span className="inline-block text-xs font-bold uppercase tracking-widest text-gold-600">
               {renderRichText(content.methodologyEyebrow)}
             </span>
-            <h2 className="text-3xl sm:text-4xl font-bold tracking-tight text-foreground">
+            <h2 className="text-3xl sm:text-4xl font-display font-medium tracking-[-0.01em] text-foreground">
               {renderRichText(content.methodologyTitle)}
             </h2>
             <p className="text-base text-foreground-muted">

@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Menu, type LucideIcon } from "lucide-react";
+import { MoreHorizontal, type LucideIcon } from "lucide-react";
 
 export type MobileTab = { label: string; href: string; icon: LucideIcon; badge?: number };
 
@@ -36,15 +36,14 @@ export function MobileTabBar({ tabs, homeHref }: { tabs: MobileTab[]; homeHref: 
               <Link
                 href={tab.href}
                 aria-current={active ? "page" : undefined}
-                className={`relative flex h-16 flex-col items-center justify-center gap-1 text-[11px] font-medium transition-colors ${
+                className={`relative flex h-16 flex-col items-center justify-center gap-1 text-[11px] font-semibold transition-colors ${
                   active ? "text-primary" : "text-foreground-muted active:text-foreground"
                 }`}
               >
-                {active && <span aria-hidden="true" className="absolute inset-x-5 top-0 h-0.5 rounded-b-full bg-gold-400" />}
-                <span className="relative">
+                <span className={`relative grid h-8 w-14 place-items-center rounded-full transition-colors ${active ? "bg-primary-light" : ""}`}>
                   <Icon aria-hidden="true" className="size-5" strokeWidth={active ? 2.25 : 1.75} />
                   {Boolean(tab.badge) && (
-                    <span className="absolute -right-2.5 -top-1.5 min-w-4 rounded-full bg-danger px-1 text-center text-[10px] font-bold leading-4 text-white">
+                    <span className="absolute right-2 -top-0.5 min-w-4 rounded-full bg-danger px-1 text-center text-[10px] font-bold leading-4 text-white">
                       {tab.badge! > 99 ? "99+" : tab.badge}
                     </span>
                   )}
@@ -58,9 +57,9 @@ export function MobileTabBar({ tabs, homeHref }: { tabs: MobileTab[]; homeHref: 
           <button
             type="button"
             onClick={() => window.dispatchEvent(new Event(OPEN_MOBILE_NAV_EVENT))}
-            className="flex h-16 w-full flex-col items-center justify-center gap-1 text-[11px] font-medium text-foreground-muted active:text-foreground"
+            className="flex h-16 w-full flex-col items-center justify-center gap-1 text-[11px] font-semibold text-foreground-muted active:text-foreground"
           >
-            <Menu aria-hidden="true" className="size-5" strokeWidth={1.75} />
+            <span className="grid h-8 w-14 place-items-center"><MoreHorizontal aria-hidden="true" className="size-5" strokeWidth={1.75} /></span>
             Más
           </button>
         </li>

@@ -12,11 +12,27 @@ export function homePathForRole(role: string) {
   return "/gestion-procesos/auth/login";
 }
 
+// Los despliegues de vista previa (*.vercel.app) no tienen subdominios de
+// portal: el sitio público queda en "/" y los paneles en sus rutas completas.
+export function isPreviewHost(hostname: string) {
+  return hostname.toLowerCase().endsWith(".vercel.app");
+}
+
+function previewPathForRole(role: string, destination: string) {
+  if (destination.startsWith("/gestion-procesos/")) return destination;
+  if (destination === "/login") return role === "ADMIN" ? "/gestion-procesos/auth/admin" : "/gestion-procesos/auth/login";
+  if (["/cambiar-password", "/recuperar-password", "/restablecer-password"].some((p) => destination.startsWith(p))) return destination;
+  const area = role === "ADMIN" ? "admin" : role === "ABOGADO_ADMIN" ? "abogado" : role === "ABOGADO" ? "dashboard" : role === "CLIENTE" ? "cliente" : "";
+  if (!area) return "/gestion-procesos/auth/login";
+  return destination === "/" ? `/gestion-procesos/${area}` : `/gestion-procesos/${area}${destination}`;
+}
+
 export function portalHrefForRole(role: string, path?: string) {
   const destination = path || homePathForRole(role);
   if (typeof window === "undefined") return destination;
 
   const hostname = window.location.hostname.toLowerCase();
+  if (isPreviewHost(hostname)) return previewPathForRole(role, destination);
   if (hostname.endsWith(".localhost")) {
     const localHost = role === "ADMIN" ? "admin.localhost" : "panel.localhost";
     if (hostname === localHost) return destination;

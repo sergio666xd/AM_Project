@@ -17,7 +17,7 @@ export function InterestForm() {
   function validate(value: string) {
     const cleanEmail = value.trim();
     if (!cleanEmail) return "Escriba su correo profesional para continuar.";
-    if (!validEmail.test(cleanEmail)) return "Ingrese un correo válido, por ejemplo nombre@firma.com.";
+    if (!validEmail.test(cleanEmail)) return "Ingrese un correo válido, por ejemplo nombre@correo.com.";
     return "";
   }
 
@@ -60,7 +60,7 @@ export function InterestForm() {
           onBlur={() => setError(validate(email))}
           aria-invalid={Boolean(error)}
           aria-describedby="lead-help lead-feedback"
-          placeholder="nombre@firma.com"
+          placeholder="nombre@correo.com"
           className={`min-h-11 min-w-0 flex-1 rounded-lg border bg-white px-4 py-3 text-[#002060] outline-none focus:ring-2 ${error ? "border-red-400 focus:ring-red-300" : "border-[#ccb56b] focus:ring-[#ccb56b]"}`}
         />
         <button type="submit" disabled={sending} className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg bg-[#ccb56b] px-5 py-3 font-bold text-[#002060] outline-none transition hover:bg-[#dcc982] focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-[#002060] disabled:cursor-not-allowed disabled:opacity-60">

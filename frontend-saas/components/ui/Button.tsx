@@ -20,9 +20,9 @@ const variants: Record<ButtonVariant, string> = {
 };
 
 const sizes: Record<ButtonSize, string> = {
-  sm: "min-h-8 gap-1.5 px-3 text-xs",
-  md: "min-h-10 gap-2 px-4 text-sm",
-  lg: "min-h-[46px] gap-2 px-5 text-sm",
+  sm: "min-h-9 gap-1.5 px-3 text-[13px]",
+  md: "min-h-11 gap-2 px-4 text-sm",
+  lg: "min-h-12 gap-2 px-5 text-[15px]",
 };
 
 export type ButtonProps = Omit<ButtonHTMLAttributes<HTMLButtonElement>, "size"> & {
