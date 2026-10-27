@@ -51,3 +51,7 @@ graphify-out/
 .codex/
 .github/*
 !.github/workflows/
+
+# Prototipo de diseño: el logo embebido se genera al compilar.
+diseno/prototipo/src/logo.js
+diseno/prototipo/out.css

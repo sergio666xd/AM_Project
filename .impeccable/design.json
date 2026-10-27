@@ -1,0 +1,235 @@
+{
+ "schemaVersion": 2,
+ "generatedAt": "2026-10-27T23:32:47.598541Z",
+ "title": "Design System: Gestión de procesos AM",
+ "extensions": {
+  "colorMeta": {
+   "navy": {
+    "role": "primary",
+    "displayName": "Logo Navy",
+    "tonalRamp": [
+     "#000f2e",
+     "#001645",
+     "#002060",
+     "#15326f",
+     "#3a5590",
+     "#6d84b5",
+     "#a9b8d8",
+     "#e5eaf4"
+    ]
+   },
+   "gold": {
+    "role": "secondary",
+    "displayName": "Logo Gold",
+    "tonalRamp": [
+     "#3a2e0c",
+     "#6f581b",
+     "#97803a",
+     "#ccb56b",
+     "#d9c68c",
+     "#e6d8ae",
+     "#f0e7cc",
+     "#f5eed6"
+    ]
+   },
+   "ground": {
+    "role": "neutral",
+    "displayName": "Manila Ground"
+   },
+   "manila": {
+    "role": "neutral",
+    "displayName": "Manila Cover"
+   },
+   "sheet": {
+    "role": "neutral",
+    "displayName": "Sheet"
+   },
+   "ink": {
+    "role": "neutral",
+    "displayName": "Ink"
+   }
+  },
+  "typographyMeta": {
+   "display": {
+    "displayName": "Display",
+    "purpose": "Page titles and the case name on the carátula."
+   },
+   "folio-numeral": {
+    "displayName": "Folio numeral",
+    "purpose": "Only inside folio stamps."
+   },
+   "radicado": {
+    "displayName": "Radicado",
+    "purpose": "23-digit radicados, segmented."
+   },
+   "body-client": {
+    "displayName": "Client reading size",
+    "purpose": "All client-portal text."
+   }
+  },
+  "darkTheme": {
+   "selector": ":root[data-theme=\"dark\"]",
+   "ground": "#0e1322",
+   "manila": "#1b2031",
+   "sheet": "#151b2c",
+   "ink": "#ece8dc",
+   "ink-2": "#bdbccb",
+   "ink-3": "#9a9db0",
+   "navy": "#8fa8de",
+   "gold": "#d4bf7c",
+   "gold-ink": "#dcc78a",
+   "gold-soft": "#2a2618",
+   "rail": "#0a1124"
+  },
+  "shadows": [
+   {
+    "name": "sheet",
+    "value": "0 1px 2px rgb(24 32 58 / 0.06), 0 4px 12px -4px rgb(24 32 58 / 0.08)",
+    "purpose": "Every content sheet."
+   },
+   {
+    "name": "pop",
+    "value": "0 2px 6px rgb(24 32 58 / 0.08), 0 16px 40px -12px rgb(24 32 58 / 0.22)",
+    "purpose": "Drawers, menus, command palette, toasts."
+   },
+   {
+    "name": "hairline-ring",
+    "value": "0 0 0 1px var(--line-strong)",
+    "purpose": "Secondary buttons and inputs; 2px navy on focus."
+   }
+  ],
+  "motion": [
+   {
+    "name": "ease-out-expo",
+    "value": "cubic-bezier(0.16, 1, 0.3, 1)",
+    "purpose": "Drawer/sheet entrance (280ms) and popovers (160ms)."
+   },
+   {
+    "name": "state",
+    "value": "150ms ease",
+    "purpose": "Button and input state changes; press scale 0.96."
+   },
+   {
+    "name": "folio-settle",
+    "value": "700ms ease-out",
+    "purpose": "A new folio stamp fading to neutral after review."
+   },
+   {
+    "name": "icon-swap",
+    "value": "cubic-bezier(0.2, 0, 0, 1)",
+    "purpose": "Copy icon to check cross-fade (scale 0.25→1, blur 4px→0)."
+   }
+  ],
+  "breakpoints": [
+   {
+    "name": "sm",
+    "value": "640px"
+   },
+   {
+    "name": "lg",
+    "value": "1024px",
+    "purpose": "Rail vs bottom bar; main/aside split."
+   }
+  ]
+ },
+ "components": [
+  {
+   "name": "Primary Button",
+   "kind": "button",
+   "refersTo": "button-primary",
+   "description": "Main action on a sheet or drawer.",
+   "html": "<button class=\"ds-btn-primary\">Avisar al cliente</button>",
+   "css": ".ds-btn-primary{background:var(--navy,#002060);color:var(--on-navy,#f4f1e8);height:40px;padding:0 14px;border:0;border-radius:8px;font:600 14px 'Public Sans',sans-serif;box-shadow:0 1px 0 rgb(255 255 255/.12) inset,0 1px 2px rgb(0 20 60/.25);transition:background-color 150ms,scale 150ms;cursor:pointer}.ds-btn-primary:hover{background:var(--navy-hover,#15326f)}.ds-btn-primary:active{scale:.96}.ds-btn-primary:focus-visible{outline:2px solid #002060;outline-offset:2px}"
+  },
+  {
+   "name": "Secondary Button",
+   "kind": "button",
+   "refersTo": "button-secondary",
+   "description": "Companion actions.",
+   "html": "<button class=\"ds-btn-secondary\">Crear tarea</button>",
+   "css": ".ds-btn-secondary{background:var(--sheet,#fff);color:var(--ink,#18203a);height:40px;padding:0 14px;border:0;border-radius:8px;font:600 14px 'Public Sans',sans-serif;box-shadow:0 0 0 1px var(--line-strong,#cdbf9c),0 1px 2px rgb(24 32 58/.06);transition:background-color 150ms,scale 150ms;cursor:pointer}.ds-btn-secondary:hover{background:var(--sheet-2,#fbf9f4)}.ds-btn-secondary:active{scale:.96}.ds-btn-secondary:focus-visible{outline:2px solid #002060;outline-offset:2px}"
+  },
+  {
+   "name": "Input",
+   "kind": "input",
+   "refersTo": "input",
+   "description": "Text field with hairline ring.",
+   "html": "<input class=\"ds-input\" placeholder=\"dd/mm/aaaa\">",
+   "css": ".ds-input{width:240px;height:40px;padding:0 12px;border:0;border-radius:8px;background:var(--sheet,#fff);color:var(--ink,#18203a);font:400 14px 'Public Sans',sans-serif;box-shadow:0 0 0 1px var(--line-strong,#cdbf9c);transition:box-shadow 150ms}.ds-input:focus{outline:none;box-shadow:0 0 0 2px var(--navy,#002060)}"
+  },
+  {
+   "name": "Folio Stamp",
+   "kind": "custom",
+   "refersTo": "folio-stamp",
+   "description": "The signature: every record carries its folio number.",
+   "html": "<span class=\"ds-folio\"><b>Fl.</b><span>87</span></span> <span class=\"ds-folio ds-folio-new\"><b>Fl.</b><span>88</span></span>",
+   "css": ".ds-folio{display:inline-flex;align-items:baseline;gap:4px;height:24px;padding:0 6px;border:1px solid var(--line-strong,#cdbf9c);border-radius:3px;color:var(--ink-3,#636b80);transition:background-color 700ms ease-out,border-color 700ms ease-out}.ds-folio b{font:600 9.5px 'Public Sans',sans-serif;text-transform:uppercase;letter-spacing:.06em;line-height:22px}.ds-folio span{font:600 15px Georgia,serif;font-variant-numeric:oldstyle-nums;line-height:22px}.ds-folio-new{background:var(--gold-soft,#f5eed6);border-color:var(--gold,#ccb56b);color:var(--gold-ink,#6f581b)}"
+  },
+  {
+   "name": "Tag",
+   "kind": "chip",
+   "refersTo": "tag-navy",
+   "description": "Area, class and status tags.",
+   "html": "<span class=\"ds-tag\">Civil</span> <span class=\"ds-tag ds-tag-navy\">Familia</span>",
+   "css": ".ds-tag{display:inline-flex;align-items:center;height:24px;padding:0 8px;border-radius:6px;background:var(--manila,#ece3cd);color:var(--ink-2,#454d63);font:600 12px 'Public Sans',sans-serif}.ds-tag-navy{background:var(--navy-soft,#e5eaf4);color:var(--navy-ink,#1d3a7a)}"
+  },
+  {
+   "name": "Carátula with tabs",
+   "kind": "card",
+   "refersTo": "caratula",
+   "description": "Manila folder cover with the active tab joined to the white sheet below.",
+   "html": "<div class=\"ds-car\"><h3>Sucesión intestada de Gloria Inés Restrepo</h3><div class=\"ds-tabs\"><span class=\"on\">Folios</span><span>Tareas</span></div></div><div class=\"ds-sheet\">Fl. 88 · Auto fija fecha de audiencia</div>",
+   "css": ".ds-car{background:var(--manila,#ece3cd);border:1px solid var(--manila-line,#d8caa6);border-bottom:0;border-radius:12px 12px 0 0;padding:20px 24px 0}.ds-car h3{margin:0 0 16px;font:400 24px Georgia,serif;color:var(--ink,#18203a)}.ds-tabs{display:flex;gap:4px}.ds-tabs span{position:relative;height:40px;line-height:40px;padding:0 14px;border-radius:8px 8px 0 0;font:600 14px 'Public Sans',sans-serif;color:var(--ink-2,#454d63)}.ds-tabs .on{background:var(--sheet,#fff);color:var(--ink,#18203a)}.ds-tabs .on:before{content:'';position:absolute;left:10px;right:10px;top:0;height:2px;background:var(--gold,#ccb56b)}.ds-sheet{background:var(--sheet,#fff);border:1px solid var(--manila-line,#d8caa6);border-top:0;border-radius:0 0 12px 12px;padding:16px 24px;font:400 15px 'Public Sans',sans-serif;color:var(--ink,#18203a)}"
+  },
+  {
+   "name": "Nav rail",
+   "kind": "nav",
+   "refersTo": "nav-rail",
+   "description": "Navy rail with grouped items; active item uses a lighter navy fill and gold icon.",
+   "html": "<nav class=\"ds-rail\"><a class=\"on\">Procesos</a><a>Clientes</a></nav>",
+   "css": ".ds-rail{display:flex;flex-direction:column;gap:2px;width:220px;padding:12px;background:var(--rail,#002060);border-radius:8px}.ds-rail a{height:40px;line-height:40px;padding:0 12px;border-radius:8px;font:500 14px 'Public Sans',sans-serif;color:#d5dbea;cursor:pointer}.ds-rail a:hover{background:rgb(255 255 255/.06)}.ds-rail a.on{background:var(--rail-active,#0f2d6b);color:#f4f1e8;font-weight:600}"
+  }
+ ],
+ "narrative": {
+  "northStar": "Expediente foliado",
+  "overview": "The app is a physical court file brought on screen. Every case is a folder: a manila carátula (cover) holds the case identity, white sheets hold the content, and every record in the file carries a folio number exactly as a Colombian expediente does. The lawyer reads the newest folios, acts on them, and moves on; the client reads the same file translated into plain language. Density is office-grade for the lawyer (desktop first, 15px body, tables) and generous for the client (17px reading size, one action per card).\n\nBrand lives in materials, not decoration. Navy and gold come from the firm's logo and stay within its range; Georgia, the logo's typeface, sets titles and folio numerals. Gold is rare on purpose: it marks what is new and what the firm is waiting for, nothing else.",
+  "keyCharacteristics": [
+   "Manila carátula + white sheet + navy rail as the three materials.",
+   "The folio stamp (`Fl. 88`) on every record, with old-style Georgia numerals.",
+   "Gold reserved for new folios, the active tab edge, and requests to the client.",
+   "Plain-language twin of every court text (\"Para el cliente: …\").",
+   "Light and dark themes from the same token names."
+  ],
+  "rules": [
+   {
+    "name": "The Gold Means Waiting Rule",
+    "body": "Gold appears only where something is new or where the firm awaits an action. If nothing is new, a screen has no gold except the active tab edge.",
+    "section": "colors"
+   },
+   {
+    "name": "The Logo Range Rule",
+    "body": "Navy and gold may shift in lightness for contrast or dark theme, but stay in the logo's hue range. The logo artwork itself is never altered; only its layout (landscape, reversed, emblem) changes.",
+    "section": "colors"
+   },
+   {
+    "name": "The Two Voices Rule",
+    "body": "Serif speaks for the file (titles, dates, folio numbers); sans speaks for the interface. Never set buttons, labels or body copy in Georgia.",
+    "section": "typography"
+   }
+  ],
+  "dos": [
+   "Do give every record in a case file a folio number, and keep folio numbers in Georgia old-style figures.",
+   "Do pair every court text shown to a client with a plain-language version.",
+   "Do write dates the Colombian way: \"martes 3 de noviembre\", \"27/10/2026\".",
+   "Do keep client actions to one obvious button per card, at 44px or taller.",
+   "Do use the reversed logo on navy and dark surfaces, the landscape logo on light ones, the emblem where space is tight."
+  ],
+  "donts": [
+   "Don't use gold for decoration, success states or generic emphasis.",
+   "Don't mark rows with coloured side stripes; use a tint or the stamp state.",
+   "Don't add uppercase kicker labels above titles or rows of KPI tiles.",
+   "Don't put ink-3 text on manila surfaces.",
+   "Don't alter the logo artwork or substitute another serif for Georgia in titles."
+  ]
+ }
+}
