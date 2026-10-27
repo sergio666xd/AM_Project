@@ -3,7 +3,7 @@
 from datetime import datetime, timezone
 
 from fastapi import APIRouter, Body, Depends, HTTPException, Query
-from sqlalchemy import or_
+from sqlalchemy import func, or_
 from sqlalchemy.orm import Session
 
 from app import models, schemas
@@ -76,7 +76,14 @@ def _alertas_admin(db: Session) -> list[dict]:
                 f"Documento pendiente: {solicitud.titulo}", solicitud.proceso.nombre,
                 "/gestion-procesos/admin/documentos", "Revisar documento")
 
-    consultas = db.query(models.ConsultaRadicado).filter(models.ConsultaRadicado.estado == "ERROR").all()
+    # Solo la consulta más reciente de cada radicado: si una consulta posterior
+    # terminó bien, el error anterior ya no es una alerta, y un radicado con
+    # varios fallos seguidos aparece una sola vez.
+    ultimas_consultas = db.query(func.max(models.ConsultaRadicado.id)).group_by(models.ConsultaRadicado.radicado_id)
+    consultas = db.query(models.ConsultaRadicado).filter(
+        models.ConsultaRadicado.id.in_(ultimas_consultas),
+        models.ConsultaRadicado.estado == "ERROR",
+    ).all()
     for consulta in consultas:
         numero = consulta.radicado.numero if consulta.radicado else "radicado"
         agregar(f"consulta:{consulta.id}", "Error", "Alta", consulta.finalizacion or consulta.inicio,
@@ -144,8 +151,11 @@ def listar_alertas_admin(
     db: Session = Depends(get_db),
     admin: models.Usuario = Depends(verificar_admin),
     limite: int | None = Query(default=None, ge=1, le=500),
+    solo_activas: bool = False,
 ):
     alertas = _alertas_admin(db)
+    if solo_activas:
+        alertas = [alerta for alerta in alertas if alerta["estado"] == "ACTIVA"]
     leidas = {registro.notificacion_id for registro in db.query(models.LecturaNotificacionAdmin).filter_by(usuario_id=admin.id).all()}
     for alerta in alertas:
         alerta["leida"] = alerta["id"] in leidas
