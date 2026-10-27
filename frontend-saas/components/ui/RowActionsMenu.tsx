@@ -159,14 +159,14 @@ export function RowActionsMenu<T>({
   const menu = open && typeof document !== "undefined"
     ? createPortal(
         isMobile ? (
-          <div className="fixed inset-0 z-[90] flex items-end bg-brand-950/40 backdrop-blur-[2px]" role="presentation" onClick={stopPropagation}>
+          <div className="motion-fade-in fixed inset-0 z-[90] flex items-end bg-brand-950/40 backdrop-blur-[2px]" role="presentation" onClick={stopPropagation}>
             <div
               ref={menuRef}
               id={menuId}
               role="menu"
               aria-label={label}
               onKeyDown={handleMenuKeyDown}
-              className="w-full rounded-t-[var(--radius-xl)] border-t border-border bg-surface pb-[max(env(safe-area-inset-bottom),12px)] pt-2 shadow-lg"
+              className="motion-sheet-in w-full rounded-t-[var(--radius-xl)] border-t border-border bg-surface pb-[max(env(safe-area-inset-bottom),12px)] pt-2 shadow-lg"
             >
               <div aria-hidden="true" className="mx-auto mb-2 h-1 w-10 rounded-full bg-border-strong" />
               <p className="px-4 pb-1 text-xs font-semibold uppercase tracking-wide text-foreground-muted">{label}</p>
@@ -189,7 +189,8 @@ export function RowActionsMenu<T>({
             }}
             className="fixed z-[90] overflow-hidden rounded-[var(--radius-lg)] border border-border bg-surface py-1 shadow-lg"
           >
-            {items}
+            {/* La animación va en un contenedor interno: el menú ya usa transform para abrirse hacia arriba. */}
+            <div className="motion-drop-in" style={{ transformOrigin: position.placement === "above" ? "bottom right" : "top right" }}>{items}</div>
           </div>
         ) : null,
         document.body,

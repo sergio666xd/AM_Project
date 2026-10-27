@@ -21,7 +21,7 @@ export function AttentionPanel({
 }) {
   if (items.length === 0) {
     return (
-      <div className="rounded-[var(--radius-lg)] border border-success/20 bg-success-light p-4">
+      <div className="motion-rise-in rounded-[var(--radius-lg)] border border-success/20 bg-success-light p-4">
         <p className="text-sm font-medium text-success">{emptyText}</p>
       </div>
     );
@@ -32,11 +32,11 @@ export function AttentionPanel({
       <header className="flex items-center gap-2 border-b border-warning/10 px-4 py-3">
         <Icon aria-hidden="true" className="size-4 text-warning" />
         <h2 className="text-sm font-semibold text-warning">{title}</h2>
-        <span className="ml-auto rounded-full bg-warning/10 px-2 py-0.5 text-xs font-semibold text-warning">
+        <span key={items.length} className="motion-pop ml-auto rounded-full bg-warning/10 px-2 py-0.5 text-xs font-semibold text-warning">
           {items.length}
         </span>
       </header>
-      <ul className="divide-y divide-warning/10">
+      <ul className="motion-stagger divide-y divide-warning/10">
         {items.map((item) => {
           const Wrapper = item.href ? "a" : "div";
           return (
@@ -46,7 +46,7 @@ export function AttentionPanel({
                 className={`flex items-center gap-3 px-4 py-3 text-sm ${item.href ? "hover:bg-warning-light/80 transition-colors" : ""}`}
               >
                 <span
-                  className={`size-2 shrink-0 rounded-full ${item.tone === "danger" ? "bg-danger" : "bg-warning"}`}
+                  className={`size-2 shrink-0 rounded-full ${item.tone === "danger" ? "motion-attention bg-danger" : "bg-warning"}`}
                   aria-hidden="true"
                 />
                 <span className="min-w-0 flex-1 font-medium text-foreground">

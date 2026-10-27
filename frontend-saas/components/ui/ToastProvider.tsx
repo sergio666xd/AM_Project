@@ -5,9 +5,10 @@ import { AlertCircle, CheckCircle2, Info, TriangleAlert, X } from "lucide-react"
 
 type ToastTone = "info" | "success" | "warning" | "error";
 interface ToastInput { title: string; description?: string; tone?: ToastTone; duration?: number }
-interface ToastItem extends ToastInput { id: number; tone: ToastTone }
+interface ToastItem extends ToastInput { id: number; tone: ToastTone; leaving?: boolean }
 interface ToastContextValue { toast: (input: ToastInput) => void }
 
+const TOAST_EXIT_MS = 180;
 const ToastContext = createContext<ToastContextValue | null>(null);
 const presentation = {
   info: { icon: Info, classes: "border-info/30 text-info" },
@@ -29,8 +30,12 @@ export function ToastProvider({ children }: { children: ReactNode }) {
   const dismiss = useCallback((id: number) => {
     const timer = timers.current.get(id);
     if (timer) clearTimeout(timer);
-    timers.current.delete(id);
-    setItems((current) => current.filter((item) => item.id !== id));
+    // Primero se marca como saliente para reproducir la animación y luego se retira.
+    setItems((current) => current.map((item) => item.id === id ? { ...item, leaving: true } : item));
+    timers.current.set(id, setTimeout(() => {
+      timers.current.delete(id);
+      setItems((current) => current.filter((item) => item.id !== id));
+    }, TOAST_EXIT_MS));
   }, []);
 
   const toast = useCallback((input: ToastInput) => {
@@ -48,8 +53,8 @@ export function ToastProvider({ children }: { children: ReactNode }) {
           const config = presentation[item.tone];
           const Icon = config.icon;
           return (
-            <div key={item.id} role={item.tone === "error" ? "alert" : "status"} className={`pointer-events-auto flex gap-3 rounded-[var(--radius-lg)] border bg-surface p-4 shadow-md ${config.classes}`}>
-              <Icon aria-hidden="true" className="mt-0.5 size-5 shrink-0" />
+            <div key={item.id} role={item.tone === "error" ? "alert" : "status"} className={`pointer-events-auto flex gap-3 rounded-[var(--radius-lg)] border bg-surface p-4 shadow-md ${config.classes} ${item.leaving ? "motion-toast-out pointer-events-none" : "motion-toast-in"}`}>
+              <Icon aria-hidden="true" className={`mt-0.5 size-5 shrink-0 ${item.leaving ? "" : "motion-pop"}`} />
               <div className="min-w-0 flex-1 text-sm">
                 <p className="font-semibold text-foreground">{item.title}</p>
                 {item.description && <p className="mt-1 text-foreground-secondary">{item.description}</p>}

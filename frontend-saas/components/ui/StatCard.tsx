@@ -44,7 +44,7 @@ export function StatCard({
   return (
     <Wrapper
       {...wrapperProps}
-      className={`group flex min-w-0 flex-col gap-2 rounded-[var(--radius-lg)] border bg-surface p-3 shadow-xs transition-shadow sm:flex-row sm:items-start sm:gap-4 sm:p-4 ${href ? "hover:shadow-sm" : ""} ${toneClasses[tone]}`}
+      className={`group flex min-w-0 flex-col gap-2 rounded-[var(--radius-lg)] border bg-surface p-3 shadow-xs transition-shadow sm:flex-row sm:items-start sm:gap-4 sm:p-4 ${href ? "motion-hover-lift" : ""} ${toneClasses[tone]}`}
     >
       {Icon && (
         <span className={`grid size-8 shrink-0 place-items-center sm:mt-0.5 sm:size-9 rounded-[var(--radius-md)] bg-brand-50 ${iconTones[tone]}`}>
@@ -53,7 +53,7 @@ export function StatCard({
       )}
       <div className="min-w-0 flex-1">
         <p className="text-xs font-medium leading-snug text-foreground-muted">{label}</p>
-        <p className="mt-0.5 font-display text-[26px] font-medium leading-tight tabular-nums text-foreground">{value}</p>
+        <p key={typeof value === "string" || typeof value === "number" ? value : undefined} className="motion-fade-in mt-0.5 font-display text-[26px] font-medium leading-tight tabular-nums text-foreground">{value}</p>
         {detail && (
           <p className="mt-0.5 text-xs text-foreground-muted">{detail}</p>
         )}

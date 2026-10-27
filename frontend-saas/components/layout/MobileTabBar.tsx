@@ -40,10 +40,10 @@ export function MobileTabBar({ tabs, homeHref }: { tabs: MobileTab[]; homeHref: 
                   active ? "text-primary" : "text-foreground-muted active:text-foreground"
                 }`}
               >
-                <span className={`relative grid h-8 w-14 place-items-center rounded-full transition-colors ${active ? "bg-primary-light" : ""}`}>
+                <span className={`motion-press relative grid h-8 w-14 place-items-center rounded-full ${active ? "bg-primary-light" : ""}`}>
                   <Icon aria-hidden="true" className="size-5" strokeWidth={active ? 2.25 : 1.75} />
                   {Boolean(tab.badge) && (
-                    <span className="absolute right-2 -top-0.5 min-w-4 rounded-full bg-danger px-1 text-center text-[10px] font-bold leading-4 text-white">
+                    <span key={tab.badge} className="motion-pop absolute right-2 -top-0.5 min-w-4 rounded-full bg-danger px-1 text-center text-[10px] font-bold leading-4 text-white">
                       {tab.badge! > 99 ? "99+" : tab.badge}
                     </span>
                   )}

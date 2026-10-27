@@ -13,8 +13,8 @@ export function EmptyState({
   action?: ReactNode;
 }) {
   return (
-    <div className="flex min-h-44 flex-col items-center justify-center px-6 py-12 text-center">
-      <span className="grid size-12 place-items-center rounded-full bg-brand-50 text-brand-700">
+    <div className="motion-rise-in flex min-h-44 flex-col items-center justify-center px-6 py-12 text-center">
+      <span className="motion-pop grid size-12 place-items-center rounded-full bg-brand-50 text-brand-700 [animation-delay:80ms]">
         <Icon aria-hidden="true" className="size-5" />
       </span>
       <h2 className="mt-4 text-[15px] font-semibold text-foreground">{title}</h2>

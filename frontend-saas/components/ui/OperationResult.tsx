@@ -15,9 +15,9 @@ export function OperationResult({
   onDismiss?: () => void;
 }) {
   return (
-    <section className="rounded-xl border border-success/30 bg-success/5 p-4" role="status" aria-live="polite">
+    <section className="motion-rise-in rounded-xl border border-success/30 bg-success/5 p-4" role="status" aria-live="polite">
       <div className="flex items-start gap-3">
-        <CheckCircle2 aria-hidden="true" className="mt-0.5 size-5 shrink-0 text-success" />
+        <CheckCircle2 aria-hidden="true" className="motion-pop mt-0.5 size-5 shrink-0 text-success [animation-delay:120ms]" />
         <div className="min-w-0 flex-1">
           <h2 className="font-semibold text-foreground">{title}</h2>
           {description && <p className="mt-1 text-sm text-foreground-muted">{description}</p>}

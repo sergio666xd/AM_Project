@@ -931,7 +931,8 @@ export default function DetalleRadicadoPage() {
                         <td className="max-w-[260px] px-4 py-4 align-top">
                           <div className="flex flex-col items-start gap-2">
                             {idsActuacionesNuevas.has(act.id) && (
-                              <span className="rounded-full border border-red-500/20 bg-red-500/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-red-700 dark:text-red-400">
+                              <span className="motion-pop inline-flex items-center gap-1 rounded-full border border-red-500/20 bg-red-500/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-red-700 dark:text-red-400">
+                                <span aria-hidden="true" className="motion-attention size-1.5 rounded-full bg-red-600 dark:bg-red-400" />
                                 Nueva
                               </span>
                             )}
