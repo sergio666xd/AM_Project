@@ -192,7 +192,7 @@ export default function AdminRequestsPage() {
   }
 
   return (
-    <section className="mx-auto max-w-6xl space-y-5">
+    <section className="motion-swap mx-auto max-w-6xl space-y-5">
       <PageHeader
         overline="Panel Administrativo · SaaS individual"
         title="Solicitudes de acceso"
@@ -396,7 +396,7 @@ export default function AdminRequestsPage() {
           role="dialog"
           aria-modal="true"
           aria-label={viewer.title}
-          className="fixed inset-0 z-50 flex items-center justify-center bg-brand-950/40 backdrop-blur-sm p-4"
+          className="motion-overlay fixed inset-0 z-50 flex items-center justify-center bg-brand-950/40 backdrop-blur-sm p-4"
         >
           <div className="flex h-[min(88vh,900px)] w-full max-w-5xl flex-col overflow-hidden rounded-[var(--radius-lg)] border border-border bg-surface">
             <header className="flex items-center justify-between border-b border-border px-4 py-3">

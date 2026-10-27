@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import type { LucideIcon } from "lucide-react";
+import { AnimatedNumber } from "./AnimatedNumber";
 
 /**
  * Compact KPI/stat card for dashboards.
@@ -53,7 +54,7 @@ export function StatCard({
       )}
       <div className="min-w-0 flex-1">
         <p className="text-xs font-medium leading-snug text-foreground-muted">{label}</p>
-        <p key={typeof value === "string" || typeof value === "number" ? value : undefined} className="motion-fade-in mt-0.5 font-display text-[26px] font-medium leading-tight tabular-nums text-foreground">{value}</p>
+        <p className="mt-0.5 font-display text-[26px] font-medium leading-tight tabular-nums text-foreground">{typeof value === "number" ? <AnimatedNumber value={value} /> : value}</p>
         {detail && (
           <p className="mt-0.5 text-xs text-foreground-muted">{detail}</p>
         )}

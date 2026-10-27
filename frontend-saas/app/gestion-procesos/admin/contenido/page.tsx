@@ -243,7 +243,7 @@ export default function ContenidoPublicoAdminPage() {
     }
   }
   return (
-    <section className="mx-auto max-w-6xl space-y-5 px-4 py-6 sm:px-6 lg:px-8">
+    <section className="motion-swap mx-auto max-w-6xl space-y-5 px-4 py-6 sm:px-6 lg:px-8">
       <header className="flex flex-wrap items-end justify-between gap-4">
         <div><p className="text-sm text-muted-foreground">Contenido público · ADMIN global</p><h1 className="mt-1 text-3xl font-semibold tracking-tight">Páginas del sitio</h1><p className="mt-1 text-sm text-muted-foreground">Edita textos y listas sin modificar la estructura visual del sitio.</p></div>
         <div className="flex gap-2"><button type="button" onClick={() => void restore()} disabled={saving || loading} className="inline-flex items-center gap-2 rounded-lg border border-border px-3 py-2 text-sm text-foreground hover:bg-muted disabled:opacity-50"><RotateCcw className="size-4" />Restaurar base</button><button type="button" onClick={() => void save()} disabled={saving || loading || !dirty} className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground disabled:opacity-50"><Save className="size-4" />{saving ? "Guardando..." : "Guardar cambios"}</button></div>
@@ -259,7 +259,7 @@ export default function ContenidoPublicoAdminPage() {
           <span>{mostrarPlanes ? "Mostrar planes" : "Mostrar Próximamente"}</span>
           <input type="checkbox" role="switch" aria-label="Mostrar planes en la página pública de Gestión de Procesos" checked={mostrarPlanes} disabled={configLoading || configSaving} onChange={(event) => void updateOfferVisibility(event.target.checked)} className="peer sr-only" />
           <span aria-hidden="true" className={`relative h-6 w-11 rounded-full transition-colors after:absolute after:left-0.5 after:top-0.5 after:size-5 after:rounded-full after:bg-white after:transition-transform peer-focus-visible:outline-none peer-focus-visible:ring-2 peer-focus-visible:ring-primary peer-disabled:opacity-50 ${mostrarPlanes ? "bg-primary after:translate-x-5" : "bg-border"}`} />
-          {configLoading && <span className="text-xs text-foreground-muted">Cargando…</span>}
+          {configLoading && <span className="motion-delayed-in text-xs text-foreground-muted">Cargando…</span>}
           {configSaving && <span className="text-xs text-foreground-muted">Guardando…</span>}
         </label>
       </section>      <div className="grid gap-5 lg:grid-cols-[240px_minmax(0,1fr)]">
@@ -268,7 +268,7 @@ export default function ContenidoPublicoAdminPage() {
         </nav>
         <div className="min-w-0 rounded-lg border border-border bg-card p-4 sm:p-6">
           <div className="mb-5 flex flex-wrap items-center justify-between gap-2 border-b border-border pb-4"><div><h2 className="font-semibold text-foreground">{selectedPage?.nombre || SITE_PAGE_LABELS[selectedSlug]}</h2><p className="mt-1 text-xs text-muted-foreground">{selectedPage?.updated_at ? `Actualizada ${new Date(selectedPage.updated_at).toLocaleString("es-CO", { timeZone: "America/Bogota" })}` : "Usando contenido base"}</p></div>{dirty && <span className="rounded-md bg-amber-500/10 px-2.5 py-1 text-xs text-amber-700">Cambios sin guardar</span>}</div>
-          {loading ? <p className="py-10 text-center text-sm text-muted-foreground">Cargando páginas...</p> : <ContentField name={selectedSlug} value={draft} template={cloneValue(SITE_PAGE_DEFAULTS[selectedSlug])} onChange={setDraft} />}
+          {loading ? <p className="motion-delayed-in py-10 text-center text-sm text-muted-foreground">Cargando páginas...</p> : <ContentField name={selectedSlug} value={draft} template={cloneValue(SITE_PAGE_DEFAULTS[selectedSlug])} onChange={setDraft} />}
         </div>
       </div>
     </section>

@@ -118,7 +118,7 @@ export default function CalendarioClientePage() {
   );
 
   return (
-    <section className="mx-auto max-w-5xl space-y-6 pb-24">
+    <section className="motion-swap mx-auto max-w-5xl space-y-6 pb-24">
       <PageHeader
         overline="Portal del cliente"
         title="Calendario"
@@ -162,16 +162,16 @@ export default function CalendarioClientePage() {
       )}
 
       {loading || sessionLoading ? (
-        <div className="grid min-h-48 place-items-center text-sm text-muted">
+        <div className="motion-delayed-in grid min-h-48 place-items-center text-sm text-muted">
           <div className="flex items-center gap-2">
             <RefreshCw className="size-4 animate-spin text-brand-700" />
             <span>Cargando agenda...</span>
           </div>
         </div>
       ) : view === "calendar" ? (
-        <TaskMonthCalendar tasks={tasks} />
+        <div className="motion-fade-in"><TaskMonthCalendar tasks={tasks} /></div>
       ) : (
-        <section className="overflow-hidden rounded-xl border border-border bg-surface shadow-xs" aria-label="Actividades próximas">
+        <section className="motion-fade-in overflow-hidden rounded-xl border border-border bg-surface shadow-xs" aria-label="Actividades próximas">
           <div className="space-y-3 border-b border-border bg-surface-secondary/40 px-4 py-3.5">
             <div>
               <h2 className="font-semibold text-foreground text-sm">Agenda en lista</h2>

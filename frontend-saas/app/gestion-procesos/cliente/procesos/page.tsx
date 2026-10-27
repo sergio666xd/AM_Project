@@ -64,7 +64,7 @@ export default function ProcesosClientePage() {
   }, [items, search, status]);
 
   return (
-    <section className="mx-auto max-w-5xl space-y-6 pb-24">
+    <section className="motion-swap mx-auto max-w-5xl space-y-6 pb-24">
       <PageHeader
         overline="Portal del cliente"
         title="Mis procesos"

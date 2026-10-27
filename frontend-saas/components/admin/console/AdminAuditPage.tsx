@@ -141,7 +141,7 @@ export default function AdminAuditPage({ initialView = "actividad" }: { initialV
   const modules = [...new Set(events.map((event) => event.modulo))].sort();
 
   return (
-    <section className="mx-auto max-w-6xl space-y-5 p-6">
+    <section className="motion-swap mx-auto max-w-6xl space-y-5 p-6">
       <header className="flex flex-wrap items-end justify-between gap-4">
         <div>
           <p className="text-xs font-semibold uppercase tracking-wide text-primary">Panel Administrativo · Global</p>
@@ -216,7 +216,7 @@ export default function AdminAuditPage({ initialView = "actividad" }: { initialV
       )}
       {!loading && <p className="text-xs text-foreground-muted">Mostrando {events.length} eventos, máximo 200 por consulta.</p>}
 
-      {selected && <div className="fixed inset-0 z-50 flex items-center justify-center bg-brand-950/40 backdrop-blur-sm p-4" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) setSelected(null); }}>
+      {selected && <div className="motion-overlay fixed inset-0 z-50 flex items-center justify-center bg-brand-950/40 backdrop-blur-sm p-4" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) setSelected(null); }}>
         <section role="dialog" aria-modal="true" aria-labelledby="audit-detail-title" className="max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-xl border border-border bg-surface shadow-xl">
           <header className="flex items-start justify-between gap-4 border-b border-border p-5"><div><p className="text-xs uppercase tracking-wide text-foreground-muted">{selected.actor} · {formatDate(selected.created_at)}</p><h2 id="audit-detail-title" className="mt-1 text-lg font-semibold">{selected.descripcion}</h2></div><Button variant="ghost" aria-label="Cerrar detalle" onClick={() => setSelected(null)}><X className="size-4" /></Button></header>
           <div className="space-y-5 p-5"><div><h3 className="mb-3 text-sm font-semibold">Vista humana</h3><p className="text-sm">{selected.actor} {selected.descripcion.replace(`${selected.actor} `, "")}</p><p className="mt-2 text-sm text-foreground-muted">Resultado: evento registrado.</p></div>

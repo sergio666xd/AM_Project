@@ -181,7 +181,7 @@ export default function ClienteHomePage() {
   ].slice(0, 5);
 
   return (
-    <section className="mx-auto max-w-6xl space-y-6 pb-24">
+    <section className="motion-swap mx-auto max-w-6xl space-y-6 pb-24">
       <PageHeader
         overline="Portal del cliente"
         title={`Hola, ${user?.nombre_completo?.split(" ")[0] || "bienvenido"}`}
@@ -233,7 +233,7 @@ export default function ClienteHomePage() {
       {loading || sessionLoading ? (
         <div role="status" aria-live="polite" className="grid min-h-56 place-items-center text-sm text-muted">
           <div className="flex items-center gap-2">
-            <RefreshCw aria-hidden="true" className="size-4 animate-spin text-brand-700" />
+            <RefreshCw aria-hidden="true" className="motion-delayed-in size-4 animate-spin text-brand-700" />
             <span>Cargando tu información...</span>
           </div>
         </div>

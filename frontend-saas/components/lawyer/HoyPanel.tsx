@@ -15,6 +15,7 @@ import {
   RefreshCw,
 } from "lucide-react";
 import TaskMonthCalendar, { type CalendarTask } from "@/components/calendar/TaskMonthCalendar";
+import { AnimatedNumber } from "@/components/ui/AnimatedNumber";
 import { Button } from "@/components/ui/Button";
 
 export interface FirmDashboardData {
@@ -122,7 +123,7 @@ export function HoyPanel({
   const activity = dashboard.actividad_reciente.filter((item) => item.tipo !== "ACTUACION").slice(0, 6);
 
   return (
-    <div className="mx-auto max-w-6xl">
+    <div className="motion-swap mx-auto max-w-6xl">
       <header className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
         <div className="min-w-0">
           <p className="mb-1 text-xs font-semibold uppercase tracking-[0.12em] text-gold-600 first-letter:uppercase dark:text-gold-400">{today}</p>
@@ -143,8 +144,8 @@ export function HoyPanel({
       {/* Indicadores compactos: informan sin competir con la bandeja. */}
       <div className="no-scrollbar -mx-4 mb-7 flex gap-2 overflow-x-auto px-4 sm:mx-0 sm:grid sm:grid-cols-4 sm:gap-3 sm:px-0">
         {stats.map((stat) => (
-          <Link key={stat.label} href={stat.href} className="min-w-[148px] shrink-0 rounded-[var(--radius-lg)] border border-border bg-surface px-4 py-3 transition-colors hover:border-border-strong">
-            <p className={`font-display text-[28px] font-medium leading-none tabular-nums ${stat.tone}`}>{stat.value}</p>
+          <Link key={stat.label} href={stat.href} className="motion-hover-lift min-w-[148px] shrink-0 rounded-[var(--radius-lg)] border border-border bg-surface px-4 py-3 hover:border-border-strong">
+            <p className={`font-display text-[28px] font-medium leading-none tabular-nums ${stat.tone}`}>{typeof stat.value === "number" ? <AnimatedNumber value={stat.value} /> : stat.value}</p>
             <p className="mt-1.5 text-[13px] text-foreground-secondary">{stat.label}</p>
           </Link>
         ))}

@@ -84,7 +84,7 @@ export default function ClientProfilePage() {
   const statusLabel = { PENDIENTE: "Pendiente", APROBADA: "Aprobada", RECHAZADA: "Rechazada" };
 
   return (
-    <section className="mx-auto max-w-3xl space-y-6 pb-24">
+    <section className="motion-swap mx-auto max-w-3xl space-y-6 pb-24">
       <PageHeader
         overline="Portal del cliente"
         title="Mi perfil"
@@ -184,7 +184,7 @@ export default function ClientProfilePage() {
       <section className="space-y-3">
         <h2 className="font-semibold text-foreground text-base">Historial de solicitudes</h2>
         {loading ? (
-          <p className="text-xs text-muted">Cargando solicitudes…</p>
+          <p className="motion-delayed-in text-xs text-muted">Cargando solicitudes…</p>
         ) : requests.length > 0 ? (
           <div className="space-y-3">
             {requests.map((request) => (

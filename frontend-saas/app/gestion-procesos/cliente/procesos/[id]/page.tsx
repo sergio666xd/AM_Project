@@ -216,7 +216,7 @@ export default function DetalleProcesoClientePage() {
     return (
       <div className="grid min-h-64 place-items-center text-sm text-muted">
         <div className="flex items-center gap-2">
-          <RefreshCw className="size-4 animate-spin text-brand-700" />
+          <RefreshCw className="motion-delayed-in size-4 animate-spin text-brand-700" />
           <span>Cargando expediente...</span>
         </div>
       </div>
@@ -258,7 +258,7 @@ export default function DetalleProcesoClientePage() {
   ];
 
   return (
-    <section className="mx-auto max-w-5xl space-y-5">
+    <section className="motion-swap mx-auto max-w-5xl space-y-5">
       <Link href="/gestion-procesos/cliente/procesos" className="inline-flex items-center gap-2 text-sm font-medium text-foreground-muted hover:text-primary">
         <ArrowLeft aria-hidden="true" className="size-4" />
         Mis procesos

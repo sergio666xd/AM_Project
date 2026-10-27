@@ -647,10 +647,10 @@ export default function ProcesoDetallePage({ section }: { section?: string }) {
   }
 
   return (
-    <div className="space-y-5 pb-24">
+    <div className="motion-swap space-y-5 pb-24">
       {/* TOAST */}
       {notice && (
-        <div className="fixed right-4 top-4 z-50 flex max-w-sm items-center gap-3 rounded-xl border border-emerald-500/20 bg-[var(--surface)] px-4 py-3 text-sm shadow-xl">
+        <div className="motion-toast-in fixed right-4 top-4 z-50 flex max-w-sm items-center gap-3 rounded-xl border border-emerald-500/20 bg-[var(--surface)] px-4 py-3 text-sm shadow-xl">
           <CheckCircle2 className="size-5 shrink-0 text-emerald-500" />
 
           <span className="text-[var(--foreground)]">
@@ -736,7 +736,7 @@ export default function ProcesoDetallePage({ section }: { section?: string }) {
         <div className="min-w-0 space-y-5">
 
       {process.admite_colaboradores && (
-        <section id="panel-equipo" role="region" aria-label="Equipo del proceso" style={{ display: activeTab === "equipo" ? undefined : "none" }} className="space-y-4 rounded-xl border border-[var(--border)] bg-[var(--surface)] p-5">
+        <section id="panel-equipo" role="region" aria-label="Equipo del proceso" style={{ display: activeTab === "equipo" ? undefined : "none" }} className="motion-tab-panel space-y-4 rounded-xl border border-[var(--border)] bg-[var(--surface)] p-5">
           <header className="flex items-start gap-3">
             <Users className="mt-0.5 size-5 text-[var(--primary)]" />
             <div>
@@ -801,7 +801,7 @@ export default function ProcesoDetallePage({ section }: { section?: string }) {
       )}
 
       {/* RESUMEN */}
-      <div id="panel-resumen" role="region" aria-label="Resumen del proceso" style={{ display: activeTab === "resumen" ? undefined : "none" }} className="scroll-mt-20 space-y-4">
+      <div id="panel-resumen" role="region" aria-label="Resumen del proceso" style={{ display: activeTab === "resumen" ? undefined : "none" }} className="motion-tab-panel scroll-mt-20 space-y-4">
         <SummaryStrip
           items={[
             { key: "abiertas", label: "Tareas abiertas", value: overview.openTasks.length },
@@ -988,7 +988,7 @@ export default function ProcesoDetallePage({ section }: { section?: string }) {
       </div>
 
       {/* CLIENTES + RADICADOS */}
-      <div id="panel-relaciones" role="region" aria-label="Clientes y radicados" style={{ display: activeTab === "relaciones" ? undefined : "none" }} className="grid gap-5 xl:grid-cols-2">
+      <div id="panel-relaciones" role="region" aria-label="Clientes y radicados" style={{ display: activeTab === "relaciones" ? undefined : "none" }} className="motion-tab-panel grid gap-5 xl:grid-cols-2">
         {/* CLIENTES */}
         <section id="clientes" className="scroll-mt-20 rounded-2xl border border-[var(--border)] bg-[var(--surface)]">
           <div className="flex items-center justify-between border-b border-[var(--border)] px-5 py-4">
@@ -1171,12 +1171,12 @@ export default function ProcesoDetallePage({ section }: { section?: string }) {
         </section>
       </div>
 
-      <section id="panel-agenda" role="region" aria-label="Agenda del proceso" style={{ display: activeTab === "agenda" ? undefined : "none" }} className="scroll-mt-20 rounded-2xl border border-[var(--border)] bg-[var(--surface)]">
+      <section id="panel-agenda" role="region" aria-label="Agenda del proceso" style={{ display: activeTab === "agenda" ? undefined : "none" }} className="motion-tab-panel scroll-mt-20 rounded-2xl border border-[var(--border)] bg-[var(--surface)]">
         <header className="flex flex-wrap items-center justify-between gap-3 border-b border-[var(--border)] px-5 py-4"><div><h2 className="text-sm font-semibold text-[var(--foreground)]">Agenda del proceso</h2><p className="mt-1 text-xs text-[var(--foreground-muted)]">Audiencias, reuniones y eventos asociados a este expediente.</p></div><button type="button" onClick={() => openAgendaEvent()} className="inline-flex items-center gap-2 rounded-lg bg-[var(--primary)] px-3 py-2 text-xs font-semibold !text-white"><Plus className="size-4" />Agendar actividad</button></header>
         {process.eventos.length ? <div className="divide-y divide-[var(--border)]">{process.eventos.map((event) => <article key={event.id} className="flex flex-wrap items-center justify-between gap-3 px-5 py-3"><div><p className="text-sm font-medium">{event.tipo === "AUDIENCIA" ? "Audiencia" : event.tipo === "REUNION" ? "Reunión" : "Evento"}: {event.titulo}</p><p className="mt-1 text-xs text-[var(--foreground-muted)]">{new Date(event.fecha_inicio).toLocaleString("es-CO", { timeZone: "America/Bogota" })} · {event.estado.replaceAll("_", " ")}{event.cliente ? ` · ${event.cliente}` : ""}</p></div><div className="flex gap-3 text-xs"><button type="button" onClick={() => openAgendaEvent(event)} className="text-[var(--primary)] hover:underline">Editar</button><button type="button" onClick={() => { if (window.confirm(`¿Eliminar ${event.titulo} de la agenda?`)) void action(`/api/expedientes/agenda/eventos/${event.id}`, "DELETE"); }} className="text-red-600 hover:underline">Eliminar</button></div></article>)}</div> : <p className="px-5 py-8 text-center text-sm text-[var(--foreground-muted)]">No hay actividades programadas para este proceso.</p>}
       </section>
 
-      <section id="panel-actividad" role="region" aria-label="Actividad del expediente" style={{ display: activeTab === "actividad" ? undefined : "none" }} className="scroll-mt-20 rounded-2xl border border-[var(--border)] bg-[var(--surface)]">
+      <section id="panel-actividad" role="region" aria-label="Actividad del expediente" style={{ display: activeTab === "actividad" ? undefined : "none" }} className="motion-tab-panel scroll-mt-20 rounded-2xl border border-[var(--border)] bg-[var(--surface)]">
         <header className="border-b border-[var(--border)] px-5 py-4"><h2 className="text-sm font-semibold text-[var(--foreground)]">Actividad del expediente</h2><p className="mt-1 text-xs text-[var(--foreground-muted)]">Timeline de actuaciones judiciales, tareas, documentos y comunicaciones, con la visibilidad asignada en el servidor.</p></header>
         {process.timeline.length ? <ol className="divide-y divide-[var(--border)]">{process.timeline.slice(0, 100).map((item) => <li key={item.id} className="flex gap-3 px-5 py-4"><span className={`mt-1 size-2 shrink-0 rounded-full ${item.visibilidad === "CLIENTE" ? "bg-emerald-500" : "bg-slate-400"}`} title={item.visibilidad === "CLIENTE" ? "Visible al cliente" : "Solo equipo interno"} /><div className="min-w-0 flex-1"><div className="flex flex-wrap items-center gap-2"><p className="text-sm font-medium text-[var(--foreground)]">{item.titulo}</p><span className="rounded-full bg-[var(--surface-secondary)] px-2 py-0.5 text-[10px] uppercase text-[var(--foreground-muted)]">{item.tipo}</span><span className={`rounded-full px-2 py-0.5 text-[10px] ${item.visibilidad === "CLIENTE" ? "bg-emerald-500/10 text-emerald-700" : "bg-slate-500/10 text-slate-600"}`}>{item.visibilidad === "CLIENTE" ? "Cliente visible" : "Interno"}</span><Link href={timelineResourceHref(item)} className="text-xs font-medium text-[var(--primary)] hover:underline">Abrir {item.recurso.toLowerCase()}</Link></div><p className="mt-1 whitespace-pre-wrap text-xs leading-5 text-[var(--foreground-secondary)]">{item.descripcion}</p><p className="mt-1 text-[11px] text-[var(--foreground-muted)]">{item.actor || item.recurso}{item.fecha ? ` · ${new Date(item.fecha).toLocaleString("es-CO", { timeZone: "America/Bogota" })}` : ""}</p></div></li>)}</ol> : <p className="p-8 text-center text-sm text-[var(--foreground-muted)]">Aún no hay actividad registrada.</p>}
       </section>
@@ -1184,7 +1184,7 @@ export default function ProcesoDetallePage({ section }: { section?: string }) {
       {/* MÓDULOS SECUNDARIOS */}
       <div className="grid gap-5">
         {/* TAREAS */}
-        <section id="panel-tareas" role="region" aria-label="Tareas del proceso" style={{ display: activeTab === "tareas" ? undefined : "none" }} className="scroll-mt-20 rounded-2xl border border-[var(--border)] bg-[var(--surface)]">
+        <section id="panel-tareas" role="region" aria-label="Tareas del proceso" style={{ display: activeTab === "tareas" ? undefined : "none" }} className="motion-tab-panel scroll-mt-20 rounded-2xl border border-[var(--border)] bg-[var(--surface)]">
           <div className="flex items-center justify-between border-b border-[var(--border)] px-5 py-4">
             <div>
               <h2 className="text-sm font-semibold text-[var(--foreground)]">
@@ -1244,7 +1244,7 @@ export default function ProcesoDetallePage({ section }: { section?: string }) {
         </section>
 
         {/* DOCUMENTOS */}
-        <section id="panel-documentos" role="region" aria-label="Documentos del proceso" style={{ display: activeTab === "documentos" ? undefined : "none" }} className="scroll-mt-20 rounded-2xl border border-[var(--border)] bg-[var(--surface)]">
+        <section id="panel-documentos" role="region" aria-label="Documentos del proceso" style={{ display: activeTab === "documentos" ? undefined : "none" }} className="motion-tab-panel scroll-mt-20 rounded-2xl border border-[var(--border)] bg-[var(--surface)]">
           <div className="flex items-center justify-between gap-3 border-b border-[var(--border)] px-5 py-4">
             <div className="flex items-center gap-3">
               <div className="flex size-9 items-center justify-center rounded-lg bg-[var(--primary)]/10 text-[var(--primary)]"><FileText className="size-4" /></div>
@@ -1289,12 +1289,12 @@ export default function ProcesoDetallePage({ section }: { section?: string }) {
         </section>
 
         {/* CONTRATOS */}
-        <section id="panel-contratos" role="region" aria-label="Contratos del proceso" style={{ display: activeTab === "contratos" ? undefined : "none" }} className="scroll-mt-20 rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-4">
+        <section id="panel-contratos" role="region" aria-label="Contratos del proceso" style={{ display: activeTab === "contratos" ? undefined : "none" }} className="motion-tab-panel scroll-mt-20 rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-4">
           <ProcessContracts processId={process.id} clients={process.clientes} onChange={load} initialContractId={contractFocusId} />
         </section>
 
         {/* NOTIFICACIONES */}
-        <section id="panel-comunicaciones" role="region" aria-label="Chat del proceso" style={{ display: activeTab === "comunicaciones" ? undefined : "none" }} className="scroll-mt-20 rounded-2xl border border-[var(--border)] bg-[var(--surface)]">
+        <section id="panel-comunicaciones" role="region" aria-label="Chat del proceso" style={{ display: activeTab === "comunicaciones" ? undefined : "none" }} className="motion-tab-panel scroll-mt-20 rounded-2xl border border-[var(--border)] bg-[var(--surface)]">
           <div className="border-b border-[var(--border)] px-5 py-4">
             <div className="flex items-center gap-3">
               <div className="flex size-9 items-center justify-center rounded-lg bg-[var(--primary)]/10 text-[var(--primary)]">
@@ -1377,10 +1377,10 @@ export default function ProcesoDetallePage({ section }: { section?: string }) {
         </div>
       </div>
 
-      {showAgendaModal && <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"><form onSubmit={(event) => void saveAgendaEvent(event)} className="max-h-[92vh] w-full max-w-xl space-y-4 overflow-y-auto rounded-xl border border-[var(--border)] bg-[var(--surface)] p-5 shadow-2xl"><header className="flex items-start justify-between gap-3"><div><h2 className="text-lg font-semibold">{editingAgendaId ? "Editar actividad" : "Agendar en este proceso"}</h2><p className="mt-1 text-sm text-[var(--foreground-muted)]">La actividad queda vinculada a {process.nombre}.</p></div><button type="button" onClick={() => setShowAgendaModal(false)} aria-label="Cerrar" className="rounded-md p-1 hover:bg-[var(--surface-secondary)]"><X className="size-5" /></button></header><label className="block text-sm font-medium">Título<input required maxLength={255} value={agendaTitle} onChange={(event) => setAgendaTitle(event.target.value)} className="mt-1 w-full rounded-lg border border-[var(--border)] bg-[var(--surface-secondary)] px-3 py-2.5" /></label><div className="grid gap-3 sm:grid-cols-2"><label className="block text-sm font-medium">Tipo<select value={agendaType} onChange={(event) => setAgendaType(event.target.value as typeof agendaType)} className="mt-1 w-full rounded-lg border border-[var(--border)] bg-[var(--surface-secondary)] px-3 py-2.5"><option value="AUDIENCIA">Audiencia</option><option value="REUNION">Reunión</option><option value="FIRMA_CONTRATO">Firma de contrato</option><option value="EVENTO">Evento</option></select></label><label className="block text-sm font-medium">Estado<select value={agendaStatus} onChange={(event) => setAgendaStatus(event.target.value as typeof agendaStatus)} className="mt-1 w-full rounded-lg border border-[var(--border)] bg-[var(--surface-secondary)] px-3 py-2.5"><option value="PROGRAMADO">Programado</option><option value="COMPLETADO">Completado</option><option value="CANCELADO">Cancelado</option></select></label></div><label className="block text-sm font-medium">Fecha y hora<input required type="datetime-local" value={agendaDate} onChange={(event) => setAgendaDate(event.target.value)} className="mt-1 w-full rounded-lg border border-[var(--border)] bg-[var(--surface-secondary)] px-3 py-2.5" /></label><label className="block text-sm font-medium">Cliente (opcional)<select value={agendaClientId} onChange={(event) => setAgendaClientId(event.target.value)} className="mt-1 w-full rounded-lg border border-[var(--border)] bg-[var(--surface-secondary)] px-3 py-2.5"><option value="">Solo equipo interno</option>{process.clientes.map((client) => <option key={client.id} value={client.id}>{client.nombre_completo}</option>)}</select></label>{agendaType === "FIRMA_CONTRATO" && <label className="block text-sm font-medium">Contrato<select required value={agendaContractId} onChange={(event) => setAgendaContractId(event.target.value)} className="mt-1 w-full rounded-lg border border-[var(--border)] bg-[var(--surface-secondary)] px-3 py-2.5"><option value="">Selecciona contrato para la firma</option>{process.contratos.filter((contract) => ["LISTO_PARA_FIRMA", "EN_FIRMA"].includes(contract.estado) || (editingAgendaId !== null && process.eventos.some((item) => item.id === editingAgendaId && item.contrato_id === contract.id))).map((contract) => <option key={contract.id} value={contract.id}>Contrato #{contract.id} · {contract.cliente} · {contract.estado}</option>)}</select><span className="mt-1 block text-xs text-[var(--foreground-muted)]">El cliente debe ser el mismo que figura en el contrato.</span></label>}<label className="block text-sm font-medium">Descripción<textarea rows={3} maxLength={4000} value={agendaDescription} onChange={(event) => setAgendaDescription(event.target.value)} className="mt-1 w-full rounded-lg border border-[var(--border)] bg-[var(--surface-secondary)] px-3 py-2.5" /></label><div className="flex justify-end gap-2 border-t border-[var(--border)] pt-4"><button type="button" disabled={working} onClick={() => setShowAgendaModal(false)} className="rounded-lg border border-[var(--border)] px-4 py-2 text-sm">Cancelar</button><button type="submit" disabled={working || !agendaTitle.trim() || !agendaDate || (agendaType === "FIRMA_CONTRATO" && (!agendaContractId || !agendaClientId))} className="rounded-lg bg-[var(--primary)] px-4 py-2 text-sm font-semibold !text-white disabled:opacity-50">Guardar actividad</button></div></form></div>}
+      {showAgendaModal && <div className="motion-overlay fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"><form onSubmit={(event) => void saveAgendaEvent(event)} className="max-h-[92vh] w-full max-w-xl space-y-4 overflow-y-auto rounded-xl border border-[var(--border)] bg-[var(--surface)] p-5 shadow-2xl"><header className="flex items-start justify-between gap-3"><div><h2 className="text-lg font-semibold">{editingAgendaId ? "Editar actividad" : "Agendar en este proceso"}</h2><p className="mt-1 text-sm text-[var(--foreground-muted)]">La actividad queda vinculada a {process.nombre}.</p></div><button type="button" onClick={() => setShowAgendaModal(false)} aria-label="Cerrar" className="rounded-md p-1 hover:bg-[var(--surface-secondary)]"><X className="size-5" /></button></header><label className="block text-sm font-medium">Título<input required maxLength={255} value={agendaTitle} onChange={(event) => setAgendaTitle(event.target.value)} className="mt-1 w-full rounded-lg border border-[var(--border)] bg-[var(--surface-secondary)] px-3 py-2.5" /></label><div className="grid gap-3 sm:grid-cols-2"><label className="block text-sm font-medium">Tipo<select value={agendaType} onChange={(event) => setAgendaType(event.target.value as typeof agendaType)} className="mt-1 w-full rounded-lg border border-[var(--border)] bg-[var(--surface-secondary)] px-3 py-2.5"><option value="AUDIENCIA">Audiencia</option><option value="REUNION">Reunión</option><option value="FIRMA_CONTRATO">Firma de contrato</option><option value="EVENTO">Evento</option></select></label><label className="block text-sm font-medium">Estado<select value={agendaStatus} onChange={(event) => setAgendaStatus(event.target.value as typeof agendaStatus)} className="mt-1 w-full rounded-lg border border-[var(--border)] bg-[var(--surface-secondary)] px-3 py-2.5"><option value="PROGRAMADO">Programado</option><option value="COMPLETADO">Completado</option><option value="CANCELADO">Cancelado</option></select></label></div><label className="block text-sm font-medium">Fecha y hora<input required type="datetime-local" value={agendaDate} onChange={(event) => setAgendaDate(event.target.value)} className="mt-1 w-full rounded-lg border border-[var(--border)] bg-[var(--surface-secondary)] px-3 py-2.5" /></label><label className="block text-sm font-medium">Cliente (opcional)<select value={agendaClientId} onChange={(event) => setAgendaClientId(event.target.value)} className="mt-1 w-full rounded-lg border border-[var(--border)] bg-[var(--surface-secondary)] px-3 py-2.5"><option value="">Solo equipo interno</option>{process.clientes.map((client) => <option key={client.id} value={client.id}>{client.nombre_completo}</option>)}</select></label>{agendaType === "FIRMA_CONTRATO" && <label className="block text-sm font-medium">Contrato<select required value={agendaContractId} onChange={(event) => setAgendaContractId(event.target.value)} className="mt-1 w-full rounded-lg border border-[var(--border)] bg-[var(--surface-secondary)] px-3 py-2.5"><option value="">Selecciona contrato para la firma</option>{process.contratos.filter((contract) => ["LISTO_PARA_FIRMA", "EN_FIRMA"].includes(contract.estado) || (editingAgendaId !== null && process.eventos.some((item) => item.id === editingAgendaId && item.contrato_id === contract.id))).map((contract) => <option key={contract.id} value={contract.id}>Contrato #{contract.id} · {contract.cliente} · {contract.estado}</option>)}</select><span className="mt-1 block text-xs text-[var(--foreground-muted)]">El cliente debe ser el mismo que figura en el contrato.</span></label>}<label className="block text-sm font-medium">Descripción<textarea rows={3} maxLength={4000} value={agendaDescription} onChange={(event) => setAgendaDescription(event.target.value)} className="mt-1 w-full rounded-lg border border-[var(--border)] bg-[var(--surface-secondary)] px-3 py-2.5" /></label><div className="flex justify-end gap-2 border-t border-[var(--border)] pt-4"><button type="button" disabled={working} onClick={() => setShowAgendaModal(false)} className="rounded-lg border border-[var(--border)] px-4 py-2 text-sm">Cancelar</button><button type="submit" disabled={working || !agendaTitle.trim() || !agendaDate || (agendaType === "FIRMA_CONTRATO" && (!agendaContractId || !agendaClientId))} className="rounded-lg bg-[var(--primary)] px-4 py-2 text-sm font-semibold !text-white disabled:opacity-50">Guardar actividad</button></div></form></div>}
 
       {showDocumentRequestModal && (
-        <div role="dialog" aria-modal="true" aria-labelledby="document-request-title" className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm">
+        <div role="dialog" aria-modal="true" aria-labelledby="document-request-title" className="motion-overlay fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm">
           <form onSubmit={async (event) => { event.preventDefault(); const ok = await action(`/api/expedientes/procesos/${id}/solicitudes-documento`, "POST", { cliente_id: Number(documentClientId), titulo: documentTitle.trim(), documentos: documentItems.split(/\r?\n/).map((value) => value.trim()).filter(Boolean), instrucciones: documentInstructions.trim() || null }); if (ok) setShowDocumentRequestModal(false); }} className="w-full max-w-lg space-y-4 rounded-xl border border-[var(--border)] bg-[var(--surface)] p-5 shadow-2xl">
             <div className="flex items-start justify-between gap-3"><div><h2 id="document-request-title" className="text-base font-semibold text-[var(--foreground)]">Solicitar documento</h2><p className="mt-1 text-sm text-[var(--foreground-muted)]">La solicitud se mostrará al cliente asignado a este proceso.</p></div><button type="button" aria-label="Cerrar" onClick={() => setShowDocumentRequestModal(false)} className="rounded-md p-1 text-[var(--foreground-muted)] hover:bg-[var(--surface-secondary)]"><X className="size-5" /></button></div>
             <label className="block text-sm font-medium text-[var(--foreground)]">Cliente<select required value={documentClientId} onChange={(event) => setDocumentClientId(event.target.value)} className="mt-1.5 w-full rounded-lg border border-[var(--border)] bg-[var(--surface-secondary)] px-3 py-2.5"><option value="">Selecciona un cliente</option>{process.clientes.map((client) => <option key={client.id} value={client.id}>{client.nombre_completo}</option>)}</select></label>
@@ -1393,7 +1393,7 @@ export default function ProcesoDetallePage({ section }: { section?: string }) {
       )}
 
       {documentPreview && (
-        <div role="dialog" aria-modal="true" aria-labelledby="document-preview-title" className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 p-3 backdrop-blur-sm sm:p-6">
+        <div role="dialog" aria-modal="true" aria-labelledby="document-preview-title" className="motion-overlay fixed inset-0 z-[60] flex items-center justify-center bg-black/60 p-3 backdrop-blur-sm sm:p-6">
           <section className="flex max-h-[94vh] w-full max-w-6xl flex-col overflow-hidden rounded-2xl border border-[var(--border)] bg-[var(--surface)] shadow-2xl">
             <header className="flex flex-wrap items-center justify-between gap-3 border-b border-[var(--border)] px-4 py-3 sm:px-6"><div className="min-w-0"><h2 id="document-preview-title" className="truncate font-semibold">{documentPreview.name}</h2><p className="text-xs text-[var(--foreground-muted)]">Vista del documento · {documentPreview.estado.replaceAll("_", " ")}</p></div><button type="button" onClick={closeDocumentPreview} aria-label="Cerrar vista del documento" className="rounded-md p-2 hover:bg-[var(--surface-secondary)]"><X className="size-5" /></button></header>
             <div className="grid min-h-0 flex-1 gap-4 overflow-y-auto p-4 lg:grid-cols-[minmax(0,1fr)_18rem] lg:p-6">
@@ -1409,7 +1409,7 @@ export default function ProcesoDetallePage({ section }: { section?: string }) {
 
       {/* MODAL CLIENTE */}
       {showClientModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm">
+        <div className="motion-overlay fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm">
           <div className="w-full max-w-lg overflow-hidden rounded-2xl border border-[var(--border)] bg-[var(--surface)] shadow-2xl">
             <div className="flex items-center justify-between border-b border-[var(--border)] px-5 py-4">
               <div>
@@ -1503,7 +1503,7 @@ export default function ProcesoDetallePage({ section }: { section?: string }) {
 
       {/* MODAL RADICADO */}
       {showRadicadoModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm">
+        <div className="motion-overlay fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm">
           <div className="w-full max-w-lg overflow-hidden rounded-2xl border border-[var(--border)] bg-[var(--surface)] shadow-2xl">
             <div className="flex items-center justify-between border-b border-[var(--border)] px-5 py-4">
               <div>
@@ -1656,7 +1656,7 @@ export default function ProcesoDetallePage({ section }: { section?: string }) {
 
       {/* MODAL TAREA */}
       {showTaskModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm">
+        <div className="motion-overlay fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm">
           <div className="max-h-[92vh] w-full max-w-2xl overflow-y-auto rounded-2xl border border-[var(--border)] bg-[var(--surface)] shadow-2xl">
             <div className="flex items-center justify-between border-b border-[var(--border)] px-5 py-4">
               <div>

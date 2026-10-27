@@ -489,7 +489,7 @@ export default function RadicadosPage() {
   ];
 
   return (
-    <section className="mx-auto max-w-7xl space-y-5">
+    <section className="motion-swap mx-auto max-w-7xl space-y-5">
       <PageHeader
         overline="Expedientes"
         title="Radicados"
@@ -551,7 +551,7 @@ export default function RadicadosPage() {
       {/* MODAL CREAR RADICADO */}
       {showCreateModal && (
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-brand-950/40 px-4 backdrop-blur-xs"
+          className="motion-overlay fixed inset-0 z-50 flex items-center justify-center bg-brand-950/40 px-4 backdrop-blur-xs"
           onMouseDown={(event) => {
             if (event.target === event.currentTarget) {
               setShowCreateModal(false);

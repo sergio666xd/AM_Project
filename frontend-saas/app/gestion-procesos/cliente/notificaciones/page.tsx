@@ -86,7 +86,7 @@ export default function NotificacionesClientePage() {
   const visible = useMemo(() => (unreadOnly ? items.filter((item) => !item.leida) : items), [items, unreadOnly]);
 
   return (
-    <section className="mx-auto max-w-4xl space-y-6 pb-24">
+    <section className="motion-swap mx-auto max-w-4xl space-y-6 pb-24">
       <PageHeader
         overline="Portal del cliente"
         title="Notificaciones"

@@ -1188,7 +1188,7 @@ export default function AdminResourcePage({ sector }: { sector: Sector }) {
             ];
 
   return (
-    <section className="mx-auto max-w-7xl space-y-5">
+    <section className="motion-swap mx-auto max-w-7xl space-y-5">
       <PageHeader
         overline={`Administración · ${sectorLabel}`}
         title={pageTitle}
@@ -1397,7 +1397,7 @@ export default function AdminResourcePage({ sector }: { sector: Sector }) {
         <DetailList items={detailItems} />
       </Drawer>
 
-      {detailRequest && <div className="fixed inset-0 z-50 flex items-center justify-center bg-brand-950/40 backdrop-blur-sm p-4" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) setDetailRequest(null); }}><section role="dialog" aria-modal="true" aria-labelledby="document-request-detail-title" className="w-full max-w-xl space-y-4 rounded-xl border border-border bg-surface p-5 shadow-2xl"><header className="flex items-start justify-between"><div><p className="text-xs uppercase text-primary">Solicitud documental · #{detailRequest.id}</p><h2 id="document-request-detail-title" className="mt-1 text-lg font-semibold">{detailRequest.titulo}</h2></div><button type="button" onClick={() => setDetailRequest(null)} aria-label="Cerrar detalle" className="rounded-md p-2 hover:bg-surface-hover"><X className="size-4" /></button></header><dl className="grid gap-3 sm:grid-cols-2">{([["Proceso", detailRequest.proceso], ["Cliente", detailRequest.cliente], ["Estado", detailRequest.estado], ["Documento", detailRequest.documento ?? "Pendiente de carga"], ["Solicitado", detailRequest.solicitado_en], ["Fecha límite", detailRequest.fecha_limite]] as const).map(([label, value]) => <div key={label} className="rounded-lg border border-border p-3"><dt className="text-xs text-foreground-muted">{label}</dt><dd className="mt-1 break-words text-sm font-medium">{display(value)}</dd></div>)}</dl><section className="space-y-2"><h3 className="text-sm font-semibold">Documentos solicitados y estado</h3>{detailRequest.documentos_requeridos.map((requested) => <article key={requested.id} className="rounded-lg border border-border p-3"><p className="font-medium">{requested.nombre} · {requested.estado.replaceAll("_", " ")}</p>{requested.archivo && <p className="text-xs text-foreground-muted">Archivo: {requested.archivo}</p>}{requested.comentario && <p className="mt-1 text-sm text-amber-700">Observación: {requested.comentario}</p>}{requested.documento_id && <button type="button" onClick={() => { const row = rows.find((item) => item.id === requested.documento_id); setDetailRequest(null); if (row) openEdit(row); }} className="mt-2 text-sm text-primary underline">Revisar documento</button>}</article>)}</section>{detailRequest.documento_id && <button type="button" onClick={() => { const row = rows.find((item) => item.id === detailRequest.documento_id); setDetailRequest(null); if (row) openEdit(row); }} className="rounded-md bg-primary px-3 py-2 text-sm font-semibold !text-white">Revisar documento</button>}</section></div>}
+      {detailRequest && <div className="motion-overlay fixed inset-0 z-50 flex items-center justify-center bg-brand-950/40 backdrop-blur-sm p-4" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) setDetailRequest(null); }}><section role="dialog" aria-modal="true" aria-labelledby="document-request-detail-title" className="w-full max-w-xl space-y-4 rounded-xl border border-border bg-surface p-5 shadow-2xl"><header className="flex items-start justify-between"><div><p className="text-xs uppercase text-primary">Solicitud documental · #{detailRequest.id}</p><h2 id="document-request-detail-title" className="mt-1 text-lg font-semibold">{detailRequest.titulo}</h2></div><button type="button" onClick={() => setDetailRequest(null)} aria-label="Cerrar detalle" className="rounded-md p-2 hover:bg-surface-hover"><X className="size-4" /></button></header><dl className="grid gap-3 sm:grid-cols-2">{([["Proceso", detailRequest.proceso], ["Cliente", detailRequest.cliente], ["Estado", detailRequest.estado], ["Documento", detailRequest.documento ?? "Pendiente de carga"], ["Solicitado", detailRequest.solicitado_en], ["Fecha límite", detailRequest.fecha_limite]] as const).map(([label, value]) => <div key={label} className="rounded-lg border border-border p-3"><dt className="text-xs text-foreground-muted">{label}</dt><dd className="mt-1 break-words text-sm font-medium">{display(value)}</dd></div>)}</dl><section className="space-y-2"><h3 className="text-sm font-semibold">Documentos solicitados y estado</h3>{detailRequest.documentos_requeridos.map((requested) => <article key={requested.id} className="rounded-lg border border-border p-3"><p className="font-medium">{requested.nombre} · {requested.estado.replaceAll("_", " ")}</p>{requested.archivo && <p className="text-xs text-foreground-muted">Archivo: {requested.archivo}</p>}{requested.comentario && <p className="mt-1 text-sm text-amber-700">Observación: {requested.comentario}</p>}{requested.documento_id && <button type="button" onClick={() => { const row = rows.find((item) => item.id === requested.documento_id); setDetailRequest(null); if (row) openEdit(row); }} className="mt-2 text-sm text-primary underline">Revisar documento</button>}</article>)}</section>{detailRequest.documento_id && <button type="button" onClick={() => { const row = rows.find((item) => item.id === detailRequest.documento_id); setDetailRequest(null); if (row) openEdit(row); }} className="rounded-md bg-primary px-3 py-2 text-sm font-semibold !text-white">Revisar documento</button>}</section></div>}
       {formOpen && (
         <div
           role="dialog"
@@ -1407,7 +1407,7 @@ export default function AdminResourcePage({ sector }: { sector: Sector }) {
               ? `Editar ${resourceNames[resource]}`
               : `Crear ${resourceNames[resource]}`
           }
-          className="fixed inset-0 z-50 flex items-center justify-center bg-brand-950/40 backdrop-blur-sm p-4"
+          className="motion-overlay fixed inset-0 z-50 flex items-center justify-center bg-brand-950/40 backdrop-blur-sm p-4"
         >
           <form
             onSubmit={save}
@@ -1734,7 +1734,7 @@ export default function AdminResourcePage({ sector }: { sector: Sector }) {
           role="dialog"
           aria-modal="true"
           aria-label="Enlace temporal del documento"
-          className="fixed inset-0 z-50 flex items-center justify-center bg-brand-950/40 backdrop-blur-sm p-4"
+          className="motion-overlay fixed inset-0 z-50 flex items-center justify-center bg-brand-950/40 backdrop-blur-sm p-4"
         >
           <section className="w-full max-w-2xl space-y-4 rounded-lg border border-border bg-surface p-5 shadow-2xl">
             <header className="flex items-start justify-between gap-4">
@@ -1763,7 +1763,7 @@ export default function AdminResourcePage({ sector }: { sector: Sector }) {
           role="dialog"
           aria-modal="true"
           aria-label={`Equipo del proceso ${teamProcess.nombre}`}
-          className="fixed inset-0 z-50 flex items-center justify-center bg-brand-950/40 backdrop-blur-sm p-4"
+          className="motion-overlay fixed inset-0 z-50 flex items-center justify-center bg-brand-950/40 backdrop-blur-sm p-4"
         >
           <section className="w-full max-w-xl space-y-4 rounded-xl border border-border bg-surface p-5 shadow-2xl">
             <header className="flex items-start justify-between gap-3">

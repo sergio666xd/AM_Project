@@ -100,7 +100,7 @@ export default function AdminChatCleanupPage() {
   }
 
   return (
-    <div className="space-y-5">
+    <div className="motion-swap space-y-5">
       <PageHeader
         overline="Panel Administrativo · Chat"
         title="Limpiar conversaciones"

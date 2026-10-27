@@ -330,7 +330,7 @@ export default function ClientesPage() {
   }
 
   return (
-    <section className="mx-auto max-w-7xl space-y-5">
+    <section className="motion-swap mx-auto max-w-7xl space-y-5">
       <PageHeader
         overline="Despacho"
         title="Clientes"
@@ -400,7 +400,7 @@ export default function ClientesPage() {
           role="dialog"
           aria-modal="true"
           aria-labelledby="create-client-title"
-          className="fixed inset-0 z-50 flex items-center justify-center bg-brand-950/40 backdrop-blur-sm p-4 backdrop-blur-sm"
+          className="motion-overlay fixed inset-0 z-50 flex items-center justify-center bg-brand-950/40 backdrop-blur-sm p-4 backdrop-blur-sm"
           onMouseDown={(event) => {
             if (event.target === event.currentTarget) {
               closeCreateModal();
@@ -535,7 +535,7 @@ export default function ClientesPage() {
           role="dialog"
           aria-modal="true"
           aria-labelledby="edit-client-title"
-          className="fixed inset-0 z-50 flex items-center justify-center bg-brand-950/40 backdrop-blur-sm p-4 backdrop-blur-sm"
+          className="motion-overlay fixed inset-0 z-50 flex items-center justify-center bg-brand-950/40 backdrop-blur-sm p-4 backdrop-blur-sm"
           onMouseDown={(event) => {
             if (event.target === event.currentTarget) {
               closeEditModal();

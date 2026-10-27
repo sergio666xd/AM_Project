@@ -32,7 +32,7 @@ const faqs = [
 
 export default function AyudaClientePage() {
   return (
-    <section className="mx-auto max-w-4xl space-y-6 pb-24">
+    <section className="motion-swap mx-auto max-w-4xl space-y-6 pb-24">
       <PageHeader
         overline="Portal del cliente"
         title="Centro de ayuda"

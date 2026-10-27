@@ -105,7 +105,7 @@ export default function AdminFirmSettingsPage() {
     {error && <p role="alert" className="rounded-md border border-danger/30 bg-danger-light p-3 text-sm text-danger">{error}</p>}
     {notice && <p role="status" className="rounded-md border border-success/30 bg-success-light p-3 text-sm text-success">{notice}</p>}
     {settings.updated_at && <p className="text-xs text-foreground-muted">Última actualización: {new Date(`${settings.updated_at.replace(/Z$/, "")}Z`).toLocaleString("es-CO", { timeZone: "America/Bogota" })}</p>}
-    {loading ? <p className="py-12 text-center text-sm text-foreground-muted">Cargando configuración…</p> : <form onSubmit={save} className="space-y-5">
+    {loading ? <p className="motion-delayed-in py-12 text-center text-sm text-foreground-muted">Cargando configuración…</p> : <form onSubmit={save} className="space-y-5">
       <fieldset className="grid gap-4 rounded-lg border border-border bg-surface p-4 sm:grid-cols-2">
         <legend className="px-2 font-semibold">Identidad y presencia pública</legend>
         <label className="text-sm font-medium sm:col-span-2">Nombre de la firma<input required maxLength={180} className={input} value={settings.nombre} onChange={(e) => set("nombre", e.target.value)} /></label>

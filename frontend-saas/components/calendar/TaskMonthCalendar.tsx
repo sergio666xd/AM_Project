@@ -31,6 +31,8 @@ export default function TaskMonthCalendar({ tasks }: { tasks: CalendarTask[] }) 
   const now = new Date();
   const today = dateKey(now);
   const [month, setMonth] = useState(() => new Date(now.getFullYear(), now.getMonth(), 1));
+  // Dirección del último cambio de mes: la cuadrícula entra deslizándose desde ese lado.
+  const [direction, setDirection] = useState<1 | -1>(1);
   const [selectedDay, setSelectedDay] = useState(today);
   const firstOfMonth = new Date(month.getFullYear(), month.getMonth(), 1);
   const gridStart = new Date(firstOfMonth);
@@ -51,12 +53,14 @@ export default function TaskMonthCalendar({ tasks }: { tasks: CalendarTask[] }) 
   const monthTitle = monthFormatter.format(month);
 
   function moveMonth(delta: number) {
+    setDirection(delta > 0 ? 1 : -1);
     setMonth((current) => new Date(current.getFullYear(), current.getMonth() + delta, 1));
   }
 
   function selectDate(date: Date) {
     setSelectedDay(dateKey(date));
     if (date.getMonth() !== month.getMonth() || date.getFullYear() !== month.getFullYear()) {
+      setDirection(date > month ? 1 : -1);
       setMonth(new Date(date.getFullYear(), date.getMonth(), 1));
     }
   }
@@ -78,7 +82,7 @@ export default function TaskMonthCalendar({ tasks }: { tasks: CalendarTask[] }) 
       <div className="grid grid-cols-7 border-b border-[var(--border)] bg-[var(--surface-secondary)]/50">
         {weekdays.map((day) => <div key={day} className="px-1 py-2 text-center text-[10px] font-semibold uppercase tracking-wide text-[var(--foreground-muted)] sm:text-xs">{day}</div>)}
       </div>
-      <div className="grid grid-cols-7">
+      <div key={`${month.getFullYear()}-${month.getMonth()}`} className={`grid grid-cols-7 ${direction > 0 ? "motion-slide-next" : "motion-slide-prev"}`}>
         {dates.map((date) => {
           const key = dateKey(date);
           const dayTasks = tasksByDay.get(key) ?? [];
@@ -92,7 +96,7 @@ export default function TaskMonthCalendar({ tasks }: { tasks: CalendarTask[] }) 
           );
         })}
       </div>
-      <section aria-label={`Tareas del ${dayFormatter.format(selectedDate)}`} className="space-y-2 p-4 sm:p-5">
+      <section key={selectedDay} aria-label={`Tareas del ${dayFormatter.format(selectedDate)}`} className="motion-swap space-y-2 p-4 sm:p-5">
         <h3 className="text-sm font-semibold capitalize text-[var(--foreground)]">{dayFormatter.format(selectedDate)}</h3>
         {selectedTasks.length ? selectedTasks.map((task) => {
           const content = <><span className="min-w-0"><span className="block truncate text-sm font-medium text-[var(--foreground)]">{task.titulo}</span><span className="mt-0.5 block text-xs text-[var(--foreground-muted)]">{task.estado.replaceAll("_", " ")}{task.prioridad ? ` · ${task.prioridad.toLowerCase()}` : ""}</span></span>{!task.soloFecha && <span className="inline-flex shrink-0 items-center gap-1.5 text-xs text-[var(--foreground-muted)]"><Clock3 className="size-3.5" />{timeFormatter.format(new Date(task.fecha_limite!))}</span>}</>;

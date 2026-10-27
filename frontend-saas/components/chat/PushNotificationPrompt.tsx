@@ -195,7 +195,7 @@ export default function PushNotificationPrompt() {
 
   if (!supported || checking || !token || !user || !open) return null;
 
-  return <div className="fixed inset-0 z-[100] grid place-items-center bg-black/45 p-4" role="presentation">
+  return <div className="motion-overlay fixed inset-0 z-[100] grid place-items-center bg-black/45 p-4" role="presentation">
     <section role="dialog" aria-modal="true" aria-labelledby="push-prompt-title" className="w-full max-w-md rounded-2xl border border-border bg-surface p-6 text-foreground shadow-2xl">
       <button type="button" onClick={dismiss} aria-label="Cerrar aviso" className="float-right rounded-lg p-2 text-foreground-muted hover:bg-surface-hover"><X className="size-4" /></button>
       <span className="grid size-12 place-items-center rounded-full bg-primary/10 text-primary"><BellRing className="size-6" /></span>

@@ -228,7 +228,7 @@ export default function AdminDashboard() {
   const attentionItems = data.atencion.filter((item) => item.count > 0);
 
   return (
-    <section className="mx-auto max-w-7xl space-y-6">
+    <section className="motion-swap mx-auto max-w-7xl space-y-6">
       {error && <Alert kind="error">Algunos datos no pudieron actualizarse. Puedes reintentar.</Alert>}
 
       {/* Page header with greeting */}

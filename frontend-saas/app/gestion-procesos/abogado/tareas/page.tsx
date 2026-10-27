@@ -554,7 +554,7 @@ export default function TareasPage() {
   const selectClass = "h-10 w-full rounded-[var(--radius-md)] border border-border bg-background px-3 text-sm text-foreground";
 
   return (
-    <div className="mx-auto max-w-7xl space-y-5">
+    <div className="motion-swap mx-auto max-w-7xl space-y-5">
       <PageHeader
         overline="Mi día"
         title="Tareas"
@@ -1033,7 +1033,7 @@ function NuevaTareaModal({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-4"
+      className="motion-overlay fixed inset-0 z-50 flex items-center justify-center p-4"
       style={{ background: "rgba(0, 0, 0, 0.5)" }}
       onMouseDown={(event) => {
         if (event.target === event.currentTarget) {

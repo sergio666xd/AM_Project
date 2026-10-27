@@ -419,6 +419,50 @@
     80%, 100% { transform: scale(2.2); opacity: 0; }
   }
 
+  @keyframes motion-swap-in {
+    from { opacity: 0; transform: translateY(4px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  @keyframes motion-slide-next {
+    from { opacity: 0; transform: translateX(16px); }
+    to { opacity: 1; transform: translateX(0); }
+  }
+
+  @keyframes motion-slide-prev {
+    from { opacity: 0; transform: translateX(-16px); }
+    to { opacity: 1; transform: translateX(0); }
+  }
+
+  @keyframes motion-message-in {
+    from { opacity: 0; transform: translateY(8px) scale(0.98); }
+    to { opacity: 1; transform: translateY(0) scale(1); }
+  }
+
+  @keyframes motion-indicator-in {
+    from { transform: scaleY(0); opacity: 0; }
+    to { transform: scaleY(1); opacity: 1; }
+  }
+
+  @keyframes motion-flash {
+    from { background-color: var(--primary-light); }
+  }
+
+  @keyframes motion-breathe {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.55; }
+  }
+
+  @keyframes motion-grow-x {
+    from { transform: scaleX(0); }
+    to { transform: scaleX(1); }
+  }
+
+  @keyframes motion-progress {
+    from { transform: translateX(-100%); }
+    to { transform: translateX(250%); }
+  }
+
   @keyframes motion-shimmer {
     from { background-position: 150% 0; }
     to { background-position: -50% 0; }
@@ -499,18 +543,133 @@
     .motion-hover-lift:hover { transform: translateY(-2px); box-shadow: var(--shadow-md); }
   }
 
+  /* Contenedor cuyos hijos aparecen al montarse: pestañas, vistas, avisos y
+     bloques que se muestran u ocultan. Los hijos que ya estaban no se vuelven a
+     animar. Con especificidad cero para que la clase propia de un hijo gane. */
+  :where(.motion-swap) > * { animation: motion-swap-in var(--motion-base) var(--ease-out) backwards; }
+
+  /* Superposiciones propias de cada página (formularios y vistas previas):
+     el fondo aparece con fundido y el último hijo, el panel, con escala. */
+  .motion-overlay { animation: motion-fade-in var(--motion-base) var(--ease-out) backwards; }
+  .motion-overlay > :last-child { animation: motion-dialog-in var(--motion-base) var(--ease-out) 40ms backwards; }
+  .motion-overlay-side { animation: motion-fade-in var(--motion-base) var(--ease-out) backwards; }
+  .motion-overlay-side > :last-child { animation: motion-slide-in-right var(--motion-slow) var(--ease-out) backwards; }
+
+
+  /* Paneles de pestaña que se ocultan con display: none; la animación se
+     repite cada vez que el panel vuelve a mostrarse. */
+  .motion-tab-panel { animation: motion-swap-in var(--motion-base) var(--ease-out) backwards; }
+
+  /* Cambio de periodo en calendarios: entra desde el lado hacia el que se avanzó. */
+  .motion-slide-next { animation: motion-slide-next var(--motion-slow) var(--ease-out) backwards; }
+  .motion-slide-prev { animation: motion-slide-prev var(--motion-slow) var(--ease-out) backwards; }
+
+  /* Mensajes del chat: entrada corta desde abajo. */
+  .motion-message-in { animation: motion-message-in var(--motion-base) var(--ease-out) backwards; }
+
+  /* Indicador de sección activa en la navegación lateral. */
+  .motion-indicator { animation: motion-indicator-in var(--motion-slow) var(--ease-out) backwards; transform-origin: center; }
+
+  /* Resalta un elemento recién creado o actualizado y se desvanece. */
+  .motion-flash { animation: motion-flash 1.4s ease-out; }
+
+  /* Barra de progreso indeterminada (consultas y cargas en curso). */
+  .motion-progress { position: relative; overflow: hidden; }
+  .motion-progress::after {
+    position: absolute;
+    inset: 0 auto 0 0;
+    width: 40%;
+    content: "";
+    border-radius: inherit;
+    background: currentColor;
+    animation: motion-progress 1.2s var(--ease-out) infinite;
+  }
+
+  /* Estado en curso (p. ej. "Consultando"): respiración suave de opacidad. */
+  .motion-breathe { animation: motion-breathe 1.6s ease-in-out infinite; }
+
+  /* Barras de avance: se llenan desde la izquierda al aparecer. */
+  .motion-grow-x { animation: motion-grow-x 700ms var(--ease-out) backwards; transform-origin: left center; }
+
+  /* Comportamiento por defecto dentro de los paneles. :where() deja la
+     especificidad en cero para que cualquier clase motion-* o utilidad gane. */
+  :where([data-panel]) :where([role="alert"]) {
+    animation: motion-shake 360ms ease-in-out backwards;
+  }
+
+  /* Avisos de éxito e informativos que aparecen tras una acción. */
+  :where([data-panel]) :where([role="status"], output) {
+    animation: motion-rise-in var(--motion-base) var(--ease-out) backwards;
+  }
+
+  :where([data-panel]) :where([role="dialog"][aria-modal="true"]) {
+    animation: motion-dialog-in var(--motion-base) var(--ease-out) backwards;
+  }
+
+  :where([data-panel]) :where(details[open] > :not(summary)) {
+    animation: motion-rise-in var(--motion-base) var(--ease-out) backwards;
+  }
+
+  :where([data-panel]) :where(details > summary) {
+    transition: color var(--motion-fast) ease, background-color var(--motion-fast) ease;
+  }
+
+  /* Barras de progreso: se llenan al aparecer y siguen los cambios de valor. */
+  :where([data-panel]) :where([role="progressbar"] > *) {
+    transform-origin: left center;
+    transition: width var(--motion-slow) var(--ease-out);
+    animation: motion-grow-x 700ms var(--ease-out) backwards;
+  }
+
+  /* Campos de formulario: el foco y los errores cambian de color con suavidad. */
+  :where([data-panel]) :where(input, select, textarea) {
+    transition: border-color var(--motion-fast) ease, box-shadow var(--motion-fast) ease, background-color var(--motion-fast) ease;
+  }
+
+  :where([data-panel]) :where(input[aria-invalid="true"], select[aria-invalid="true"], textarea[aria-invalid="true"]) {
+    animation: motion-shake 360ms ease-in-out backwards;
+  }
+
+  /* Botones y enlaces: cambios de color suaves y una leve escala al pulsar.
+     Se excluyen los fondos de modales (botones fixed o absolute a pantalla completa). */
+  :where([data-panel]) :where(button, a, [role="button"], summary) {
+    transition-property: color, background-color, border-color, box-shadow, opacity, transform;
+    transition-duration: var(--motion-fast);
+    transition-timing-function: var(--ease-out);
+  }
+
+  :where([data-panel]) :where(button:not(:disabled, .fixed, .absolute), [role="button"]):active {
+    transform: scale(0.98);
+  }
+
+  /* Interruptores (checkbox de tipo switch y casillas). */
+  :where([data-panel]) :where(input[type="checkbox"], input[type="radio"]):checked {
+    animation: motion-pop 240ms var(--ease-out);
+  }
+
+  /* Filas de tabla seleccionables: el resaltado entra con transición. */
+  :where([data-panel]) :where(tbody > tr) {
+    transition: background-color var(--motion-fast) ease;
+  }
+
   @media (prefers-reduced-motion: reduce) {
     .motion-fade-in, .motion-fade-out, .motion-rise-in, .motion-drop-in, .motion-lift-in,
     .motion-dialog-in, .motion-dialog-out, .motion-slide-in-right, .motion-slide-out-right,
     .motion-sheet-in, .motion-toast-in, .motion-toast-out, .motion-page, .motion-delayed-in,
-    .motion-stagger > *, .motion-pop, .motion-shake, .skeleton, .motion-attention::after {
+    .motion-stagger > *, .motion-pop, .motion-shake, .skeleton, .motion-attention::after,
+    .motion-overlay, .motion-overlay > :last-child, .motion-overlay-side, .motion-overlay-side > :last-child,
+    .motion-swap > *, .motion-tab-panel, .motion-slide-next, .motion-slide-prev, .motion-message-in, .motion-indicator, .motion-breathe, .motion-grow-x, [data-panel] [role="progressbar"] > *, .motion-flash, .motion-progress::after,
+    [data-panel] [role="alert"], [data-panel] [role="status"], [data-panel] [role="dialog"],
+    [data-panel] details[open] > :not(summary), [data-panel] input, [data-panel] select, [data-panel] textarea {
       animation: none;
     }
 
     .motion-attention::after { display: none; }
 
     .motion-press:active:not(:disabled),
-    .motion-hover-lift:hover {
+    .motion-hover-lift:hover,
+    [data-panel] button:active,
+    [data-panel] [role="button"]:active {
       transform: none;
     }
   }

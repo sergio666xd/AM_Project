@@ -212,7 +212,7 @@ function NavSection({ section, pathname, onNavigate }: { section: NavSection; pa
                 >
                   {active && (
                     <span
-                      className="absolute left-0 top-2 bottom-2 w-[3px] rounded-r-full bg-gold-400"
+                      className="motion-indicator absolute left-0 top-2 bottom-2 w-[3px] rounded-r-full bg-gold-400"
                       aria-hidden="true"
                     />
                   )}
@@ -348,7 +348,7 @@ export default function AdminConsoleShell({ children }: { children: ReactNode })
                 >
                   {active && (
                     <span
-                      className="absolute left-0 top-2 bottom-2 w-[3px] rounded-r-full bg-gold-400"
+                      className="motion-indicator absolute left-0 top-2 bottom-2 w-[3px] rounded-r-full bg-gold-400"
                       aria-hidden="true"
                     />
                   )}
@@ -418,7 +418,7 @@ export default function AdminConsoleShell({ children }: { children: ReactNode })
   }
 
   return (
-    <div className={`${isChatRoute ? "h-dvh overflow-hidden" : "min-h-screen"} bg-background text-foreground`}>
+    <div data-panel className={`${isChatRoute ? "h-dvh overflow-hidden" : "min-h-screen"} bg-background text-foreground`}>
       <ChatPresenceHeartbeat />
       <PushNotificationPrompt />
 

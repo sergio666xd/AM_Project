@@ -87,7 +87,7 @@ function obtenerEstadoVisual(estado: string) {
   if (estadoNormalizado === "ejecutando") {
     return {
       label: "Consultando",
-      className: "bg-blue-500/10 text-blue-600 dark:text-blue-400",
+      className: "motion-breathe bg-blue-500/10 text-blue-600 dark:text-blue-400",
     };
   }
 
@@ -786,7 +786,7 @@ export default function RadicadosPage() {
   }
 
   return (
-    <div className="space-y-5">
+    <div className="motion-swap space-y-5">
       {/* =========================================================
           NOTIFICACIÓN
       ========================================================== */}
@@ -1377,7 +1377,7 @@ export default function RadicadosPage() {
       ========================================================== */}
       {showAddModal && (
         <div
-          className="fixed inset-0 z-[9998] flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm"
+          className="motion-overlay fixed inset-0 z-[9998] flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm"
           onMouseDown={(event) => {
             if (event.target === event.currentTarget) {
               if (!adding) {

@@ -191,7 +191,7 @@ export function SecurityChangeButton({ action, title, token, whatsappAvailable, 
       {notice && <p role="status" className="text-xs text-success">{notice}</p>}
       {error && !open && <p role="alert" className="text-xs text-danger">{error}</p>}
     </div>
-    {open && <div className="fixed inset-0 z-[100] flex items-center justify-center overflow-y-auto bg-black/50 p-4" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) void closePopup(); }}>
+    {open && <div className="motion-overlay fixed inset-0 z-[100] flex items-center justify-center overflow-y-auto bg-black/50 p-4" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) void closePopup(); }}>
       <section role="dialog" aria-modal="true" aria-labelledby={`security-${action}-title`} onKeyDown={(event) => { if (event.key === "Escape") void closePopup(); }} className="w-full max-w-md space-y-4 rounded-2xl border border-border bg-surface p-5 shadow-2xl">
         <header className="flex items-start justify-between gap-4">
           <div><h2 id={`security-${action}-title`} className="font-semibold">{title}</h2><p className="mt-1 text-sm text-foreground-muted">Valida tu identidad primero. El código vence en 3 minutos.</p></div>
