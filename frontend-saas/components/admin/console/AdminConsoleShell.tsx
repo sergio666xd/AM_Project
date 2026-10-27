@@ -387,7 +387,8 @@ export default function AdminConsoleShell({ children }: { children: ReactNode })
           </button>
 
           {userMenuOpen && (
-            <div className="absolute bottom-full left-3 right-3 mb-2 overflow-hidden rounded-[var(--radius-lg)] border border-border bg-surface text-foreground shadow-lg">
+            /* Con la barra colapsada el menú se abre a la derecha de la barra para no recortarse. */
+            <div className={`absolute z-50 overflow-hidden ${collapsed ? "bottom-3 left-full ml-2 w-64" : "bottom-full left-3 right-3 mb-2"} rounded-[var(--radius-lg)] border border-border bg-surface text-foreground shadow-lg`}>
               <div className="border-b border-border px-4 py-3">
                 <p className="text-sm font-semibold text-foreground">{user?.nombre_completo || "Administrador"}</p>
                 {user?.email && <p className="mt-0.5 truncate text-xs text-foreground-muted">{user.email}</p>}
