@@ -45,7 +45,7 @@ export function MarketingContactCta() {
         </div>
 
         <p className="text-xs text-neutral-400 pt-2">
-          Atención en Sabaneta, Antioquia y representación en toda Colombia · T.P. 375.092 C.S. de la J.
+          Atención en Sabaneta, Antioquia y representación en toda Colombia
         </p>
       </div>
     </section>

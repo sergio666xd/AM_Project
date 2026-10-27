@@ -96,7 +96,7 @@ export default async function Home() {
                 </span>
                 <div>
                   <h2 className="text-base font-bold text-white">Alejandra Muñoz Marín</h2>
-                  <p className="text-xs text-gold-300">T.P. 375.092 C.S. de la J.</p>
+                  <p className="text-xs text-gold-300">Abogada titular</p>
                 </div>
               </div>
 

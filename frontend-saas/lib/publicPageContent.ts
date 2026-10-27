@@ -17,22 +17,29 @@ function mergeContent<T>(defaults: T, override: unknown): T {
   return (override ?? defaults) as T;
 }
 
+// URL absoluta de la API para peticiones hechas desde el servidor.
+export function serverApiUrl(path: string): URL | null {
+  const configuredBaseUrl = process.env.BACKEND_SERVICE_URL || API_URL;
+  if (!configuredBaseUrl) return null;
+  const apiBase = new URL(configuredBaseUrl);
+  const basePath = apiBase.pathname.replace(/\/+$/, "");
+  const apiPath = basePath.endsWith("/api") ? basePath : `${basePath}/api`;
+  apiBase.pathname = `${apiPath}${path}`;
+  apiBase.search = "";
+  apiBase.hash = "";
+  return apiBase;
+}
+
 export async function loadPublicPageContent<T>(slug: PublicPageSlug, defaults: T): Promise<T> {
   try {
     // Vercel service bindings are injected at request time, not while building static pages.
     await connection();
     // Vercel's service binding is server-only; browser requests continue using the /api rewrite.
-    const configuredBaseUrl = process.env.BACKEND_SERVICE_URL || API_URL;
-    if (!configuredBaseUrl) {
+    const apiBase = serverApiUrl(`/contenido-publico/${encodeURIComponent(slug)}`);
+    if (!apiBase) {
       console.error(`[publicPageContent] No hay una URL de API configurada para cargar "${slug}".`);
       return defaults;
     }
-    const apiBase = new URL(configuredBaseUrl);
-    const basePath = apiBase.pathname.replace(/\/+$/, "");
-    const apiPath = basePath.endsWith("/api") ? basePath : `${basePath}/api`;
-    apiBase.pathname = `${apiPath}/contenido-publico/${encodeURIComponent(slug)}`;
-    apiBase.search = "";
-    apiBase.hash = "";
     const response = await fetch(apiBase, { cache: "no-store" });
     if (!response.ok) {
       console.error(`[publicPageContent] La API respondió ${response.status} al cargar "${slug}".`);

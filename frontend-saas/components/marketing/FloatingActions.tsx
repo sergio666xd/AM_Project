@@ -30,7 +30,7 @@ export function FloatingActions() {
         href="https://wa.me/573508809878?text=Hola%2C%20quiero%20recibir%20asesor%C3%ADa%20jur%C3%ADdica."
         target="_blank"
         rel="noreferrer"
-        aria-label="Escribir a WhatsApp de la firma"
+        aria-label="Escribir a WhatsApp de Alejandra Muñoz"
         title="Escribir por WhatsApp"
         className="group relative grid size-14 place-items-center rounded-full bg-[#25d366] text-white shadow-xl transition-all hover:scale-105 hover:shadow-2xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400 focus-visible:ring-offset-2"
       >

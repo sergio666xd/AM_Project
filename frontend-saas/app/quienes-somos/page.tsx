@@ -4,7 +4,7 @@ import { MarketingLayout } from "@/components/marketing/MarketingLayout";
 import { loadPublicPageContent } from "@/lib/publicPageContent";
 import { SITE_PAGE_DEFAULTS } from "@/lib/sitePageDefaults";
 import { generatePublicPageMetadata } from "@/lib/pageSeo";
-import { CheckCircle2, ShieldCheck } from "lucide-react";
+import { CheckCircle2 } from "lucide-react";
 
 export function generateMetadata() {
   return generatePublicPageMetadata("quienes-somos", SITE_PAGE_DEFAULTS["quienes-somos"], "/quienes-somos");
@@ -27,22 +27,6 @@ export default async function QuienesSomos() {
           <p className="text-lg sm:text-xl leading-relaxed text-foreground-muted">
             {renderRichText(content.intro)}
           </p>
-        </div>
-
-        {/* Credentials Callout Card */}
-        <div className="rounded-2xl border border-gold-400/30 bg-gold-400/10 p-6 sm:p-8 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-6">
-          <div className="space-y-1">
-            <h2 className="text-base font-bold text-brand-950 flex items-center gap-2">
-              <ShieldCheck className="size-5 text-gold-600" aria-hidden="true" />
-              Dirección Jurídica Titular
-            </h2>
-            <p className="text-sm text-foreground-muted">
-              Yeinny Alejandra Muñoz Marín · T.P. 375.092 del Consejo Superior de la Judicatura.
-            </p>
-          </div>
-          <span className="inline-flex rounded-xl bg-brand-900 px-4 py-2 text-xs font-bold text-white shrink-0">
-            Sabaneta · Colombia
-          </span>
         </div>
 
         {/* Content Sections */}

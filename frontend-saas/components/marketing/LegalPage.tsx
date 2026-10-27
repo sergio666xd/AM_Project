@@ -109,7 +109,7 @@ export function LegalPage({
             href="/contacto"
             className="font-bold text-brand-900 hover:text-gold-600 underline transition-colors shrink-0"
           >
-            Comuníquese con la firma
+            Comuníquese con nosotros
           </Link>
         </div>
       </main>

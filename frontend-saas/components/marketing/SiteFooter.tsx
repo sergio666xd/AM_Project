@@ -1,8 +1,12 @@
 import Link from "next/link";
-import { Mail, MapPin, Phone, ShieldCheck } from "lucide-react";
+import { Mail, MapPin, MessageCircle, Phone } from "lucide-react";
+import { formatPhone, loadPublicContact, whatsappDigits } from "@/lib/publicContact";
 
-export function SiteFooter() {
+export async function SiteFooter() {
   const year = new Date().getFullYear();
+  // Datos configurados por la administración (Administración > Datos de la firma).
+  const contact = await loadPublicContact();
+  const location = [contact.direccion, contact.ciudad].filter(Boolean).join(" · ");
 
   return (
     <footer className="mt-20 border-t border-border/80 bg-brand-950 text-white">
@@ -10,19 +14,10 @@ export function SiteFooter() {
         <div className="grid gap-10 sm:grid-cols-2 lg:grid-cols-4">
           {/* Column 1: Identity & Purpose */}
           <div className="space-y-4">
-            <h3 className="text-lg font-bold text-white tracking-tight">
-              Alejandra Muñoz
-              <span className="block text-xs font-normal text-gold-400 uppercase tracking-widest mt-0.5">
-                Abogada y Asociados
-              </span>
-            </h3>
+            <h3 className="font-display text-xl font-medium text-white">{contact.nombre}</h3>
             <p className="text-xs leading-5 text-neutral-300">
               Asesoría jurídica preventiva, estratégica y cercana. Acompañamiento integral para personas, familias y empresas desde Sabaneta para toda Colombia.
             </p>
-            <div className="flex items-center gap-2 text-xs text-gold-300/90 pt-1">
-              <ShieldCheck className="size-4 shrink-0 text-gold-400" aria-hidden="true" />
-              <span>T.P. 375.092 C.S. de la J.</span>
-            </div>
           </div>
 
           {/* Column 2: Legal Practice Areas */}
@@ -65,33 +60,49 @@ export function SiteFooter() {
               Ubicación y atención
             </h4>
             <ul className="mt-4 space-y-3 text-xs text-neutral-300">
-              <li className="flex items-start gap-2">
-                <MapPin className="size-4 shrink-0 text-gold-400 mt-0.5" aria-hidden="true" />
-                <span>Sabaneta, Antioquia · Cobertura nacional en Colombia</span>
-              </li>
-              <li className="flex items-center gap-2">
-                <Phone className="size-4 shrink-0 text-gold-400" aria-hidden="true" />
-                <a
-                  href="https://wa.me/573508809878"
-                  target="_blank"
-                  rel="noreferrer"
-                  className="hover:text-gold-300 transition-colors"
-                >
-                  WhatsApp: +57 350 880 9878
-                </a>
-              </li>
-              <li className="flex items-center gap-2">
-                <Mail className="size-4 shrink-0 text-gold-400" aria-hidden="true" />
-                <a
-                  href="mailto:alejandramunozabg@outlook.com"
-                  className="hover:text-gold-300 transition-colors"
-                >
-                  alejandramunozabg@outlook.com
-                </a>
-              </li>
-              <li className="text-neutral-400 text-[11px] pt-1">
-                Lunes a Viernes · 8:00 AM – 5:00 PM
-              </li>
+              {location && (
+                <li className="flex items-start gap-2">
+                  <MapPin className="size-4 shrink-0 text-gold-400 mt-0.5" aria-hidden="true" />
+                  <span>{location}{contact.pais ? `, ${contact.pais}` : ""}</span>
+                </li>
+              )}
+              {contact.whatsapp && (
+                <li className="flex items-center gap-2">
+                  <MessageCircle className="size-4 shrink-0 text-gold-400" aria-hidden="true" />
+                  <a href={`https://wa.me/${whatsappDigits(contact.whatsapp)}`} target="_blank" rel="noreferrer" className="hover:text-gold-300 transition-colors">
+                    WhatsApp: {formatPhone(contact.whatsapp)}
+                  </a>
+                </li>
+              )}
+              {contact.telefono && (
+                <li className="flex items-center gap-2">
+                  <Phone className="size-4 shrink-0 text-gold-400" aria-hidden="true" />
+                  <a href={`tel:${contact.telefono.replace(/[^\d+]/g, "")}`} className="hover:text-gold-300 transition-colors">
+                    {formatPhone(contact.telefono)}
+                  </a>
+                </li>
+              )}
+              {contact.correo_contacto && (
+                <li className="flex items-center gap-2">
+                  <Mail className="size-4 shrink-0 text-gold-400" aria-hidden="true" />
+                  <a href={`mailto:${contact.correo_contacto}`} className="break-all hover:text-gold-300 transition-colors">
+                    {contact.correo_contacto}
+                  </a>
+                </li>
+              )}
+              {contact.correo_pqr && (
+                <li className="flex items-center gap-2">
+                  <Mail className="size-4 shrink-0 text-gold-400" aria-hidden="true" />
+                  <a href={`mailto:${contact.correo_pqr}`} className="break-all hover:text-gold-300 transition-colors">
+                    PQR: {contact.correo_pqr}
+                  </a>
+                </li>
+              )}
+              {!contact.mostrar_contacto && (
+                <li>
+                  <Link href="/contacto" className="hover:text-gold-300 transition-colors">Escríbenos desde la página de contacto</Link>
+                </li>
+              )}
             </ul>
           </div>
 
@@ -132,7 +143,7 @@ export function SiteFooter() {
 
         {/* Bottom bar */}
         <div className="mt-12 pt-8 border-t border-white/10 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-neutral-400">
-          <p>© {year} Alejandra Muñoz | Abogada y Asociados. Todos los derechos reservados.</p>
+          <p>© {year} {contact.nombre}. Todos los derechos reservados.</p>
           <div className="flex items-center gap-6 text-[11px]">
             <Link href="/politica-de-privacidad" className="hover:text-white transition-colors">Privacidad</Link>
             <span aria-hidden="true" className="text-white/20">·</span>

@@ -15,7 +15,7 @@ export function JsonLd({ schema }: JsonLdProps) {
     logo: `${SITE_URL}/AM_logo_Recurso%202_Landscape_web.svg`,
     image: `${SITE_URL}/AM_logo_Recurso%202_Landscape_web.svg`,
     description:
-      "Firma jurídica especializada en derecho civil, familia, sucesiones, contratos, propiedad horizontal y pólizas jurídicas preventivas en Sabaneta, Antioquia y Colombia.",
+      "Asesoría jurídica especializada en derecho civil, familia, sucesiones, contratos, propiedad horizontal y pólizas jurídicas preventivas en Sabaneta, Antioquia y Colombia.",
     telephone: "+573508809878",
     email: "alejandramunozabg@outlook.com",
     address: {
@@ -55,11 +55,6 @@ export function JsonLd({ schema }: JsonLdProps) {
       "@type": "Person",
       name: "Yeinny Alejandra Muñoz Marín",
       jobTitle: "Abogada Titular",
-      hasCredential: {
-        "@type": "EducationalOccupationalCredential",
-        credentialCategory: "Tarjeta Profesional",
-        name: "Tarjeta Profesional No. 375.092 C.S. de la J.",
-      },
     },
   };
 
