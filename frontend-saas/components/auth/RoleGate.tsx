@@ -6,7 +6,7 @@ import { useSession } from "@/context/SessionContext";
 import { LoadingState } from "@/components/ui/LoadingState";
 import { ApiErrorState } from "@/components/ui/ApiErrorState";
 import { loginUrlForRedirect } from "@/lib/authRedirect";
-import { isLocalPortalHost, portalHrefForRole } from "@/lib/portalHosts";
+import { isLocalPortalHost, isPreviewHost, portalHrefForRole } from "@/lib/portalHosts";
 
 type Role = "ADMIN" | "ABOGADO" | "ABOGADO_ADMIN" | "CLIENTE";
 const homeByRole: Record<Role, string> = {
@@ -30,7 +30,7 @@ export function RoleGate({ roles, children, restrictedBehavior = "redirect" }: {
       const currentUrl = typeof window === "undefined"
         ? pathname
         : `${pathname}${window.location.search}${window.location.hash}`;
-      if (typeof window !== "undefined" && isLocalPortalHost(window.location.hostname)) {
+      if (typeof window !== "undefined" && (isLocalPortalHost(window.location.hostname) || isPreviewHost(window.location.hostname))) {
         const onAdminPortal = window.location.hostname === "admin.localhost"
           || pathname.startsWith("/gestion-procesos/admin");
         if (onAdminPortal) {

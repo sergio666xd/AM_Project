@@ -9,12 +9,17 @@
   --brand-900: #002060;
   --brand-800: #123675;
   --brand-700: #244A8B;
+  --brand-500: #4F6FAE;
+  --brand-300: #9DB1D8;
+  --brand-200: #C6D3EC;
   --brand-100: #E8EEF8;
   --brand-50: #F4F7FC;
 
+  --gold-700: #735B1C;
   --gold-600: #8F7225;
   --gold-500: #A88D3D;
   --gold-400: #CCB56B;
+  --gold-300: #DCC98E;
   --gold-200: #E8DDAE;
   --gold-100: #F6F0DB;
   --gold-50: #FBF8EF;
@@ -159,12 +164,17 @@
   --color-brand-900: var(--brand-900);
   --color-brand-800: var(--brand-800);
   --color-brand-700: var(--brand-700);
+  --color-brand-500: var(--brand-500);
+  --color-brand-300: var(--brand-300);
+  --color-brand-200: var(--brand-200);
   --color-brand-100: var(--brand-100);
   --color-brand-50: var(--brand-50);
 
+  --color-gold-700: var(--gold-700);
   --color-gold-600: var(--gold-600);
   --color-gold-500: var(--gold-500);
   --color-gold-400: var(--gold-400);
+  --color-gold-300: var(--gold-300);
   --color-gold-200: var(--gold-200);
   --color-gold-100: var(--gold-100);
   --color-gold-50: var(--gold-50);

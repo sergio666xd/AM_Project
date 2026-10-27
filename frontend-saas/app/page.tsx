@@ -11,7 +11,6 @@ import {
   MessageCircle,
   Scale,
   ShieldCheck,
-  Sparkles,
 } from "lucide-react";
 import { MarketingLayout } from "@/components/marketing/MarketingLayout";
 import { MarketingContactCta } from "@/components/marketing/MarketingContactCta";
@@ -31,7 +30,7 @@ export default async function Home() {
     <MarketingLayout>
       <main>
         {/* Hero Section */}
-        <section className="relative overflow-hidden bg-gradient-to-b from-brand-950 via-brand-900 to-brand-950 px-5 py-20 text-white lg:px-8 lg:py-28 border-b border-gold-400/20">
+        <section className="relative overflow-hidden bg-gradient-to-b from-brand-950 via-brand-900 to-brand-950 px-5 py-16 text-white sm:py-20 lg:px-8 lg:py-24 border-b border-gold-400/20">
           {/* Subtle background glow */}
           <div
             className="pointer-events-none absolute -left-40 top-0 size-96 rounded-full bg-gold-400/10 blur-3xl"
@@ -44,12 +43,12 @@ export default async function Home() {
 
           <div className="relative mx-auto grid max-w-7xl gap-12 lg:grid-cols-[1.2fr_.8fr] lg:items-center">
             <div className="marketing-reveal space-y-6">
-              <span className="inline-flex items-center gap-2 rounded-full border border-gold-400/40 bg-gold-400/10 px-4 py-1.5 text-xs font-bold uppercase tracking-widest text-gold-300">
-                <Sparkles className="size-3 text-gold-300" aria-hidden="true" />
+              <p className="flex items-center gap-3 text-xs font-semibold uppercase tracking-[0.2em] text-gold-300">
+                <span className="h-px w-8 bg-gold-400" aria-hidden="true" />
                 {renderRichText(content.heroEyebrow)}
-              </span>
+              </p>
 
-              <h1 className="max-w-4xl text-4xl sm:text-5xl lg:text-6xl font-bold tracking-tight text-white leading-[1.12]">
+              <h1 style={{ textWrap: "balance" }} className="max-w-4xl text-4xl sm:text-5xl lg:text-6xl font-display font-medium tracking-[-0.01em] text-white leading-[1.12]">
                 {renderRichText(content.heroTitle)}
               </h1>
 
@@ -62,7 +61,7 @@ export default async function Home() {
                   href="https://wa.me/573508809878?text=Hola%2C%20quiero%20recibir%20asesor%C3%ADa%20jur%C3%ADdica."
                   target="_blank"
                   rel="noreferrer"
-                  className="marketing-cta inline-flex min-h-12 items-center justify-center gap-2.5 rounded-xl bg-gold-400 px-6 py-3.5 text-sm font-bold text-brand-950 transition-all hover:bg-gold-300 hover:shadow-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold-400 focus-visible:ring-offset-2 focus-visible:ring-offset-brand-900"
+                  className="inline-flex min-h-12 items-center justify-center gap-2.5 rounded-xl bg-gold-400 px-6 py-3.5 text-sm font-bold text-brand-950 transition-all hover:bg-gold-300 hover:shadow-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold-400 focus-visible:ring-offset-2 focus-visible:ring-offset-brand-900"
                 >
                   <MessageCircle className="size-4" aria-hidden="true" />
                   {renderRichText(content.heroCta)}
@@ -90,7 +89,7 @@ export default async function Home() {
             </div>
 
             {/* Aside Credential Card */}
-            <aside className="marketing-float marketing-reveal marketing-reveal-delay-2 rounded-3xl border border-gold-400/30 bg-white/5 p-8 shadow-2xl backdrop-blur-md">
+            <aside className="marketing-reveal marketing-reveal-delay-2 rounded-3xl border border-gold-400/30 bg-white/5 p-8 shadow-2xl backdrop-blur-md">
               <div className="flex items-center gap-3 border-b border-white/10 pb-5">
                 <span className="grid size-12 place-items-center rounded-2xl bg-gold-400/20 text-gold-300">
                   <Scale className="size-6" aria-hidden="true" />
@@ -173,7 +172,7 @@ export default async function Home() {
             <span className="inline-block text-xs font-bold uppercase tracking-widest text-gold-600">
               {renderRichText(content.servicesEyebrow)}
             </span>
-            <h2 className="text-3xl sm:text-4xl font-bold tracking-tight text-foreground">
+            <h2 className="text-3xl sm:text-4xl font-display font-medium tracking-[-0.01em] text-foreground">
               {renderRichText(content.servicesTitle)}
             </h2>
             <p className="text-base text-foreground-muted">
@@ -232,7 +231,7 @@ export default async function Home() {
               <span className="inline-block text-xs font-bold uppercase tracking-widest text-gold-600">
                 {renderRichText(content.preventionEyebrow)}
               </span>
-              <h2 className="text-3xl sm:text-4xl font-bold tracking-tight text-foreground leading-tight">
+              <h2 className="text-3xl sm:text-4xl font-display font-medium tracking-[-0.01em] text-foreground leading-tight">
                 {renderRichText(content.preventionTitle)}
               </h2>
               <p className="text-base leading-relaxed text-foreground-muted">
@@ -273,7 +272,7 @@ export default async function Home() {
                 <span className="inline-flex items-center gap-2 rounded-full border border-gold-400/40 bg-gold-400/10 px-3.5 py-1 text-xs font-bold uppercase tracking-widest text-gold-300">
                   Para empresas y copropiedades
                 </span>
-                <h2 className="text-3xl sm:text-4xl font-bold tracking-tight text-white">
+                <h2 className="text-3xl sm:text-4xl font-display font-medium tracking-[-0.01em] text-white">
                   Póliza Jurídica Preventiva
                 </h2>
                 <p className="text-base text-neutral-300 leading-relaxed max-w-2xl">
@@ -320,7 +319,7 @@ export default async function Home() {
         {/* About section preview */}
         <section className="border-t border-border bg-surface px-5 py-16 text-center lg:px-8">
           <div className="mx-auto max-w-3xl space-y-4">
-            <h2 className="text-2xl sm:text-3xl font-bold tracking-tight text-foreground">
+            <h2 className="text-2xl sm:text-3xl font-display font-medium tracking-[-0.01em] text-foreground">
               {renderRichText(content.aboutTitle)}
             </h2>
             <p className="mx-auto max-w-2xl text-base leading-relaxed text-foreground-muted">

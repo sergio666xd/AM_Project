@@ -21,7 +21,7 @@ export default async function QuienesSomos() {
           <span className="inline-block text-xs font-bold uppercase tracking-widest text-gold-600">
             {renderRichText(content.eyebrow)}
           </span>
-          <h1 className="text-3xl sm:text-4xl lg:text-5xl font-bold tracking-tight text-foreground">
+          <h1 className="text-3xl sm:text-4xl lg:text-5xl font-display font-medium tracking-[-0.01em] text-foreground">
             {renderRichText(content.title)}
           </h1>
           <p className="text-lg sm:text-xl leading-relaxed text-foreground-muted">

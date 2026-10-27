@@ -75,7 +75,7 @@ export function PortalLoginForm({ portal }: { portal: Portal }) {
         return;
       }
       await refreshUser();
-      router.replace(redirect || homePathForRole(me.rol));
+      router.replace(portalHrefForRole(me.rol, redirect || homePathForRole(me.rol)));
     } catch (loginError) {
       setWrongPortal(false);
       setError(loginError instanceof Error ? loginError.message : "No fue posible iniciar sesión.");

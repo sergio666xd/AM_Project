@@ -40,7 +40,7 @@ export default function GestionProcesosPage() {
               <span className="inline-block text-xs font-bold uppercase tracking-widest text-gold-400">
                 Plataforma SaaS para profesionales del derecho
               </span>
-              <h1 className="text-4xl sm:text-5xl font-bold tracking-tight text-white leading-tight">
+              <h1 className="text-4xl sm:text-5xl font-display font-medium tracking-[-0.01em] text-white leading-tight">
                 Gestión de Procesos
               </h1>
               <p className="max-w-xl text-lg leading-relaxed text-neutral-300">
@@ -59,7 +59,7 @@ export default function GestionProcesosPage() {
             <span className="text-xs font-bold uppercase tracking-widest text-gold-600">
               Ventajas de la plataforma
             </span>
-            <h2 id="saas-benefits-heading" className="text-3xl font-bold tracking-tight text-foreground">
+            <h2 id="saas-benefits-heading" className="text-3xl font-display font-medium tracking-[-0.01em] text-foreground">
               Funciones diseñadas para litigantes
             </h2>
           </div>
@@ -89,7 +89,7 @@ export default function GestionProcesosPage() {
               <span className="text-xs font-bold uppercase tracking-widest text-gold-600">
                 Servicios jurídicos de la firma
               </span>
-              <h2 id="firm-services-heading" className="text-2xl sm:text-3xl font-bold tracking-tight text-foreground">
+              <h2 id="firm-services-heading" className="text-2xl sm:text-3xl font-display font-medium tracking-[-0.01em] text-foreground">
                 La asesoría profesional de la firma está disponible
               </h2>
               <p className="text-sm leading-relaxed text-foreground-muted">

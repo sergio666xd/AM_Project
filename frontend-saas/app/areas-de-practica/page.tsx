@@ -22,7 +22,7 @@ export default async function AreasDePractica() {
           <span className="inline-block text-xs font-bold uppercase tracking-widest text-gold-600">
             {renderRichText(content.eyebrow)}
           </span>
-          <h1 className="text-3xl sm:text-4xl lg:text-5xl font-bold tracking-tight text-foreground">
+          <h1 className="text-3xl sm:text-4xl lg:text-5xl font-display font-medium tracking-[-0.01em] text-foreground">
             {renderRichText(content.title)}
           </h1>
           <p className="text-base sm:text-lg leading-relaxed text-foreground-muted">
@@ -35,7 +35,7 @@ export default async function AreasDePractica() {
 
         {/* Closing Banner */}
         <section className="rounded-3xl border border-gold-400/30 bg-gradient-to-r from-brand-950 via-brand-900 to-brand-950 p-8 sm:p-12 text-center text-white shadow-xl">
-          <h2 className="text-2xl sm:text-3xl font-bold tracking-tight text-white">
+          <h2 className="text-2xl sm:text-3xl font-display font-medium tracking-[-0.01em] text-white">
             {renderRichText(content.closingTitle)}
           </h2>
           <p className="mx-auto mt-3 max-w-2xl text-sm sm:text-base text-neutral-300 leading-relaxed">
