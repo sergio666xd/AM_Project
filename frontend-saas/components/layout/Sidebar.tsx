@@ -2,7 +2,8 @@
 
 import Link from "next/link";
 import Image from "next/image";
-import { usePathname, useRouter } from "next/navigation";
+import { useRouter } from "next/navigation";
+import { usePortalPathname } from "@/lib/usePortalPathname";
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { useSession } from "@/context/SessionContext";
 
@@ -159,7 +160,7 @@ function getIsActive(pathname: string, href: string): boolean {
 
 /* ─── Component ─── */
 export default function Sidebar({ variant }: SidebarProps) {
-  const pathname = usePathname();
+  const pathname = usePortalPathname();
   const router = useRouter();
   const [mobileOpen, setMobileOpen] = useState(false);
   const [userMenuOpen, setUserMenuOpen] = useState(false);

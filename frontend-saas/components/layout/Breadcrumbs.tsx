@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePortalPathname } from "@/lib/usePortalPathname";
 import { useEffect, useState } from "react";
 import { useSession } from "@/context/SessionContext";
 import { apiRequest } from "@/lib/api";
@@ -33,6 +33,16 @@ const labels: Record<string, string> = {
   perfil: "Mi perfil",
   configuracion: "Configuración",
   auth: "Acceso",
+  alertas: "Alertas",
+  actividad: "Actividad",
+  almacenamiento: "Almacenamiento",
+  firma: "Datos generales",
+  metricas: "Métricas",
+  calendario: "Calendario",
+  ayuda: "Ayuda",
+  mensajes: "Mensajes",
+  entregas: "Envíos",
+  plantillas: "Plantillas",
 };
 
 function labelFor(segment: string) {
@@ -41,7 +51,7 @@ function labelFor(segment: string) {
 }
 
 export default function Breadcrumbs() {
-  const pathname = usePathname();
+  const pathname = usePortalPathname();
   const { token } = useSession();
   const [chatLabel, setChatLabel] = useState<{ href: string; titulo: string; subtitulo: string } | null>(null);
   const segments = pathname.split("/").filter(Boolean);
@@ -93,12 +103,14 @@ export default function Breadcrumbs() {
     <nav aria-label="Ruta de navegación" className="min-w-0">
       <ol className="flex min-w-0 flex-wrap items-center gap-1.5 text-sm text-foreground-muted">
         {segments.map((segment, index) => {
+          // «Gestión de procesos» no aporta dentro de los paneles: la ruta empieza en el área.
+          if (index === 0 && segment === "gestion-procesos" && segments.length > 1) return null;
           const href = `/${segments.slice(0, index + 1).join("/")}`;
           const current = index === segments.length - 1;
           const label = labelFor(segment);
           return (
             <li key={href} className="flex min-w-0 items-center gap-1.5">
-              {index > 0 && <span aria-hidden="true">/</span>}
+              {index > (segments[0] === "gestion-procesos" ? 1 : 0) && <span aria-hidden="true">/</span>}
               {current ? (
                 <span aria-current="page" className="truncate font-medium text-foreground">{label}</span>
               ) : (

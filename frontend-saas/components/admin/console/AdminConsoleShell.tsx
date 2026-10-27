@@ -3,7 +3,7 @@
 import { ReactNode, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
-import { usePathname } from "next/navigation";
+import { usePortalPathname } from "@/lib/usePortalPathname";
 import {
   Activity,
   BarChart3,
@@ -256,7 +256,7 @@ function NavSection({ section, pathname, onNavigate }: { section: NavSection; pa
 
 /* ─── Main shell ─── */
 export default function AdminConsoleShell({ children }: { children: ReactNode }) {
-  const pathname = usePathname();
+  const pathname = usePortalPathname();
   const { user, logout, token } = useSession();
   const [mobileOpen, setMobileOpen] = useState(false);
   const [collapsed, setCollapsed] = useState(false);
