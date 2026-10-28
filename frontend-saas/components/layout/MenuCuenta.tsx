@@ -71,7 +71,7 @@ export function MenuCuenta({ areaHref, enlaces, enRiel = false }: { areaHref: st
           enRiel ? "w-full p-2 hover:bg-rail-active" : "size-10 justify-center hover:bg-manila",
         )}
       >
-        <Initials name={nombre} size={32} className={enRiel ? "bg-rail-chip text-[#f4f1e8]" : undefined} />
+        <Initials name={nombre} size={32} enRiel={enRiel} />
         {enRiel && (
           <>
             <span className="min-w-0 flex-1">

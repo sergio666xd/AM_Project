@@ -30,7 +30,7 @@ export default function Sidebar({
   const activo = itemActivo(ruta, todos, inicio);
 
   return (
-    <aside className="fixed inset-y-0 left-0 z-30 hidden w-[248px] flex-col bg-rail text-[#f4f1e8] lg:flex">
+    <aside className="fixed inset-y-0 left-0 z-30 hidden w-[248px] flex-col border-r border-transparent bg-rail text-[#f4f1e8] lg:flex dark:border-line">
       <Link href={inicio} className="mx-3 mb-3 mt-4 block rounded-lg px-2 py-2" aria-label="Ir al inicio">
         <Logo variante="horizontal-inversa" className="h-auto w-[196px]" />
       </Link>
@@ -60,10 +60,10 @@ function Grupo({ grupo, primero, activo, ruta, inicio }: { grupo: GrupoNav; prim
             type="button"
             onClick={() => setAbiertoManual(!abierto)}
             aria-expanded={abierto}
-            className={cx(titulo, "flex min-h-8 w-full items-center gap-1 hover:text-[#f4f1e8]")}
+            className={cx(titulo, "flex min-h-8 w-full items-center gap-1 text-left hover:text-[#f4f1e8]")}
           >
             <ChevronRight aria-hidden="true" size={12} className={cx("transition-transform", abierto && "rotate-90")} />
-            {grupo.titulo}
+            <span className="truncate">{grupo.titulo}</span>
           </button>
         ) : (
           <p className={cx(titulo, "mb-1.5")}>{grupo.titulo}</p>

@@ -1,7 +1,18 @@
 import { cx } from "@/lib/cx";
 
 /** Avatar con las iniciales del nombre. */
-export function Initials({ name, size = 32, className }: { name: string; size?: number; className?: string }) {
+export function Initials({
+  name,
+  size = 32,
+  enRiel = false,
+  className,
+}: {
+  name: string;
+  size?: number;
+  /** Sobre el riel azul: chip oscuro con letras claras. */
+  enRiel?: boolean;
+  className?: string;
+}) {
   const iniciales = name
     .split(/\s+/)
     .filter(Boolean)
@@ -11,7 +22,11 @@ export function Initials({ name, size = 32, className }: { name: string; size?: 
   return (
     <span
       aria-hidden="true"
-      className={cx("inline-flex shrink-0 items-center justify-center rounded-full bg-navy-soft font-semibold text-navy-ink", className)}
+      className={cx(
+        "inline-flex shrink-0 items-center justify-center rounded-full font-semibold",
+        enRiel ? "bg-rail-chip text-on-navy" : "bg-navy-soft text-navy-ink",
+        className,
+      )}
       style={{ width: size, height: size, fontSize: Math.round(size * 0.38) }}
     >
       {iniciales || "·"}

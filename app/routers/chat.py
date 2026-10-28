@@ -11,6 +11,7 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import func, or_
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, selectinload
 
 from app import models, schemas, security
@@ -63,7 +64,16 @@ def actualizar_presencia_panel(
         db.add(presence)
     else:
         presence.last_seen_at = now
-    db.commit()
+    try:
+        db.commit()
+    except IntegrityError:
+        # Dos pestañas del mismo panel pueden crear la fila a la vez; la otra
+        # ya la dejó vigente, así que basta con actualizarla.
+        db.rollback()
+        db.query(models.ChatPresenciaPanel).filter_by(
+            usuario_id=user.id, session_id=data.session_id,
+        ).update({"last_seen_at": now}, synchronize_session=False)
+        db.commit()
     return {"activo": True, "expira_en_segundos": int(PANEL_PRESENCE_TTL.total_seconds())}
 
 

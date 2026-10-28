@@ -328,6 +328,10 @@
 }
 
 :root.dark:has([data-app]) {
+  /* Páginas que aún pintan botones con brand-900 y texto blanco: un azul
+     medio que se separa del fondo oscuro y conserva el contraste. */
+  --brand-900: #2b4c93;
+  --brand-800: #365aa6;
   --neutral-100: #181e30;
   --neutral-400: #5d6480;
   --neutral-500: #7d8299;

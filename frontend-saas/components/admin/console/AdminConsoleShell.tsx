@@ -95,7 +95,7 @@ const grupos: GrupoNav[] = [
     ],
   },
   {
-    titulo: "Heredado (solo consulta)",
+    titulo: "Heredado",
     plegable: true,
     items: [
       { id: "solicitudes", label: "Registros pendientes", href: `${ADMIN}/solicitudes`, icon: UserCheck },

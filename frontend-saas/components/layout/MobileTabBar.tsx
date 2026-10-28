@@ -83,7 +83,7 @@ export function MobileTabBar({
       </nav>
 
       {mas && (
-        <div className="fixed inset-0 z-50 lg:hidden">
+        <div className="fixed inset-0 z-[90] lg:hidden">
           <div aria-hidden="true" className="motion-fade-in absolute inset-0 bg-scrim" onClick={() => setMas(false)} />
           <div role="dialog" aria-modal="true" aria-label="Más secciones" className="motion-sheet-in absolute inset-x-0 bottom-0 rounded-t-2xl bg-sheet pb-[max(env(safe-area-inset-bottom),12px)] shadow-pop">
             <div aria-hidden="true" className="mx-auto mt-2 h-1 w-10 rounded-full bg-line-strong" />

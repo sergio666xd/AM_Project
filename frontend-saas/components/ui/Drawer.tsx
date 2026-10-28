@@ -67,7 +67,7 @@ export function Drawer({
   if (!mounted || typeof document === "undefined") return null;
 
   return createPortal(
-    <div className={`fixed inset-0 z-[70] flex items-end justify-end sm:items-stretch ${closing ? "pointer-events-none" : ""}`} role="presentation">
+    <div className={`fixed inset-0 z-[90] flex items-end justify-end sm:items-stretch ${closing ? "pointer-events-none" : ""}`} role="presentation">
       <button type="button" aria-label="Cerrar" tabIndex={-1} onClick={onClose} className={`absolute inset-0 bg-scrim ${closing ? "motion-fade-out" : "motion-fade-in"}`} />
       <div
         ref={panelRef}
