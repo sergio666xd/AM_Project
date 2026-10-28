@@ -921,6 +921,119 @@
         }
       }
     },
+    "/api/v2/procesos/{proceso_id}/etapa": {
+      "patch": {
+        "tags": [
+          "Procesos"
+        ],
+        "summary": "Cambiar la etapa del proceso",
+        "description": "Fija la etapa actual y la anota en el historial (y en los folios del expediente).",
+        "operationId": "cambiar_etapa",
+        "parameters": [
+          {
+            "name": "proceso_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Proceso Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CambiarEtapa"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProcesoDetalle"
+                }
+              }
+            }
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Too Many Requests"
+          }
+        }
+      }
+    },
     "/api/v2/procesos/{proceso_id}/folios": {
       "get": {
         "tags": [
@@ -1254,6 +1367,250 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/FoliosNuevos"
+                }
+              }
+            }
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Too Many Requests"
+          }
+        }
+      }
+    },
+    "/api/v2/procesos/{proceso_id}/folios/{numero}/avisar": {
+      "post": {
+        "tags": [
+          "Folios"
+        ],
+        "summary": "Avisar al cliente de una actuación",
+        "description": "Envía la actuación del folio con los comentarios de la firma, por los canales que cada\ncliente tenga activos, y deja el folio revisado.",
+        "operationId": "avisar_cliente",
+        "parameters": [
+          {
+            "name": "proceso_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Proceso Id"
+            }
+          },
+          {
+            "name": "numero",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Numero"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AvisarCliente"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ClientesAvisados"
+                }
+              }
+            }
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Too Many Requests"
+          }
+        }
+      }
+    },
+    "/api/v2/procesos/{proceso_id}/folios/{numero}/tarea": {
+      "post": {
+        "tags": [
+          "Folios"
+        ],
+        "summary": "Crear una tarea desde un folio",
+        "description": "La tarea queda en el proceso (y en la actuación, si el folio es una) y el folio, revisado.",
+        "operationId": "crear_tarea",
+        "parameters": [
+          {
+            "name": "proceso_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Proceso Id"
+            }
+          },
+          {
+            "name": "numero",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Numero"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TareaDesdeFolio"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TareaCreada"
                 }
               }
             }
@@ -1738,6 +2095,108 @@
           }
         }
       }
+    },
+    "/api/v2/terminos/calcular": {
+      "post": {
+        "tags": [
+          "Términos judiciales"
+        ],
+        "summary": "Calcular el vencimiento de un término",
+        "description": "Cuenta días hábiles desde el día siguiente a la notificación, sin festivos de Colombia\nni vacancia judicial (20 de diciembre a 10 de enero y Semana Santa).",
+        "operationId": "calcular",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CalcularTermino"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Termino"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too Many Requests",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -1760,6 +2219,37 @@
           "url"
         ],
         "title": "ArchivoFolio"
+      },
+      "AvisarCliente": {
+        "properties": {
+          "comentarios": {
+            "type": "string",
+            "maxLength": 2000,
+            "minLength": 1,
+            "title": "Comentarios",
+            "description": "Lo que la firma le explica al cliente."
+          },
+          "cliente_ids": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "integer"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cliente Ids",
+            "description": "Clientes del proceso a los que se avisa. Vacío: a todos los vinculados."
+          }
+        },
+        "type": "object",
+        "required": [
+          "comentarios"
+        ],
+        "title": "AvisarCliente"
       },
       "Aviso": {
         "properties": {
@@ -1848,6 +2338,127 @@
         ],
         "title": "Avisos"
       },
+      "CalcularTermino": {
+        "properties": {
+          "notificacion": {
+            "type": "string",
+            "format": "date",
+            "title": "Notificacion",
+            "description": "Día en que se notificó la providencia (por estado, personal, etc.)."
+          },
+          "dias": {
+            "type": "integer",
+            "maximum": 365.0,
+            "minimum": 1.0,
+            "title": "Dias",
+            "description": "Duración del término en días hábiles."
+          }
+        },
+        "type": "object",
+        "required": [
+          "notificacion",
+          "dias"
+        ],
+        "title": "CalcularTermino"
+      },
+      "CambiarEtapa": {
+        "properties": {
+          "etapa": {
+            "type": "string",
+            "enum": [
+              "demanda",
+              "admision",
+              "pruebas",
+              "audiencia",
+              "sentencia"
+            ],
+            "title": "Etapa"
+          },
+          "nota": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 500
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Nota"
+          }
+        },
+        "type": "object",
+        "required": [
+          "etapa"
+        ],
+        "title": "CambiarEtapa"
+      },
+      "CambioEtapa": {
+        "properties": {
+          "etapa": {
+            "type": "string",
+            "enum": [
+              "demanda",
+              "admision",
+              "pruebas",
+              "audiencia",
+              "sentencia"
+            ],
+            "title": "Etapa"
+          },
+          "fecha": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Fecha"
+          },
+          "nota": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Nota",
+            "description": "Nota de la firma. Al cliente no le llega."
+          },
+          "autor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Autor"
+          }
+        },
+        "type": "object",
+        "required": [
+          "etapa",
+          "fecha"
+        ],
+        "title": "CambioEtapa"
+      },
+      "ClientesAvisados": {
+        "properties": {
+          "clientes": {
+            "items": {
+              "$ref": "#/components/schemas/ProcesoDelFolio"
+            },
+            "type": "array",
+            "title": "Clientes",
+            "description": "Clientes a los que se envió el aviso (id y nombre)."
+          }
+        },
+        "type": "object",
+        "required": [
+          "clientes"
+        ],
+        "title": "ClientesAvisados"
+      },
       "ErrorRespuesta": {
         "properties": {
           "codigo": {
@@ -1894,7 +2505,8 @@
               "comunicacion",
               "aviso",
               "tarea",
-              "evento"
+              "evento",
+              "etapa"
             ],
             "title": "Tipo"
           },
@@ -2004,7 +2616,8 @@
               "comunicacion",
               "aviso",
               "tarea",
-              "evento"
+              "evento",
+              "etapa"
             ],
             "title": "Tipo"
           },
@@ -2276,6 +2889,32 @@
         ],
         "title": "PaginaProcesos"
       },
+      "PeriodoInhabil": {
+        "properties": {
+          "desde": {
+            "type": "string",
+            "format": "date",
+            "title": "Desde"
+          },
+          "hasta": {
+            "type": "string",
+            "format": "date",
+            "title": "Hasta"
+          },
+          "motivo": {
+            "type": "string",
+            "title": "Motivo",
+            "description": "Festivo o vacancia judicial que no contó."
+          }
+        },
+        "type": "object",
+        "required": [
+          "desde",
+          "hasta",
+          "motivo"
+        ],
+        "title": "PeriodoInhabil"
+      },
       "PersonaBreve": {
         "properties": {
           "id": {
@@ -2351,6 +2990,25 @@
             "title": "Radicados",
             "description": "Números de radicado de 23 dígitos vinculados al proceso."
           },
+          "etapa": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "demanda",
+                  "admision",
+                  "pruebas",
+                  "audiencia",
+                  "sentencia"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Etapa",
+            "description": "Etapa actual; vacía mientras la firma no la fije."
+          },
           "archivado_en": {
             "anyOf": [
               {
@@ -2380,6 +3038,14 @@
             "type": "array",
             "title": "Colaboradores",
             "description": "Abogados que colaboran. Al cliente solo le llegan los marcados como visibles."
+          },
+          "etapas": {
+            "items": {
+              "$ref": "#/components/schemas/CambioEtapa"
+            },
+            "type": "array",
+            "title": "Etapas",
+            "description": "Historial de cambios de etapa, del más antiguo al más reciente."
           }
         },
         "type": "object",
@@ -2390,10 +3056,12 @@
           "responsable",
           "clientes",
           "radicados",
+          "etapa",
           "archivado_en",
           "creado_en",
           "puede_administrar",
-          "colaboradores"
+          "colaboradores",
+          "etapas"
         ],
         "title": "ProcesoDetalle"
       },
@@ -2436,6 +3104,25 @@
             "title": "Radicados",
             "description": "Números de radicado de 23 dígitos vinculados al proceso."
           },
+          "etapa": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "demanda",
+                  "admision",
+                  "pruebas",
+                  "audiencia",
+                  "sentencia"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Etapa",
+            "description": "Etapa actual; vacía mientras la firma no la fije."
+          },
           "archivado_en": {
             "anyOf": [
               {
@@ -2467,6 +3154,7 @@
           "responsable",
           "clientes",
           "radicados",
+          "etapa",
           "archivado_en",
           "creado_en",
           "puede_administrar"
@@ -2567,6 +3255,130 @@
         },
         "type": "object",
         "title": "RevisarFolios"
+      },
+      "TareaCreada": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "titulo": {
+            "type": "string",
+            "title": "Titulo"
+          },
+          "fecha_limite": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fecha Limite"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "titulo",
+          "fecha_limite"
+        ],
+        "title": "TareaCreada"
+      },
+      "TareaDesdeFolio": {
+        "properties": {
+          "titulo": {
+            "type": "string",
+            "maxLength": 255,
+            "minLength": 1,
+            "title": "Titulo"
+          },
+          "descripcion": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 2000
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Descripcion"
+          },
+          "fecha_limite": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fecha Limite",
+            "description": "Día de vencimiento (fin del día en Colombia)."
+          },
+          "prioridad": {
+            "type": "string",
+            "enum": [
+              "BAJA",
+              "MEDIA",
+              "ALTA",
+              "URGENTE"
+            ],
+            "title": "Prioridad",
+            "default": "MEDIA"
+          }
+        },
+        "type": "object",
+        "required": [
+          "titulo"
+        ],
+        "title": "TareaDesdeFolio"
+      },
+      "Termino": {
+        "properties": {
+          "notificacion": {
+            "type": "string",
+            "format": "date",
+            "title": "Notificacion"
+          },
+          "dias": {
+            "type": "integer",
+            "title": "Dias"
+          },
+          "inicia": {
+            "type": "string",
+            "format": "date",
+            "title": "Inicia",
+            "description": "Primer día hábil del término: el siguiente a la notificación."
+          },
+          "vence": {
+            "type": "string",
+            "format": "date",
+            "title": "Vence",
+            "description": "Último día hábil del término."
+          },
+          "inhabiles": {
+            "items": {
+              "$ref": "#/components/schemas/PeriodoInhabil"
+            },
+            "type": "array",
+            "title": "Inhabiles",
+            "description": "Festivos y vacancia judicial dentro del término. Los fines de semana no se listan."
+          }
+        },
+        "type": "object",
+        "required": [
+          "notificacion",
+          "dias",
+          "inicia",
+          "vence",
+          "inhabiles"
+        ],
+        "title": "Termino"
       },
       "UsuarioSesion": {
         "properties": {

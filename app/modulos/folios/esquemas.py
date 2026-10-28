@@ -1,3 +1,4 @@
+from datetime import date
 from typing import Literal
 
 from pydantic import BaseModel, Field
@@ -6,7 +7,7 @@ from app.nucleo.paginacion import Pagina
 from app.nucleo.zona_horaria import FechaHora
 
 TipoFolio = Literal[
-    "actuacion", "documento", "solicitud", "contrato", "mensaje", "comunicacion", "aviso", "tarea", "evento",
+    "actuacion", "documento", "solicitud", "contrato", "mensaje", "comunicacion", "aviso", "tarea", "evento", "etapa",
 ]
 GrupoFolios = Literal["actuaciones", "documentos", "mensajes", "tareas"]
 
@@ -58,3 +59,30 @@ class RevisarFolios(BaseModel):
 
 class FoliosRevisados(BaseModel):
     revisados: int
+
+
+class AvisarCliente(BaseModel):
+    comentarios: str = Field(min_length=1, max_length=2000, description="Lo que la firma le explica al cliente.")
+    cliente_ids: list[int] | None = Field(
+        None, description="Clientes del proceso a los que se avisa. Vacío: a todos los vinculados."
+    )
+
+
+class ClientesAvisados(BaseModel):
+    clientes: list[ProcesoDelFolio] = Field(description="Clientes a los que se envió el aviso (id y nombre).")
+
+
+Prioridad = Literal["BAJA", "MEDIA", "ALTA", "URGENTE"]
+
+
+class TareaDesdeFolio(BaseModel):
+    titulo: str = Field(min_length=1, max_length=255)
+    descripcion: str | None = Field(None, max_length=2000)
+    fecha_limite: date | None = Field(None, description="Día de vencimiento (fin del día en Colombia).")
+    prioridad: Prioridad = "MEDIA"
+
+
+class TareaCreada(BaseModel):
+    id: int
+    titulo: str
+    fecha_limite: FechaHora | None

@@ -142,3 +142,79 @@ def test_el_cliente_y_los_ajenos_no_ven_folios(iniciar, crear_usuario, crear_pro
     assert respuesta.json()["codigo"] == "no_encontrado"
     revisar = cliente_http.post(f"/api/v2/procesos/{proceso.id}/folios/revisar", headers=CSRF)
     assert revisar.status_code == 404
+
+
+def test_avisar_al_cliente_de_una_actuacion(iniciar, crear_usuario, crear_proceso, cliente_http, sesion_bd, monkeypatch):
+    enviados = []
+    monkeypatch.setattr(
+        "app.notification_service.emitir_notificacion_workflow",
+        lambda db, usuario, tipo, origen, asunto, cuerpo, **kw: enviados.append((usuario.id, tipo, kw["variables"]["comentarios"])),
+    )
+    abogada = crear_usuario("ABOGADO_ADMIN")
+    gloria = crear_usuario("CLIENTE", nombre="Gloria Restrepo")
+    hernan = crear_usuario("CLIENTE", nombre="Hernán Restrepo")
+    proceso = crear_proceso(abogada, clientes=[gloria, hernan], radicados=["05001311000420240031200"])
+    iniciar(abogada)
+    cliente_http.get(f"/api/v2/procesos/{proceso.id}/folios")
+    _actuacion(sesion_bd, proceso, 0, _dia(1), "Auto fija fecha de audiencia")
+    _tarea(sesion_bd, abogada, proceso, "Preparar audiencia")
+    folios = cliente_http.get(f"/api/v2/procesos/{proceso.id}/folios").json()["items"]
+    actuacion = next(f for f in folios if f["tipo"] == "actuacion")
+    tarea = next(f for f in folios if f["tipo"] == "tarea")
+    assert actuacion["nuevo"] is True
+
+    url = f"/api/v2/procesos/{proceso.id}/folios/{actuacion['numero']}/avisar"
+    respuesta = cliente_http.post(url, json={"comentarios": "La audiencia es el 12 de noviembre.", "cliente_ids": [gloria.id]}, headers=CSRF)
+    assert respuesta.status_code == 200, respuesta.text
+    assert respuesta.json() == {"clientes": [{"id": gloria.id, "nombre": "Gloria Restrepo"}]}
+    assert enviados == [(gloria.id, "ACTUACIONES", "La audiencia es el 12 de noviembre.")]
+
+    folios = cliente_http.get(f"/api/v2/procesos/{proceso.id}/folios").json()["items"]
+    assert next(f for f in folios if f["numero"] == actuacion["numero"])["nuevo"] is False
+    # El aviso queda como folio del expediente.
+    assert folios[0]["tipo"] == "aviso" and folios[0]["detalle"] == "La audiencia es el 12 de noviembre."
+
+    todos = cliente_http.post(url, json={"comentarios": "Recordatorio."}, headers=CSRF)
+    assert {c["id"] for c in todos.json()["clientes"]} == {gloria.id, hernan.id}
+
+    ajeno = crear_usuario("CLIENTE")
+    con_ajeno = cliente_http.post(url, json={"comentarios": "x", "cliente_ids": [ajeno.id]}, headers=CSRF)
+    assert con_ajeno.status_code == 400 and "cliente_ids" in con_ajeno.json()["campos"]
+    no_actuacion = cliente_http.post(
+        f"/api/v2/procesos/{proceso.id}/folios/{tarea['numero']}/avisar", json={"comentarios": "x"}, headers=CSRF,
+    )
+    assert no_actuacion.json()["codigo"] == "folio_no_avisable"
+    assert cliente_http.post(f"/api/v2/procesos/{proceso.id}/folios/99/avisar", json={"comentarios": "x"}, headers=CSRF).status_code == 404
+
+
+def test_crear_tarea_desde_un_folio(iniciar, crear_usuario, crear_proceso, cliente_http, sesion_bd):
+    abogada = crear_usuario("ABOGADO_ADMIN")
+    proceso = crear_proceso(abogada, radicados=["05001311000420240031200"])
+    iniciar(abogada)
+    cliente_http.get(f"/api/v2/procesos/{proceso.id}/folios")
+    actuacion = _actuacion(sesion_bd, proceso, 0, _dia(1), "Traslado de excepciones")
+    numero = cliente_http.get(f"/api/v2/procesos/{proceso.id}/folios").json()["items"][0]["numero"]
+
+    vence = (utc_ahora() + timedelta(days=10)).date().isoformat()
+    respuesta = cliente_http.post(
+        f"/api/v2/procesos/{proceso.id}/folios/{numero}/tarea",
+        json={"titulo": "Descorrer traslado", "fecha_limite": vence, "prioridad": "ALTA"},
+        headers=CSRF,
+    )
+    assert respuesta.status_code == 201, respuesta.text
+    creada = respuesta.json()
+    assert creada["titulo"] == "Descorrer traslado"
+    assert creada["fecha_limite"] == f"{vence}T23:59:00-05:00"
+
+    tarea = sesion_bd.get(models.Tarea, creada["id"])
+    assert (tarea.proceso_id, tarea.actuacion_id, tarea.usuario_id) == (proceso.id, actuacion.id, abogada.id)
+    assert tarea.prioridad == models.PrioridadTarea.ALTA
+    assert f"folio {numero}" in tarea.descripcion
+    folios = cliente_http.get(f"/api/v2/procesos/{proceso.id}/folios").json()["items"]
+    assert folios[0]["titulo"] == "Descorrer traslado"
+    assert next(f for f in folios if f["numero"] == numero)["nuevo"] is False
+
+    pasada = cliente_http.post(
+        f"/api/v2/procesos/{proceso.id}/folios/{numero}/tarea", json={"titulo": "Tarde", "fecha_limite": "2020-01-01"}, headers=CSRF,
+    )
+    assert pasada.status_code == 400 and "fecha_limite" in pasada.json()["campos"]

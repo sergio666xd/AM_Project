@@ -15,6 +15,7 @@ import {
   ListChecks,
   Mail,
   MessageSquare,
+  Milestone,
   RefreshCw,
   ScrollText,
   Send,
@@ -56,6 +57,7 @@ export const ICONO_FOLIO: Record<FolioApi["tipo"], LucideIcon> = {
   aviso: Send,
   tarea: ListChecks,
   evento: CalendarDays,
+  etapa: Milestone,
 };
 
 /** Fecha del folio: solo el día cuando el origen no trae hora (las actuaciones). */

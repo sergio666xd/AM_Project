@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, Query
 
 from app import models
 from app.api.v2.dependencias import servicio_procesos
-from app.modulos.expedientes.esquemas import PaginaProcesos, ProcesoDetalle
+from app.modulos.expedientes.esquemas import CambiarEtapa, PaginaProcesos, ProcesoDetalle
 from app.modulos.expedientes.repositorio import FiltroProcesos
 from app.modulos.expedientes.servicio import ServicioProcesos
 from app.nucleo.paginacion import ParametrosPagina, parametros_pagina
@@ -55,3 +55,14 @@ def reabrir_proceso(
     servicio: ServicioProcesos = Depends(servicio_procesos),
 ):
     return servicio.reabrir(usuario, proceso_id)
+
+
+@router.patch("/{proceso_id}/etapa", response_model=ProcesoDetalle, summary="Cambiar la etapa del proceso")
+def cambiar_etapa(
+    proceso_id: int,
+    datos: CambiarEtapa,
+    usuario: models.Usuario = Depends(usuario_actual),
+    servicio: ServicioProcesos = Depends(servicio_procesos),
+):
+    """Fija la etapa actual y la anota en el historial (y en los folios del expediente)."""
+    return servicio.cambiar_etapa(usuario, proceso_id, datos)
