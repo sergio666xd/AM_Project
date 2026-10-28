@@ -1,13 +1,15 @@
 import type { HTMLAttributes, ReactNode } from "react";
 import { AlertCircle, CheckCircle2, Info, TriangleAlert } from "lucide-react";
+import { TONOS_TAG } from "./Tag";
 
 const kinds = {
-  info: { icon: Info, classes: "border-info/30 bg-info-light text-info", role: "status" as const },
-  success: { icon: CheckCircle2, classes: "border-success/30 bg-success-light text-success", role: "status" as const },
-  warning: { icon: TriangleAlert, classes: "border-warning/30 bg-warning-light text-warning", role: "status" as const },
-  error: { icon: AlertCircle, classes: "border-danger/30 bg-danger-light text-danger", role: "alert" as const },
+  info: { icon: Info, tone: TONOS_TAG.navy, role: "status" as const },
+  success: { icon: CheckCircle2, tone: TONOS_TAG.ok, role: "status" as const },
+  warning: { icon: TriangleAlert, tone: TONOS_TAG.warn, role: "status" as const },
+  error: { icon: AlertCircle, tone: TONOS_TAG.bad, role: "alert" as const },
 };
 
+/** Aviso a lo ancho: fondo teñido, icono, título y texto (nunca solo color). */
 export function Alert({
   kind = "info",
   title,
@@ -18,11 +20,11 @@ export function Alert({
   const config = kinds[kind];
   const Icon = config.icon;
   return (
-    <div role={config.role} className={`flex gap-3 rounded-[var(--radius-md)] border p-4 ${kind === "error" ? "motion-shake" : "motion-rise-in"} ${config.classes} ${className}`} {...props}>
-      <Icon aria-hidden="true" className="mt-0.5 size-5 shrink-0" />
-      <div className="min-w-0 text-sm">
+    <div role={config.role} className={`flex gap-3 rounded-lg px-4 py-3 ${config.tone} ${className}`} {...props}>
+      <Icon aria-hidden="true" size={18} strokeWidth={2} className="mt-0.5 shrink-0" />
+      <div className="min-w-0 flex-1 text-[14px]">
         {title && <p className="font-semibold">{title}</p>}
-        {children && <div className={title ? "mt-1" : ""}>{children}</div>}
+        {children && <div className={title ? "mt-0.5 opacity-90" : ""}>{children}</div>}
       </div>
     </div>
   );

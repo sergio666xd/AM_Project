@@ -199,6 +199,196 @@
   --shadow-lg: var(--shadow-lg);
 }
 
+/* ── Expediente foliado ──
+   Sistema visual de la app (DESIGN.md en la raíz del repositorio): fondo
+   manila, hojas blancas, riel azul del logo y dorado solo para lo nuevo o lo
+   que la firma espera. Los nombres siguen DESIGN.md; las utilidades salen del
+   @theme de abajo (bg-sheet, text-ink-2, shadow-sheet…). */
+:root {
+  --ground: #f6f2e8;
+  --manila: #ece3cd;
+  --manila-line: #d8caa6;
+  --sheet: #ffffff;
+  --sheet-2: #fbf9f4;
+  --line: #e4ddcc;
+  --line-strong: #cdbf9c;
+  --ink: #18203a;
+  --ink-2: #454d63;
+  /* Solo sobre blanco: sobre manila no llega a 4.5:1 (usar ink-2). */
+  --ink-3: #636b80;
+  --navy: #002060;
+  --navy-hover: #15326f;
+  --navy-soft: #e5eaf4;
+  --navy-ink: #1d3a7a;
+  --on-navy: #f4f1e8;
+  --on-navy-2: #b9c3dc;
+  --rail: #002060;
+  --rail-active: #0f2d6b;
+  --rail-chip: #24427f;
+  --gold: #ccb56b;
+  --gold-ink: #6f581b;
+  --gold-soft: #f5eed6;
+  --ok: #2c6a3e;
+  --ok-soft: #e3f0e4;
+  --warn: #8a5a00;
+  --warn-soft: #fbefd6;
+  --bad: #a3312a;
+  --bad-soft: #f9e4e1;
+  --scrim: rgb(10 16 36 / 0.38);
+  --shadow-sheet: 0 1px 2px rgb(24 32 58 / 0.06), 0 4px 12px -4px rgb(24 32 58 / 0.08);
+  --shadow-pop: 0 2px 6px rgb(24 32 58 / 0.08), 0 16px 40px -12px rgb(24 32 58 / 0.22);
+  --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.dark {
+  --ground: #0e1322;
+  --manila: #1b2031;
+  --manila-line: #2e3449;
+  --sheet: #151b2c;
+  --sheet-2: #121827;
+  --line: #262d42;
+  --line-strong: #363e57;
+  --ink: #ece8dc;
+  --ink-2: #bdbccb;
+  --ink-3: #9a9db0;
+  --navy: #8fa8de;
+  --navy-hover: #a9bde6;
+  --navy-soft: #1c2747;
+  --navy-ink: #a9bde6;
+  --on-navy: #0e1322;
+  --on-navy-2: #9aa6c4;
+  --rail: #0a1124;
+  --rail-active: #17213d;
+  --rail-chip: #1f2b4d;
+  --gold: #d4bf7c;
+  --gold-ink: #dcc78a;
+  --gold-soft: #2a2618;
+  --ok: #7cc48e;
+  --ok-soft: #17291d;
+  --warn: #e3b25a;
+  --warn-soft: #2d2412;
+  --bad: #f08a80;
+  --bad-soft: #321a19;
+  --scrim: rgb(0 0 0 / 0.55);
+  --shadow-sheet: 0 1px 2px rgb(0 0 0 / 0.3), 0 4px 12px -4px rgb(0 0 0 / 0.4);
+  --shadow-pop: 0 2px 6px rgb(0 0 0 / 0.35), 0 16px 40px -12px rgb(0 0 0 / 0.6);
+}
+
+/* Las pantallas de la app (todo lo que cuelga de /gestion-procesos marca
+   [data-app] en su layout) toman el expediente foliado también en los tokens
+   heredados, así las ~95 pantallas cambian de una vez. El sitio público
+   conserva los suyos hasta su rediseño. :has() alcanza también lo que se
+   pinta en portales fuera del layout (modales, avisos). */
+:root:has([data-app]) {
+  --background: var(--ground);
+  --surface: var(--sheet);
+  --surface-hover: var(--manila);
+  --surface-muted: var(--sheet-2);
+  --foreground: var(--ink);
+  --foreground-secondary: var(--ink-2);
+  --foreground-muted: var(--ink-3);
+  --foreground-inverse: var(--on-navy);
+  --border: var(--line);
+  --border-strong: var(--line-strong);
+  --primary: var(--navy);
+  --primary-hover: var(--navy-hover);
+  --primary-light: var(--navy-soft);
+  --primary-foreground: var(--on-navy);
+  --success: var(--ok);
+  --success-light: var(--ok-soft);
+  --warning: var(--warn);
+  --warning-light: var(--warn-soft);
+  --danger: var(--bad);
+  --danger-light: var(--bad-soft);
+  --info: var(--navy-ink);
+  --info-light: var(--navy-soft);
+  --nav-bg: var(--rail);
+  --sidebar-width: 248px;
+
+  --neutral-50: var(--sheet-2);
+  --neutral-100: #f3eee2;
+  --neutral-200: var(--line);
+  --neutral-300: var(--line-strong);
+  --neutral-400: #a59d89;
+  --neutral-500: #7a7f8f;
+  --neutral-600: var(--ink-3);
+  --neutral-700: var(--ink-2);
+  --neutral-800: #2c3450;
+  --neutral-900: var(--ink);
+
+  --shadow-xs: 0 1px 2px rgb(24 32 58 / 0.05);
+  --shadow-sm: var(--shadow-sheet);
+  --shadow-md: var(--shadow-sheet);
+  --shadow-lg: var(--shadow-pop);
+
+  --font-sans: var(--font-public-sans), ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  /* Georgia es la letra del logo; Gelasio la reemplaza donde no está instalada. */
+  --font-display: Georgia, var(--font-gelasio), "Times New Roman", serif;
+  --font-mono: var(--font-roboto-mono), ui-monospace, "SFMono-Regular", Menlo, monospace;
+}
+
+:root.dark:has([data-app]) {
+  --neutral-100: #181e30;
+  --neutral-400: #5d6480;
+  --neutral-500: #7d8299;
+  --neutral-800: #d7d4c9;
+  --shadow-xs: 0 1px 2px rgb(0 0 0 / 0.25);
+}
+
+@theme inline {
+  --color-ground: var(--ground);
+  --color-manila: var(--manila);
+  --color-manila-line: var(--manila-line);
+  --color-sheet: var(--sheet);
+  --color-sheet-2: var(--sheet-2);
+  --color-line: var(--line);
+  --color-line-strong: var(--line-strong);
+  --color-ink: var(--ink);
+  --color-ink-2: var(--ink-2);
+  --color-ink-3: var(--ink-3);
+  --color-navy: var(--navy);
+  --color-navy-hover: var(--navy-hover);
+  --color-navy-soft: var(--navy-soft);
+  --color-navy-ink: var(--navy-ink);
+  --color-on-navy: var(--on-navy);
+  --color-on-navy-2: var(--on-navy-2);
+  --color-rail: var(--rail);
+  --color-rail-active: var(--rail-active);
+  --color-rail-chip: var(--rail-chip);
+  --color-gold: var(--gold);
+  --color-gold-ink: var(--gold-ink);
+  --color-gold-soft: var(--gold-soft);
+  --color-ok: var(--ok);
+  --color-ok-soft: var(--ok-soft);
+  --color-warn: var(--warn);
+  --color-warn-soft: var(--warn-soft);
+  --color-bad: var(--bad);
+  --color-bad-soft: var(--bad-soft);
+  --color-scrim: var(--scrim);
+  --shadow-sheet: var(--shadow-sheet);
+  --shadow-pop: var(--shadow-pop);
+  --ease-out-expo: var(--ease-out-expo);
+}
+
+/* Superficies del navegador dentro de la app. */
+@layer base {
+  :root:has([data-app]) body {
+    font-size: 15px;
+    line-height: 1.5;
+  }
+  [data-app] p { text-wrap: pretty; }
+  [data-app] ::selection, [data-app]::selection { background: var(--gold-soft); color: var(--ink); }
+  .dark [data-app] ::selection { background: #4a4126; }
+  [data-app] :is(input, textarea) { caret-color: var(--navy); }
+  [data-app] :focus-visible { outline: 2px solid var(--navy); outline-offset: 2px; }
+  [data-app] a { text-underline-offset: 3px; }
+  :root:has([data-app]) * { scrollbar-width: thin; scrollbar-color: var(--line-strong) transparent; }
+  /* Numerales del folio: Georgia trae cifras elzevirianas. */
+  .folio-num { font-family: var(--font-display); font-variant-numeric: oldstyle-nums; }
+  /* Portal del cliente: letra más grande para lectura cómoda. */
+  .lectura { font-size: 17px; line-height: 1.6; }
+}
+
 /* Estilos de elementos en la capa base: fuera de una capa ganarían a las
    utilidades de Tailwind (text-*, font-*) y obligarían a usar !important. */
 @layer base {
@@ -389,6 +579,7 @@
   @keyframes motion-slide-in-right { from { transform: translateX(100%); } to { transform: translateX(0); } }
   @keyframes motion-slide-out-right { from { transform: translateX(0); } to { transform: translateX(100%); } }
   @keyframes motion-sheet-in { from { transform: translateY(100%); } to { transform: translateY(0); } }
+  @keyframes motion-slide-out-down { from { transform: translateY(0); } to { transform: translateY(100%); } }
 
   @keyframes motion-toast-in {
     from { opacity: 0; transform: translateX(16px) scale(0.98); }
@@ -482,6 +673,14 @@
   .motion-toast-in { animation: motion-toast-in var(--motion-slow) var(--ease-out) backwards; }
   .motion-toast-out { animation: motion-toast-out var(--motion-base) var(--ease-in) both; }
 
+  /* Panel lateral: hoja inferior en celular, lateral derecho desde sm. */
+  .motion-drawer-in { animation: motion-sheet-in var(--motion-slow) var(--ease-out-expo) backwards; }
+  .motion-drawer-out { animation: motion-slide-out-down var(--motion-base) var(--ease-in) both; }
+  @media (min-width: 640px) {
+    .motion-drawer-in { animation-name: motion-slide-in-right; }
+    .motion-drawer-out { animation-name: motion-slide-out-right; }
+  }
+
   /* Cambio de página dentro de un panel. */
   .motion-page { animation: motion-rise-in var(--motion-slow) var(--ease-out) backwards; }
 
@@ -504,7 +703,7 @@
 
   /* Esqueleto de carga con barrido de luz. */
   .skeleton {
-    background-color: var(--surface-hover);
+    background-color: var(--neutral-100);
     background-image: linear-gradient(90deg, transparent 0%, rgba(255, 255, 255, 0.55) 50%, transparent 100%);
     background-size: 200% 100%;
     background-repeat: no-repeat;
@@ -655,7 +854,7 @@
   @media (prefers-reduced-motion: reduce) {
     .motion-fade-in, .motion-fade-out, .motion-rise-in, .motion-drop-in, .motion-lift-in,
     .motion-dialog-in, .motion-dialog-out, .motion-slide-in-right, .motion-slide-out-right,
-    .motion-sheet-in, .motion-toast-in, .motion-toast-out, .motion-page, .motion-delayed-in,
+    .motion-sheet-in, .motion-drawer-in, .motion-drawer-out, .motion-toast-in, .motion-toast-out, .motion-page, .motion-delayed-in,
     .motion-stagger > *, .motion-pop, .motion-shake, .skeleton, .motion-attention::after,
     .motion-overlay, .motion-overlay > :last-child, .motion-overlay-side, .motion-overlay-side > :last-child,
     .motion-swap > *, .motion-tab-panel, .motion-slide-next, .motion-slide-prev, .motion-message-in, .motion-indicator, .motion-breathe, .motion-grow-x, [data-panel] [role="progressbar"] > *, .motion-flash, .motion-progress::after,

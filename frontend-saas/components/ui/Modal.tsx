@@ -70,14 +70,14 @@ export function Modal({
 
   return (
     <div className={`fixed inset-0 z-[100] grid place-items-center overflow-y-auto p-4 ${closing ? "pointer-events-none" : ""}`} onMouseDown={(event) => { if (event.target === event.currentTarget) onClose(); }}>
-      <div aria-hidden="true" onMouseDown={onClose} className={`fixed inset-0 bg-brand-950/40 backdrop-blur-[2px] ${closing ? "motion-fade-out" : "motion-fade-in"}`} />
-      <div ref={dialogRef} role="dialog" aria-modal="true" aria-labelledby={titleId} aria-describedby={description ? descriptionId : undefined} tabIndex={-1} className={`relative z-[1] max-h-[calc(100vh-2rem)] w-full overflow-y-auto rounded-[var(--radius-xl)] border border-border bg-surface shadow-lg ${sizeClass} ${closing ? "motion-dialog-out" : "motion-dialog-in"}`}>
-        <header className="flex items-start justify-between gap-4 border-b border-border px-5 py-4">
-          <div>
-            <h2 id={titleId} className="text-lg font-semibold text-foreground">{title}</h2>
-            {description && <p id={descriptionId} className="mt-1 text-sm text-foreground-muted">{description}</p>}
+      <div aria-hidden="true" onMouseDown={onClose} className={`fixed inset-0 bg-scrim ${closing ? "motion-fade-out" : "motion-fade-in"}`} />
+      <div ref={dialogRef} role="dialog" aria-modal="true" aria-labelledby={titleId} aria-describedby={description ? descriptionId : undefined} tabIndex={-1} className={`relative z-[1] max-h-[calc(100dvh-2rem)] w-full overflow-y-auto rounded-2xl bg-sheet shadow-pop outline-none ${sizeClass} ${closing ? "motion-dialog-out" : "motion-dialog-in"}`}>
+        <header className="flex items-start justify-between gap-4 border-b border-line px-5 py-4">
+          <div className="min-w-0">
+            <h2 id={titleId} className="font-display text-[21px] leading-snug text-ink">{title}</h2>
+            {description && <p id={descriptionId} className="mt-1 text-[13px] text-ink-3">{description}</p>}
           </div>
-          <button type="button" aria-label="Cerrar diálogo" onClick={onClose} className="grid size-9 shrink-0 place-items-center rounded-lg text-foreground-muted hover:bg-surface-hover hover:text-foreground"><X aria-hidden="true" className="size-4" /></button>
+          <button type="button" aria-label="Cerrar diálogo" onClick={onClose} className="-mr-2 -mt-1 grid size-10 shrink-0 place-items-center rounded-lg text-ink-2 transition-colors hover:bg-manila hover:text-ink"><X aria-hidden="true" size={18} strokeWidth={1.75} /></button>
         </header>
         <div className="p-5">{children}</div>
       </div>

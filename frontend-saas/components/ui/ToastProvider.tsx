@@ -11,10 +11,10 @@ interface ToastContextValue { toast: (input: ToastInput) => void }
 const TOAST_EXIT_MS = 180;
 const ToastContext = createContext<ToastContextValue | null>(null);
 const presentation = {
-  info: { icon: Info, classes: "border-info/30 text-info" },
-  success: { icon: CheckCircle2, classes: "border-success/30 text-success" },
-  warning: { icon: TriangleAlert, classes: "border-warning/30 text-warning" },
-  error: { icon: AlertCircle, classes: "border-danger/30 text-danger" },
+  info: { icon: Info, classes: "text-navy-ink" },
+  success: { icon: CheckCircle2, classes: "text-ok" },
+  warning: { icon: TriangleAlert, classes: "text-warn" },
+  error: { icon: AlertCircle, classes: "text-bad" },
 };
 
 export function ToastProvider({ children }: { children: ReactNode }) {
@@ -48,18 +48,18 @@ export function ToastProvider({ children }: { children: ReactNode }) {
   return (
     <ToastContext.Provider value={{ toast }}>
       {children}
-      <div aria-live="polite" aria-relevant="additions removals" className="pointer-events-none fixed right-4 top-4 z-[120] flex w-[min(24rem,calc(100vw-2rem))] flex-col gap-2">
+      <div aria-live="polite" aria-relevant="additions removals" className="pointer-events-none fixed inset-x-4 bottom-[calc(env(safe-area-inset-bottom)+5.5rem)] z-[120] flex flex-col gap-2 sm:inset-x-auto sm:bottom-auto sm:right-4 sm:top-4 sm:w-[24rem]">
         {items.map((item) => {
           const config = presentation[item.tone];
           const Icon = config.icon;
           return (
-            <div key={item.id} role={item.tone === "error" ? "alert" : "status"} className={`pointer-events-auto flex gap-3 rounded-[var(--radius-lg)] border bg-surface p-4 shadow-md ${config.classes} ${item.leaving ? "motion-toast-out pointer-events-none" : "motion-toast-in"}`}>
-              <Icon aria-hidden="true" className={`mt-0.5 size-5 shrink-0 ${item.leaving ? "" : "motion-pop"}`} />
-              <div className="min-w-0 flex-1 text-sm">
-                <p className="font-semibold text-foreground">{item.title}</p>
-                {item.description && <p className="mt-1 text-foreground-secondary">{item.description}</p>}
+            <div key={item.id} role={item.tone === "error" ? "alert" : "status"} className={`pointer-events-auto flex gap-3 rounded-xl bg-sheet p-4 shadow-pop ${config.classes} ${item.leaving ? "motion-toast-out pointer-events-none" : "motion-toast-in"}`}>
+              <Icon aria-hidden="true" size={18} strokeWidth={2} className="mt-0.5 shrink-0" />
+              <div className="min-w-0 flex-1 text-[14px]">
+                <p className="font-semibold text-ink">{item.title}</p>
+                {item.description && <p className="mt-0.5 text-ink-2">{item.description}</p>}
               </div>
-              <button type="button" aria-label="Cerrar notificación" onClick={() => dismiss(item.id)} className="grid size-7 shrink-0 place-items-center rounded-md text-foreground-muted hover:bg-surface-hover"><X aria-hidden="true" className="size-4" /></button>
+              <button type="button" aria-label="Cerrar notificación" onClick={() => dismiss(item.id)} className="-m-1.5 grid size-9 shrink-0 place-items-center rounded-lg text-ink-2 hover:bg-manila hover:text-ink"><X aria-hidden="true" size={16} strokeWidth={1.75} /></button>
             </div>
           );
         })}
