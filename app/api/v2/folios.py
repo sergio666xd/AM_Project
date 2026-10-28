@@ -1,10 +1,20 @@
 from typing import Literal
 
-from fastapi import APIRouter, Body, Depends, Query
+from fastapi import APIRouter, Body, Depends, Query, status
 
 from app import models
 from app.api.v2.dependencias import servicio_folios
-from app.modulos.folios.esquemas import FoliosNuevos, FoliosRevisados, GrupoFolios, PaginaFolios, RevisarFolios
+from app.modulos.folios.esquemas import (
+    AvisarCliente,
+    ClientesAvisados,
+    FoliosNuevos,
+    FoliosRevisados,
+    GrupoFolios,
+    PaginaFolios,
+    RevisarFolios,
+    TareaCreada,
+    TareaDesdeFolio,
+)
 from app.modulos.folios.servicio import ServicioFolios
 from app.nucleo.paginacion import ParametrosPagina, parametros_pagina
 from app.nucleo.sesion import usuario_actual
@@ -46,3 +56,37 @@ def folios_nuevos(
 ):
     """Lo que llegó sin revisar a los procesos activos que el usuario puede ver, del más reciente al más antiguo."""
     return servicio.nuevos(usuario, limite)
+
+
+@router.post(
+    "/procesos/{proceso_id}/folios/{numero}/avisar",
+    response_model=ClientesAvisados,
+    summary="Avisar al cliente de una actuación",
+)
+def avisar_cliente(
+    proceso_id: int,
+    numero: int,
+    datos: AvisarCliente,
+    usuario: models.Usuario = Depends(usuario_actual),
+    servicio: ServicioFolios = Depends(servicio_folios),
+):
+    """Envía la actuación del folio con los comentarios de la firma, por los canales que cada
+    cliente tenga activos, y deja el folio revisado."""
+    return servicio.avisar(usuario, proceso_id, numero, datos)
+
+
+@router.post(
+    "/procesos/{proceso_id}/folios/{numero}/tarea",
+    response_model=TareaCreada,
+    status_code=status.HTTP_201_CREATED,
+    summary="Crear una tarea desde un folio",
+)
+def crear_tarea(
+    proceso_id: int,
+    numero: int,
+    datos: TareaDesdeFolio,
+    usuario: models.Usuario = Depends(usuario_actual),
+    servicio: ServicioFolios = Depends(servicio_folios),
+):
+    """La tarea queda en el proceso (y en la actuación, si el folio es una) y el folio, revisado."""
+    return servicio.crear_tarea(usuario, proceso_id, numero, datos)

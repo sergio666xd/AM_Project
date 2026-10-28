@@ -13,14 +13,17 @@ import {
   Filter,
   Gavel,
   ListChecks,
+  ListPlus,
   Mail,
   MessageSquare,
+  Milestone,
   RefreshCw,
   ScrollText,
   Send,
   type LucideIcon,
 } from "lucide-react";
 
+import { AvisarClienteModal, TareaFolioModal } from "@/components/expediente/AccionesFolio";
 import { Button } from "@/components/ui/Button";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { Folio } from "@/components/ui/Folio";
@@ -56,6 +59,7 @@ export const ICONO_FOLIO: Record<FolioApi["tipo"], LucideIcon> = {
   aviso: Send,
   tarea: ListChecks,
   evento: CalendarDays,
+  etapa: Milestone,
 };
 
 /** Fecha del folio: solo el día cuando el origen no trae hora (las actuaciones). */
@@ -80,6 +84,8 @@ export function FoliosExpediente({ procesoId, folioInicial }: { procesoId: numbe
   const [errorSalto, setErrorSalto] = useState<string | null>(null);
   const [resaltado, setResaltado] = useState<number | null>(folioInicial ?? null);
   const [revisando, setRevisando] = useState<Set<number>>(new Set());
+  const [avisando, setAvisando] = useState<FolioApi | null>(null);
+  const [creandoTarea, setCreandoTarea] = useState<FolioApi | null>(null);
   const pedido = useRef(0);
 
   const pedir = useCallback(
@@ -279,6 +285,8 @@ export function FoliosExpediente({ procesoId, folioInicial }: { procesoId: numbe
               resaltado={resaltado === folio.numero}
               revisando={revisando.has(folio.numero)}
               onRevisar={() => void revisar([folio.numero])}
+              onAvisar={() => setAvisando(folio)}
+              onCrearTarea={() => setCreandoTarea(folio)}
             />
           ))}
         </ol>
@@ -303,6 +311,10 @@ export function FoliosExpediente({ procesoId, folioInicial }: { procesoId: numbe
           </div>
         </div>
       )}
+
+      {/* Avisar o crear tarea deja el folio revisado y añade uno nuevo (el aviso o la tarea). */}
+      <AvisarClienteModal procesoId={procesoId} folio={avisando} onClose={() => setAvisando(null)} onHecho={() => void cargar(consulta)} />
+      <TareaFolioModal procesoId={procesoId} folio={creandoTarea} onClose={() => setCreandoTarea(null)} onHecho={() => void cargar(consulta)} />
     </div>
   );
 }
@@ -312,14 +324,21 @@ function FilaFolio({
   resaltado,
   revisando,
   onRevisar,
+  onAvisar,
+  onCrearTarea,
 }: {
   folio: FolioApi;
   resaltado: boolean;
   revisando: boolean;
   onRevisar: () => void;
+  onAvisar: () => void;
+  onCrearTarea: () => void;
 }) {
   const Icono = ICONO_FOLIO[folio.tipo] ?? FileText;
   const fecha = fechaDeFolio(folio);
+  // Las actuaciones siempre traen sus acciones; el resto, mientras esté sin revisar.
+  const actuacion = folio.tipo === "actuacion" && !folio.retirado;
+  const conAcciones = !folio.retirado && (actuacion || folio.nuevo);
   return (
     <li
       id={`folio-${folio.numero}`}
@@ -341,21 +360,31 @@ function FilaFolio({
         </div>
         <p className={cx("mt-1 text-[15px] font-semibold text-pretty", folio.retirado ? "text-ink-3" : "text-ink")}>{folio.titulo}</p>
         {folio.detalle && <p className="mt-1 max-w-[72ch] text-[14px] leading-relaxed text-pretty text-ink-2">{folio.detalle}</p>}
-        {(folio.archivo || folio.nuevo) && (
-          <div className="mt-2.5 flex flex-wrap items-center gap-x-4 gap-y-2">
+        {(folio.archivo || conAcciones) && (
+          <div className="mt-2.5 flex flex-wrap items-center gap-x-2 gap-y-2">
             {folio.archivo && (
               <a
                 href={folio.archivo.url}
                 target="_blank"
                 rel="noopener"
-                className="inline-flex min-h-9 items-center gap-1.5 text-[13px] font-semibold text-navy-ink hover:underline"
+                className="mr-2 inline-flex min-h-9 items-center gap-1.5 text-[13px] font-semibold text-navy-ink hover:underline"
               >
                 <Eye aria-hidden="true" size={14} />
                 <span className="break-all">{folio.archivo.nombre}</span>
               </a>
             )}
+            {actuacion && (
+              <Button size="sm" variant={folio.nuevo ? "primary" : "secondary"} icon={<Send size={14} />} onClick={onAvisar}>
+                Avisar al cliente
+              </Button>
+            )}
+            {conAcciones && (
+              <Button size="sm" variant="secondary" icon={<ListPlus size={14} />} onClick={onCrearTarea}>
+                Crear tarea
+              </Button>
+            )}
             {folio.nuevo && (
-              <Button size="sm" variant="secondary" icon={<Check size={14} />} loading={revisando} onClick={onRevisar}>
+              <Button size="sm" variant="ghost" icon={<Check size={14} />} loading={revisando} onClick={onRevisar}>
                 Marcar revisado
               </Button>
             )}

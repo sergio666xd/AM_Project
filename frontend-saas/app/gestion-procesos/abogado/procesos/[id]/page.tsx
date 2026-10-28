@@ -7,6 +7,7 @@ import { SummaryStrip } from "@/components/ui/SummaryStrip";
 import { formatDate, formatRelative, isOverdue, toDate } from "@/lib/labels";
 import { useNow } from "@/lib/useNow";
 import { Button } from "@/components/ui/Button";
+import { CabeceraExpediente } from "@/components/expediente/CabeceraExpediente";
 import { FoliosExpediente } from "@/components/expediente/FoliosExpediente";
 
 import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
@@ -22,7 +23,6 @@ import {
   Pencil,
   Phone,
   Bell,
-  BriefcaseBusiness,
   CheckCircle2,
   Download,
   FileText,
@@ -184,6 +184,7 @@ export default function ProcesoDetallePage({ section }: { section?: string }) {
   const [activeTab, setActiveTab] = useState(section || "resumen");
   const [contractFocusId, setContractFocusId] = useState<number | null>(null);
   const [folioInicial, setFolioInicial] = useState<number | null>(null);
+  const [versionFolios, setVersionFolios] = useState(0);
 
   const [clientQuery, setClientQuery] = useState("");
   const [creatingClient, setCreatingClient] = useState(false);
@@ -682,31 +683,7 @@ export default function ProcesoDetallePage({ section }: { section?: string }) {
         Procesos
       </Link>
 
-      {/* HEADER */}
-      <header className="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
-        <div className="min-w-0">
-          <p className="text-sm font-medium text-muted">
-            Ficha integral del proceso
-          </p>
-
-          <div className="mt-1 flex items-center gap-3">
-            <div className="flex size-11 shrink-0 items-center justify-center rounded-xl bg-brand-50 text-brand-700 dark:bg-brand-950 dark:text-brand-300">
-              <BriefcaseBusiness className="size-5" />
-            </div>
-
-            <div className="min-w-0">
-              <h1 className="break-words text-2xl font-semibold tracking-tight text-foreground sm:text-3xl">
-                {process.nombre}
-              </h1>
-
-              <p className="mt-0.5 text-xs text-muted">
-                Proceso #{process.id}
-              </p>
-            </div>
-          </div>
-        </div>
-
-      </header>
+      <CabeceraExpediente procesoId={Number(id)} nombre={process.nombre} onCambio={() => setVersionFolios((v) => v + 1)} />
 
       <div className="grid gap-4 lg:grid-cols-[14rem_minmax(0,1fr)] lg:items-start">
         <aside className="min-w-0 lg:sticky lg:top-4">
@@ -1183,7 +1160,7 @@ export default function ProcesoDetallePage({ section }: { section?: string }) {
       </section>
 
       <section id="panel-folios" role="region" aria-label="Folios del expediente" style={{ display: activeTab === "folios" ? undefined : "none" }} className="motion-tab-panel scroll-mt-20 overflow-hidden rounded-xl bg-sheet shadow-sheet">
-        {activeTab === "folios" && <FoliosExpediente key={folioInicial ?? 0} procesoId={Number(id)} folioInicial={folioInicial ?? undefined} />}
+        {activeTab === "folios" && <FoliosExpediente key={`${folioInicial ?? 0}-${versionFolios}`} procesoId={Number(id)} folioInicial={folioInicial ?? undefined} />}
       </section>
 
       {/* MÓDULOS SECUNDARIOS */}

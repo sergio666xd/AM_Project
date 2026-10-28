@@ -121,6 +121,7 @@ def listar_procesos(db: Session = Depends(get_db), usuario: models.Usuario = Dep
             "id": proceso.id,
             "nombre": proceso.nombre,
             "descripcion": proceso.descripcion,
+            "etapa": proceso.etapa,
             **_equipo_proceso(proceso),
             "soy_responsable": usuario.rol == models.RolUsuario.ADMIN or usuario.id == proceso.abogado_id,
             "radicados": [
@@ -237,6 +238,7 @@ def listar_procesos_archivados(
             "id": proceso.id,
             "nombre": proceso.nombre,
             "descripcion": proceso.descripcion,
+            "etapa": proceso.etapa,
             "archivado_en": proceso.archivado_en,
             "radicados": [
                 {

@@ -14,11 +14,12 @@ from sqlalchemy import func, select, update
 from sqlalchemy.orm import Session
 
 from app import models
+from app.modulos.expedientes.esquemas import NOMBRES_ETAPA
 from app.nucleo.zona_horaria import a_colombia
 from app.timezone import COLOMBIA
 
 # Orden de desempate cuando varios registros tienen la misma fecha.
-ORDEN_TIPOS = ("actuacion", "solicitud", "documento", "contrato", "evento", "tarea", "aviso", "comunicacion", "mensaje")
+ORDEN_TIPOS = ("actuacion", "solicitud", "documento", "contrato", "evento", "tarea", "aviso", "comunicacion", "mensaje", "etapa")
 
 GRUPOS = {
     "actuaciones": ("actuacion",),
@@ -141,6 +142,12 @@ class RepositorioFolios:
         ):
             externo = getattr(rol, "value", rol) == models.RolUsuario.CLIENTE.value
             salida.append(Registro(proceso_id, "mensaje", origen_id, fecha, externo))
+
+        P = models.EtapaProceso
+        for proceso_id, origen_id, fecha in db.execute(
+            select(P.proceso_id, P.id, P.fecha).where(P.proceso_id.in_(proceso_ids))
+        ):
+            salida.append(Registro(proceso_id, "etapa", origen_id, fecha, False))
 
         return [r if r.fecha.tzinfo is None else Registro(r.proceso_id, r.tipo, r.origen_id, _ingenua(r.fecha), r.externo)
                 for r in salida]
@@ -369,3 +376,16 @@ class RepositorioFolios:
                 autor=autor,
             )
         return salida
+
+    def _contenido_etapa(self, ids: list[int]) -> dict[int, Contenido]:
+        P = models.EtapaProceso
+        cambios = list(self._db.scalars(select(P).where(P.id.in_(ids))))
+        nombres = self._nombres({c.usuario_id for c in cambios})
+        return {
+            c.id: Contenido(
+                titulo=f"El proceso pasa a la etapa de {NOMBRES_ETAPA.get(c.etapa, c.etapa).lower()}",
+                detalle=c.nota,
+                autor=nombres.get(c.usuario_id),
+            )
+            for c in cambios
+        }

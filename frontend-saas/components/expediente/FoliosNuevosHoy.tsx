@@ -2,8 +2,9 @@
 
 import Link from "next/link";
 import { useCallback, useState } from "react";
-import { ArrowRight, Check, FileText, RefreshCw, ScrollText } from "lucide-react";
+import { Check, FileText, ListPlus, RefreshCw, ScrollText, Send } from "lucide-react";
 
+import { AvisarClienteModal, TareaFolioModal } from "@/components/expediente/AccionesFolio";
 import { ICONO_FOLIO, fechaDeFolio } from "@/components/expediente/FoliosExpediente";
 import { Button } from "@/components/ui/Button";
 import { Folio } from "@/components/ui/Folio";
@@ -28,6 +29,8 @@ export function FoliosNuevosHoy() {
   const [cargando, setCargando] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [revisando, setRevisando] = useState<string | null>(null);
+  const [avisando, setAvisando] = useState<FolioNuevo | null>(null);
+  const [creandoTarea, setCreandoTarea] = useState<FolioNuevo | null>(null);
 
   const cargar = useCallback(async () => {
     setCargando(true);
@@ -54,6 +57,10 @@ export function FoliosNuevosHoy() {
       toast({ title: "No se pudo marcar como revisado", description: mensajeDeError(fallo), tone: "error" });
       return;
     }
+    quitar(folio);
+  }
+
+  function quitar(folio: FolioNuevo) {
     setItems((actuales) => actuales.filter((f) => f !== folio));
     setTotal((n) => Math.max(0, n - 1));
   }
@@ -103,17 +110,20 @@ export function FoliosNuevosHoy() {
                     <span aria-hidden="true">·</span>
                     <span className="tabular-nums">{fechaDeFolio(folio)}</span>
                   </p>
-                  <p className="mt-0.5 font-semibold text-pretty text-ink">{folio.titulo}</p>
+                  <Link href={enlaceAlFolio(folio)} className="mt-0.5 block font-semibold text-pretty text-ink underline-offset-2 hover:underline">
+                    {folio.titulo}
+                  </Link>
                   <p className="truncate text-sm text-ink-2">{folio.proceso.nombre}</p>
                   <div className="mt-2.5 flex flex-wrap gap-2">
-                    <Link
-                      href={enlaceAlFolio(folio)}
-                      className="inline-flex min-h-9 items-center gap-1.5 rounded-[var(--radius-md)] bg-brand-900 px-3 text-[13px] font-semibold !text-white transition-colors hover:bg-brand-800"
-                    >
-                      Abrir en el expediente
-                      <ArrowRight aria-hidden="true" className="size-3.5" />
-                    </Link>
-                    <Button size="sm" variant="secondary" icon={<Check size={14} />} loading={revisando === clave} onClick={() => void revisar(folio)}>
+                    {folio.tipo === "actuacion" && (
+                      <Button size="sm" icon={<Send size={14} />} onClick={() => setAvisando(folio)}>
+                        Avisar al cliente
+                      </Button>
+                    )}
+                    <Button size="sm" variant="secondary" icon={<ListPlus size={14} />} onClick={() => setCreandoTarea(folio)}>
+                      Crear tarea
+                    </Button>
+                    <Button size="sm" variant="ghost" icon={<Check size={14} />} loading={revisando === clave} onClick={() => void revisar(folio)}>
                       Marcar revisado
                     </Button>
                   </div>
@@ -124,6 +134,19 @@ export function FoliosNuevosHoy() {
           })}
         </ul>
       )}
+
+      <AvisarClienteModal
+        procesoId={avisando?.proceso.id ?? 0}
+        folio={avisando}
+        onClose={() => setAvisando(null)}
+        onHecho={() => avisando && quitar(avisando)}
+      />
+      <TareaFolioModal
+        procesoId={creandoTarea?.proceso.id ?? 0}
+        folio={creandoTarea}
+        onClose={() => setCreandoTarea(null)}
+        onHecho={() => creandoTarea && quitar(creandoTarea)}
+      />
     </section>
   );
 }

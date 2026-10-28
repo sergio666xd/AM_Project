@@ -421,6 +421,8 @@ class Proceso(Base):
     archivado_en = Column(DateTime(timezone=True), nullable=True, index=True)
     # Primera foliación del expediente; lo anterior entró revisado (ver FolioExpediente).
     foliado_en = Column(DateTime, nullable=True)
+    # Etapa actual (demanda, admision, pruebas, audiencia, sentencia); el historial va en EtapaProceso.
+    etapa = Column(String(16), nullable=True)
     abogado = relationship("Usuario", back_populates="procesos", foreign_keys=[abogado_id])
     colaboradores = relationship(
         "ProcesoColaborador",
@@ -651,6 +653,18 @@ class NovedadRadicadoUsuario(Base):
     actualizado_en = Column(DateTime, nullable=False, default=utc_ahora)
 
     radicado = relationship("Radicado")
+
+
+class EtapaProceso(Base):
+    """Cada cambio de etapa de un proceso, con quién lo hizo y una nota opcional."""
+    __tablename__ = "etapas_proceso"
+
+    id = Column(Integer, primary_key=True)
+    proceso_id = Column(Integer, ForeignKey("procesos.id", ondelete="CASCADE"), nullable=False, index=True)
+    etapa = Column(String(16), nullable=False)
+    nota = Column(Text, nullable=True)
+    fecha = Column(DateTime, nullable=False, default=utc_ahora)
+    usuario_id = Column(Integer, ForeignKey("usuarios.id", ondelete="SET NULL"), nullable=True)
 
 
 class FolioExpediente(Base):

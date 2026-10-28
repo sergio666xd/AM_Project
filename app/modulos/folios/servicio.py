@@ -8,31 +8,38 @@ cliente) entra como nuevo hasta que alguien de la firma lo marca revisado.
 """
 
 from collections import defaultdict
+from datetime import datetime, time, timezone
 
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
-from app import models
+from app import models, notification_service
 from app.audit import registrar_evento_auditoria
 from app.modulos.expedientes import politicas
 from app.modulos.expedientes.repositorio import RepositorioProcesos
 from app.modulos.folios.esquemas import (
     ArchivoFolio,
+    AvisarCliente,
+    ClientesAvisados,
     Folio,
     FolioNuevo,
     FoliosNuevos,
     FoliosRevisados,
     PaginaFolios,
     ProcesoDelFolio,
+    TareaCreada,
+    TareaDesdeFolio,
 )
 from app.modulos.folios.repositorio import GRUPOS, ORDEN_TIPOS, Contenido, RepositorioFolios
 from app.modulos.identidad.modelos import Usuario
-from app.nucleo.errores import NoEncontrado, SinPermiso
+from app.nucleo.errores import Conflicto, ErrorDominio, NoEncontrado, SinPermiso
 from app.nucleo.paginacion import ParametrosPagina, codificar_cursor
-from app.timezone import utc_ahora
+from app.timezone import COLOMBIA, utc_ahora
+from app.workflow_service import user_portal_url
 
 NO_ENCONTRADO = "No encontramos el proceso, o no tienes acceso a él."
+FOLIO_NO_ENCONTRADO = "No encontramos ese folio en el expediente."
 SOLO_FIRMA = "Los folios del expediente son para el equipo de la firma."
 
 ETIQUETAS = {
@@ -45,6 +52,7 @@ ETIQUETAS = {
     "aviso": "Aviso al cliente",
     "tarea": "Tarea",
     "evento": "Agenda",
+    "etapa": "Etapa",
 }
 
 
@@ -166,6 +174,112 @@ class ServicioFolios:
             )
         self._db.commit()
         return FoliosRevisados(revisados=revisados)
+
+    def avisar(self, usuario: Usuario, proceso_id: int, numero: int, datos: AvisarCliente) -> ClientesAvisados:
+        """Avisa a los clientes de una actuación del folio y lo deja revisado."""
+        proceso = self._proceso_de_firma(usuario, proceso_id)
+        folio = self._folio(proceso_id, numero)
+        if folio.tipo != "actuacion":
+            raise ErrorDominio("Solo se avisa al cliente de las actuaciones judiciales.", codigo="folio_no_avisable")
+        actuacion = self._db.get(models.Actuacion, folio.origen_id)
+        if actuacion is None:
+            raise Conflicto("La actuación de este folio se retiró del expediente.", codigo="folio_retirado")
+        vinculados = {
+            vinculo.cliente.id: vinculo.cliente
+            for vinculo in proceso.clientes
+            if vinculo.cliente and vinculo.cliente.estado == models.EstadoUsuario.ACTIVO
+        }
+        if not vinculados:
+            raise Conflicto("El proceso no tiene clientes activos a los que avisar.", codigo="sin_clientes")
+        ids = datos.cliente_ids or list(vinculados)
+        ajenos = [i for i in ids if i not in vinculados]
+        if ajenos:
+            raise ErrorDominio("Elige clientes vinculados al proceso.", codigo="cliente_ajeno",
+                               campos={"cliente_ids": "Hay clientes que no están vinculados al proceso."})
+        comentarios = datos.comentarios.strip()
+        radicado = actuacion.radicado_rel.numero if actuacion.radicado_rel else ""
+        asunto = f"Actualización del proceso {proceso.nombre}"
+        avisados = []
+        for cliente_id in dict.fromkeys(ids):
+            cliente = vinculados[cliente_id]
+            enlace = user_portal_url(cliente, f"/gestion-procesos/cliente/procesos/{proceso.id}#actuacion-{actuacion.id}")
+            cuerpo = (
+                f"Hola {cliente.nombre_completo},\n\n{usuario.nombre_completo} le notifica una actuación del proceso "
+                f"{proceso.nombre}.\n\nRadicado: {radicado}\nFecha: {actuacion.fecha_actuacion or 'No informada'}\n"
+                f"Actuación: {actuacion.actuacion}\nAnotación: {actuacion.anotacion or 'Sin anotación'}\n"
+                f"Comentarios del abogado: {comentarios}"
+            )
+            notification_service.emitir_notificacion_workflow(
+                self._db, cliente, "ACTUACIONES", f"NOTIFICACION_ACTUACION:{actuacion.id}:{cliente.id}", asunto, cuerpo,
+                emisor=usuario, incluir_email=True, plantilla_clave="ACTUACION_NOTIFICADA",
+                variables={"nombre": cliente.nombre_completo, "actor": usuario.nombre_completo, "proceso": proceso.nombre,
+                           "radicado": radicado, "fecha": actuacion.fecha_actuacion or "No informada",
+                           "actuacion": actuacion.actuacion, "anotacion": actuacion.anotacion or "Sin anotación",
+                           "comentarios": comentarios},
+                enlace_texto="Ver actuación", enlace_url=enlace,
+            )
+            self._db.add(models.NotificacionProceso(
+                abogado_id=usuario.id, proceso_id=proceso.id, cliente_id=cliente.id, actuacion_id=actuacion.id,
+                comentarios=comentarios, asunto=asunto, cuerpo=cuerpo,
+            ))
+            avisados.append(ProcesoDelFolio(id=cliente.id, nombre=cliente.nombre_completo))
+        self._folios.marcar_revisados(proceso_id, [numero], usuario.id, utc_ahora())
+        registrar_evento_auditoria(self._db, usuario, "proceso.notificacion.enviar", "proceso", proceso.id,
+                                   {"folio": numero, "clientes": [c.id for c in avisados]})
+        self._db.commit()
+        return ClientesAvisados(clientes=avisados)
+
+    def crear_tarea(self, usuario: Usuario, proceso_id: int, numero: int, datos: TareaDesdeFolio) -> TareaCreada:
+        """Crea una tarea del proceso a partir de un folio y lo deja revisado."""
+        # Los recordatorios de las tareas viven en la API v1 hasta la Fase 4.
+        from app.routers.tareas import _crear_recordatorios_sistema, _lanzar_recordatorios_pendientes
+
+        proceso = self._proceso_de_firma(usuario, proceso_id)
+        folio = self._folio(proceso_id, numero)
+        actuacion = self._db.get(models.Actuacion, folio.origen_id) if folio.tipo == "actuacion" else None
+        fecha_limite = None
+        if datos.fecha_limite is not None:
+            # Vence al final del día en Colombia; la base guarda UTC sin zona.
+            fin = datetime.combine(datos.fecha_limite, time(23, 59), COLOMBIA)
+            fecha_limite = fin.astimezone(timezone.utc).replace(tzinfo=None)
+            if fecha_limite <= utc_ahora():
+                raise ErrorDominio("La fecha límite ya pasó.", codigo="fecha_pasada",
+                                   campos={"fecha_limite": "Elige hoy o una fecha futura."})
+        descripcion = (datos.descripcion or "").strip()
+        referencia = f"Creada desde el folio {numero} del expediente."
+        tarea = models.Tarea(
+            usuario_id=usuario.id if usuario.id in {proceso.abogado_id, *self._colaboradores(proceso)} else proceso.abogado_id,
+            proceso_id=proceso.id,
+            radicado_id=actuacion.radicado_id if actuacion else None,
+            actuacion_id=actuacion.id if actuacion else None,
+            titulo=datos.titulo.strip(),
+            descripcion=f"{descripcion}\n\n{referencia}" if descripcion else referencia,
+            prioridad=models.PrioridadTarea(datos.prioridad),
+            fecha_limite=fecha_limite,
+        )
+        self._db.add(tarea)
+        self._db.flush()
+        recordatorios = _crear_recordatorios_sistema(self._db, tarea)
+        self._folios.marcar_revisados(proceso_id, [numero], usuario.id, utc_ahora())
+        registrar_evento_auditoria(self._db, usuario, "tarea.crear", "tarea", tarea.id, {"folio": numero})
+        self._db.commit()
+        _lanzar_recordatorios_pendientes(self._db, tarea, recordatorios)
+        return TareaCreada(id=tarea.id, titulo=tarea.titulo, fecha_limite=tarea.fecha_limite)
+
+    @staticmethod
+    def _colaboradores(proceso: models.Proceso) -> set[int]:
+        return {vinculo.abogado_id for vinculo in proceso.colaboradores}
+
+    def _folio(self, proceso_id: int, numero: int) -> models.FolioExpediente:
+        self.foliar([proceso_id])
+        folio = self._db.scalar(
+            select(models.FolioExpediente).where(
+                models.FolioExpediente.proceso_id == proceso_id, models.FolioExpediente.numero == numero,
+            )
+        )
+        if folio is None:
+            raise NoEncontrado(FOLIO_NO_ENCONTRADO)
+        return folio
 
     def _proceso_de_firma(self, usuario: Usuario, proceso_id: int) -> models.Proceso:
         if politicas.es_cliente(usuario):

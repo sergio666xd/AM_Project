@@ -2,8 +2,15 @@ from sqlalchemy.orm import Session
 
 from app.audit import registrar_evento_auditoria
 from app.modulos.expedientes import politicas
-from app.modulos.expedientes.esquemas import PaginaProcesos, PersonaBreve, ProcesoDetalle, ProcesoResumen
-from app.modulos.expedientes.modelos import Proceso
+from app.modulos.expedientes.esquemas import (
+    CambiarEtapa,
+    CambioEtapa,
+    PaginaProcesos,
+    PersonaBreve,
+    ProcesoDetalle,
+    ProcesoResumen,
+)
+from app.modulos.expedientes.modelos import EtapaProceso, Proceso
 from app.modulos.expedientes.repositorio import FiltroProcesos, RepositorioProcesos
 from app.modulos.identidad.modelos import Usuario
 from app.nucleo.errores import Conflicto, NoEncontrado, SinPermiso
@@ -25,6 +32,7 @@ def _datos_resumen(proceso: Proceso, usuario: Usuario) -> dict:
         "responsable": _persona(proceso.abogado),
         "clientes": [_persona(vinculo.cliente) for vinculo in proceso.clientes if vinculo.cliente],
         "radicados": sorted(vinculo.radicado.numero for vinculo in proceso.radicados if vinculo.radicado),
+        "etapa": proceso.etapa,
         "archivado_en": proceso.archivado_en,
         "creado_en": proceso.created_at,
         "puede_administrar": politicas.puede_administrar(usuario, proceso),
@@ -62,10 +70,29 @@ class ServicioProcesos:
             for vinculo in proceso.colaboradores
             if vinculo.abogado and (vinculo.visible_cliente or not politicas.es_cliente(usuario))
         ]
+        cliente = politicas.es_cliente(usuario)
         return ProcesoDetalle(
             **_datos_resumen(proceso, usuario),
             colaboradores=[_persona(vinculo.abogado) for vinculo in colaboradores],
+            etapas=[
+                CambioEtapa(etapa=cambio.etapa, fecha=cambio.fecha, nota=None if cliente else cambio.nota, autor=autor)
+                for cambio, autor in self._procesos.historial_etapas(proceso.id)
+            ],
         )
+
+    def cambiar_etapa(self, usuario: Usuario, proceso_id: int, datos: CambiarEtapa) -> ProcesoDetalle:
+        if politicas.es_cliente(usuario):
+            raise SinPermiso("Solo el equipo de la firma puede cambiar la etapa del proceso.")
+        proceso = self._proceso_visible(usuario, proceso_id)
+        if proceso.etapa == datos.etapa:
+            raise Conflicto("El proceso ya está en esa etapa.", codigo="misma_etapa")
+        nota = (datos.nota or "").strip() or None
+        proceso.etapa = datos.etapa
+        self._db.add(EtapaProceso(proceso_id=proceso.id, etapa=datos.etapa, nota=nota, usuario_id=usuario.id,
+                                  fecha=ahora_utc().replace(tzinfo=None)))
+        registrar_evento_auditoria(self._db, usuario, "proceso.etapa", "proceso", proceso.id, {"etapa": datos.etapa})
+        self._db.commit()
+        return self.obtener(usuario, proceso_id)
 
     def archivar(self, usuario: Usuario, proceso_id: int) -> ProcesoDetalle:
         proceso = self._proceso_administrable(usuario, proceso_id, "archivar el proceso")

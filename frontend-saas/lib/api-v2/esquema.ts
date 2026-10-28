@@ -140,6 +140,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v2/procesos/{proceso_id}/etapa": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /**
+         * Cambiar la etapa del proceso
+         * @description Fija la etapa actual y la anota en el historial (y en los folios del expediente).
+         */
+        patch: operations["cambiar_etapa"];
+        trace?: never;
+    };
     "/api/v2/procesos/{proceso_id}/folios": {
         parameters: {
             query?: never;
@@ -189,6 +209,68 @@ export interface paths {
          * @description Lo que llegó sin revisar a los procesos activos que el usuario puede ver, del más reciente al más antiguo.
          */
         get: operations["folios_nuevos"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v2/procesos/{proceso_id}/folios/{numero}/avisar": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Avisar al cliente de una actuación
+         * @description Envía la actuación del folio con los comentarios de la firma, por los canales que cada
+         *     cliente tenga activos, y deja el folio revisado.
+         */
+        post: operations["avisar_cliente"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v2/procesos/{proceso_id}/folios/{numero}/tarea": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Crear una tarea desde un folio
+         * @description La tarea queda en el proceso (y en la actuación, si el folio es una) y el folio, revisado.
+         */
+        post: operations["crear_tarea"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v2/bandeja": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Bandeja «Hoy»
+         * @description Tareas vencidas y por vencer, agenda de la semana y documentos del cliente por revisar,
+         *     de los procesos activos que el usuario ve.
+         */
+        get: operations["bandeja"];
         put?: never;
         post?: never;
         delete?: never;
@@ -274,6 +356,27 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v2/terminos/calcular": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Calcular el vencimiento de un término
+         * @description Cuenta días hábiles desde el día siguiente a la notificación, sin festivos de Colombia
+         *     ni vacancia judicial (20 de diciembre a 10 de enero y Semana Santa).
+         */
+        post: operations["calcular"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -287,6 +390,19 @@ export interface components {
              * @description Ruta de descarga del archivo, con la sesión del usuario.
              */
             url: string;
+        };
+        /** AvisarCliente */
+        AvisarCliente: {
+            /**
+             * Comentarios
+             * @description Lo que la firma le explica al cliente.
+             */
+            comentarios: string;
+            /**
+             * Cliente Ids
+             * @description Clientes del proceso a los que se avisa. Vacío: a todos los vinculados.
+             */
+            cliente_ids?: number[] | null;
         };
         /** Aviso */
         Aviso: {
@@ -324,6 +440,72 @@ export interface components {
              */
             sin_leer: number;
         };
+        /** Bandeja */
+        Bandeja: {
+            resumen: components["schemas"]["ResumenBandeja"];
+            /**
+             * Pendientes
+             * @description Ordenados por urgencia y fecha.
+             */
+            pendientes: components["schemas"]["Pendiente"][];
+            /**
+             * Agenda
+             * @description Audiencias y eventos de hoy y los próximos 7 días.
+             */
+            agenda: components["schemas"]["Pendiente"][];
+        };
+        /** CalcularTermino */
+        CalcularTermino: {
+            /**
+             * Notificacion
+             * Format: date
+             * @description Día en que se notificó la providencia (por estado, personal, etc.).
+             */
+            notificacion: string;
+            /**
+             * Dias
+             * @description Duración del término en días hábiles.
+             */
+            dias: number;
+        };
+        /** CambiarEtapa */
+        CambiarEtapa: {
+            /**
+             * Etapa
+             * @enum {string}
+             */
+            etapa: "demanda" | "admision" | "pruebas" | "audiencia" | "sentencia";
+            /** Nota */
+            nota?: string | null;
+        };
+        /** CambioEtapa */
+        CambioEtapa: {
+            /**
+             * Etapa
+             * @enum {string}
+             */
+            etapa: "demanda" | "admision" | "pruebas" | "audiencia" | "sentencia";
+            /**
+             * Fecha
+             * Format: date-time
+             */
+            fecha: string;
+            /**
+             * Nota
+             * @description Nota de la firma. Al cliente no le llega.
+             */
+            nota?: string | null;
+            /** Autor */
+            autor?: string | null;
+        };
+        /** ClientesAvisados */
+        ClientesAvisados: {
+            /**
+             * Clientes
+             * @description Clientes a los que se envió el aviso (id y nombre).
+             */
+            clientes: components["schemas"]["ProcesoDelFolio"][];
+        };
         /** ErrorRespuesta */
         ErrorRespuesta: {
             /**
@@ -355,7 +537,7 @@ export interface components {
              * Tipo
              * @enum {string}
              */
-            tipo: "actuacion" | "documento" | "solicitud" | "contrato" | "mensaje" | "comunicacion" | "aviso" | "tarea" | "evento";
+            tipo: "actuacion" | "documento" | "solicitud" | "contrato" | "mensaje" | "comunicacion" | "aviso" | "tarea" | "evento" | "etapa";
             /**
              * Etiqueta
              * @description Nombre del tipo para mostrar: «Actuación», «Mensaje»...
@@ -409,7 +591,7 @@ export interface components {
              * Tipo
              * @enum {string}
              */
-            tipo: "actuacion" | "documento" | "solicitud" | "contrato" | "mensaje" | "comunicacion" | "aviso" | "tarea" | "evento";
+            tipo: "actuacion" | "documento" | "solicitud" | "contrato" | "mensaje" | "comunicacion" | "aviso" | "tarea" | "evento" | "etapa";
             /**
              * Etiqueta
              * @description Nombre del tipo para mostrar: «Actuación», «Mensaje»...
@@ -531,8 +713,64 @@ export interface components {
              */
             siguiente: string | null;
         };
+        /** Pendiente */
+        Pendiente: {
+            /**
+             * Clave
+             * @description Identificador estable del pendiente, como «tarea:12».
+             */
+            clave: string;
+            /**
+             * Tipo
+             * @enum {string}
+             */
+            tipo: "tarea" | "evento" | "documento";
+            /**
+             * Urgencia
+             * @description vencida: pasó la fecha; hoy: vence u ocurre hoy; pronto: en los próximos 7 días; por_revisar: un documento del cliente sin revisar.
+             * @enum {string}
+             */
+            urgencia: "vencida" | "hoy" | "pronto" | "por_revisar";
+            /** Titulo */
+            titulo: string;
+            /** Detalle */
+            detalle?: string | null;
+            /** Fecha */
+            fecha?: string | null;
+            proceso?: components["schemas"]["ProcesoBreve"] | null;
+            /**
+             * Enlace
+             * @description Ruta del panel del abogado donde se atiende.
+             */
+            enlace: string;
+        };
+        /** PeriodoInhabil */
+        PeriodoInhabil: {
+            /**
+             * Desde
+             * Format: date
+             */
+            desde: string;
+            /**
+             * Hasta
+             * Format: date
+             */
+            hasta: string;
+            /**
+             * Motivo
+             * @description Festivo o vacancia judicial que no contó.
+             */
+            motivo: string;
+        };
         /** PersonaBreve */
         PersonaBreve: {
+            /** Id */
+            id: number;
+            /** Nombre */
+            nombre: string;
+        };
+        /** ProcesoBreve */
+        ProcesoBreve: {
             /** Id */
             id: number;
             /** Nombre */
@@ -561,6 +799,11 @@ export interface components {
              * @description Números de radicado de 23 dígitos vinculados al proceso.
              */
             radicados: string[];
+            /**
+             * Etapa
+             * @description Etapa actual; vacía mientras la firma no la fije.
+             */
+            etapa: ("demanda" | "admision" | "pruebas" | "audiencia" | "sentencia") | null;
             /** Archivado En */
             archivado_en: string | null;
             /**
@@ -578,6 +821,11 @@ export interface components {
              * @description Abogados que colaboran. Al cliente solo le llegan los marcados como visibles.
              */
             colaboradores: components["schemas"]["PersonaBreve"][];
+            /**
+             * Etapas
+             * @description Historial de cambios de etapa, del más antiguo al más reciente.
+             */
+            etapas: components["schemas"]["CambioEtapa"][];
         };
         /** ProcesoResumen */
         ProcesoResumen: {
@@ -595,6 +843,11 @@ export interface components {
              * @description Números de radicado de 23 dígitos vinculados al proceso.
              */
             radicados: string[];
+            /**
+             * Etapa
+             * @description Etapa actual; vacía mientras la firma no la fije.
+             */
+            etapa: ("demanda" | "admision" | "pruebas" | "audiencia" | "sentencia") | null;
             /** Archivado En */
             archivado_en: string | null;
             /**
@@ -637,6 +890,20 @@ export interface components {
              */
             items: components["schemas"]["Resultado"][];
         };
+        /** ResumenBandeja */
+        ResumenBandeja: {
+            /** Procesos Activos */
+            procesos_activos: number;
+            /** Tareas Vencidas */
+            tareas_vencidas: number;
+            /**
+             * Vencen Esta Semana
+             * @description Tareas que vencen y audiencias o eventos en los próximos 7 días.
+             */
+            vencen_esta_semana: number;
+            /** Documentos Por Revisar */
+            documentos_por_revisar: number;
+        };
         /** RevisarFolios */
         RevisarFolios: {
             /**
@@ -644,6 +911,60 @@ export interface components {
              * @description Folios a marcar revisados; si se omite, todos los nuevos del proceso.
              */
             numeros?: number[] | null;
+        };
+        /** TareaCreada */
+        TareaCreada: {
+            /** Id */
+            id: number;
+            /** Titulo */
+            titulo: string;
+            /** Fecha Limite */
+            fecha_limite: string | null;
+        };
+        /** TareaDesdeFolio */
+        TareaDesdeFolio: {
+            /** Titulo */
+            titulo: string;
+            /** Descripcion */
+            descripcion?: string | null;
+            /**
+             * Fecha Limite
+             * @description Día de vencimiento (fin del día en Colombia).
+             */
+            fecha_limite?: string | null;
+            /**
+             * Prioridad
+             * @default MEDIA
+             * @enum {string}
+             */
+            prioridad: "BAJA" | "MEDIA" | "ALTA" | "URGENTE";
+        };
+        /** Termino */
+        Termino: {
+            /**
+             * Notificacion
+             * Format: date
+             */
+            notificacion: string;
+            /** Dias */
+            dias: number;
+            /**
+             * Inicia
+             * Format: date
+             * @description Primer día hábil del término: el siguiente a la notificación.
+             */
+            inicia: string;
+            /**
+             * Vence
+             * Format: date
+             * @description Último día hábil del término.
+             */
+            vence: string;
+            /**
+             * Inhabiles
+             * @description Festivos y vacancia judicial dentro del término. Los fines de semana no se listan.
+             */
+            inhabiles: components["schemas"]["PeriodoInhabil"][];
         };
         /** UsuarioSesion */
         UsuarioSesion: {
@@ -1434,6 +1755,95 @@ export interface operations {
             };
         };
     };
+    cambiar_etapa: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                proceso_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CambiarEtapa"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProcesoDetalle"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+        };
+    };
     listar_folios: {
         parameters: {
             query?: {
@@ -1636,6 +2046,269 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["FoliosNuevos"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+        };
+    };
+    avisar_cliente: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                proceso_id: number;
+                numero: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AvisarCliente"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ClientesAvisados"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+        };
+    };
+    crear_tarea: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                proceso_id: number;
+                numero: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TareaDesdeFolio"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TareaCreada"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+        };
+    };
+    bandeja: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Bandeja"];
                 };
             };
             /** @description Bad Request */
@@ -1978,6 +2651,93 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["Resultados"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+        };
+    };
+    calcular: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CalcularTermino"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Termino"];
                 };
             };
             /** @description Bad Request */

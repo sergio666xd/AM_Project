@@ -4,6 +4,7 @@ from sqlalchemy import ColumnElement, exists, func, or_, select
 from sqlalchemy.orm import Session, selectinload
 
 from app.modulos.expedientes.modelos import (
+    EtapaProceso,
     Proceso,
     ProcesoCliente,
     ProcesoColaborador,
@@ -87,3 +88,11 @@ class RepositorioProcesos:
                 selectinload(Proceso.colaboradores).selectinload(ProcesoColaborador.abogado),
             )
         )
+
+    def historial_etapas(self, proceso_id: int) -> list[tuple[EtapaProceso, str | None]]:
+        return [(cambio, autor) for cambio, autor in self._db.execute(
+            select(EtapaProceso, Usuario.nombre_completo)
+            .outerjoin(Usuario, Usuario.id == EtapaProceso.usuario_id)
+            .where(EtapaProceso.proceso_id == proceso_id)
+            .order_by(EtapaProceso.fecha, EtapaProceso.id)
+        )]
