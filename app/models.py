@@ -419,6 +419,8 @@ class Proceso(Base):
     descripcion = Column(Text, nullable=True)
     created_at = Column(DateTime, nullable=False, default=utc_ahora)
     archivado_en = Column(DateTime(timezone=True), nullable=True, index=True)
+    # Primera foliación del expediente; lo anterior entró revisado (ver FolioExpediente).
+    foliado_en = Column(DateTime, nullable=True)
     abogado = relationship("Usuario", back_populates="procesos", foreign_keys=[abogado_id])
     colaboradores = relationship(
         "ProcesoColaborador",
@@ -649,6 +651,30 @@ class NovedadRadicadoUsuario(Base):
     actualizado_en = Column(DateTime, nullable=False, default=utc_ahora)
 
     radicado = relationship("Radicado")
+
+
+class FolioExpediente(Base):
+    """Número de folio de cada registro del expediente de un proceso.
+
+    El número se asigna una vez y no cambia: los registros nuevos toman el
+    siguiente, aunque su fecha sea anterior. Si el registro de origen se
+    borra, el folio queda (como en un expediente físico) y se muestra retirado.
+    """
+    __tablename__ = "folios_expediente"
+    __table_args__ = (
+        UniqueConstraint("proceso_id", "numero", name="uq_folio_proceso_numero"),
+        UniqueConstraint("proceso_id", "tipo", "origen_id", name="uq_folio_proceso_origen"),
+    )
+
+    id = Column(Integer, primary_key=True)
+    proceso_id = Column(Integer, ForeignKey("procesos.id", ondelete="CASCADE"), nullable=False, index=True)
+    numero = Column(Integer, nullable=False)
+    tipo = Column(String(16), nullable=False)
+    origen_id = Column(Integer, nullable=False)
+    fecha = Column(DateTime, nullable=False)
+    creado_en = Column(DateTime, nullable=False, default=utc_ahora)
+    revisado_en = Column(DateTime, nullable=True, index=True)
+    revisado_por_id = Column(Integer, ForeignKey("usuarios.id", ondelete="SET NULL"), nullable=True)
 
 
 class LecturaNotificacionCliente(Base):
