@@ -1688,6 +1688,98 @@
         }
       }
     },
+    "/api/v2/bandeja": {
+      "get": {
+        "tags": [
+          "Bandeja"
+        ],
+        "summary": "Bandeja «Hoy»",
+        "description": "Tareas vencidas y por vencer, agenda de la semana y documentos del cliente por revisar,\nde los procesos activos que el usuario ve.",
+        "operationId": "bandeja",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Bandeja"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too Many Requests",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v2/avisos": {
       "get": {
         "tags": [
@@ -2338,6 +2430,36 @@
         ],
         "title": "Avisos"
       },
+      "Bandeja": {
+        "properties": {
+          "resumen": {
+            "$ref": "#/components/schemas/ResumenBandeja"
+          },
+          "pendientes": {
+            "items": {
+              "$ref": "#/components/schemas/Pendiente"
+            },
+            "type": "array",
+            "title": "Pendientes",
+            "description": "Ordenados por urgencia y fecha."
+          },
+          "agenda": {
+            "items": {
+              "$ref": "#/components/schemas/Pendiente"
+            },
+            "type": "array",
+            "title": "Agenda",
+            "description": "Audiencias y eventos de hoy y los próximos 7 días."
+          }
+        },
+        "type": "object",
+        "required": [
+          "resumen",
+          "pendientes",
+          "agenda"
+        ],
+        "title": "Bandeja"
+      },
       "CalcularTermino": {
         "properties": {
           "notificacion": {
@@ -2889,6 +3011,86 @@
         ],
         "title": "PaginaProcesos"
       },
+      "Pendiente": {
+        "properties": {
+          "clave": {
+            "type": "string",
+            "title": "Clave",
+            "description": "Identificador estable del pendiente, como «tarea:12»."
+          },
+          "tipo": {
+            "type": "string",
+            "enum": [
+              "tarea",
+              "evento",
+              "documento"
+            ],
+            "title": "Tipo"
+          },
+          "urgencia": {
+            "type": "string",
+            "enum": [
+              "vencida",
+              "hoy",
+              "pronto",
+              "por_revisar"
+            ],
+            "title": "Urgencia",
+            "description": "vencida: pasó la fecha; hoy: vence u ocurre hoy; pronto: en los próximos 7 días; por_revisar: un documento del cliente sin revisar."
+          },
+          "titulo": {
+            "type": "string",
+            "title": "Titulo"
+          },
+          "detalle": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Detalle"
+          },
+          "fecha": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fecha"
+          },
+          "proceso": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ProcesoBreve"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "enlace": {
+            "type": "string",
+            "title": "Enlace",
+            "description": "Ruta del panel del abogado donde se atiende."
+          }
+        },
+        "type": "object",
+        "required": [
+          "clave",
+          "tipo",
+          "urgencia",
+          "titulo",
+          "enlace"
+        ],
+        "title": "Pendiente"
+      },
       "PeriodoInhabil": {
         "properties": {
           "desde": {
@@ -2932,6 +3134,24 @@
           "nombre"
         ],
         "title": "PersonaBreve"
+      },
+      "ProcesoBreve": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "nombre": {
+            "type": "string",
+            "title": "Nombre"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "nombre"
+        ],
+        "title": "ProcesoBreve"
       },
       "ProcesoDelFolio": {
         "properties": {
@@ -3233,6 +3453,35 @@
           "items"
         ],
         "title": "Resultados"
+      },
+      "ResumenBandeja": {
+        "properties": {
+          "procesos_activos": {
+            "type": "integer",
+            "title": "Procesos Activos"
+          },
+          "tareas_vencidas": {
+            "type": "integer",
+            "title": "Tareas Vencidas"
+          },
+          "vencen_esta_semana": {
+            "type": "integer",
+            "title": "Vencen Esta Semana",
+            "description": "Tareas que vencen y audiencias o eventos en los próximos 7 días."
+          },
+          "documentos_por_revisar": {
+            "type": "integer",
+            "title": "Documentos Por Revisar"
+          }
+        },
+        "type": "object",
+        "required": [
+          "procesos_activos",
+          "tareas_vencidas",
+          "vencen_esta_semana",
+          "documentos_por_revisar"
+        ],
+        "title": "ResumenBandeja"
       },
       "RevisarFolios": {
         "properties": {

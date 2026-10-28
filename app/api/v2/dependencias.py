@@ -4,6 +4,8 @@ from fastapi import Depends
 from sqlalchemy.orm import Session
 
 from app.modulos.avisos.servicio import ServicioAvisos
+from app.modulos.bandeja.repositorio import RepositorioBandeja
+from app.modulos.bandeja.servicio import ServicioBandeja
 from app.modulos.busqueda.servicio import ServicioBusqueda
 from app.modulos.expedientes.repositorio import RepositorioProcesos
 from app.modulos.expedientes.servicio import ServicioProcesos
@@ -32,3 +34,7 @@ def servicio_busqueda(db: Session = Depends(obtener_bd)) -> ServicioBusqueda:
 
 def servicio_folios(db: Session = Depends(obtener_bd)) -> ServicioFolios:
     return ServicioFolios(db, RepositorioFolios(db), RepositorioProcesos(db))
+
+
+def servicio_bandeja(db: Session = Depends(obtener_bd)) -> ServicioBandeja:
+    return ServicioBandeja(RepositorioBandeja(db))

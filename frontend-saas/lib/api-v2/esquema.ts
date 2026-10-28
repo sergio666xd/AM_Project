@@ -258,6 +258,27 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v2/bandeja": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Bandeja «Hoy»
+         * @description Tareas vencidas y por vencer, agenda de la semana y documentos del cliente por revisar,
+         *     de los procesos activos que el usuario ve.
+         */
+        get: operations["bandeja"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v2/avisos": {
         parameters: {
             query?: never;
@@ -418,6 +439,20 @@ export interface components {
              * @description Avisos sin leer en total, no solo en `items`.
              */
             sin_leer: number;
+        };
+        /** Bandeja */
+        Bandeja: {
+            resumen: components["schemas"]["ResumenBandeja"];
+            /**
+             * Pendientes
+             * @description Ordenados por urgencia y fecha.
+             */
+            pendientes: components["schemas"]["Pendiente"][];
+            /**
+             * Agenda
+             * @description Audiencias y eventos de hoy y los próximos 7 días.
+             */
+            agenda: components["schemas"]["Pendiente"][];
         };
         /** CalcularTermino */
         CalcularTermino: {
@@ -678,6 +713,37 @@ export interface components {
              */
             siguiente: string | null;
         };
+        /** Pendiente */
+        Pendiente: {
+            /**
+             * Clave
+             * @description Identificador estable del pendiente, como «tarea:12».
+             */
+            clave: string;
+            /**
+             * Tipo
+             * @enum {string}
+             */
+            tipo: "tarea" | "evento" | "documento";
+            /**
+             * Urgencia
+             * @description vencida: pasó la fecha; hoy: vence u ocurre hoy; pronto: en los próximos 7 días; por_revisar: un documento del cliente sin revisar.
+             * @enum {string}
+             */
+            urgencia: "vencida" | "hoy" | "pronto" | "por_revisar";
+            /** Titulo */
+            titulo: string;
+            /** Detalle */
+            detalle?: string | null;
+            /** Fecha */
+            fecha?: string | null;
+            proceso?: components["schemas"]["ProcesoBreve"] | null;
+            /**
+             * Enlace
+             * @description Ruta del panel del abogado donde se atiende.
+             */
+            enlace: string;
+        };
         /** PeriodoInhabil */
         PeriodoInhabil: {
             /**
@@ -698,6 +764,13 @@ export interface components {
         };
         /** PersonaBreve */
         PersonaBreve: {
+            /** Id */
+            id: number;
+            /** Nombre */
+            nombre: string;
+        };
+        /** ProcesoBreve */
+        ProcesoBreve: {
             /** Id */
             id: number;
             /** Nombre */
@@ -816,6 +889,20 @@ export interface components {
              * @description Agrupados por tipo: procesos, clientes y tareas.
              */
             items: components["schemas"]["Resultado"][];
+        };
+        /** ResumenBandeja */
+        ResumenBandeja: {
+            /** Procesos Activos */
+            procesos_activos: number;
+            /** Tareas Vencidas */
+            tareas_vencidas: number;
+            /**
+             * Vencen Esta Semana
+             * @description Tareas que vencen y audiencias o eventos en los próximos 7 días.
+             */
+            vencen_esta_semana: number;
+            /** Documentos Por Revisar */
+            documentos_por_revisar: number;
         };
         /** RevisarFolios */
         RevisarFolios: {
@@ -2139,6 +2226,89 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["TareaCreada"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+        };
+    };
+    bandeja: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Bandeja"];
                 };
             };
             /** @description Bad Request */
