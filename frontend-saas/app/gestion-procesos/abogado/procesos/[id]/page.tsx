@@ -9,6 +9,7 @@ import { useNow } from "@/lib/useNow";
 import { Button } from "@/components/ui/Button";
 import { CabeceraExpediente } from "@/components/expediente/CabeceraExpediente";
 import { FoliosExpediente } from "@/components/expediente/FoliosExpediente";
+import { DocumentosProceso } from "@/components/documentos/DocumentosProceso";
 
 import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
@@ -24,7 +25,6 @@ import {
   Phone,
   Bell,
   CheckCircle2,
-  Download,
   FileText,
   Link2,
   Loader2,
@@ -160,10 +160,6 @@ export default function ProcesoDetallePage({ section }: { section?: string }) {
   const [taskClientId, setTaskClientId] = useState("");
   const [taskRadicadoId, setTaskRadicadoId] = useState("");
   const [taskActuationId, setTaskActuationId] = useState("");
-  const [documentTitle, setDocumentTitle] = useState("");
-  const [documentItems, setDocumentItems] = useState("");
-  const [documentInstructions, setDocumentInstructions] = useState("");
-  const [documentClientId, setDocumentClientId] = useState("");
   const [notificationActuationId, setNotificationActuationId] = useState("");
   const [notificationClientId, setNotificationClientId] = useState("");
   const [notificationComments, setNotificationComments] = useState("");
@@ -204,11 +200,7 @@ export default function ProcesoDetallePage({ section }: { section?: string }) {
   const [showClientModal, setShowClientModal] = useState(false);
   const [showRadicadoModal, setShowRadicadoModal] = useState(false);
   const [showTaskModal, setShowTaskModal] = useState(false);
-  const [showDocumentRequestModal, setShowDocumentRequestModal] = useState(false);
   const [showAgendaModal, setShowAgendaModal] = useState(false);
-  const [documentPreview, setDocumentPreview] = useState<{ id: number; name: string; mimeType: string; url: string; estado: string; comentario: string } | null>(null);
-  const [documentReviewSaving, setDocumentReviewSaving] = useState(false);
-  const [downloadingDocumentId, setDownloadingDocumentId] = useState<number | null>(null);
 
   const headers = useCallback(
     () => ({
@@ -409,64 +401,6 @@ export default function ProcesoDetallePage({ section }: { section?: string }) {
       `/api/expedientes/procesos/${id}/colaboradores/${colleagueId}`,
       "DELETE",
     );
-  }
-
-  async function downloadDocument(documentId: number, filename: string) {
-    setDownloadingDocumentId(documentId);
-    setError("");
-    try {
-      const response = await apiRequest(`/api/expedientes/documentos/${documentId}/archivo`, {
-        headers: headers(),
-      });
-      if (!response.ok) {
-        const result: { detail?: string } = await response.json().catch(() => ({}));
-        throw new Error(result.detail || "No fue posible descargar el documento.");
-      }
-      const url = URL.createObjectURL(await response.blob());
-      const anchor = window.document.createElement("a");
-      anchor.href = url;
-      anchor.download = filename;
-      anchor.click();
-      window.setTimeout(() => URL.revokeObjectURL(url), 1000);
-    } catch (cause) {
-      setError(cause instanceof Error ? cause.message : "No fue posible descargar el documento.");
-    } finally {
-      setDownloadingDocumentId(null);
-    }
-  }
-
-  async function openDocumentPreview(document: Process["documentos"][number]) {
-    setDownloadingDocumentId(document.id);
-    setError("");
-    try {
-      const response = await apiRequest(`/api/expedientes/documentos/${document.id}/archivo`, { headers: headers() });
-      if (!response.ok) {
-        const result: { detail?: string } = await response.json().catch(() => ({}));
-        throw new Error(result.detail || "No fue posible abrir el documento.");
-      }
-      const url = URL.createObjectURL(await response.blob());
-      setDocumentPreview({ id: document.id, name: document.nombre_archivo, mimeType: document.mime_type, url, estado: document.estado_revision === "RECIBIDO" ? "EN_REVISION" : document.estado_revision || "EN_REVISION", comentario: document.comentario_revision || "" });
-    } catch (cause) {
-      setError(cause instanceof Error ? cause.message : "No fue posible abrir el documento.");
-    } finally {
-      setDownloadingDocumentId(null);
-    }
-  }
-
-  function closeDocumentPreview() {
-    if (documentPreview?.url) URL.revokeObjectURL(documentPreview.url);
-    setDocumentPreview(null);
-  }
-
-  async function saveDocumentReview() {
-    if (!documentPreview) return;
-    setDocumentReviewSaving(true);
-    const ok = await action(`/api/expedientes/documentos/${documentPreview.id}/revision`, "PATCH", {
-      estado_revision: documentPreview.estado,
-      comentario_revision: documentPreview.comentario,
-    });
-    if (ok) setDocumentPreview((current) => current ? { ...current } : current);
-    setDocumentReviewSaving(false);
   }
 
   async function saveCommunication(event: FormEvent<HTMLFormElement>) {
@@ -1227,47 +1161,7 @@ export default function ProcesoDetallePage({ section }: { section?: string }) {
 
         {/* DOCUMENTOS */}
         <section id="panel-documentos" role="region" aria-label="Documentos del proceso" style={{ display: activeTab === "documentos" ? undefined : "none" }} className="motion-tab-panel scroll-mt-20 rounded-2xl border border-[var(--border)] bg-[var(--surface)]">
-          <div className="flex items-center justify-between gap-3 border-b border-[var(--border)] px-5 py-4">
-            <div className="flex items-center gap-3">
-              <div className="flex size-9 items-center justify-center rounded-lg bg-[var(--primary)]/10 text-[var(--primary)]"><FileText className="size-4" /></div>
-              <div><h2 className="text-sm font-semibold text-[var(--foreground)]">Documentos</h2><p className="text-xs text-[var(--foreground-muted)]">{process.solicitudes_documento.length} solicitudes · {process.documentos.filter((document) => !document.contrato_id).length} archivos recibidos</p></div>
-            </div>
-            <button type="button" disabled={!process.clientes.length || working} onClick={() => { setDocumentTitle(""); setDocumentItems(""); setDocumentInstructions(""); setDocumentClientId(String(process.clientes[0]?.id ?? "")); setShowDocumentRequestModal(true); }} className="inline-flex items-center gap-2 rounded-lg border border-[var(--border)] px-3 py-2 text-xs font-medium text-[var(--foreground)] hover:bg-[var(--surface-secondary)] disabled:opacity-50"><Plus className="size-4" />Solicitar</button>
-          </div>
-
-          <div className="space-y-4 p-4">
-            <div>
-              <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-[var(--foreground-muted)]">Solicitudes y carpetas</h3>
-              {process.solicitudes_documento.length ? <div className="space-y-3">{process.solicitudes_documento.map((request) => {
-                const requestedDocuments = process.documentos.filter((document) => !document.contrato_id && document.solicitud_id === request.id);
-                return <div key={request.id} id={`solicitud-${request.id}`} className="overflow-hidden rounded-xl border border-[var(--border)] bg-[var(--surface)]">
-                  <div className="flex flex-wrap items-start justify-between gap-3 border-b border-[var(--border)] bg-[var(--surface-secondary)] px-4 py-3">
-                    <div className="min-w-0"><p className="text-sm font-semibold text-[var(--foreground)]">{request.titulo}</p><p className="mt-1 text-xs text-[var(--foreground-muted)]">Cliente: {request.cliente} · {requestedDocuments.length} archivo{requestedDocuments.length === 1 ? "" : "s"} recibido{requestedDocuments.length === 1 ? "" : "s"}</p>{request.instrucciones && <p className="mt-2 text-sm text-[var(--foreground-muted)]">{request.instrucciones}</p>}</div>
-                    <div className="flex items-center gap-2"><span className="rounded-md bg-[var(--primary-light)] px-2 py-1 text-[10px] font-medium text-[var(--primary)]">{request.estado.replaceAll("_", " ")}</span><Link href={`/gestion-procesos/abogado/documentos?proceso=${id}#solicitud-${request.id}`} className="text-xs font-medium text-[var(--primary)] hover:underline">Abrir carpeta</Link><button type="button" disabled={working} onClick={() => { if (window.confirm(`¿Eliminar la solicitud ${request.titulo}? El cliente dejará de verla; los archivos ya cargados se conservan en el proceso.`)) void action(`/api/expedientes/solicitudes-documento/${request.id}`, "DELETE"); }} className="text-xs font-medium text-red-600 hover:underline disabled:opacity-50">Eliminar</button></div>
-                  </div>
-                  <div className="divide-y divide-[var(--border)] px-4">
-                    {request.documentos_requeridos.map((item) => {
-                      const submitted = process.documentos.filter((document) => !document.contrato_id && document.solicitud_id === request.id && document.solicitud_item_id === item.id);
-                      return <div key={item.id} className="py-3">
-                        <div className="flex flex-wrap items-center justify-between gap-2"><div><p className="text-sm font-medium text-[var(--foreground)]">{item.nombre}</p><p className="mt-0.5 text-xs text-[var(--foreground-muted)]">{item.estado.replaceAll("_", " ")}</p></div><span className="text-xs text-[var(--foreground-muted)]">{submitted.length} archivo{submitted.length === 1 ? "" : "s"}</span></div>
-                        {submitted.length ? <div className="mt-2 space-y-2">{submitted.map((document) => <div key={document.id} className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-[var(--border)] bg-[var(--surface-secondary)] px-3 py-2.5"><div className="flex min-w-0 items-center gap-2"><FileText className="size-4 shrink-0 text-[var(--primary)]" /><div className="min-w-0"><p className="truncate text-sm font-medium text-[var(--foreground)]">{item.nombre}</p><p className="truncate text-xs text-[var(--foreground-muted)]">Archivo: {document.nombre_archivo} · {document.cliente} · {new Date(document.created_at).toLocaleDateString("es-CO", { timeZone: "America/Bogota" })} · {document.estado_revision.replaceAll("_", " ")}</p>{document.comentario_revision && <p className="mt-1 text-xs text-amber-700">Observación: {document.comentario_revision}</p>}</div></div><div className="flex shrink-0 items-center gap-2"><button type="button" disabled={downloadingDocumentId !== null} onClick={() => void openDocumentPreview(document)} className="rounded-md border border-[var(--border)] bg-[var(--surface)] px-2.5 py-2 text-xs hover:bg-[var(--surface-hover)] disabled:opacity-50">{downloadingDocumentId === document.id ? "Abriendo…" : "Previsualizar y revisar"}</button><button type="button" disabled={downloadingDocumentId !== null} onClick={() => void downloadDocument(document.id, document.nombre_archivo)} aria-label={`Descargar ${item.nombre}`} className="inline-flex items-center gap-1.5 rounded-md border border-[var(--border)] bg-[var(--surface)] px-2.5 py-2 text-xs text-[var(--foreground)] hover:bg-[var(--surface-hover)] disabled:opacity-50">{downloadingDocumentId === document.id ? <Loader2 className="size-3.5 animate-spin" /> : <Download className="size-3.5" />}{downloadingDocumentId === document.id ? "Descargando…" : "Descargar"}</button></div></div>)}</div> : <p className="mt-2 rounded-lg border border-dashed border-[var(--border)] px-3 py-2 text-xs text-[var(--foreground-muted)]">Pendiente de entrega.</p>}
-                      </div>;
-                    })}
-                    {requestedDocuments.filter((document) => !document.solicitud_item_id || !request.documentos_requeridos.some((item) => item.id === document.solicitud_item_id)).map((document) => <div key={`legacy-${document.id}`} className="flex flex-wrap items-center justify-between gap-3 py-3"><div className="flex min-w-0 items-center gap-2"><FileText className="size-4 shrink-0 text-[var(--primary)]" /><div className="min-w-0"><p className="truncate text-sm font-medium text-[var(--foreground)]">Documento de esta solicitud</p><p className="truncate text-xs text-[var(--foreground-muted)]">Archivo: {document.nombre_archivo} · {document.cliente} · {new Date(document.created_at).toLocaleDateString("es-CO", { timeZone: "America/Bogota" })} · {document.estado_revision.replaceAll("_", " ")}</p></div></div><div className="flex shrink-0 items-center gap-2"><button type="button" disabled={downloadingDocumentId !== null} onClick={() => void openDocumentPreview(document)} className="rounded-md border border-[var(--border)] bg-[var(--surface-secondary)] px-2.5 py-2 text-xs hover:bg-[var(--surface-hover)] disabled:opacity-50">Previsualizar y revisar</button><button type="button" disabled={downloadingDocumentId !== null} onClick={() => void downloadDocument(document.id, document.nombre_archivo)} aria-label={`Descargar ${request.titulo}`} className="inline-flex items-center gap-1.5 rounded-md border border-[var(--border)] bg-[var(--surface-secondary)] px-2.5 py-2 text-xs text-[var(--foreground)] hover:bg-[var(--surface-hover)] disabled:opacity-50"><Download className="size-3.5" />Descargar</button></div></div>)}
-                  </div>
-                </div>;
-              })}</div> : <p className="rounded-lg border border-dashed border-[var(--border)] px-3 py-5 text-center text-xs text-[var(--foreground-muted)]">No hay solicitudes para este proceso.</p>}
-            </div>
-            <div>
-              {(() => {
-                const ungroupedDocuments = process.documentos.filter((document) => !document.contrato_id && (!document.solicitud_id || !process.solicitudes_documento.some((request) => request.id === document.solicitud_id)));
-                return <>
-                  <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-[var(--foreground-muted)]">Otros documentos</h3>
-                  {ungroupedDocuments.length ? <div className="space-y-2">{ungroupedDocuments.map((document) => <div key={document.id} className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-[var(--border)] bg-[var(--surface-secondary)] px-3 py-2.5"><div className="flex min-w-0 items-center gap-2"><FileText className="size-4 shrink-0 text-[var(--primary)]" /><div className="min-w-0"><p className="truncate text-sm font-medium text-[var(--foreground)]">{document.nombre_archivo}</p><p className="truncate text-xs text-[var(--foreground-muted)]">{document.cliente} · {new Date(document.created_at).toLocaleDateString("es-CO", { timeZone: "America/Bogota" })} · {document.estado_revision.replaceAll("_", " ")}</p><Link href={`/gestion-procesos/abogado/documentos?proceso=${id}#documento-${document.id}`} className="mt-1 inline-block text-xs font-medium text-[var(--primary)] hover:underline">Abrir documento</Link></div></div><div className="flex shrink-0 items-center gap-2"><button type="button" disabled={downloadingDocumentId !== null} onClick={() => void openDocumentPreview(document)} className="rounded-md border border-[var(--border)] bg-[var(--surface)] px-2.5 py-2 text-xs hover:bg-[var(--surface-hover)] disabled:opacity-50">{downloadingDocumentId === document.id ? "Abriendo…" : "Previsualizar y revisar"}</button><button type="button" disabled={downloadingDocumentId !== null} onClick={() => void downloadDocument(document.id, document.nombre_archivo)} aria-label={`Descargar ${document.nombre_archivo}`} className="inline-flex items-center gap-1.5 rounded-md border border-[var(--border)] bg-[var(--surface)] px-2.5 py-2 text-xs text-[var(--foreground)] hover:bg-[var(--surface-hover)] disabled:opacity-50">{downloadingDocumentId === document.id ? <Loader2 className="size-3.5 animate-spin" /> : <Download className="size-3.5" />}{downloadingDocumentId === document.id ? "Descargando…" : "Descargar"}</button></div></div>)}</div> : <p className="rounded-lg border border-dashed border-[var(--border)] px-3 py-5 text-center text-xs text-[var(--foreground-muted)]">Los contratos se consultan en la sección Contratos. No hay otros documentos sin solicitud.</p>}
-                </>;
-              })()}
-            </div>
-          </div>
+          <DocumentosProceso procesoId={Number(id)} hayClientes={process.clientes.length > 0} onCambio={() => void load()} />
         </section>
 
         {/* CONTRATOS */}
@@ -1360,34 +1254,6 @@ export default function ProcesoDetallePage({ section }: { section?: string }) {
       </div>
 
       {showAgendaModal && <div className="motion-overlay fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"><form onSubmit={(event) => void saveAgendaEvent(event)} className="max-h-[92vh] w-full max-w-xl space-y-4 overflow-y-auto rounded-xl border border-[var(--border)] bg-[var(--surface)] p-5 shadow-2xl"><header className="flex items-start justify-between gap-3"><div><h2 className="text-lg font-semibold">{editingAgendaId ? "Editar actividad" : "Agendar en este proceso"}</h2><p className="mt-1 text-sm text-[var(--foreground-muted)]">La actividad queda vinculada a {process.nombre}.</p></div><button type="button" onClick={() => setShowAgendaModal(false)} aria-label="Cerrar" className="rounded-md p-1 hover:bg-[var(--surface-secondary)]"><X className="size-5" /></button></header><label className="block text-sm font-medium">Título<input required maxLength={255} value={agendaTitle} onChange={(event) => setAgendaTitle(event.target.value)} className="mt-1 w-full rounded-lg border border-[var(--border)] bg-[var(--surface-secondary)] px-3 py-2.5" /></label><div className="grid gap-3 sm:grid-cols-2"><label className="block text-sm font-medium">Tipo<select value={agendaType} onChange={(event) => setAgendaType(event.target.value as typeof agendaType)} className="mt-1 w-full rounded-lg border border-[var(--border)] bg-[var(--surface-secondary)] px-3 py-2.5"><option value="AUDIENCIA">Audiencia</option><option value="REUNION">Reunión</option><option value="FIRMA_CONTRATO">Firma de contrato</option><option value="EVENTO">Evento</option></select></label><label className="block text-sm font-medium">Estado<select value={agendaStatus} onChange={(event) => setAgendaStatus(event.target.value as typeof agendaStatus)} className="mt-1 w-full rounded-lg border border-[var(--border)] bg-[var(--surface-secondary)] px-3 py-2.5"><option value="PROGRAMADO">Programado</option><option value="COMPLETADO">Completado</option><option value="CANCELADO">Cancelado</option></select></label></div><label className="block text-sm font-medium">Fecha y hora<input required type="datetime-local" value={agendaDate} onChange={(event) => setAgendaDate(event.target.value)} className="mt-1 w-full rounded-lg border border-[var(--border)] bg-[var(--surface-secondary)] px-3 py-2.5" /></label><label className="block text-sm font-medium">Cliente (opcional)<select value={agendaClientId} onChange={(event) => setAgendaClientId(event.target.value)} className="mt-1 w-full rounded-lg border border-[var(--border)] bg-[var(--surface-secondary)] px-3 py-2.5"><option value="">Solo equipo interno</option>{process.clientes.map((client) => <option key={client.id} value={client.id}>{client.nombre_completo}</option>)}</select></label>{agendaType === "FIRMA_CONTRATO" && <label className="block text-sm font-medium">Contrato<select required value={agendaContractId} onChange={(event) => setAgendaContractId(event.target.value)} className="mt-1 w-full rounded-lg border border-[var(--border)] bg-[var(--surface-secondary)] px-3 py-2.5"><option value="">Selecciona contrato para la firma</option>{process.contratos.filter((contract) => ["LISTO_PARA_FIRMA", "EN_FIRMA"].includes(contract.estado) || (editingAgendaId !== null && process.eventos.some((item) => item.id === editingAgendaId && item.contrato_id === contract.id))).map((contract) => <option key={contract.id} value={contract.id}>Contrato #{contract.id} · {contract.cliente} · {contract.estado}</option>)}</select><span className="mt-1 block text-xs text-[var(--foreground-muted)]">El cliente debe ser el mismo que figura en el contrato.</span></label>}<label className="block text-sm font-medium">Descripción<textarea rows={3} maxLength={4000} value={agendaDescription} onChange={(event) => setAgendaDescription(event.target.value)} className="mt-1 w-full rounded-lg border border-[var(--border)] bg-[var(--surface-secondary)] px-3 py-2.5" /></label><div className="flex justify-end gap-2 border-t border-[var(--border)] pt-4"><button type="button" disabled={working} onClick={() => setShowAgendaModal(false)} className="rounded-lg border border-[var(--border)] px-4 py-2 text-sm">Cancelar</button><button type="submit" disabled={working || !agendaTitle.trim() || !agendaDate || (agendaType === "FIRMA_CONTRATO" && (!agendaContractId || !agendaClientId))} className="rounded-lg bg-[var(--primary)] px-4 py-2 text-sm font-semibold !text-white disabled:opacity-50">Guardar actividad</button></div></form></div>}
-
-      {showDocumentRequestModal && (
-        <div role="dialog" aria-modal="true" aria-labelledby="document-request-title" className="motion-overlay fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm">
-          <form onSubmit={async (event) => { event.preventDefault(); const ok = await action(`/api/expedientes/procesos/${id}/solicitudes-documento`, "POST", { cliente_id: Number(documentClientId), titulo: documentTitle.trim(), documentos: documentItems.split(/\r?\n/).map((value) => value.trim()).filter(Boolean), instrucciones: documentInstructions.trim() || null }); if (ok) setShowDocumentRequestModal(false); }} className="w-full max-w-lg space-y-4 rounded-xl border border-[var(--border)] bg-[var(--surface)] p-5 shadow-2xl">
-            <div className="flex items-start justify-between gap-3"><div><h2 id="document-request-title" className="text-base font-semibold text-[var(--foreground)]">Solicitar documento</h2><p className="mt-1 text-sm text-[var(--foreground-muted)]">La solicitud se mostrará al cliente asignado a este proceso.</p></div><button type="button" aria-label="Cerrar" onClick={() => setShowDocumentRequestModal(false)} className="rounded-md p-1 text-[var(--foreground-muted)] hover:bg-[var(--surface-secondary)]"><X className="size-5" /></button></div>
-            <label className="block text-sm font-medium text-[var(--foreground)]">Cliente<select required value={documentClientId} onChange={(event) => setDocumentClientId(event.target.value)} className="mt-1.5 w-full rounded-lg border border-[var(--border)] bg-[var(--surface-secondary)] px-3 py-2.5"><option value="">Selecciona un cliente</option>{process.clientes.map((client) => <option key={client.id} value={client.id}>{client.nombre_completo}</option>)}</select></label>
-            <label className="block text-sm font-medium text-[var(--foreground)]">Nombre de la solicitud<input required maxLength={255} value={documentTitle} onChange={(event) => setDocumentTitle(event.target.value)} placeholder="Documentos para la demanda" className="mt-1.5 w-full rounded-lg border border-[var(--border)] bg-[var(--surface-secondary)] px-3 py-2.5" /></label>
-            <label className="block text-sm font-medium text-[var(--foreground)]">Documentos requeridos <span className="font-normal text-[var(--foreground-muted)]">(uno por línea)</span><textarea required rows={5} value={documentItems} onChange={(event) => setDocumentItems(event.target.value)} placeholder={"Copia de la cédula\nRegistro civil\nCertificado de residencia"} className="mt-1.5 w-full rounded-lg border border-[var(--border)] bg-[var(--surface-secondary)] px-3 py-2.5" /></label>
-            <label className="block text-sm font-medium text-[var(--foreground)]">Instrucciones<textarea rows={3} value={documentInstructions} onChange={(event) => setDocumentInstructions(event.target.value)} className="mt-1.5 w-full resize-y rounded-lg border border-[var(--border)] bg-[var(--surface-secondary)] px-3 py-2.5" /></label>
-            <footer className="flex justify-end gap-2 border-t border-[var(--border)] pt-4"><button type="button" disabled={working} onClick={() => setShowDocumentRequestModal(false)} className="rounded-lg border border-[var(--border)] px-4 py-2 text-sm text-[var(--foreground)]">Cancelar</button><button type="submit" disabled={working || !documentClientId || !documentTitle.trim() || !documentItems.trim()} className="inline-flex items-center gap-2 rounded-lg bg-[var(--primary)] px-4 py-2 text-sm font-medium !text-white disabled:opacity-50">{working && <Loader2 className="size-4 animate-spin" />}Enviar solicitud</button></footer>
-          </form>
-        </div>
-      )}
-
-      {documentPreview && (
-        <div role="dialog" aria-modal="true" aria-labelledby="document-preview-title" className="motion-overlay fixed inset-0 z-[60] flex items-center justify-center bg-black/60 p-3 backdrop-blur-sm sm:p-6">
-          <section className="flex max-h-[94vh] w-full max-w-6xl flex-col overflow-hidden rounded-2xl border border-[var(--border)] bg-[var(--surface)] shadow-2xl">
-            <header className="flex flex-wrap items-center justify-between gap-3 border-b border-[var(--border)] px-4 py-3 sm:px-6"><div className="min-w-0"><h2 id="document-preview-title" className="truncate font-semibold">{documentPreview.name}</h2><p className="text-xs text-[var(--foreground-muted)]">Vista del documento · {documentPreview.estado.replaceAll("_", " ")}</p></div><button type="button" onClick={closeDocumentPreview} aria-label="Cerrar vista del documento" className="rounded-md p-2 hover:bg-[var(--surface-secondary)]"><X className="size-5" /></button></header>
-            <div className="grid min-h-0 flex-1 gap-4 overflow-y-auto p-4 lg:grid-cols-[minmax(0,1fr)_18rem] lg:p-6">
-              <div className="grid min-h-[40vh] place-items-center overflow-hidden rounded-xl border border-[var(--border)] bg-[var(--surface-secondary)] lg:min-h-[65vh]">{documentPreview.mimeType.startsWith("image/") ? (
-                // eslint-disable-next-line @next/next/no-img-element -- vista previa de un archivo con URL temporal (blob o R2) que next/image no puede optimizar.
-                <img src={documentPreview.url} alt={documentPreview.name} className="max-h-[72vh] max-w-full object-contain" />
-              ) : documentPreview.mimeType === "application/pdf" ? <iframe title={`Vista previa de ${documentPreview.name}`} src={documentPreview.url} className="h-[65vh] w-full" /> : <p className="p-8 text-center text-sm text-[var(--foreground-muted)]">Este tipo de archivo no admite vista previa. Descárgalo para revisarlo.</p>}</div>
-              <aside className="space-y-4"><label className="block text-sm font-medium">Estado de revisión<select value={documentPreview.estado} onChange={(event) => setDocumentPreview({ ...documentPreview, estado: event.target.value })} className="mt-1.5 w-full rounded-lg border border-[var(--border)] bg-[var(--surface-secondary)] px-3 py-2.5"><option value="RECIBIDO">Recibido</option><option value="EN_REVISION">En revisión</option><option value="APROBADO">Aprobado</option><option value="REQUIERE_CORRECCION">Requiere corrección</option><option value="RECHAZADO">Rechazado</option></select></label><label className="block text-sm font-medium">Comentario para el historial<textarea rows={6} maxLength={4000} value={documentPreview.comentario} onChange={(event) => setDocumentPreview({ ...documentPreview, comentario: event.target.value })} className="mt-1.5 w-full resize-y rounded-lg border border-[var(--border)] bg-[var(--surface-secondary)] px-3 py-2.5" /></label><button type="button" onClick={() => void saveDocumentReview()} disabled={documentReviewSaving} className="w-full rounded-lg bg-[var(--primary)] px-4 py-2.5 text-sm font-semibold !text-white disabled:opacity-50">{documentReviewSaving ? "Guardando…" : "Guardar revisión"}</button><button type="button" disabled={downloadingDocumentId !== null} onClick={() => void downloadDocument(documentPreview.id, documentPreview.name)} className="inline-flex w-full items-center justify-center gap-2 rounded-lg border border-[var(--border)] px-4 py-2.5 text-sm disabled:opacity-50">{downloadingDocumentId === documentPreview.id ? <Loader2 className="size-4 animate-spin" /> : <Download className="size-4" />}{downloadingDocumentId === documentPreview.id ? "Descargando…" : "Descargar archivo"}</button><p className="text-xs leading-5 text-[var(--foreground-muted)]">Solicitar corrección devuelve la solicitud al estado pendiente para que el cliente vuelva a cargar el archivo.</p></aside>
-            </div>
-          </section>
-        </div>
-      )}
 
       {/* MODAL CLIENTE */}
       {showClientModal && (

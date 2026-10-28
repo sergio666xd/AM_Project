@@ -17,13 +17,13 @@ export function Modal({
   title: string;
   description?: string;
   children: ReactNode;
-  size?: "sm" | "md" | "lg";
+  size?: "sm" | "md" | "lg" | "xl";
 }) {
   const titleId = useId();
   const descriptionId = useId();
   const dialogRef = useRef<HTMLDivElement>(null);
   const onCloseRef = useRef(onClose);
-  const sizeClass = { sm: "max-w-md", md: "max-w-xl", lg: "max-w-3xl" }[size];
+  const sizeClass = { sm: "max-w-md", md: "max-w-xl", lg: "max-w-3xl", xl: "max-w-6xl" }[size];
   const { mounted, closing } = usePresence(open, 120);
 
   useEffect(() => {

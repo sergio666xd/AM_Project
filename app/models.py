@@ -477,6 +477,8 @@ class SolicitudDocumento(Base):
     documentos_requeridos = Column(JSON, nullable=False, default=list)
     fecha_limite = Column(DateTime, nullable=True)
     atendida_en = Column(DateTime, nullable=True)
+    # Último recordatorio enviado al cliente, a mano o por el Cron diario.
+    ultimo_recordatorio_en = Column(DateTime, nullable=True)
     created_at = Column(DateTime, nullable=False, default=utc_ahora)
     proceso = relationship("Proceso", back_populates="solicitudes_documento")
     cliente = relationship("Usuario", foreign_keys=[cliente_id])
