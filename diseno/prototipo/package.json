@@ -1,0 +1,16 @@
+{
+  "name": "am-prototipo-expediente-foliado",
+  "description": "Prototipo clicable de la Fase 0 (Expediente foliado)",
+  "scripts": {
+    "build": "node build.mjs"
+  },
+  "dependencies": {
+    "@tailwindcss/cli": "^4.3.3",
+    "esbuild": "^0.28.2",
+    "lucide-react": "^1.62.0",
+    "react": "^19.2.0",
+    "react-dom": "^19.2.0",
+    "tailwindcss": "^4.3.3"
+  },
+  "private": true
+}

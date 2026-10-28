@@ -1,0 +1,153 @@
+@import "tailwindcss";
+@source "./";
+@custom-variant dark (&:where([data-theme=dark], [data-theme=dark] *));
+
+/* Tokens del expediente foliado. Azul y dorado salen del logo de la firma. */
+:root {
+  --ground: #f6f2e8;        /* fondo manila claro, la carátula */
+  --manila: #ece3cd;        /* carátulas y filtros */
+  --manila-line: #d8caa6;
+  --sheet: #ffffff;         /* hojas de contenido */
+  --sheet-2: #fbf9f4;
+  --line: #e4ddcc;
+  --line-strong: #cdbf9c;
+  --ink: #18203a;
+  --ink-2: #454d63;
+  --ink-3: #636b80;
+  --navy: #002060;
+  --navy-hover: #15326f;
+  --navy-soft: #e5eaf4;
+  --navy-ink: #1d3a7a;
+  --on-navy: #f4f1e8;
+  --on-navy-2: #b9c3dc;
+  --rail: #002060;
+  --rail-active: #0f2d6b;
+  --gold: #ccb56b;
+  --gold-ink: #6f581b;
+  --gold-soft: #f5eed6;
+  --ok: #2c6a3e;
+  --ok-soft: #e3f0e4;
+  --warn: #8a5a00;
+  --warn-soft: #fbefd6;
+  --bad: #a3312a;
+  --bad-soft: #f9e4e1;
+  --info: #1d3a7a;
+  --info-soft: #e5eaf4;
+  --shadow-sheet: 0 1px 2px rgb(24 32 58 / 0.06), 0 4px 12px -4px rgb(24 32 58 / 0.08);
+  --shadow-pop: 0 2px 6px rgb(24 32 58 / 0.08), 0 16px 40px -12px rgb(24 32 58 / 0.22);
+  color-scheme: light;
+}
+
+:root[data-theme="dark"] {
+  --ground: #0e1322;
+  --manila: #1b2031;
+  --manila-line: #2e3449;
+  --sheet: #151b2c;
+  --sheet-2: #121827;
+  --line: #262d42;
+  --line-strong: #363e57;
+  --ink: #ece8dc;
+  --ink-2: #bdbccb;
+  --ink-3: #9a9db0;
+  --navy: #8fa8de;
+  --navy-hover: #a9bde6;
+  --navy-soft: #1c2747;
+  --navy-ink: #a9bde6;
+  --on-navy: #0e1322;
+  --on-navy-2: #9aa6c4;
+  --rail: #0a1124;
+  --rail-active: #17213d;
+  --gold: #d4bf7c;
+  --gold-ink: #dcc78a;
+  --gold-soft: #2a2618;
+  --ok: #7cc48e;
+  --ok-soft: #17291d;
+  --warn: #e3b25a;
+  --warn-soft: #2d2412;
+  --bad: #f08a80;
+  --bad-soft: #321a19;
+  --info: #a9bde6;
+  --info-soft: #1c2747;
+  --shadow-sheet: 0 1px 2px rgb(0 0 0 / 0.3), 0 4px 12px -4px rgb(0 0 0 / 0.4);
+  --shadow-pop: 0 2px 6px rgb(0 0 0 / 0.35), 0 16px 40px -12px rgb(0 0 0 / 0.6);
+  color-scheme: dark;
+}
+
+@theme inline {
+  --color-ground: var(--ground);
+  --color-manila: var(--manila);
+  --color-manila-line: var(--manila-line);
+  --color-sheet: var(--sheet);
+  --color-sheet-2: var(--sheet-2);
+  --color-line: var(--line);
+  --color-line-strong: var(--line-strong);
+  --color-ink: var(--ink);
+  --color-ink-2: var(--ink-2);
+  --color-ink-3: var(--ink-3);
+  --color-navy: var(--navy);
+  --color-navy-hover: var(--navy-hover);
+  --color-navy-soft: var(--navy-soft);
+  --color-navy-ink: var(--navy-ink);
+  --color-on-navy: var(--on-navy);
+  --color-on-navy-2: var(--on-navy-2);
+  --color-rail: var(--rail);
+  --color-rail-active: var(--rail-active);
+  --color-gold: var(--gold);
+  --color-gold-ink: var(--gold-ink);
+  --color-gold-soft: var(--gold-soft);
+  --color-ok: var(--ok);
+  --color-ok-soft: var(--ok-soft);
+  --color-warn: var(--warn);
+  --color-warn-soft: var(--warn-soft);
+  --color-bad: var(--bad);
+  --color-bad-soft: var(--bad-soft);
+  --color-info: var(--info);
+  --color-info-soft: var(--info-soft);
+  --font-display: Georgia, "Gelasio", "Times New Roman", serif;
+  --font-sans: "Public Sans", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "Roboto Mono", ui-monospace, monospace;
+  --shadow-sheet: var(--shadow-sheet);
+  --shadow-pop: var(--shadow-pop);
+  --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+html { -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; }
+body {
+  background: var(--ground);
+  color: var(--ink);
+  font-family: var(--font-sans);
+  font-size: 15px;
+  line-height: 1.5;
+}
+h1, h2, h3 { text-wrap: balance; }
+p { text-wrap: pretty; }
+::selection { background: var(--gold-soft); color: var(--ink); }
+:root[data-theme="dark"] ::selection { background: #4a4126; }
+input, textarea { caret-color: var(--navy); }
+:focus-visible { outline: 2px solid var(--navy); outline-offset: 2px; border-radius: 6px; }
+a { text-underline-offset: 3px; }
+* { scrollbar-width: thin; scrollbar-color: var(--line-strong) transparent; }
+
+/* Numerales del folio: Georgia trae cifras elzevirianas, que es justo lo que buscamos. */
+.folio-num { font-family: var(--font-display); font-variant-numeric: oldstyle-nums; }
+.tnum { font-variant-numeric: tabular-nums; }
+
+/* Cliente: letra más grande para lectura cómoda. */
+.lectura { font-size: 17px; line-height: 1.6; }
+
+@keyframes sheet-up { from { transform: translateY(16px); opacity: 0; } to { transform: none; opacity: 1; } }
+@keyframes fade-in { from { opacity: 0; } to { opacity: 1; } }
+@keyframes pop-in { from { transform: translateY(-4px) scale(0.98); opacity: 0; } to { transform: none; opacity: 1; } }
+@keyframes shimmer { from { background-position: -200% 0; } to { background-position: 200% 0; } }
+.anim-sheet { animation: sheet-up 280ms var(--ease-out-expo) both; }
+.anim-fade { animation: fade-in 180ms ease-out both; }
+.anim-pop { animation: pop-in 160ms var(--ease-out-expo) both; }
+.skeleton {
+  background: linear-gradient(90deg, var(--line) 0%, var(--sheet-2) 50%, var(--line) 100%);
+  background-size: 200% 100%;
+  animation: shimmer 1.4s linear infinite;
+  border-radius: 6px;
+}
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: 1ms !important; animation-iteration-count: 1 !important; transition-duration: 1ms !important; }
+}
