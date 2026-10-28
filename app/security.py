@@ -38,8 +38,17 @@ def create_access_token(data: dict, *, persistent: bool = False) -> str:
     """Crea un JWT.  Si *persistent* es True usa la expiración de 15 días."""
     to_encode = data.copy()
     expire_minutes = PERSISTENT_TOKEN_EXPIRE_MINUTES if persistent else ACCESS_TOKEN_EXPIRE_MINUTES
-    expire = datetime.now(timezone.utc) + timedelta(minutes=expire_minutes)
-    to_encode.update({"exp": expire, "persistent": persistent})
+    ahora = datetime.now(timezone.utc)
+    expire = ahora + timedelta(minutes=expire_minutes)
+    # `emitido` (milisegundos) permite invalidar de una vez las sesiones
+    # emitidas antes de "cerrar sesión en todos los dispositivos"
+    # (Usuario.sesiones_cerradas_en).
+    to_encode.update({
+        "exp": expire,
+        "iat": int(ahora.timestamp()),
+        "emitido": int(ahora.timestamp() * 1000),
+        "persistent": persistent,
+    })
     return jwt.encode(to_encode, get_jwt_secret(), algorithm=ALGORITHM)
 
 
@@ -49,6 +58,20 @@ def decode_token_payload(token: str) -> dict | None:
         return jwt.decode(token, get_jwt_secret(), algorithms=[ALGORITHM])
     except JWTError:
         return None
+
+
+def token_vigente(payload: dict, usuario: models.Usuario) -> bool:
+    """False si el token se emitió antes del último cierre de todas las sesiones."""
+    cerradas_en = getattr(usuario, "sesiones_cerradas_en", None)
+    if cerradas_en is None:
+        return True
+    if cerradas_en.tzinfo is None:
+        cerradas_en = cerradas_en.replace(tzinfo=timezone.utc)
+    try:
+        emitido = int(payload.get("emitido") or int(payload.get("iat") or 0) * 1000)
+    except (TypeError, ValueError):
+        return False
+    return emitido > int(cerradas_en.timestamp() * 1000)
 
 
 def _decode_password_reset_payload(token: str) -> dict | None:
@@ -114,13 +137,14 @@ def _obtener_usuario_desde_token(
     try:
         payload = jwt.decode(token, get_jwt_secret(), algorithms=[ALGORITHM])
         usuario_id: str = payload.get("sub")
-        if usuario_id is None:
+        # Un enlace de recuperación de contraseña no sirve como sesión.
+        if usuario_id is None or payload.get("purpose"):
             raise credentials_exception
     except JWTError:
         raise credentials_exception
 
     usuario = db.query(models.Usuario).filter(models.Usuario.id == int(usuario_id)).first()
-    if usuario is None:
+    if usuario is None or not token_vigente(payload, usuario):
         raise credentials_exception
     return usuario
 

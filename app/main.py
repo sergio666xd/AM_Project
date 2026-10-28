@@ -6,11 +6,13 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 
+from app.api import v2
 from app.audit import (
     establecer_contexto_solicitud_auditoria,
     limpiar_contexto_solicitud_auditoria,
 )
 from app.esquema import crear_datos_iniciales
+from app.nucleo.errores import registrar_manejadores
 from app.routers import (
     admin,
     auth,
@@ -34,10 +36,15 @@ async def lifespan(_app: FastAPI):
 
 app = FastAPI(
     lifespan=lifespan,
-    title="Plataforma SaaS de Seguimiento Judicial",
-    description="API Multi-Tenant para gestión de radicados y alertas de WhatsApp",
-    version="1.0.0",
+    title="Gestión de procesos AM",
+    description=(
+        "API de Alejandra Muñoz | Abogada y Asociados. Las rutas nuevas viven en "
+        "`/api/v2` (sesión por cookie, errores uniformes, listados por cursor); "
+        "el resto es la API v1, que se retira a medida que cada panel migra."
+    ),
+    version="2.0.0",
 )
+registrar_manejadores(app)
 
 
 @app.middleware("http")
@@ -61,6 +68,7 @@ app.include_router(auth.router)
 app.include_router(dashboard.router)
 app.include_router(solicitudes_registro.router)
 app.include_router(radicados.router)
+app.include_router(v2.router)
 
 
 def get_cors_origins() -> list[str]:

@@ -168,6 +168,22 @@ El modelo y las rutas de servidor restringen al cliente a sus procesos asignados
 
 ## API relevante
 
+### API v2 (`/api/v2`)
+
+La reconstrucción migra cada panel a la API v2; la v1 sigue viva hasta que su panel migre.
+
+- **Capas:** `app/api/v2` (routers delgados) → `app/modulos/<módulo>/servicio.py` (casos de uso, transacción y auditoría) → `repositorio.py` (único lugar con consultas) y `politicas.py` (quién ve y cambia qué). Lo compartido vive en `app/nucleo`.
+- **Sesión:** `POST /api/v2/sesion` deja el token en la cookie httpOnly `am_sesion` (`SameSite=Lax`). Los cambios autenticados con cookie llevan el encabezado `X-AM-Solicitud: 1`. También se acepta `Authorization: Bearer`. `DELETE /api/v2/sesion/todas` invalida las sesiones de todos los dispositivos, también las de la v1.
+- **Errores:** `{"codigo", "mensaje", "campos"}`; `codigo` es estable y `mensaje` se puede mostrar tal cual.
+- **Listados:** `{"items", "total", "siguiente"}`; se pide la página siguiente con `?cursor=<siguiente>`.
+- **Fechas:** ISO 8601 con la zona de Bogotá (`-05:00`).
+- **Tipos del frontend:** `frontend-saas/lib/api-v2/esquema.ts` se genera del contrato; tras cambiar una ruta v2 ejecuta `python scripts/exportar_openapi.py` y `npm run api:tipos` en `frontend-saas`. CI falla si quedan desactualizados. El cliente está en `frontend-saas/lib/api-v2/cliente.ts`.
+- **Pruebas:** `pytest tests/v2` usa SQLite; con `PRUEBAS_DATABASE_URL=postgresql://…` corre sobre PostgreSQL, como en CI.
+
+Rutas actuales: sesión (`/sesion`, `/sesion/renovar`, `/sesion/todas`) y procesos (`GET /procesos` con búsqueda por nombre, radicado o cliente; `GET /procesos/{id}`; `POST /procesos/{id}/archivar` y `/reabrir`).
+
+### API v1
+
 Todas las rutas protegidas usan `Authorization: Bearer <token>`.
 
 ### Autenticación

@@ -24,6 +24,63 @@ jobs:
       - run: ruff check
       - run: pytest -q
 
+  backend-postgres:
+    name: Backend sobre PostgreSQL (API v2 y migraciones)
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: pruebas
+          POSTGRES_PASSWORD: pruebas
+          POSTGRES_DB: am_pruebas
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U pruebas"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      PRUEBAS_DATABASE_URL: postgresql://pruebas:pruebas@localhost:5432/am_pruebas
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: requirements*.txt
+      - run: pip install -r requirements-dev.txt
+      # Crea el esquema con las migraciones de producción y corre la API v2 encima.
+      - run: pytest -q tests/v2
+
+  contrato-api:
+    name: Contrato de la API v2 y tipos del frontend
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: requirements*.txt
+      - uses: actions/setup-node@v5
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: frontend-saas/package-lock.json
+      - run: pip install -r requirements.txt
+      - run: python scripts/exportar_openapi.py
+      - run: npm ci
+        working-directory: frontend-saas
+      - run: npm run api:tipos
+        working-directory: frontend-saas
+      - name: Los tipos committeados coinciden con el backend
+        run: |
+          if ! git diff --exit-code -- frontend-saas/lib/api-v2; then
+            echo "::error::El contrato de la API v2 cambió. Ejecuta 'python scripts/exportar_openapi.py' y 'npm run api:tipos' en frontend-saas, y haz commit."
+            exit 1
+          fi
+
   frontend:
     name: Frontend (ESLint, TypeScript y build)
     runs-on: ubuntu-latest
