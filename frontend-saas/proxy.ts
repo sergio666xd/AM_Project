@@ -130,7 +130,7 @@ export function proxy(request: NextRequest) {
     if (!local && pathname === "/gestion-procesos/auth/registro") return redirectToHost(request, PUBLIC_SITE_HOST, pathname);
 
     if (pathname.startsWith("/gestion-procesos/")) return NextResponse.next();
-    const lawyerRoute = /^\/procesos\/\d+(?:\/(?:resumen|agenda|documentos|radicados|tareas|relaciones|actividad))?$/.test(pathname)
+    const lawyerRoute = /^\/procesos\/\d+(?:\/(?:resumen|folios|agenda|documentos|radicados|tareas|relaciones|actividad))?$/.test(pathname)
       || /^\/(?:tareas|radicados|documentos)(?:\/|$)/.test(pathname)
       || pathname === "/agenda";
     const area = role === "ABOGADO_ADMIN" || (!role && lawyerRoute) ? "abogado" : role === "ABOGADO" ? "dashboard" : "cliente";

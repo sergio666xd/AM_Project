@@ -14,6 +14,7 @@ import {
   Plus,
   RefreshCw,
 } from "lucide-react";
+import { FoliosNuevosHoy } from "@/components/expediente/FoliosNuevosHoy";
 import TaskMonthCalendar, { type CalendarTask } from "@/components/calendar/TaskMonthCalendar";
 import { AnimatedNumber } from "@/components/ui/AnimatedNumber";
 import { Button } from "@/components/ui/Button";
@@ -126,80 +127,83 @@ export function HoyPanel({
     <div className="motion-swap mx-auto max-w-6xl">
       <header className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
         <div className="min-w-0">
-          <p className="mb-1 text-xs font-semibold uppercase tracking-[0.12em] text-gold-600 first-letter:uppercase dark:text-gold-400">{today}</p>
-          <h1 className="font-display text-[30px] font-medium leading-tight tracking-[-0.01em] text-foreground sm:text-[36px]">
-            {greeting()}, {firstName}
-          </h1>
-          <p className="mt-1 text-[15px] text-foreground-secondary">
-            {inbox.length
-              ? `Tienes ${inbox.length} ${inbox.length === 1 ? "cosa" : "cosas"} que atender. Empieza por lo que tiene fecha.`
-              : "No hay nada urgente. Buen momento para avanzar en tus procesos."}
-          </p>
-        </div>
-        <Button variant="outline" size="sm" onClick={onReload} disabled={loading} icon={<RefreshCw className={`size-4 ${loading ? "animate-spin" : ""}`} />}>
-          Actualizar
-        </Button>
-      </header>
-
-      {/* Indicadores compactos: informan sin competir con la bandeja. */}
-      <div className="no-scrollbar -mx-4 mb-7 flex gap-2 overflow-x-auto px-4 sm:mx-0 sm:grid sm:grid-cols-4 sm:gap-3 sm:px-0">
-        {stats.map((stat) => (
-          <Link key={stat.label} href={stat.href} className="motion-hover-lift min-w-[148px] shrink-0 rounded-[var(--radius-lg)] border border-border bg-surface px-4 py-3 hover:border-border-strong">
-            <p className={`font-display text-[28px] font-medium leading-none tabular-nums ${stat.tone}`}>{typeof stat.value === "number" ? <AnimatedNumber value={stat.value} /> : stat.value}</p>
-            <p className="mt-1.5 text-[13px] text-foreground-secondary">{stat.label}</p>
-          </Link>
-        ))}
-      </div>
-
-      <div className="grid gap-7 lg:grid-cols-[minmax(0,1fr)_340px]">
-        <section aria-labelledby="bandeja-titulo">
-          <div className="mb-3">
-            <h2 id="bandeja-titulo" className="text-[17px] font-semibold text-foreground">Requiere tu atención</h2>
-            <p className="text-sm text-foreground-muted">Ordenado por urgencia</p>
+            <p className="mb-1 text-xs font-semibold uppercase tracking-[0.12em] text-gold-600 first-letter:uppercase dark:text-gold-400">{today}</p>
+            <h1 className="font-display text-[30px] font-medium leading-tight tracking-[-0.01em] text-foreground sm:text-[36px]">
+              {greeting()}, {firstName}
+            </h1>
+            <p className="mt-1 text-[15px] text-foreground-secondary">
+              {inbox.length
+                ? `Tienes ${inbox.length} ${inbox.length === 1 ? "cosa" : "cosas"} que atender. Empieza por lo que tiene fecha.`
+                : "No hay nada urgente. Buen momento para avanzar en tus procesos."}
+            </p>
           </div>
-          {inbox.length === 0 ? (
-            <div className="motion-rise-in flex flex-col items-center rounded-[var(--radius-lg)] border border-dashed border-border-strong px-6 py-10 text-center">
-              <span className="motion-pop mb-3 grid size-12 place-items-center rounded-full bg-success-light text-success [animation-delay:100ms]"><CheckCircle2 aria-hidden="true" className="size-6" /></span>
-              <p className="font-semibold text-foreground">Todo al día</p>
-              <p className="mt-1 max-w-[42ch] text-sm text-foreground-secondary">No hay tareas vencidas ni novedades judiciales sin revisar. Las nuevas actuaciones aparecerán aquí después de cada consulta.</p>
+          <Button variant="outline" size="sm" onClick={onReload} disabled={loading} icon={<RefreshCw className={`size-4 ${loading ? "animate-spin" : ""}`} />}>
+            Actualizar
+          </Button>
+        </header>
+
+        {/* Indicadores compactos: informan sin competir con la bandeja. */}
+        <div className="no-scrollbar -mx-4 mb-7 flex gap-2 overflow-x-auto px-4 sm:mx-0 sm:grid sm:grid-cols-4 sm:gap-3 sm:px-0">
+          {stats.map((stat) => (
+            <Link key={stat.label} href={stat.href} className="motion-hover-lift min-w-[148px] shrink-0 rounded-[var(--radius-lg)] border border-border bg-surface px-4 py-3 hover:border-border-strong">
+              <p className={`font-display text-[28px] font-medium leading-none tabular-nums ${stat.tone}`}>{typeof stat.value === "number" ? <AnimatedNumber value={stat.value} /> : stat.value}</p>
+              <p className="mt-1.5 text-[13px] text-foreground-secondary">{stat.label}</p>
+            </Link>
+          ))}
+        </div>
+
+        <div className="grid gap-7 lg:grid-cols-[minmax(0,1fr)_340px]">
+          <div className="min-w-0">
+          <FoliosNuevosHoy />
+          <section aria-labelledby="bandeja-titulo">
+            <div className="mb-3">
+              <h2 id="bandeja-titulo" className="text-[17px] font-semibold text-foreground">Requiere tu atención</h2>
+              <p className="text-sm text-foreground-muted">Ordenado por urgencia</p>
             </div>
-          ) : (
-            <ul className="motion-stagger flex flex-col gap-3">
-              {inbox.slice(0, 12).map((item) => {
-                const Icon = item.icon;
-                const when = relativeDay(item.date);
-                return (
-                  <li key={item.key} className="rounded-[var(--radius-lg)] border border-border bg-surface p-4 sm:p-5">
-                    <div className="flex gap-3.5">
-                      <span className={`relative mt-0.5 grid size-10 shrink-0 place-items-center rounded-[var(--radius-md)] ${toneClasses[item.tone]}`}>
-                        <Icon aria-hidden="true" className="size-[19px]" />
-                        {/* Las actuaciones nuevas y las tareas vencidas llaman la atención con una onda suave. */}
-                        {item.tone === "danger" && <span aria-hidden="true" className="motion-attention absolute -right-1 -top-1 size-2.5 rounded-full bg-danger ring-2 ring-surface" />}
-                      </span>
-                      <div className="min-w-0 flex-1">
-                        <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-                          <p className="text-xs font-semibold uppercase tracking-[0.1em] text-foreground-muted">{item.kind}</p>
-                          {when && <span className="inline-flex items-center gap-1 text-xs text-foreground-muted"><Clock3 aria-hidden="true" className="size-3" />{when}</span>}
+            {inbox.length === 0 ? (
+              <div className="motion-rise-in flex flex-col items-center rounded-[var(--radius-lg)] border border-dashed border-border-strong px-6 py-10 text-center">
+                <span className="motion-pop mb-3 grid size-12 place-items-center rounded-full bg-success-light text-success [animation-delay:100ms]"><CheckCircle2 aria-hidden="true" className="size-6" /></span>
+                <p className="font-semibold text-foreground">Todo al día</p>
+                <p className="mt-1 max-w-[42ch] text-sm text-foreground-secondary">No hay tareas vencidas ni novedades judiciales sin revisar. Las nuevas actuaciones aparecerán aquí después de cada consulta.</p>
+              </div>
+            ) : (
+              <ul className="motion-stagger flex flex-col gap-3">
+                {inbox.slice(0, 12).map((item) => {
+                  const Icon = item.icon;
+                  const when = relativeDay(item.date);
+                  return (
+                    <li key={item.key} className="rounded-[var(--radius-lg)] border border-border bg-surface p-4 sm:p-5">
+                      <div className="flex gap-3.5">
+                        <span className={`relative mt-0.5 grid size-10 shrink-0 place-items-center rounded-[var(--radius-md)] ${toneClasses[item.tone]}`}>
+                          <Icon aria-hidden="true" className="size-[19px]" />
+                          {/* Las actuaciones nuevas y las tareas vencidas llaman la atención con una onda suave. */}
+                          {item.tone === "danger" && <span aria-hidden="true" className="motion-attention absolute -right-1 -top-1 size-2.5 rounded-full bg-danger ring-2 ring-surface" />}
+                        </span>
+                        <div className="min-w-0 flex-1">
+                          <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                            <p className="text-xs font-semibold uppercase tracking-[0.1em] text-foreground-muted">{item.kind}</p>
+                            {when && <span className="inline-flex items-center gap-1 text-xs text-foreground-muted"><Clock3 aria-hidden="true" className="size-3" />{when}</span>}
+                          </div>
+                          <p className="mt-0.5 font-semibold text-foreground">{item.title}</p>
+                          <p className="mt-0.5 text-sm text-foreground-secondary">{item.context}</p>
+                          <Link
+                            href={item.href}
+                            className={`mt-3 inline-flex min-h-9 items-center gap-1.5 rounded-[var(--radius-md)] px-3 text-[13px] font-semibold transition-colors ${
+                              item.primary ? "bg-brand-900 !text-white hover:bg-brand-800" : "border border-border bg-surface text-foreground hover:bg-surface-hover"
+                            }`}
+                          >
+                            {item.action}
+                            <ArrowRight aria-hidden="true" className="size-3.5" />
+                          </Link>
                         </div>
-                        <p className="mt-0.5 font-semibold text-foreground">{item.title}</p>
-                        <p className="mt-0.5 text-sm text-foreground-secondary">{item.context}</p>
-                        <Link
-                          href={item.href}
-                          className={`mt-3 inline-flex min-h-9 items-center gap-1.5 rounded-[var(--radius-md)] px-3 text-[13px] font-semibold transition-colors ${
-                            item.primary ? "bg-brand-900 !text-white hover:bg-brand-800" : "border border-border bg-surface text-foreground hover:bg-surface-hover"
-                          }`}
-                        >
-                          {item.action}
-                          <ArrowRight aria-hidden="true" className="size-3.5" />
-                        </Link>
                       </div>
-                    </div>
-                  </li>
-                );
-              })}
-            </ul>
-          )}
-        </section>
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
+          </section>
+        </div>
 
         <aside className="flex flex-col gap-7">
           <section>

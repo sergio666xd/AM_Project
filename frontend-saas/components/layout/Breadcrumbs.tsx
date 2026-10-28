@@ -35,6 +35,7 @@ const labels: Record<string, string> = {
   auth: "Acceso",
   alertas: "Alertas",
   actividad: "Actividad",
+  folios: "Folios",
   almacenamiento: "Almacenamiento",
   firma: "Datos generales",
   metricas: "Métricas",
