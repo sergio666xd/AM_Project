@@ -30,6 +30,9 @@ def _insert_plantillas_por_defecto() -> str:
 
 @event.listens_for(models.PlantillaMensaje.__table__, "after_create")
 def _sembrar_plantillas(target, connection, **kw):
+    if connection.dialect.name != "sqlite":
+        # Las pruebas sobre PostgreSQL (tests/v2) no usan las plantillas.
+        return
     # En producción las plantillas se siembran con la migración SQL al arrancar;
     # las bases SQLite de las pruebas reciben el mismo contenido al crear la tabla.
     connection.exec_driver_sql(_insert_plantillas_por_defecto())

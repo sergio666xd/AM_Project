@@ -7,13 +7,15 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "test:workflow": "vitest run --config vitest.integration.config.ts"
+    "test:workflow": "vitest run --config vitest.integration.config.ts",
+    "api:tipos": "openapi-typescript lib/api-v2/openapi.json -o lib/api-v2/esquema.ts"
   },
   "dependencies": {
     "@workflow/core": "4.8.9",
     "@workflow/next": "4.1.13",
     "lucide-react": "^1.47.0",
     "next": "16.3.6",
+    "openapi-fetch": "0.17.0",
     "react": "19.2.8",
     "react-dom": "19.2.8",
     "workflow": "4.8.9"
@@ -30,6 +32,7 @@
     "@workflow/vitest": "^4.0.25",
     "eslint": "^9",
     "eslint-config-next": "16.3.6",
+    "openapi-typescript": "7.13.0",
     "tailwindcss": "^4",
     "typescript": "^5",
     "vitest": "^4.0.18"

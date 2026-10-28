@@ -244,6 +244,8 @@ class Usuario(Base):
     silenciar_whatsapp_si_push = Column(Boolean, nullable=False, default=False)
     created_at = Column(DateTime, default=utc_ahora)
     ultimo_acceso = Column(DateTime, nullable=True)
+    # Los tokens emitidos antes de este instante dejan de valer.
+    sesiones_cerradas_en = Column(DateTime(timezone=True), nullable=True)
 
     tareas = relationship(
         "Tarea",

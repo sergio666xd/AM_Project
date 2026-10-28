@@ -16,6 +16,7 @@ from fastapi import (
     Form,
     HTTPException,
     Request,
+    Response,
     UploadFile,
     status,
 )
@@ -29,6 +30,7 @@ from app.audit import (
 from app.database import get_db
 from app.email_service import enviar_correo
 from app.message_templates import render_message
+from app.nucleo.sesion import fijar_cookie_sesion
 from app.notification_policy import PREFERENCIA_PLAN_WHATSAPP, plan_whatsapp_habilitado
 from app.password_reset import password_reset_url, send_password_reset_email
 from app.rate_limit import (
@@ -161,8 +163,13 @@ def login(
     form_data: OAuth2PasswordRequestForm = Depends(),
     remember_me: bool = Form(True),
     db: Session = Depends(get_db),
+    response: Response = None,
 ):
-    """Inicia sesión y genera el token JWT. Valida que la cuenta esté activa."""
+    """Inicia sesión y genera el token JWT. Valida que la cuenta esté activa.
+
+    También deja el token en la cookie httpOnly de la API v2, para que el paso
+    del frontend a la sesión por cookie no obligue a iniciar sesión otra vez.
+    """
     claves_fallo = [clave_intento("login:email", form_data.username), clave_intento("login:ip", ip_cliente(request))]
     if limite_excedido(db, list(zip(claves_fallo, (10, 50))), VENTANA_LOGIN):
         raise HTTPException(status_code=429, detail="Demasiados intentos fallidos. Espera unos minutos e intenta de nuevo.")
@@ -190,6 +197,8 @@ def login(
     access_token = security.create_access_token(
         data={"sub": str(usuario.id)}, persistent=remember_me,
     )
+    if response is not None:
+        fijar_cookie_sesion(response, access_token, persistente=remember_me)
     return {"access_token": access_token, "token_type": "bearer", "debe_cambiar_password": usuario.debe_cambiar_password}
 
 
