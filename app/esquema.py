@@ -155,6 +155,9 @@ def preparar_esquema() -> None:
         if not RUTA_MIGRACION_PLANTILLAS.is_file():
             raise FileNotFoundError(f"No se encontró la migración de plantillas: {RUTA_MIGRACION_PLANTILLAS}")
         ddl, datos_plantillas = RUTA_MIGRACION_PLANTILLAS.read_text(encoding="utf-8").split("\n\n", maxsplit=1)
+        if engine.dialect.paramstyle in ("format", "pyformat"):
+            # psycopg lee cada % suelto como marcador aunque no haya parámetros.
+            datos_plantillas = datos_plantillas.replace("%", "%%")
         with engine.begin() as conexion:
             conexion.exec_driver_sql(ddl)
             conexion.exec_driver_sql(datos_plantillas)

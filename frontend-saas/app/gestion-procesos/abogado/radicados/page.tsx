@@ -1,6 +1,6 @@
 "use client";
 
-import { apiRequest, iniciarWorkflowConsultaRadicado } from "@/lib/api";
+import { apiRequest, iniciarWorkflowConsultaRadicado, TOKEN_EN_COOKIE } from "@/lib/api";
 
 import { FormEvent, useCallback, useEffect, useState } from "react";
 import { PageHeader } from "@/components/ui/PageHeader";
@@ -109,7 +109,7 @@ export default function RadicadosPage() {
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [nuevoNumero, setNuevoNumero] = useState("");
 
-  const token = () => localStorage.getItem("token") || "";
+  const token = () => TOKEN_EN_COOKIE;
 
   const loadRadicados = useCallback(async () => {
     setError("");

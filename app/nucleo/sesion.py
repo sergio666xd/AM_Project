@@ -25,12 +25,20 @@ from app.nucleo.errores import NoAutenticado, SinPermiso
 ENCABEZADO_CSRF = "X-AM-Solicitud"
 METODOS_SEGUROS = {"GET", "HEAD", "OPTIONS"}
 
+# Mientras se reescriben las pantallas v1, el frontend todavía arma
+# `Authorization: Bearer ${token}` con este marcador en lugar de un JWT (el
+# token real ya no es legible desde JavaScript). Se trata como "sin token" y
+# manda la cookie.
+MARCADORES_SIN_TOKEN = {"", "cookie", "null", "undefined"}
+
 
 def token_de_solicitud(request: Request) -> tuple[str | None, str]:
     """Devuelve el token y de dónde vino: `"encabezado"` o `"cookie"`."""
     autorizacion = request.headers.get("authorization", "")
     if autorizacion.lower().startswith("bearer "):
-        return autorizacion[7:].strip() or None, "encabezado"
+        valor = autorizacion[7:].strip()
+        if valor not in MARCADORES_SIN_TOKEN:
+            return valor, "encabezado"
     return request.cookies.get(ajustes().cookie_sesion), "cookie"
 
 
@@ -99,14 +107,28 @@ def usuario_actual(usuario: models.Usuario = Depends(usuario_en_sesion)) -> mode
     return usuario
 
 
-def proteger_csrf(request: Request) -> None:
+def _sin_encabezado_csrf(request: Request, *, acepta_autorizacion: bool) -> bool:
+    """Si es un cambio autenticado con la cookie que no trae un encabezado propio."""
     if request.method in METODOS_SEGUROS:
-        return
+        return False
     _token, origen = token_de_solicitud(request)
     if origen != "cookie" or not request.cookies.get(ajustes().cookie_sesion):
-        return
-    if request.headers.get(ENCABEZADO_CSRF) != "1":
-        raise SinPermiso(
-            "La solicitud se rechazó por seguridad. Recarga la página e inténtalo de nuevo.",
-            codigo="csrf",
-        )
+        return False
+    if request.headers.get(ENCABEZADO_CSRF) == "1":
+        return False
+    # Cualquier `Authorization` también obliga al navegador a pedir permiso
+    # CORS antes de enviar la petición; la API v1 lo acepta por las pantallas
+    # que todavía mandan el marcador.
+    return not (acepta_autorizacion and "authorization" in request.headers)
+
+
+MENSAJE_CSRF = "La solicitud se rechazó por seguridad. Recarga la página e inténtalo de nuevo."
+
+
+def proteger_csrf(request: Request) -> None:
+    if _sin_encabezado_csrf(request, acepta_autorizacion=False):
+        raise SinPermiso(MENSAJE_CSRF, codigo="csrf")
+
+
+def falta_encabezado_csrf_v1(request: Request) -> bool:
+    return _sin_encabezado_csrf(request, acepta_autorizacion=True)

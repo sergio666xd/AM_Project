@@ -1,15 +1,27 @@
-const configuredApiUrl = process.env.NEXT_PUBLIC_API_URL?.replace(
-  /^http:\/\/localhost(?=:|$)/i,
-  "http://127.0.0.1",
-);
-
+/**
+ * Base de la API. En el navegador siempre es el mismo origen: en Vercel
+ * `/api` se reescribe al backend (vercel.json) y en desarrollo lo hace
+ * next.config.ts, así la cookie de sesión viaja sola. En el servidor de
+ * desarrollo no hay reescritura, y se llama al backend local.
+ */
 export const API_URL =
-  configuredApiUrl ||
-  // Local Uvicorn commonly binds IPv4 only; avoid localhost resolving to ::1.
-  (process.env.NODE_ENV === "development" ? "http://127.0.0.1:8000" : "");
+  typeof window === "undefined" && process.env.NODE_ENV === "development"
+    ? // Uvicorn suele escuchar solo en IPv4; localhost podría resolver a ::1.
+      process.env.BACKEND_DEV_URL ?? "http://127.0.0.1:8000"
+    : "";
 
-/** Evento global emitido cuando la API rechaza el token de la sesión. */
+/** Evento global emitido cuando la API rechaza la sesión. */
 export const SESSION_EXPIRED_EVENT = "session-expired";
+
+/**
+ * Marcador que `useSession().token` entrega cuando hay sesión. El token real
+ * vive en una cookie httpOnly que JavaScript no puede leer; las pantallas que
+ * aún arman `Authorization: Bearer ${token}` mandan este marcador y la API lo
+ * trata como "usa la cookie". Desaparece cuando esas pantallas pasen a la API v2.
+ */
+export const TOKEN_EN_COOKIE = "cookie";
+
+const ENCABEZADO_CSRF = "X-AM-Solicitud";
 
 export interface FetchOptions extends RequestInit {
   token?: string | null;
@@ -83,7 +95,8 @@ export async function apiRequest(
 ): Promise<Response> {
   const { token, headers, ...rest } = options;
   const requestHeaders = new Headers(headers);
-  if (token) requestHeaders.set("Authorization", `Bearer ${token}`);
+  if (token && token !== TOKEN_EN_COOKIE) requestHeaders.set("Authorization", `Bearer ${token}`);
+  if (requestHeaders.get("Authorization") === `Bearer ${TOKEN_EN_COOKIE}`) requestHeaders.delete("Authorization");
   if (
     !(typeof FormData !== "undefined" && rest.body instanceof FormData) &&
     !requestHeaders.has("Content-Type")
@@ -94,11 +107,14 @@ export async function apiRequest(
     ? endpoint
     : `${API_URL}${endpoint.startsWith("/") ? endpoint : `/${endpoint}`}`;
   const method = String(rest.method || "GET").toUpperCase();
+  // La API rechaza los cambios autenticados con la cookie que no traen este
+  // encabezado; un sitio ajeno no puede añadirlo.
+  if (!["GET", "HEAD", "OPTIONS"].includes(method)) requestHeaders.set(ENCABEZADO_CSRF, "1");
   const retryDelays = method === "GET" || method === "HEAD" ? [250, 700] : [];
   const fetchWithTransientRetries = async () => {
     for (let attempt = 0; ; attempt += 1) {
       try {
-        return await fetch(url, { ...rest, headers: requestHeaders });
+        return await fetch(url, { credentials: "same-origin", ...rest, headers: requestHeaders });
       } catch (cause) {
         if (!(cause instanceof TypeError) || attempt >= retryDelays.length) throw cause;
         await new Promise((resolve) => window.setTimeout(resolve, retryDelays[attempt]));
@@ -120,11 +136,7 @@ export async function apiRequest(
 
   if (!response.ok) {
     const errorData = await response.json().catch(() => ({}));
-    if (
-      response.status === 401 &&
-      requestHeaders.has("Authorization") &&
-      typeof window !== "undefined"
-    ) {
+    if (response.status === 401 && typeof window !== "undefined") {
       window.dispatchEvent(new Event(SESSION_EXPIRED_EVENT));
     }
     throw new ApiError(
@@ -150,7 +162,7 @@ export async function fetchApi(
 }
 
 export async function iniciarWorkflowConsultaRadicado(
-  token: string,
+  _token: string | null,
   input:
     | { tipo: "AUTOMATICA_NUEVO"; radicado_id: number; consulta_id: number }
     | { tipo: "MANUAL"; radicado_id: number }
@@ -158,10 +170,7 @@ export async function iniciarWorkflowConsultaRadicado(
 ): Promise<{ workflow_run_id: string }> {
   const response = await fetch("/workflow-admin/consultas/radicado", {
     method: "POST",
-    headers: {
-      Authorization: `Bearer ${token}`,
-      "Content-Type": "application/json",
-    },
+    headers: { "Content-Type": "application/json", [ENCABEZADO_CSRF]: "1" },
     body: JSON.stringify(input),
   });
   const result = await response.json().catch(() => ({}));
@@ -178,9 +187,6 @@ export async function fetchBlobApi(
   return (await apiRequest(endpoint, options)).blob();
 }
 
-export async function getCurrentUser(token: string) {
-  return fetchApi("/api/auth/me", {
-    method: "GET",
-    token,
-  });
+export async function getCurrentUser() {
+  return fetchApi("/api/auth/me", { method: "GET" });
 }

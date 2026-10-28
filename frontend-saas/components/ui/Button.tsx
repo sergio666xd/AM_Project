@@ -4,25 +4,25 @@ import { Loader2 } from "lucide-react";
 type ButtonVariant = "primary" | "secondary" | "outline" | "ghost" | "danger" | "gold";
 type ButtonSize = "sm" | "md" | "lg";
 
+// Profundidad con anillos y luces interiores, no con bordes (DESIGN.md).
 const variants: Record<ButtonVariant, string> = {
   primary:
-    "bg-brand-900 text-white hover:bg-brand-800 active:bg-brand-950 focus-visible:ring-brand-700",
+    "bg-navy text-on-navy hover:bg-navy-hover shadow-[inset_0_1px_0_rgb(255_255_255/0.12),0_1px_2px_rgb(0_20_60/0.25)]",
   secondary:
-    "bg-neutral-100 text-neutral-900 hover:bg-neutral-200 active:bg-neutral-300 border border-neutral-200 focus-visible:ring-brand-700",
+    "bg-sheet text-ink hover:bg-sheet-2 shadow-[0_0_0_1px_var(--line-strong),0_1px_2px_rgb(24_32_58/0.06)]",
   outline:
-    "border border-border bg-surface text-foreground hover:bg-surface-hover active:bg-neutral-200 focus-visible:ring-brand-700",
-  ghost:
-    "text-foreground-secondary hover:bg-surface-hover hover:text-foreground active:bg-neutral-200 focus-visible:ring-brand-700",
-  danger:
-    "bg-danger text-white hover:bg-[#9A1E2C] active:bg-[#841925] focus-visible:ring-danger",
-  gold:
-    "bg-gold-400 text-brand-950 hover:bg-gold-500 active:bg-gold-600 focus-visible:ring-gold-400",
+    "bg-sheet text-ink hover:bg-sheet-2 shadow-[0_0_0_1px_var(--line-strong),0_1px_2px_rgb(24_32_58/0.06)]",
+  ghost: "text-ink-2 hover:bg-manila hover:text-ink",
+  danger: "bg-sheet text-bad hover:bg-bad-soft shadow-[0_0_0_1px_var(--line-strong)]",
+  // Solo para confirmaciones poco frecuentes.
+  gold: "bg-gold text-[#2b220a] hover:brightness-[1.04] shadow-[0_1px_2px_rgb(60_45_10/0.25)]",
 };
 
+// En celular los controles llegan a 44 px; en escritorio, a la densidad del panel.
 const sizes: Record<ButtonSize, string> = {
-  sm: "min-h-9 gap-1.5 px-3 text-[13px]",
-  md: "min-h-11 gap-2 px-4 text-sm",
-  lg: "min-h-12 gap-2 px-5 text-[15px]",
+  sm: "min-h-9 gap-1.5 rounded-md px-2.5 text-[13px] sm:min-h-8",
+  md: "min-h-11 gap-2 rounded-lg px-3.5 text-[14px] sm:min-h-10",
+  lg: "min-h-12 gap-2 rounded-lg px-5 text-[16px]",
 };
 
 export type ButtonProps = Omit<ButtonHTMLAttributes<HTMLButtonElement>, "size"> & {
@@ -48,13 +48,14 @@ export function Button({
     <button
       type={type}
       disabled={isDisabled}
-      className={`motion-press inline-flex items-center justify-center rounded-[var(--radius-md)] font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 ${variants[variant]} ${sizes[size]} ${className}`}
+      aria-busy={loading || undefined}
+      className={`relative inline-flex select-none items-center justify-center whitespace-nowrap font-semibold transition-[background-color,box-shadow,color,scale,filter] duration-150 active:scale-[0.96] disabled:pointer-events-none disabled:opacity-50 ${variants[variant]} ${sizes[size]} ${className}`}
       {...props}
     >
       {loading ? (
         <Loader2 aria-hidden="true" className="size-4 animate-spin" />
       ) : icon ? (
-        <span className="shrink-0">{icon}</span>
+        <span className="-ml-0.5 inline-flex shrink-0">{icon}</span>
       ) : null}
       {children}
     </button>

@@ -21,6 +21,13 @@ router = APIRouter(prefix="/api/expedientes", tags=["Expedientes"])
 # Los avisos de actuaciones nuevas solo se quitan al abrir el detalle del radicado.
 PREFIJO_AVISO_ACTUACIONES = "actuaciones-radicado:"
 
+_EVENTO_PROXIMO = {
+    "EVENTO": "Evento próximo",
+    "AUDIENCIA": "Audiencia próxima",
+    "REUNION": "Reunión próxima",
+    "FIRMA_CONTRATO": "Firma de contrato próxima",
+}
+
 
 @router.get("/notificaciones")
 def listar_notificaciones_despacho(db: Session = Depends(get_db), usuario: models.Usuario = Depends(security.obtener_usuario_actual)):
@@ -102,7 +109,7 @@ def _notificaciones_abogado(db: Session, usuario: models.Usuario) -> list[dict]:
         ).all()
         for event in upcoming_events:
             items.append({"id": f"evento:{event.id}", "categoria": "proceso", "tipo": "EVENTO_PROXIMO",
-                          "titulo": event.titulo, "descripcion": f"{event.tipo.lower().replace('_', ' ')} próximo",
+                          "titulo": event.titulo, "descripcion": _EVENTO_PROXIMO.get(event.tipo, "Evento próximo"),
                           "fecha": event.fecha_inicio, "href": f"/gestion-procesos/abogado/procesos/{event.proceso_id}/agenda",
                           "proceso_id": event.proceso_id, "leida": False})
         notices = db.query(models.NotificacionProceso).filter(models.NotificacionProceso.proceso_id.in_(process_ids)).all()

@@ -255,7 +255,7 @@ export default function AdminOperationsPage({ section = "resumen" }: { section?:
       const response = await fetch(selected ? "/workflow-admin/consultas/radicado" : "/workflow-admin/consultas", {
         method: "POST",
         headers: {
-          Authorization: `Bearer ${token}`,
+          "X-AM-Solicitud": "1",
           ...(selected ? { "Content-Type": "application/json" } : {}),
         },
         ...(selected ? {

@@ -1,6 +1,6 @@
 "use client";
 
-import { apiRequest } from "@/lib/api";
+import { apiRequest, TOKEN_EN_COOKIE } from "@/lib/api";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { Check, CheckCheck, ExternalLink, FileText, RefreshCw, Search } from "lucide-react";
@@ -27,7 +27,7 @@ export default function NotificacionesPage() {
   const load = useCallback(async () => {
     try {
       setLoading(true); setError("");
-      const response = await apiRequest("/api/expedientes/notificaciones/centro", { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } });
+      const response = await apiRequest("/api/expedientes/notificaciones/centro", { headers: { Authorization: `Bearer ${TOKEN_EN_COOKIE}` } });
       const result = await response.json();
       if (!response.ok) throw new Error(result.detail || "No fue posible cargar las notificaciones.");
       setItems(Array.isArray(result) ? result : []);
@@ -52,7 +52,7 @@ export default function NotificacionesPage() {
     if (!ids.length) return;
     setBusy(true); setError("");
     try {
-      const response = await apiRequest("/api/expedientes/notificaciones/leer", { method: "POST", headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}`, "Content-Type": "application/json" }, body: JSON.stringify({ ids }) });
+      const response = await apiRequest("/api/expedientes/notificaciones/leer", { method: "POST", headers: { Authorization: `Bearer ${TOKEN_EN_COOKIE}`, "Content-Type": "application/json" }, body: JSON.stringify({ ids }) });
       const result = await response.json();
       if (!response.ok) throw new Error(result.detail || "No fue posible actualizar las notificaciones.");
       const read = new Set(ids); setItems((current) => current.map((item) => read.has(item.id) ? { ...item, leida: true } : item));
@@ -63,7 +63,7 @@ export default function NotificacionesPage() {
   async function markAllRead() {
     setBusy(true); setError("");
     try {
-      const response = await apiRequest("/api/expedientes/notificaciones/leer-todas", { method: "POST", headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } });
+      const response = await apiRequest("/api/expedientes/notificaciones/leer-todas", { method: "POST", headers: { Authorization: `Bearer ${TOKEN_EN_COOKIE}` } });
       const result = await response.json();
       if (!response.ok) throw new Error(result.detail || "No fue posible marcar todo como leído.");
       setItems((current) => current.map((item) => ({ ...item, leida: true })));

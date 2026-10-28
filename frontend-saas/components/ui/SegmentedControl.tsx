@@ -22,17 +22,17 @@ export function SegmentedControl<V extends string>({
 }) {
   return (
     <div role="tablist" aria-label={label} className="-mx-1 flex max-w-full gap-1 overflow-x-auto px-1 pb-0.5 [scrollbar-width:none]">
-      <div className="inline-flex shrink-0 gap-1 rounded-[var(--radius-lg)] border border-border bg-surface p-1">
+      <div className="inline-flex shrink-0 gap-0.5 rounded-lg bg-manila p-0.5">
         {options.map((option) => {
           const active = option.value === value;
-          const className = `inline-flex min-h-9 items-center gap-2 whitespace-nowrap rounded-[var(--radius-md)] px-3 text-sm font-medium motion-press ${
-            active ? "bg-brand-900 text-white shadow-xs dark:bg-brand-800" : "text-foreground-secondary hover:bg-surface-hover hover:text-foreground"
+          const className = `inline-flex min-h-9 items-center gap-1.5 whitespace-nowrap rounded-md px-3 text-[13px] font-semibold transition-[background-color,color,box-shadow] sm:min-h-8 ${
+            active ? "bg-sheet text-ink shadow-[0_1px_2px_rgb(24_32_58/0.12)]" : "text-ink-2 hover:text-ink"
           }`;
           const content = (
             <>
               {option.label}
               {option.count !== undefined && (
-                <span key={option.count} className={`motion-fade-in rounded-full px-1.5 text-xs leading-5 ${active ? "bg-white/20 text-white" : "bg-surface-hover text-foreground-muted"}`}>
+                <span key={option.count} className={`rounded px-1 text-[11px] leading-5 tabular-nums ${active ? "bg-manila text-ink-2" : "text-ink-2"}`}>
                   {option.count}
                 </span>
               )}

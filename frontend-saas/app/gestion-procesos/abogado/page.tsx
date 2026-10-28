@@ -1,6 +1,6 @@
 "use client";
 
-import { apiRequest } from "@/lib/api";
+import { apiRequest, TOKEN_EN_COOKIE } from "@/lib/api";
 
 import { useEffect, useState } from "react";
 
@@ -56,7 +56,7 @@ interface SaasDashboardData {
 
 async function requestOverview(isSaasLawyer: boolean) {
   const headers = {
-    Authorization: `Bearer ${localStorage.getItem("token") || ""}`,
+    Authorization: `Bearer ${TOKEN_EN_COOKIE}`,
   };
   const saasDashboardRequest = isSaasLawyer
     ? apiRequest(`/api/dashboard`, { headers })

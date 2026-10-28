@@ -297,7 +297,7 @@ npm install
 npm run dev
 ```
 
-Configure `NEXT_PUBLIC_API_URL` para apuntar al backend cuando frontend y API no estén en el mismo origen.
+El navegador siempre llama a `/api` en el mismo origen: en Vercel lo reescribe `vercel.json` y en `next dev` lo reescribe `next.config.ts` hacia `BACKEND_DEV_URL` (por defecto `http://127.0.0.1:8000`). Así la cookie de sesión `am_sesion` (httpOnly) viaja sola; el frontend no guarda ningún token.
 
 ## Verificación realizada
 

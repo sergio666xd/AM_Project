@@ -82,38 +82,25 @@ function CambiarPasswordForm() {
     if (nueva !== confirmacion) {
       return setError("Las contraseñas no coinciden.");
     }
-    const token = typeof window !== "undefined" ? localStorage.getItem("token") : null;
-    if (!token) {
-      return setError("No se encontró una sesión activa. Vuelve a iniciar sesión para continuar.");
-    }
-
     setSending(true);
     try {
+      // La sesión va en la cookie; la respuesta trae una cookie renovada.
       const response = await fetch(`${API_URL}/api/auth/cambiar-password`, {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
+        headers: { "Content-Type": "application/json", "X-AM-Solicitud": "1" },
         body: JSON.stringify({ password_actual: actual, password_nueva: nueva }),
       });
       const data: {
-        access_token?: string;
         rol?: string;
         email?: string;
         detail?: string;
       } = await response.json().catch(() => ({}));
 
+      if (response.status === 401) {
+        throw new Error("No se encontró una sesión activa. Vuelve a iniciar sesión para continuar.");
+      }
       if (!response.ok) {
         throw new Error(data.detail || "No fue posible cambiar la contraseña.");
-      }
-
-      // Guardar el nuevo token generado por el backend
-      if (data.access_token) {
-        localStorage.setItem("token", data.access_token);
-        if (localStorage.getItem("remember_me") !== "false") {
-          localStorage.setItem("remember_me", "true");
-        }
       }
 
       if (typeof window !== "undefined") {

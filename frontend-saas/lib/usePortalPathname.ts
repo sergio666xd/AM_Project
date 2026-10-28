@@ -28,8 +28,10 @@ export function usePortalPathname() {
   const { user } = useSession();
   if (pathname.startsWith("/gestion-procesos")) return pathname;
 
-  const adminHost = hostname === ADMIN_PORTAL_HOST || hostname === "admin.localhost";
-  const userHost = hostname === USER_PORTAL_HOST || hostname === "panel.localhost";
+  // En localhost el proxy decide el portal por el rol, igual que aquí.
+  const localSinSubdominio = hostname === "localhost" || hostname === "127.0.0.1";
+  const adminHost = hostname === ADMIN_PORTAL_HOST || hostname === "admin.localhost" || (localSinSubdominio && user?.rol === "ADMIN");
+  const userHost = hostname === USER_PORTAL_HOST || hostname === "panel.localhost" || (localSinSubdominio && !adminHost);
   if (!adminHost && !userHost) return pathname;
 
   const area = adminHost ? "admin" : areaForRole(user?.rol);

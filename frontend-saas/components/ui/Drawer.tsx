@@ -6,8 +6,8 @@ import { X } from "lucide-react";
 import { usePresence } from "@/lib/usePresence";
 
 /**
- * Panel lateral para fichas de detalle. En escritorio se abre a la derecha
- * sin perder el contexto de la tabla; en móvil ocupa la pantalla completa.
+ * Panel lateral para fichas y formularios cortos. En escritorio se abre a la
+ * derecha sin perder el contexto; en celular sube como hoja inferior.
  */
 export function Drawer({
   open,
@@ -67,34 +67,35 @@ export function Drawer({
   if (!mounted || typeof document === "undefined") return null;
 
   return createPortal(
-    <div className={`fixed inset-0 z-[70] flex justify-end ${closing ? "pointer-events-none" : ""}`} role="presentation">
-      <button type="button" aria-label="Cerrar" tabIndex={-1} onClick={onClose} className={`absolute inset-0 bg-brand-950/40 backdrop-blur-[2px] ${closing ? "motion-fade-out" : "motion-fade-in"}`} />
+    <div className={`fixed inset-0 z-[90] flex items-end justify-end sm:items-stretch ${closing ? "pointer-events-none" : ""}`} role="presentation">
+      <button type="button" aria-label="Cerrar" tabIndex={-1} onClick={onClose} className={`absolute inset-0 bg-scrim ${closing ? "motion-fade-out" : "motion-fade-in"}`} />
       <div
         ref={panelRef}
         role="dialog"
         aria-modal="true"
         aria-labelledby={titleId}
         tabIndex={-1}
-        className={`relative flex h-full w-full flex-col bg-surface shadow-lg outline-none sm:border-l sm:border-border ${width === "lg" ? "sm:max-w-2xl" : "sm:max-w-lg"} ${closing ? "motion-slide-out-right" : "motion-slide-in-right"}`}
+        className={`relative flex max-h-[92dvh] w-full flex-col rounded-t-2xl bg-sheet shadow-pop outline-none sm:h-full sm:max-h-none sm:rounded-none sm:rounded-l-2xl ${width === "lg" ? "sm:max-w-2xl" : "sm:max-w-lg"} ${closing ? "motion-drawer-out" : "motion-drawer-in"}`}
       >
-        <header className="flex items-start gap-3 border-b border-border px-5 pb-4 pt-[max(env(safe-area-inset-top),16px)]">
+        <div aria-hidden="true" className="mx-auto mt-2 h-1 w-10 shrink-0 rounded-full bg-line-strong sm:hidden" />
+        <header className="flex items-start gap-3 border-b border-line px-5 pb-4 pt-3 sm:pt-[max(env(safe-area-inset-top),16px)]">
           <div className="min-w-0 flex-1">
-            {overline && <p className="text-xs font-semibold uppercase tracking-wide text-gold-600 dark:text-gold-400">{overline}</p>}
-            <h2 id={titleId} className="mt-0.5 break-words text-lg font-semibold leading-snug text-foreground">{title}</h2>
-            {subtitle && <div className="mt-1 text-sm text-foreground-muted">{subtitle}</div>}
+            {overline && <p className="text-[13px] text-ink-3">{overline}</p>}
+            <h2 id={titleId} className="break-words font-display text-[21px] leading-snug text-ink">{title}</h2>
+            {subtitle && <div className="mt-1 text-[13px] text-ink-3">{subtitle}</div>}
           </div>
           <button
             type="button"
             onClick={onClose}
             aria-label="Cerrar panel"
-            className="grid size-10 shrink-0 place-items-center rounded-[var(--radius-md)] text-foreground-muted hover:bg-surface-hover hover:text-foreground"
+            className="-mr-2 -mt-1 grid size-10 shrink-0 place-items-center rounded-lg text-ink-2 transition-colors hover:bg-manila hover:text-ink"
           >
-            <X aria-hidden="true" className="size-5" />
+            <X aria-hidden="true" size={18} strokeWidth={1.75} />
           </button>
         </header>
-        <div className="flex-1 overflow-y-auto px-5 py-4">{children}</div>
+        <div className="flex-1 overflow-y-auto px-5 py-5">{children}</div>
         {footer && (
-          <footer className="flex flex-wrap justify-end gap-2 border-t border-border px-5 pt-3 pb-[max(env(safe-area-inset-bottom),12px)]">
+          <footer className="flex flex-wrap justify-end gap-2 border-t border-line bg-sheet-2 px-5 pt-3.5 pb-[max(env(safe-area-inset-bottom),14px)] sm:rounded-bl-2xl">
             {footer}
           </footer>
         )}
@@ -110,8 +111,8 @@ export function DetailList({ items }: { items: { label: string; value: ReactNode
     <dl className="grid grid-cols-1 gap-x-4 gap-y-3 sm:grid-cols-2">
       {items.map((item) => (
         <div key={item.label} className={`min-w-0 ${item.wide ? "sm:col-span-2" : ""}`}>
-          <dt className="text-xs font-medium text-foreground-muted">{item.label}</dt>
-          <dd className="mt-0.5 break-words text-sm text-foreground">{item.value ?? "—"}</dd>
+          <dt className="text-[13px] font-semibold text-ink-2">{item.label}</dt>
+          <dd className="mt-0.5 break-words text-[14px] text-ink">{item.value ?? "—"}</dd>
         </div>
       ))}
     </dl>

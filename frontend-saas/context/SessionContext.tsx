@@ -15,11 +15,14 @@ import {
   API_URL,
   apiErrorStatus,
   SESSION_EXPIRED_EVENT,
+  TOKEN_EN_COOKIE,
 } from "@/lib/api";
+import { api, SESION_TERMINADA } from "@/lib/api-v2/cliente";
 import { useLoadEffect } from "@/lib/useLoadEffect";
 
-/** Intervalo de renovación del token: cada 12 horas (en ms). */
-const TOKEN_REFRESH_INTERVAL_MS = 12 * 60 * 60 * 1000;
+/** Cada cuánto se renueva la sesión mientras el portal está abierto (12 horas). */
+const RENOVACION_MS = 12 * 60 * 60 * 1000;
+const CLAVE_ULTIMA_RENOVACION = "am:sesion-renovada-en";
 
 export interface UsuarioActual {
   id: number;
@@ -53,10 +56,16 @@ export interface UsuarioActual {
 interface SessionContextType {
   user: UsuarioActual | null;
   loading: boolean;
+  /**
+   * Marcador de compatibilidad (`TOKEN_EN_COOKIE`) cuando hay sesión, o null.
+   * El token real está en una cookie httpOnly; no se puede leer desde aquí.
+   */
   token: string | null;
   /** Mensaje cuando la sesión no se pudo validar por un fallo de red o del servidor. */
   sessionError: string | null;
-  logout: () => void;
+  logout: () => Promise<void>;
+  /** Cierra la sesión en todos los dispositivos (invalida todos los tokens emitidos). */
+  logoutEverywhere: () => Promise<void>;
   refreshUser: () => Promise<void>;
   retrySession: () => Promise<void>;
 }
@@ -75,23 +84,50 @@ function persistPortalRole(role?: string | null) {
   document.cookie = `portal_role=${encodeURIComponent(role)}; Path=/; SameSite=Lax${secure}`;
 }
 
-/**
- * Llama a POST /api/auth/refresh-token para obtener un nuevo JWT
- * con la misma política de expiración (sliding window).
- * Devuelve el nuevo token o null si la renovación falla.
- */
-async function refreshTokenFromApi(currentToken: string): Promise<string | null> {
+function leerAlmacen(clave: string): string | null {
   try {
-    const response = await fetch(`${API_URL}/api/auth/refresh-token`, {
-      method: "POST",
-      headers: { Authorization: `Bearer ${currentToken}` },
-    });
-    if (!response.ok) return null;
-    const data: { access_token?: string } = await response.json().catch(() => ({}));
-    return data.access_token ?? null;
+    return localStorage.getItem(clave);
   } catch {
     return null;
   }
+}
+
+function escribirAlmacen(clave: string, valor: string | null) {
+  try {
+    if (valor === null) localStorage.removeItem(clave);
+    else localStorage.setItem(clave, valor);
+  } catch {
+    // Modo privado o almacenamiento bloqueado: la sesión sigue en la cookie.
+  }
+}
+
+/**
+ * Pasa a la cookie una sesión iniciada antes de este cambio, cuando el token
+ * se guardaba en localStorage: renovarlo con ese token deja la cookie puesta
+ * y nadie tiene que volver a iniciar sesión. Después se borra el token viejo.
+ */
+async function migrarTokenAntiguo() {
+  const antiguo = leerAlmacen("token");
+  if (!antiguo) return;
+  try {
+    await fetch(`${API_URL}/api/auth/refresh-token`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${antiguo}` },
+      credentials: "same-origin",
+    });
+  } catch {
+    // Sin red: el usuario vuelve a iniciar sesión si la cookie no quedó.
+  } finally {
+    escribirAlmacen("token", null);
+    escribirAlmacen("remember_me", null);
+  }
+}
+
+async function renovarSiToca() {
+  const ultima = Number(leerAlmacen(CLAVE_ULTIMA_RENOVACION) || 0);
+  if (Date.now() - ultima < RENOVACION_MS) return;
+  const { response } = await api.POST("/api/v2/sesion/renovar");
+  if (response.ok) escribirAlmacen(CLAVE_ULTIMA_RENOVACION, String(Date.now()));
 }
 
 export function SessionProvider({
@@ -100,79 +136,35 @@ export function SessionProvider({
   children: ReactNode;
 }) {
   const [user, setUser] = useState<UsuarioActual | null>(null);
-  const [token, setToken] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [sessionError, setSessionError] = useState<string | null>(null);
-  const refreshTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
-
-  /** Renueva el token silenciosamente y lo guarda en localStorage. */
-  const silentRefresh = useCallback(async () => {
-    const storedToken = localStorage.getItem("token");
-    if (!storedToken) return;
-
-    const newToken = await refreshTokenFromApi(storedToken);
-    if (newToken) {
-      localStorage.setItem("token", newToken);
-      setToken(newToken);
-    }
-    // Si falla, el token actual sigue siendo válido hasta que expire.
-  }, []);
-
-  /** Inicia el timer periódico de renovación si remember_me está activo. */
-  const startRefreshTimer = useCallback(() => {
-    if (refreshTimerRef.current) clearInterval(refreshTimerRef.current);
-    const isRemembered = localStorage.getItem("remember_me") === "true";
-    if (!isRemembered) return;
-
-    refreshTimerRef.current = setInterval(() => {
-      silentRefresh();
-    }, TOKEN_REFRESH_INTERVAL_MS);
-  }, [silentRefresh]);
+  const userRef = useRef<UsuarioActual | null>(null);
+  useEffect(() => {
+    userRef.current = user;
+  }, [user]);
 
   const clearSession = useCallback(() => {
-    localStorage.removeItem("token");
-    localStorage.removeItem("remember_me");
     persistPortalRole(null);
-    setToken(null);
+    escribirAlmacen(CLAVE_ULTIMA_RENOVACION, null);
     setUser(null);
-    if (refreshTimerRef.current) {
-      clearInterval(refreshTimerRef.current);
-      refreshTimerRef.current = null;
-    }
   }, []);
 
   const loadSession = useCallback(async () => {
-    const storedToken = localStorage.getItem("token");
-
-    if (!storedToken) {
-      setToken(null);
-      setUser(null);
-      persistPortalRole(null);
-      setLoading(false);
-      return;
-    }
-
-    setToken(storedToken);
     setSessionError(null);
-
     try {
-      const currentUser = await getCurrentUser(storedToken);
-
+      await migrarTokenAntiguo();
+      const currentUser: UsuarioActual = await getCurrentUser();
       setUser(currentUser);
       persistPortalRole(currentUser.rol);
-
-      // Si hay sesión persistente, renovar el token en segundo plano para
-      // extender la ventana de 15 días sin retrasar la carga del portal.
-      if (localStorage.getItem("remember_me") === "true") {
-        void silentRefresh();
-      }
+      // Mantiene viva la ventana de la sesión sin retrasar la carga del portal.
+      void renovarSiToca().catch(() => undefined);
     } catch (error) {
       const status = apiErrorStatus(error);
       if (status === 401 || status === 403) {
         clearSession();
       } else {
-        // Un fallo de red o del servidor no invalida el token: se conserva
-        // para que el usuario pueda reintentar sin volver a iniciar sesión.
+        // Un fallo de red o del servidor no invalida la sesión: se conserva
+        // la cookie para que el usuario pueda reintentar sin volver a entrar.
         console.error("No fue posible recuperar la sesión:", error);
         setSessionError(
           error instanceof Error
@@ -183,7 +175,7 @@ export function SessionProvider({
     } finally {
       setLoading(false);
     }
-  }, [clearSession, silentRefresh]);
+  }, [clearSession]);
 
   const retrySession = useCallback(async () => {
     setLoading(true);
@@ -192,66 +184,57 @@ export function SessionProvider({
 
   useLoadEffect(loadSession);
 
-  // La API avisa cuando rechaza el token; limpiar la sesión hace que RoleGate
-  // lleve al usuario al inicio de sesión conservando la ruta actual.
+  // La API avisa cuando rechaza la sesión; limpiarla hace que RoleGate lleve
+  // al usuario al inicio de sesión conservando la ruta actual.
   useEffect(() => {
     const handleExpired = () => {
-      if (localStorage.getItem("token")) clearSession();
+      if (userRef.current) clearSession();
     };
     window.addEventListener(SESSION_EXPIRED_EVENT, handleExpired);
-    return () => window.removeEventListener(SESSION_EXPIRED_EVENT, handleExpired);
+    window.addEventListener(SESION_TERMINADA, handleExpired);
+    return () => {
+      window.removeEventListener(SESSION_EXPIRED_EVENT, handleExpired);
+      window.removeEventListener(SESION_TERMINADA, handleExpired);
+    };
   }, [clearSession]);
 
-  // Iniciar/detener el timer de renovación cuando cambia el token
+  const conSesion = Boolean(user);
   useEffect(() => {
-    if (token) {
-      startRefreshTimer();
-    }
-    return () => {
-      if (refreshTimerRef.current) {
-        clearInterval(refreshTimerRef.current);
-        refreshTimerRef.current = null;
-      }
-    };
-  }, [token, startRefreshTimer]);
+    if (!conSesion) return;
+    const intervalo = window.setInterval(() => void renovarSiToca().catch(() => undefined), RENOVACION_MS);
+    return () => window.clearInterval(intervalo);
+  }, [conSesion]);
 
-  async function refreshUser() {
-    const storedToken = localStorage.getItem("token");
-
-    if (!storedToken) {
-      setToken(null);
-      setUser(null);
-      return;
-    }
-
+  const refreshUser = useCallback(async () => {
     try {
-      const currentUser = await getCurrentUser(storedToken);
-
-      setToken(storedToken);
+      const currentUser: UsuarioActual = await getCurrentUser();
       setUser(currentUser);
       persistPortalRole(currentUser.rol);
     } catch (error) {
-      console.error(
-        "No fue posible actualizar el usuario:",
-        error
-      );
+      if (apiErrorStatus(error) === 401) clearSession();
+      else console.error("No fue posible actualizar el usuario:", error);
     }
-  }
+  }, [clearSession]);
 
-  function logout() {
+  const salir = useCallback(async (todas: boolean) => {
+    await (todas ? api.DELETE("/api/v2/sesion/todas") : api.DELETE("/api/v2/sesion")).catch(() => undefined);
     clearSession();
     // eslint-disable-next-line @next/next/no-location-assign-relative-destination -- recarga completa al cerrar sesión para descartar todo el estado en memoria.
     window.location.assign("/");
-  }
+  }, [clearSession]);
+
+  const logout = useCallback(() => salir(false), [salir]);
+  const logoutEverywhere = useCallback(() => salir(true), [salir]);
 
   return (
     <SessionContext.Provider
       value={{
         user,
         loading,
-        token,
+        token: user ? TOKEN_EN_COOKIE : null,
         sessionError,
         logout,
+        logoutEverywhere,
         refreshUser,
         retrySession,
       }}

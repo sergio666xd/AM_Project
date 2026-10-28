@@ -6,7 +6,7 @@ import { Eye, EyeOff, LockKeyhole, Mail, Scale } from "lucide-react";
 import { useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import { useSession } from "@/context/SessionContext";
-import { API_URL } from "@/lib/api";
+import { api, mensajeDeError } from "@/lib/api-v2/cliente";
 import { safeInternalRedirect } from "@/lib/authRedirect";
 import { homePathForRole, portalHrefForRole } from "@/lib/portalHosts";
 
@@ -31,40 +31,24 @@ export function PortalLoginForm({ portal }: { portal: Portal }) {
     setWrongPortal(false);
     setLoading(true);
     try {
-      const formData = new URLSearchParams({
-        username: email.trim(),
-        password,
-        remember_me: rememberMe ? "true" : "false",
+      // La API deja la sesión en una cookie httpOnly; aquí no se guarda ningún token.
+      const { data: sesion, error: fallo } = await api.POST("/api/v2/sesion", {
+        body: { email: email.trim(), password, recordarme: rememberMe },
       });
-      const response = await fetch(`${API_URL}/api/auth/login`, {
-        method: "POST",
-        headers: { "Content-Type": "application/x-www-form-urlencoded" },
-        body: formData,
-      });
-      const data: { access_token?: string; detail?: string; debe_cambiar_password?: boolean } = await response.json().catch(() => ({}));
-      if (!response.ok || !data.access_token) throw new Error(data.detail || "Correo o contraseña incorrectos, o cuenta inactiva.");
-
-      const meResponse = await fetch(`${API_URL}/api/auth/me`, { headers: { Authorization: `Bearer ${data.access_token}` } });
-      const me: { rol?: string; detail?: string } = await meResponse.json().catch(() => ({}));
-      if (!meResponse.ok || !me.rol) throw new Error(me.detail || "No fue posible verificar los permisos de la cuenta.");
-
-      const roleMatchesPortal = isAdminPortal ? me.rol === "ADMIN" : me.rol !== "ADMIN";
+      if (!sesion) throw new Error(mensajeDeError(fallo));
+      const roleMatchesPortal = isAdminPortal ? sesion.rol === "ADMIN" : sesion.rol !== "ADMIN";
       if (!roleMatchesPortal) {
         setWrongPortal(true);
         setError(isAdminPortal
           ? "Esta cuenta no es administradora. Continúa desde el portal de cliente y abogado."
           : "El acceso de administración tiene un portal separado. Continúa desde el portal administrativo.");
+        // La cookie no debe quedar puesta en el portal equivocado.
+        await api.DELETE("/api/v2/sesion");
         return;
       }
 
-      localStorage.setItem("token", data.access_token);
-      if (rememberMe) {
-        localStorage.setItem("remember_me", "true");
-      } else {
-        localStorage.removeItem("remember_me");
-      }
       const redirect = safeInternalRedirect(new URLSearchParams(window.location.search).get("redirect"));
-      if (data.debe_cambiar_password) {
+      if (sesion.debe_cambiar_password) {
         localStorage.setItem("pending_user_email", email.trim());
         const params = new URLSearchParams();
         params.set("email", email.trim());
@@ -75,7 +59,7 @@ export function PortalLoginForm({ portal }: { portal: Portal }) {
         return;
       }
       await refreshUser();
-      router.replace(portalHrefForRole(me.rol, redirect || homePathForRole(me.rol)));
+      router.replace(portalHrefForRole(sesion.rol, redirect || homePathForRole(sesion.rol)));
     } catch (loginError) {
       setWrongPortal(false);
       setError(loginError instanceof Error ? loginError.message : "No fue posible iniciar sesión.");
