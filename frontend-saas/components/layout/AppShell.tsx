@@ -33,7 +33,11 @@ export default function AppShell({ children, variant = "saas" }: AppShellProps) 
   const { user } = useSession();
   const nav = navegacion(variant, user?.rol === "ABOGADO_ADMIN");
   const areaHref = rutaAreaCuenta(variant);
-  const enChat = usePathname().split("/").includes("chat");
+  const segmentos = usePathname().split("/");
+  const enChat = segmentos.includes("chat");
+  // En la lista de Mensajes del abogado sigue la barra inferior; dentro de una conversación, no.
+  const tramoChat = segmentos.slice(segmentos.indexOf("chat") + 1).filter(Boolean);
+  const conversacionAbierta = enChat && !(tramoChat.length === 0 || (tramoChat.length === 1 && /^\d+$/.test(tramoChat[0])));
   const chatViewport = useChatViewport();
   const estiloChat = enChat && chatViewport.height ? { height: `${chatViewport.height}px` } : undefined;
 
@@ -74,7 +78,7 @@ export default function AppShell({ children, variant = "saas" }: AppShellProps) 
       <main className={cx("mx-auto w-full max-w-[1280px]", enChat ? "min-h-0 flex-1" : "px-4 pb-28 pt-5 sm:px-6 lg:px-8 lg:pb-12 lg:pt-7")}>
         {children}
       </main>
-      {!enChat && <MobileTabBar pestanas={nav.pestanas} resto={nav.resto} inicio={nav.inicio} />}
+      {!conversacionAbierta && <MobileTabBar pestanas={nav.pestanas} resto={nav.resto} inicio={nav.inicio} />}
       {!enChat && <ChatFloatingButton />}
       <BusquedaGlobal area="abogado" />
     </div>

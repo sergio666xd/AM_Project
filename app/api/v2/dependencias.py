@@ -19,6 +19,8 @@ from app.modulos.expedientes.repositorio import RepositorioProcesos
 from app.modulos.expedientes.servicio import ServicioProcesos
 from app.modulos.folios.repositorio import RepositorioFolios
 from app.modulos.folios.servicio import ServicioFolios
+from app.modulos.mensajes.repositorio import RepositorioMensajes
+from app.modulos.mensajes.servicio import ServicioMensajes
 from app.modulos.identidad.repositorio import RepositorioUsuarios
 from app.modulos.identidad.servicio import ServicioSesion
 from app.modulos.tareas.repositorio import RepositorioTareas
@@ -68,3 +70,7 @@ def servicio_clientes(db: Session = Depends(obtener_bd)) -> ServicioClientes:
 
 def servicio_contratos(db: Session = Depends(obtener_bd)) -> ServicioContratos:
     return ServicioContratos(db, RepositorioContratos(db))
+
+
+def servicio_mensajes(db: Session = Depends(obtener_bd)) -> ServicioMensajes:
+    return ServicioMensajes(db, RepositorioMensajes(db), ServicioFolios(db, RepositorioFolios(db), RepositorioProcesos(db)))

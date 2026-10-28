@@ -5,6 +5,8 @@ import { usePortalPathname } from "@/lib/usePortalPathname";
 import { useEffect, useState } from "react";
 import { useSession } from "@/context/SessionContext";
 import { apiRequest } from "@/lib/api";
+import { api } from "@/lib/api-v2/cliente";
+import { RUTA_MENSAJES, claveDeRuta, partesDeRuta } from "@/lib/mensajes";
 
 const labels: Record<string, string> = {
   "gestion-procesos": "Gestión de procesos",
@@ -58,8 +60,23 @@ export default function Breadcrumbs() {
   const segments = pathname.split("/").filter(Boolean);
   const chatIndex = segments.indexOf("chat");
 
+  const mensajesAbogado = chatIndex > 0 && segments[chatIndex - 1] === "abogado";
+  const claveChat = mensajesAbogado ? claveDeRuta(partesDeRuta(pathname)) : null;
+
+  // Mensajes del abogado (API v2): «Mensajes / Proceso / Persona».
   useEffect(() => {
-    if (chatIndex < 0 || !token) return;
+    if (!claveChat) return;
+    let cancelled = false;
+    const currentPath = pathname.replace(/\/$/, "");
+    void api.GET("/api/v2/conversaciones", { params: { query: { sincronizar: false } } }).then(({ data }) => {
+      const match = data?.items.find((item) => item.clave === claveChat);
+      if (!cancelled && match) setChatLabel({ href: currentPath, titulo: match.titulo, subtitulo: match.proceso?.nombre ?? "" });
+    });
+    return () => { cancelled = true; };
+  }, [claveChat, pathname]);
+
+  useEffect(() => {
+    if (chatIndex < 0 || !token || mensajesAbogado) return;
     let cancelled = false;
     apiRequest("/api/chat/conversaciones", { token })
       .then((response) => response.json())
@@ -78,9 +95,32 @@ export default function Breadcrumbs() {
       })
       .catch(() => { if (!cancelled) setChatLabel(null); });
     return () => { cancelled = true; };
-  }, [chatIndex, pathname, token]);
+  }, [chatIndex, mensajesAbogado, pathname, token]);
 
   if (segments.length === 0) return null;
+
+  if (mensajesAbogado) {
+    const currentPath = pathname.replace(/\/$/, "");
+    const actual = claveChat && chatLabel?.href === currentPath ? chatLabel : null;
+    const finales = claveChat ? (actual ? [actual.subtitulo, actual.titulo].filter(Boolean) : ["…"]) : [];
+    return (
+      <nav aria-label="Ruta de navegación" className="min-w-0">
+        <ol className="flex min-w-0 items-center gap-1.5 overflow-hidden whitespace-nowrap text-[13px] text-ink-3">
+          <li className="flex min-w-0 items-center gap-1.5"><Link href={RUTA_MENSAJES.replace(/\/chat$/, "")} className="truncate transition-colors hover:text-ink">Mi trabajo</Link></li>
+          <li className="flex min-w-0 items-center gap-1.5">
+            <span aria-hidden="true" className="text-line-strong">/</span>
+            {finales.length ? <Link href={RUTA_MENSAJES} className="truncate transition-colors hover:text-ink">Mensajes</Link> : <span aria-current="page" className="truncate font-semibold text-ink">Mensajes</span>}
+          </li>
+          {finales.map((label, index) => (
+            <li key={`${label}-${index}`} className="flex min-w-0 items-center gap-1.5">
+              <span aria-hidden="true" className="text-line-strong">/</span>
+              <span aria-current={index === finales.length - 1 ? "page" : undefined} className={`truncate ${index === finales.length - 1 ? "font-semibold text-ink" : ""}`}>{label}</span>
+            </li>
+          ))}
+        </ol>
+      </nav>
+    );
+  }
 
   if (chatIndex >= 0) {
     const prefix = segments.slice(0, chatIndex + 1);

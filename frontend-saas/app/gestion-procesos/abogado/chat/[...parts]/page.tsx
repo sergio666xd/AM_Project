@@ -1,6 +1,6 @@
-import ChatWorkspace from "@/components/chat/ChatWorkspace";
 import { RoleGate } from "@/components/auth/RoleGate";
+import { MensajesWorkspace } from "@/components/mensajes/MensajesWorkspace";
 
-export default function LawyerConversationPage() {
-  return <RoleGate roles={["ABOGADO", "ABOGADO_ADMIN", "ADMIN"]}><ChatWorkspace /></RoleGate>;
+export default function MensajesPage() {
+  return <RoleGate roles={["ABOGADO", "ABOGADO_ADMIN", "ADMIN"]}><MensajesWorkspace /></RoleGate>;
 }

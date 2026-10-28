@@ -799,6 +799,123 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v2/conversaciones": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Conversaciones del usuario
+         * @description Todas, con el último mensaje, cuántos sin leer y si un cliente espera respuesta. Las más recientes primero.
+         */
+        get: operations["listar_conversaciones"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v2/conversaciones/resolver": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Abrir una conversación por su ruta
+         * @description La crea si aún no existe y el usuario puede participar en ella.
+         */
+        get: operations["resolver_conversacion"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v2/conversaciones/{conversacion_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Mensajes de una conversación
+         * @description Sin parámetros, los últimos mensajes. Marca como entregados los que recibe el usuario.
+         */
+        get: operations["ver_hilo"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v2/conversaciones/{conversacion_id}/mensajes": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Enviar un mensaje
+         * @description Avisa a los demás (push y, si no están en el panel, correo o WhatsApp). En un proceso, queda como folio.
+         */
+        post: operations["enviar_mensaje"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v2/conversaciones/{conversacion_id}/leido": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Marcar como leído */
+        post: operations["marcar_leido"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v2/conversaciones/{conversacion_id}/referencias": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Qué se puede adjuntar
+         * @description Radicados, actuaciones, tareas, eventos y documentos del proceso que todos los participantes pueden ver.
+         */
+        get: operations["listar_referencias"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -898,6 +1015,13 @@ export interface components {
              * @description Ruta de descarga del archivo, con la sesión del usuario.
              */
             url: string;
+        };
+        /** Autor */
+        Autor: {
+            /** Id */
+            id: number;
+            /** Nombre */
+            nombre: string;
         };
         /** AvanceSubtareas */
         AvanceSubtareas: {
@@ -1173,6 +1297,18 @@ export interface components {
              */
             clientes: components["schemas"]["ProcesoDelFolio"][];
         };
+        /** Contacto */
+        Contacto: {
+            /** Id */
+            id: number;
+            /** Nombre */
+            nombre: string;
+            /**
+             * Rol
+             * @enum {string}
+             */
+            rol: "cliente" | "abogado" | "administrador";
+        };
         /** Contrato */
         Contrato: {
             /** Id */
@@ -1219,6 +1355,49 @@ export interface components {
             proceso: components["schemas"]["ProcesoBreve"];
             /** Firmado En */
             firmado_en: string | null;
+        };
+        /** Conversacion */
+        Conversacion: {
+            /** Id */
+            id: number;
+            /**
+             * Clave
+             * @description Ruta estable de la conversación, como «process:12:34» o «direct:5».
+             */
+            clave: string;
+            /**
+             * Tipo
+             * @description cliente: con un cliente sobre un proceso; colaboradores: el equipo del proceso; equipo_proceso: dos abogados sobre un proceso; equipo: dos integrantes de la firma.
+             * @enum {string}
+             */
+            tipo: "cliente" | "colaboradores" | "equipo_proceso" | "equipo";
+            /** Titulo */
+            titulo: string;
+            proceso: components["schemas"]["ProcesoBreve"] | null;
+            /** @description La otra persona, si la conversación es entre dos. */
+            contacto: components["schemas"]["Contacto"] | null;
+            /** Participantes */
+            participantes: number;
+            /**
+             * En Linea
+             * @description Cuántos de los demás participantes tienen el panel abierto ahora.
+             */
+            en_linea: number;
+            /** Sin Leer */
+            sin_leer: number;
+            /** Primer Sin Leer Id */
+            primer_sin_leer_id: number | null;
+            /**
+             * Por Responder
+             * @description El último mensaje es de un cliente y nadie de la firma ha respondido.
+             */
+            por_responder: boolean;
+            ultimo: components["schemas"]["UltimoMensaje"] | null;
+            /**
+             * Actualizada En
+             * Format: date-time
+             */
+            actualizada_en: string;
         };
         /** DatosCliente */
         DatosCliente: {
@@ -1322,6 +1501,26 @@ export interface components {
              * Format: date-time
              */
             creada_en: string;
+        };
+        /** Entrega */
+        Entrega: {
+            /**
+             * Estado
+             * @enum {string}
+             */
+            estado: "enviado" | "entregado" | "entregado_parcial" | "leido";
+            /** Entregados */
+            entregados: number;
+            /** Leidos */
+            leidos: number;
+            /** Destinatarios */
+            destinatarios: number;
+        };
+        /** EntregaDeMensaje */
+        EntregaDeMensaje: {
+            /** Id */
+            id: number;
+            entrega: components["schemas"]["Entrega"];
         };
         /** ErrorRespuesta */
         ErrorRespuesta: {
@@ -1467,6 +1666,25 @@ export interface components {
             /** Revisados */
             revisados: number;
         };
+        /** Hilo */
+        Hilo: {
+            conversacion: components["schemas"]["Conversacion"];
+            /**
+             * Mensajes
+             * @description En orden cronológico.
+             */
+            mensajes: components["schemas"]["Mensaje"][];
+            /**
+             * Hay Mas
+             * @description Hay mensajes anteriores al primero de la página.
+             */
+            hay_mas: boolean;
+            /**
+             * Entregas
+             * @description Estado actual de los mensajes propios recientes, para refrescarlos.
+             */
+            entregas: components["schemas"]["EntregaDeMensaje"][];
+        };
         /** IniciarSesion */
         IniciarSesion: {
             /** Email */
@@ -1479,6 +1697,14 @@ export interface components {
              * @default true
              */
             recordarme: boolean;
+        };
+        /** Leido */
+        Leido: {
+            /**
+             * Hasta
+             * @description Id del último mensaje leído.
+             */
+            hasta: number;
         };
         /** ListaArchivos */
         ListaArchivos: {
@@ -1499,6 +1725,12 @@ export interface components {
             /** Items */
             items: components["schemas"]["Contrato"][];
             resumen: components["schemas"]["ResumenContratos"];
+        };
+        /** ListaConversaciones */
+        ListaConversaciones: {
+            /** Items */
+            items: components["schemas"]["Conversacion"][];
+            resumen: components["schemas"]["ResumenMensajes"];
         };
         /** ListaPlantillas */
         ListaPlantillas: {
@@ -1537,6 +1769,30 @@ export interface components {
         MarcarLeidos: {
             /** Ids */
             ids: string[];
+        };
+        /** Mensaje */
+        Mensaje: {
+            /** Id */
+            id: number;
+            /** Texto */
+            texto: string;
+            /** @description Vacío si la cuenta del autor ya no existe. */
+            autor: components["schemas"]["Autor"] | null;
+            /** Es Mio */
+            es_mio: boolean;
+            /**
+             * Enviado En
+             * Format: date-time
+             */
+            enviado_en: string;
+            /** @description Solo en los mensajes propios. */
+            entrega: components["schemas"]["Entrega"] | null;
+            referencia: components["schemas"]["Referencia"] | null;
+            /**
+             * Folio
+             * @description Número de folio en el expediente, en las conversaciones de un proceso.
+             */
+            folio: number | null;
         };
         /** NuevaSolicitud */
         NuevaSolicitud: {
@@ -1582,6 +1838,35 @@ export interface components {
              * @enum {string}
              */
             canal: "EMAIL" | "WHATSAPP";
+        };
+        /** NuevoMensaje */
+        NuevoMensaje: {
+            /** Texto */
+            texto: string;
+            referencia?: components["schemas"]["ReferenciaElegida"] | null;
+        };
+        /** OpcionReferencia */
+        OpcionReferencia: {
+            /**
+             * Tipo
+             * @enum {string}
+             */
+            tipo: "RADICADO" | "ACTUACION" | "TAREA" | "SUBTAREA" | "EVENTO" | "DOCUMENTO";
+            /** Id */
+            id: number;
+            /** Titulo */
+            titulo: string;
+            /**
+             * Grupo
+             * @description Radicado de la actuación, tarea de la subtarea o solicitud del documento.
+             */
+            grupo?: string | null;
+            /** Radicado */
+            radicado?: string | null;
+            /** Padre Id */
+            padre_id?: number | null;
+            /** Solicitud Id */
+            solicitud_id?: number | null;
         };
         /** PaginaFolios */
         PaginaFolios: {
@@ -1883,6 +2168,30 @@ export interface components {
              */
             ultimo_contrato: ("BORRADOR" | "LISTO_PARA_FIRMA" | "EN_FIRMA" | "FIRMADO" | "TERMINADO" | "ANULADO") | null;
         };
+        /** Referencia */
+        Referencia: {
+            /**
+             * Tipo
+             * @enum {string}
+             */
+            tipo: "RADICADO" | "ACTUACION" | "TAREA" | "SUBTAREA" | "EVENTO" | "DOCUMENTO";
+            /** Id */
+            id: number;
+            /** Titulo */
+            titulo: string;
+            /** Enlace */
+            enlace: string | null;
+        };
+        /** ReferenciaElegida */
+        ReferenciaElegida: {
+            /**
+             * Tipo
+             * @enum {string}
+             */
+            tipo: "RADICADO" | "ACTUACION" | "TAREA" | "SUBTAREA" | "EVENTO" | "DOCUMENTO";
+            /** Id */
+            id: number;
+        };
         /** Resultado */
         Resultado: {
             /**
@@ -1980,6 +2289,19 @@ export interface components {
             solicitudes_abiertas: number;
             /** Solicitudes Vencidas */
             solicitudes_vencidas: number;
+        };
+        /** ResumenMensajes */
+        ResumenMensajes: {
+            /**
+             * Sin Leer
+             * @description Conversaciones con mensajes sin leer.
+             */
+            sin_leer: number;
+            /**
+             * Por Responder
+             * @description Conversaciones con clientes cuyo último mensaje espera respuesta.
+             */
+            por_responder: number;
         };
         /** ResumenTareas */
         ResumenTareas: {
@@ -2170,6 +2492,20 @@ export interface components {
              * @description Festivos y vacancia judicial dentro del término. Los fines de semana no se listan.
              */
             inhabiles: components["schemas"]["PeriodoInhabil"][];
+        };
+        /** UltimoMensaje */
+        UltimoMensaje: {
+            /** Texto */
+            texto: string;
+            /** Autor */
+            autor: string | null;
+            /** Es Mio */
+            es_mio: boolean;
+            /**
+             * Enviado En
+             * Format: date-time
+             */
+            enviado_en: string;
         };
         /** UsuarioSesion */
         UsuarioSesion: {
@@ -6479,6 +6815,530 @@ export interface operations {
                 };
                 content: {
                     "application/pdf": unknown;
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+        };
+    };
+    listar_conversaciones: {
+        parameters: {
+            query?: {
+                /** @description Crea antes las conversaciones que le corresponden. Los sondeos periódicos envían false. */
+                sincronizar?: boolean;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ListaConversaciones"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+        };
+    };
+    resolver_conversacion: {
+        parameters: {
+            query: {
+                /** @description process:{proceso}:{persona}, process:{proceso}:collaborators o direct:{persona}. */
+                clave: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Conversacion"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+        };
+    };
+    ver_hilo: {
+        parameters: {
+            query?: {
+                /** @description Solo los mensajes posteriores a este id (para refrescar). */
+                despues_de?: number;
+                /** @description La página anterior a este id (para subir en el historial). */
+                antes_de?: number;
+                limite?: number;
+            };
+            header?: never;
+            path: {
+                conversacion_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Hilo"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+        };
+    };
+    enviar_mensaje: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                conversacion_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["NuevoMensaje"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Mensaje"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+        };
+    };
+    marcar_leido: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                conversacion_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["Leido"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+        };
+    };
+    listar_referencias: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                conversacion_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OpcionReferencia"][];
                 };
             };
             /** @description Bad Request */
