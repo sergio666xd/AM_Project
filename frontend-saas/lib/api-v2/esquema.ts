@@ -1110,7 +1110,7 @@ export interface components {
             /** Descripcion */
             descripcion?: string | null;
             /** Palabras Clave */
-            palabras_clave?: string[];
+            palabras_clave: string[];
             /** Pasos */
             pasos: components["schemas"]["PasoPlantilla"][];
             /** Id */

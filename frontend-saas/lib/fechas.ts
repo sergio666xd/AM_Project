@@ -63,3 +63,29 @@ export function diaCorto(iso: string, ahora = new Date()): string {
 export function hoyISO(ahora = new Date()): string {
   return clave.format(ahora);
 }
+
+/** El día de Bogotá de un instante, como "2026-10-28". */
+export function diaDe(valor: string | Date): string {
+  const fecha = aFecha(valor);
+  return fecha ? clave.format(fecha) : "";
+}
+
+/** "9:40 a. m." en Bogotá. */
+export function horaDe(valor: string | Date): string {
+  const fecha = aFecha(valor);
+  return fecha ? hora.format(fecha) : "";
+}
+
+/** Suma días a un día del calendario: sumarDias("2026-10-28", 7) → "2026-11-04". */
+export function sumarDias(iso: string, dias: number): string {
+  const [a, m, d] = iso.split("-").map(Number);
+  const fecha = new Date(Date.UTC(a, m - 1, d + dias));
+  return fecha.toISOString().slice(0, 10);
+}
+
+/** Lunes de la semana de ese día (las semanas empiezan en lunes en Colombia). */
+export function lunesDe(iso: string): string {
+  const [a, m, d] = iso.split("-").map(Number);
+  const diaSemana = new Date(Date.UTC(a, m - 1, d)).getUTCDay();
+  return sumarDias(iso, -((diaSemana + 6) % 7));
+}

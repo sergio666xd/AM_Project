@@ -116,6 +116,7 @@ class DatosPlantilla(BaseModel):
 
 class Plantilla(DatosPlantilla):
     id: int
+    palabras_clave: list[str]
     coincide: bool = Field(False, description="Si sus palabras clave aparecen en el texto de `para`.")
     puede_editar: bool
 

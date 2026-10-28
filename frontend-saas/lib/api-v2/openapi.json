@@ -4816,7 +4816,6 @@
               "type": "string"
             },
             "type": "array",
-            "maxItems": 20,
             "title": "Palabras Clave"
           },
           "pasos": {
@@ -4846,6 +4845,7 @@
         "type": "object",
         "required": [
           "nombre",
+          "palabras_clave",
           "pasos",
           "id",
           "puede_editar"

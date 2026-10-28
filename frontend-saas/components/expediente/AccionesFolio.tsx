@@ -1,9 +1,10 @@
 "use client";
 
 import { useCallback, useId, useState, type FormEvent } from "react";
-import { Calculator, ChevronDown, ListPlus, Send } from "lucide-react";
+import { Calculator, ChevronDown, LayoutTemplate, ListPlus, Send } from "lucide-react";
 
 import { CAMPO, CalculadoraTermino, ETIQUETA } from "@/components/expediente/CalculadoraTermino";
+import { AplicarPlantillaModal } from "@/components/tareas/AplicarPlantillaModal";
 import { Button } from "@/components/ui/Button";
 import { Folio } from "@/components/ui/Folio";
 import { Modal } from "@/components/ui/Modal";
@@ -182,8 +183,28 @@ export function TareaFolioModal({
   const [explicacion, setExplicacion] = useState<string | null>(null);
   const [errores, setErrores] = useState<Record<string, string>>({});
   const [guardando, setGuardando] = useState(false);
+  const [sugerida, setSugerida] = useState<Esquemas["Plantilla"] | null>(null);
+  const [conPlantilla, setConPlantilla] = useState(false);
+  const textoFolio = folio ? [folio.titulo, folio.detalle].filter(Boolean).join(" ") : "";
+
+  const buscarPlantilla = useCallback(async () => {
+    setSugerida(null);
+    if (!textoFolio) return;
+    const { data } = await api.GET("/api/v2/tareas/plantillas", { params: { query: { para: textoFolio.slice(0, 2000) } } });
+    setSugerida(data?.items.find((p) => p.coincide) ?? null);
+  }, [textoFolio]);
+  useLoadEffect(buscarPlantilla);
+
+  async function plantillaAplicada() {
+    if (!folio) return;
+    // Las tareas ya quedaron creadas: el folio pasa a revisado como con «Crear tarea».
+    await api.POST("/api/v2/procesos/{proceso_id}/folios/revisar", { params: { path: { proceso_id: procesoId } }, body: { numeros: [folio.numero] } });
+    onHecho(folio.numero);
+    cerrar();
+  }
 
   function cerrar() {
+    setConPlantilla(false);
     setTitulo("");
     setFecha("");
     setPrioridad("MEDIA");
@@ -225,10 +246,20 @@ export function TareaFolioModal({
   const notificacion = folio ? new Intl.DateTimeFormat("en-CA", { timeZone: "America/Bogota" }).format(new Date(folio.fecha)) : undefined;
 
   return (
-    <Modal open={folio !== null} onClose={cerrar} title="Crear tarea" description="Queda en el proceso y el folio pasa a revisado.">
+    <>
+    <Modal open={folio !== null && !conPlantilla} onClose={cerrar} title="Crear tarea" description="Queda en el proceso y el folio pasa a revisado.">
       {folio && (
         <form onSubmit={guardar} noValidate>
           <ReferenciaFolio folio={folio} />
+          {sugerida && (
+            <div className="mb-5 flex flex-wrap items-center gap-x-3 gap-y-2 rounded-xl px-3.5 py-3 shadow-[0_0_0_1px_var(--gold)]">
+              <LayoutTemplate aria-hidden="true" size={18} className="shrink-0 text-gold-ink" />
+              <p className="min-w-0 flex-1 text-[13.5px] text-ink-2">
+                <span className="font-semibold text-ink">Plantilla «{sugerida.nombre}»</span>: crea {sugerida.pasos.length === 1 ? "1 tarea" : `${sugerida.pasos.length} tareas`} con sus fechas.
+              </p>
+              <Button type="button" size="sm" variant="secondary" onClick={() => setConPlantilla(true)}>Usar la plantilla</Button>
+            </div>
+          )}
           <label htmlFor={`${id}-titulo`} className={ETIQUETA}>Qué hay que hacer</label>
           <input
             id={`${id}-titulo`}
@@ -307,5 +338,15 @@ export function TareaFolioModal({
         </form>
       )}
     </Modal>
+    <AplicarPlantillaModal
+      open={folio !== null && conPlantilla}
+      onClose={() => setConPlantilla(false)}
+      onCreadas={() => void plantillaAplicada()}
+      procesoId={procesoId}
+      notificacionInicial={notificacion}
+      folio={folio?.numero}
+      para={textoFolio.slice(0, 2000)}
+    />
+    </>
   );
 }
