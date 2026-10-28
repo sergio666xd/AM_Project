@@ -28,3 +28,16 @@ export function fechaLarga(valor: string | Date): string {
   const fecha = aFecha(valor);
   return fecha ? larga.format(fecha) : "";
 }
+
+/** "27 oct." en el año en curso, "27 oct. 2025" en otro. */
+export function fechaCorta(valor: string | Date | null | undefined, ahora = new Date()): string {
+  const fecha = valor ? aFecha(valor) : null;
+  if (!fecha) return "";
+  return clave.format(fecha).slice(0, 4) === clave.format(ahora).slice(0, 4) ? diaMes.format(fecha) : diaMesAnio.format(fecha);
+}
+
+/** "27 oct., 9:00 a. m." */
+export function fechaConHora(valor: string | Date | null | undefined): string {
+  const fecha = valor ? aFecha(valor) : null;
+  return fecha ? `${fechaCorta(fecha)}, ${hora.format(fecha)}` : "";
+}

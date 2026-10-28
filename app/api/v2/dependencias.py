@@ -7,6 +7,8 @@ from app.modulos.avisos.servicio import ServicioAvisos
 from app.modulos.busqueda.servicio import ServicioBusqueda
 from app.modulos.expedientes.repositorio import RepositorioProcesos
 from app.modulos.expedientes.servicio import ServicioProcesos
+from app.modulos.folios.repositorio import RepositorioFolios
+from app.modulos.folios.servicio import ServicioFolios
 from app.modulos.identidad.repositorio import RepositorioUsuarios
 from app.modulos.identidad.servicio import ServicioSesion
 from app.nucleo.bd import obtener_bd
@@ -26,3 +28,7 @@ def servicio_avisos(db: Session = Depends(obtener_bd)) -> ServicioAvisos:
 
 def servicio_busqueda(db: Session = Depends(obtener_bd)) -> ServicioBusqueda:
     return ServicioBusqueda(db, RepositorioProcesos(db))
+
+
+def servicio_folios(db: Session = Depends(obtener_bd)) -> ServicioFolios:
+    return ServicioFolios(db, RepositorioFolios(db), RepositorioProcesos(db))

@@ -7,6 +7,7 @@ import { SummaryStrip } from "@/components/ui/SummaryStrip";
 import { formatDate, formatRelative, isOverdue, toDate } from "@/lib/labels";
 import { useNow } from "@/lib/useNow";
 import { Button } from "@/components/ui/Button";
+import { FoliosExpediente } from "@/components/expediente/FoliosExpediente";
 
 import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
@@ -182,6 +183,7 @@ export default function ProcesoDetallePage({ section }: { section?: string }) {
   const [selectedColleagueVisible, setSelectedColleagueVisible] = useState(false);
   const [activeTab, setActiveTab] = useState(section || "resumen");
   const [contractFocusId, setContractFocusId] = useState<number | null>(null);
+  const [folioInicial, setFolioInicial] = useState<number | null>(null);
 
   const [clientQuery, setClientQuery] = useState("");
   const [creatingClient, setCreatingClient] = useState(false);
@@ -258,6 +260,8 @@ export default function ProcesoDetallePage({ section }: { section?: string }) {
     const syncLocation = () => {
       const params = new URLSearchParams(window.location.search);
       const requestedContractId = Number(params.get("contrato"));
+      const requestedFolio = Number(params.get("folio"));
+      setFolioInicial(Number.isInteger(requestedFolio) && requestedFolio > 0 ? requestedFolio : null);
       const rawHash = window.location.hash.slice(1);
       let hashTab = "";
       try {
@@ -267,8 +271,10 @@ export default function ProcesoDetallePage({ section }: { section?: string }) {
       }
       if (hashTab.startsWith("panel-")) hashTab = hashTab.slice("panel-".length);
       const requestedTab = hashTab || params.get("tab") || (requestedContractId > 0 ? "contratos" : section || "resumen");
-      const validTabs = ["resumen", "relaciones", "agenda", "tareas", "documentos", "contratos", "actividad", "comunicaciones", "equipo"];
-      const nextTab = validTabs.includes(requestedTab) ? requestedTab : "resumen";
+      const validTabs = ["resumen", "folios", "relaciones", "agenda", "tareas", "documentos", "contratos", "comunicaciones", "equipo"];
+      // "actividad" era la línea de tiempo que hoy son los folios; los enlaces viejos siguen sirviendo.
+      const pedida = requestedTab === "actividad" ? "folios" : requestedTab;
+      const nextTab = validTabs.includes(pedida) ? pedida : "resumen";
       setActiveTab(nextTab);
       setContractFocusId(Number.isInteger(requestedContractId) && requestedContractId > 0 ? requestedContractId : null);
       if (hashTab) {
@@ -605,12 +611,12 @@ export default function ProcesoDetallePage({ section }: { section?: string }) {
 
   const processSections: { id: string; label: string }[] = [
     { id: "resumen", label: "Resumen" },
+    { id: "folios", label: "Folios" },
     { id: "relaciones", label: "Clientes y radicados" },
     { id: "agenda", label: "Agenda" },
     { id: "tareas", label: "Tareas" },
     { id: "documentos", label: "Documentos" },
     { id: "contratos", label: "Contratos" },
-    { id: "actividad", label: "Actividad" },
     { id: "comunicaciones", label: "Chat" },
     ...(process?.admite_colaboradores ? [{ id: "equipo", label: "Equipo" }] : []),
   ];
@@ -866,7 +872,7 @@ export default function ProcesoDetallePage({ section }: { section?: string }) {
 
             <OverviewCard
               title="Actividad reciente"
-              action={<Link href={`/gestion-procesos/abogado/procesos/${id}/actividad`} className="text-xs font-semibold text-primary hover:underline">Ver todo</Link>}
+              action={<Link href={`/gestion-procesos/abogado/procesos/${id}/folios`} className="text-xs font-semibold text-primary hover:underline">Ver todo</Link>}
             >
               {process.timeline.length ? (
                 <ol className="space-y-3">
@@ -1176,9 +1182,8 @@ export default function ProcesoDetallePage({ section }: { section?: string }) {
         {process.eventos.length ? <div className="divide-y divide-[var(--border)]">{process.eventos.map((event) => <article key={event.id} className="flex flex-wrap items-center justify-between gap-3 px-5 py-3"><div><p className="text-sm font-medium">{event.tipo === "AUDIENCIA" ? "Audiencia" : event.tipo === "REUNION" ? "Reunión" : "Evento"}: {event.titulo}</p><p className="mt-1 text-xs text-[var(--foreground-muted)]">{new Date(event.fecha_inicio).toLocaleString("es-CO", { timeZone: "America/Bogota" })} · {event.estado.replaceAll("_", " ")}{event.cliente ? ` · ${event.cliente}` : ""}</p></div><div className="flex gap-3 text-xs"><button type="button" onClick={() => openAgendaEvent(event)} className="text-[var(--primary)] hover:underline">Editar</button><button type="button" onClick={() => { if (window.confirm(`¿Eliminar ${event.titulo} de la agenda?`)) void action(`/api/expedientes/agenda/eventos/${event.id}`, "DELETE"); }} className="text-red-600 hover:underline">Eliminar</button></div></article>)}</div> : <p className="px-5 py-8 text-center text-sm text-[var(--foreground-muted)]">No hay actividades programadas para este proceso.</p>}
       </section>
 
-      <section id="panel-actividad" role="region" aria-label="Actividad del expediente" style={{ display: activeTab === "actividad" ? undefined : "none" }} className="motion-tab-panel scroll-mt-20 rounded-2xl border border-[var(--border)] bg-[var(--surface)]">
-        <header className="border-b border-[var(--border)] px-5 py-4"><h2 className="text-sm font-semibold text-[var(--foreground)]">Actividad del expediente</h2><p className="mt-1 text-xs text-[var(--foreground-muted)]">Timeline de actuaciones judiciales, tareas, documentos y comunicaciones, con la visibilidad asignada en el servidor.</p></header>
-        {process.timeline.length ? <ol className="divide-y divide-[var(--border)]">{process.timeline.slice(0, 100).map((item) => <li key={item.id} className="flex gap-3 px-5 py-4"><span className={`mt-1 size-2 shrink-0 rounded-full ${item.visibilidad === "CLIENTE" ? "bg-emerald-500" : "bg-slate-400"}`} title={item.visibilidad === "CLIENTE" ? "Visible al cliente" : "Solo equipo interno"} /><div className="min-w-0 flex-1"><div className="flex flex-wrap items-center gap-2"><p className="text-sm font-medium text-[var(--foreground)]">{item.titulo}</p><span className="rounded-full bg-[var(--surface-secondary)] px-2 py-0.5 text-[10px] uppercase text-[var(--foreground-muted)]">{item.tipo}</span><span className={`rounded-full px-2 py-0.5 text-[10px] ${item.visibilidad === "CLIENTE" ? "bg-emerald-500/10 text-emerald-700" : "bg-slate-500/10 text-slate-600"}`}>{item.visibilidad === "CLIENTE" ? "Cliente visible" : "Interno"}</span><Link href={timelineResourceHref(item)} className="text-xs font-medium text-[var(--primary)] hover:underline">Abrir {item.recurso.toLowerCase()}</Link></div><p className="mt-1 whitespace-pre-wrap text-xs leading-5 text-[var(--foreground-secondary)]">{item.descripcion}</p><p className="mt-1 text-[11px] text-[var(--foreground-muted)]">{item.actor || item.recurso}{item.fecha ? ` · ${new Date(item.fecha).toLocaleString("es-CO", { timeZone: "America/Bogota" })}` : ""}</p></div></li>)}</ol> : <p className="p-8 text-center text-sm text-[var(--foreground-muted)]">Aún no hay actividad registrada.</p>}
+      <section id="panel-folios" role="region" aria-label="Folios del expediente" style={{ display: activeTab === "folios" ? undefined : "none" }} className="motion-tab-panel scroll-mt-20 overflow-hidden rounded-xl bg-sheet shadow-sheet">
+        {activeTab === "folios" && <FoliosExpediente key={folioInicial ?? 0} procesoId={Number(id)} folioInicial={folioInicial ?? undefined} />}
       </section>
 
       {/* MÓDULOS SECUNDARIOS */}

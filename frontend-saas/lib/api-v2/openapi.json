@@ -921,6 +921,416 @@
         }
       }
     },
+    "/api/v2/procesos/{proceso_id}/folios": {
+      "get": {
+        "tags": [
+          "Folios"
+        ],
+        "summary": "Listar los folios de un expediente",
+        "description": "Cada registro del expediente con su número de folio. Folia lo que aún no tenga número.",
+        "operationId": "listar_folios",
+        "parameters": [
+          {
+            "name": "proceso_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Proceso Id"
+            }
+          },
+          {
+            "name": "grupo",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "enum": [
+                    "actuaciones",
+                    "documentos",
+                    "mensajes",
+                    "tareas"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Solo actuaciones, documentos, mensajes o tareas.",
+              "title": "Grupo"
+            },
+            "description": "Solo actuaciones, documentos, mensajes o tareas."
+          },
+          {
+            "name": "orden",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "enum": [
+                "recientes",
+                "antiguos"
+              ],
+              "type": "string",
+              "default": "recientes",
+              "title": "Orden"
+            }
+          },
+          {
+            "name": "desde",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer",
+                  "minimum": 1
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Empieza en este folio (para «Ir al folio»).",
+              "title": "Desde"
+            },
+            "description": "Empieza en este folio (para «Ir al folio»)."
+          },
+          {
+            "name": "limite",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 100,
+              "minimum": 1,
+              "description": "Elementos por página.",
+              "default": 25,
+              "title": "Limite"
+            },
+            "description": "Elementos por página."
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "maxLength": 500
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Valor de `siguiente` de la página anterior.",
+              "title": "Cursor"
+            },
+            "description": "Valor de `siguiente` de la página anterior."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PaginaFolios"
+                }
+              }
+            }
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Too Many Requests"
+          }
+        }
+      }
+    },
+    "/api/v2/procesos/{proceso_id}/folios/revisar": {
+      "post": {
+        "tags": [
+          "Folios"
+        ],
+        "summary": "Marcar folios revisados",
+        "operationId": "revisar_folios",
+        "parameters": [
+          {
+            "name": "proceso_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Proceso Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RevisarFolios"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FoliosRevisados"
+                }
+              }
+            }
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Too Many Requests"
+          }
+        }
+      }
+    },
+    "/api/v2/folios/nuevos": {
+      "get": {
+        "tags": [
+          "Folios"
+        ],
+        "summary": "Folios nuevos de todos los procesos",
+        "description": "Lo que llegó sin revisar a los procesos activos que el usuario puede ver, del más reciente al más antiguo.",
+        "operationId": "folios_nuevos",
+        "parameters": [
+          {
+            "name": "limite",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 100,
+              "minimum": 1,
+              "default": 20,
+              "title": "Limite"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FoliosNuevos"
+                }
+              }
+            }
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Too Many Requests"
+          }
+        }
+      }
+    },
     "/api/v2/avisos": {
       "get": {
         "tags": [
@@ -1332,6 +1742,25 @@
   },
   "components": {
     "schemas": {
+      "ArchivoFolio": {
+        "properties": {
+          "nombre": {
+            "type": "string",
+            "title": "Nombre"
+          },
+          "url": {
+            "type": "string",
+            "title": "Url",
+            "description": "Ruta de descarga del archivo, con la sesión del usuario."
+          }
+        },
+        "type": "object",
+        "required": [
+          "nombre",
+          "url"
+        ],
+        "title": "ArchivoFolio"
+      },
       "Aviso": {
         "properties": {
           "id": {
@@ -1447,6 +1876,265 @@
         ],
         "title": "ErrorRespuesta"
       },
+      "Folio": {
+        "properties": {
+          "numero": {
+            "type": "integer",
+            "title": "Numero",
+            "description": "Número de folio dentro del expediente; no cambia nunca."
+          },
+          "tipo": {
+            "type": "string",
+            "enum": [
+              "actuacion",
+              "documento",
+              "solicitud",
+              "contrato",
+              "mensaje",
+              "comunicacion",
+              "aviso",
+              "tarea",
+              "evento"
+            ],
+            "title": "Tipo"
+          },
+          "etiqueta": {
+            "type": "string",
+            "title": "Etiqueta",
+            "description": "Nombre del tipo para mostrar: «Actuación», «Mensaje»..."
+          },
+          "titulo": {
+            "type": "string",
+            "title": "Titulo"
+          },
+          "detalle": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Detalle"
+          },
+          "fecha": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Fecha"
+          },
+          "con_hora": {
+            "type": "boolean",
+            "title": "Con Hora",
+            "description": "Falso cuando el origen solo trae el día (las actuaciones)."
+          },
+          "autor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Autor",
+            "description": "Quién lo incorporó: «Rama Judicial», el cliente, la abogada."
+          },
+          "estado": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Estado",
+            "description": "Estado corto cuando aplica, como «en curso» en una tarea."
+          },
+          "archivo": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ArchivoFolio"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "nuevo": {
+            "type": "boolean",
+            "title": "Nuevo",
+            "description": "Llegó después de la última revisión y nadie lo ha marcado revisado."
+          },
+          "retirado": {
+            "type": "boolean",
+            "title": "Retirado",
+            "description": "El registro de origen se borró; el número se conserva.",
+            "default": false
+          }
+        },
+        "type": "object",
+        "required": [
+          "numero",
+          "tipo",
+          "etiqueta",
+          "titulo",
+          "fecha",
+          "con_hora",
+          "nuevo"
+        ],
+        "title": "Folio"
+      },
+      "FolioNuevo": {
+        "properties": {
+          "numero": {
+            "type": "integer",
+            "title": "Numero",
+            "description": "Número de folio dentro del expediente; no cambia nunca."
+          },
+          "tipo": {
+            "type": "string",
+            "enum": [
+              "actuacion",
+              "documento",
+              "solicitud",
+              "contrato",
+              "mensaje",
+              "comunicacion",
+              "aviso",
+              "tarea",
+              "evento"
+            ],
+            "title": "Tipo"
+          },
+          "etiqueta": {
+            "type": "string",
+            "title": "Etiqueta",
+            "description": "Nombre del tipo para mostrar: «Actuación», «Mensaje»..."
+          },
+          "titulo": {
+            "type": "string",
+            "title": "Titulo"
+          },
+          "detalle": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Detalle"
+          },
+          "fecha": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Fecha"
+          },
+          "con_hora": {
+            "type": "boolean",
+            "title": "Con Hora",
+            "description": "Falso cuando el origen solo trae el día (las actuaciones)."
+          },
+          "autor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Autor",
+            "description": "Quién lo incorporó: «Rama Judicial», el cliente, la abogada."
+          },
+          "estado": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Estado",
+            "description": "Estado corto cuando aplica, como «en curso» en una tarea."
+          },
+          "archivo": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ArchivoFolio"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "nuevo": {
+            "type": "boolean",
+            "title": "Nuevo",
+            "description": "Llegó después de la última revisión y nadie lo ha marcado revisado."
+          },
+          "retirado": {
+            "type": "boolean",
+            "title": "Retirado",
+            "description": "El registro de origen se borró; el número se conserva.",
+            "default": false
+          },
+          "proceso": {
+            "$ref": "#/components/schemas/ProcesoDelFolio"
+          }
+        },
+        "type": "object",
+        "required": [
+          "numero",
+          "tipo",
+          "etiqueta",
+          "titulo",
+          "fecha",
+          "con_hora",
+          "nuevo",
+          "proceso"
+        ],
+        "title": "FolioNuevo"
+      },
+      "FoliosNuevos": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/FolioNuevo"
+            },
+            "type": "array",
+            "title": "Items"
+          },
+          "total": {
+            "type": "integer",
+            "title": "Total",
+            "description": "Folios sin revisar en todos los procesos visibles, no solo en `items`."
+          }
+        },
+        "type": "object",
+        "required": [
+          "items",
+          "total"
+        ],
+        "title": "FoliosNuevos"
+      },
+      "FoliosRevisados": {
+        "properties": {
+          "revisados": {
+            "type": "integer",
+            "title": "Revisados"
+          }
+        },
+        "type": "object",
+        "required": [
+          "revisados"
+        ],
+        "title": "FoliosRevisados"
+      },
       "IniciarSesion": {
         "properties": {
           "email": {
@@ -1506,6 +2194,53 @@
         ],
         "title": "MarcarLeidos"
       },
+      "PaginaFolios": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/Folio"
+            },
+            "type": "array",
+            "title": "Items"
+          },
+          "total": {
+            "type": "integer",
+            "title": "Total",
+            "description": "Cantidad total con los filtros aplicados, sin contar el cursor."
+          },
+          "siguiente": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Siguiente",
+            "description": "Cursor de la página siguiente, o null si no hay más."
+          },
+          "ultimo": {
+            "type": "integer",
+            "title": "Ultimo",
+            "description": "Número del último folio del expediente (sin filtros)."
+          },
+          "nuevos": {
+            "type": "integer",
+            "title": "Nuevos",
+            "description": "Folios del expediente sin revisar."
+          }
+        },
+        "type": "object",
+        "required": [
+          "items",
+          "total",
+          "siguiente",
+          "ultimo",
+          "nuevos"
+        ],
+        "title": "PaginaFolios"
+      },
       "PaginaProcesos": {
         "properties": {
           "items": {
@@ -1558,6 +2293,24 @@
           "nombre"
         ],
         "title": "PersonaBreve"
+      },
+      "ProcesoDelFolio": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "nombre": {
+            "type": "string",
+            "title": "Nombre"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "nombre"
+        ],
+        "title": "ProcesoDelFolio"
       },
       "ProcesoDetalle": {
         "properties": {
@@ -1792,6 +2545,28 @@
           "items"
         ],
         "title": "Resultados"
+      },
+      "RevisarFolios": {
+        "properties": {
+          "numeros": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "integer"
+                },
+                "type": "array",
+                "maxItems": 500
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Numeros",
+            "description": "Folios a marcar revisados; si se omite, todos los nuevos del proceso."
+          }
+        },
+        "type": "object",
+        "title": "RevisarFolios"
       },
       "UsuarioSesion": {
         "properties": {

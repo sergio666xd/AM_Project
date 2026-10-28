@@ -140,6 +140,63 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v2/procesos/{proceso_id}/folios": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Listar los folios de un expediente
+         * @description Cada registro del expediente con su número de folio. Folia lo que aún no tenga número.
+         */
+        get: operations["listar_folios"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v2/procesos/{proceso_id}/folios/revisar": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Marcar folios revisados */
+        post: operations["revisar_folios"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v2/folios/nuevos": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Folios nuevos de todos los procesos
+         * @description Lo que llegó sin revisar a los procesos activos que el usuario puede ver, del más reciente al más antiguo.
+         */
+        get: operations["folios_nuevos"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v2/avisos": {
         parameters: {
             query?: never;
@@ -221,6 +278,16 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        /** ArchivoFolio */
+        ArchivoFolio: {
+            /** Nombre */
+            nombre: string;
+            /**
+             * Url
+             * @description Ruta de descarga del archivo, con la sesión del usuario.
+             */
+            url: string;
+        };
         /** Aviso */
         Aviso: {
             /**
@@ -277,6 +344,130 @@ export interface components {
                 [key: string]: string;
             };
         };
+        /** Folio */
+        Folio: {
+            /**
+             * Numero
+             * @description Número de folio dentro del expediente; no cambia nunca.
+             */
+            numero: number;
+            /**
+             * Tipo
+             * @enum {string}
+             */
+            tipo: "actuacion" | "documento" | "solicitud" | "contrato" | "mensaje" | "comunicacion" | "aviso" | "tarea" | "evento";
+            /**
+             * Etiqueta
+             * @description Nombre del tipo para mostrar: «Actuación», «Mensaje»...
+             */
+            etiqueta: string;
+            /** Titulo */
+            titulo: string;
+            /** Detalle */
+            detalle?: string | null;
+            /**
+             * Fecha
+             * Format: date-time
+             */
+            fecha: string;
+            /**
+             * Con Hora
+             * @description Falso cuando el origen solo trae el día (las actuaciones).
+             */
+            con_hora: boolean;
+            /**
+             * Autor
+             * @description Quién lo incorporó: «Rama Judicial», el cliente, la abogada.
+             */
+            autor?: string | null;
+            /**
+             * Estado
+             * @description Estado corto cuando aplica, como «en curso» en una tarea.
+             */
+            estado?: string | null;
+            archivo?: components["schemas"]["ArchivoFolio"] | null;
+            /**
+             * Nuevo
+             * @description Llegó después de la última revisión y nadie lo ha marcado revisado.
+             */
+            nuevo: boolean;
+            /**
+             * Retirado
+             * @description El registro de origen se borró; el número se conserva.
+             * @default false
+             */
+            retirado: boolean;
+        };
+        /** FolioNuevo */
+        FolioNuevo: {
+            /**
+             * Numero
+             * @description Número de folio dentro del expediente; no cambia nunca.
+             */
+            numero: number;
+            /**
+             * Tipo
+             * @enum {string}
+             */
+            tipo: "actuacion" | "documento" | "solicitud" | "contrato" | "mensaje" | "comunicacion" | "aviso" | "tarea" | "evento";
+            /**
+             * Etiqueta
+             * @description Nombre del tipo para mostrar: «Actuación», «Mensaje»...
+             */
+            etiqueta: string;
+            /** Titulo */
+            titulo: string;
+            /** Detalle */
+            detalle?: string | null;
+            /**
+             * Fecha
+             * Format: date-time
+             */
+            fecha: string;
+            /**
+             * Con Hora
+             * @description Falso cuando el origen solo trae el día (las actuaciones).
+             */
+            con_hora: boolean;
+            /**
+             * Autor
+             * @description Quién lo incorporó: «Rama Judicial», el cliente, la abogada.
+             */
+            autor?: string | null;
+            /**
+             * Estado
+             * @description Estado corto cuando aplica, como «en curso» en una tarea.
+             */
+            estado?: string | null;
+            archivo?: components["schemas"]["ArchivoFolio"] | null;
+            /**
+             * Nuevo
+             * @description Llegó después de la última revisión y nadie lo ha marcado revisado.
+             */
+            nuevo: boolean;
+            /**
+             * Retirado
+             * @description El registro de origen se borró; el número se conserva.
+             * @default false
+             */
+            retirado: boolean;
+            proceso: components["schemas"]["ProcesoDelFolio"];
+        };
+        /** FoliosNuevos */
+        FoliosNuevos: {
+            /** Items */
+            items: components["schemas"]["FolioNuevo"][];
+            /**
+             * Total
+             * @description Folios sin revisar en todos los procesos visibles, no solo en `items`.
+             */
+            total: number;
+        };
+        /** FoliosRevisados */
+        FoliosRevisados: {
+            /** Revisados */
+            revisados: number;
+        };
         /** IniciarSesion */
         IniciarSesion: {
             /** Email */
@@ -300,6 +491,31 @@ export interface components {
             /** Ids */
             ids: string[];
         };
+        /** PaginaFolios */
+        PaginaFolios: {
+            /** Items */
+            items: components["schemas"]["Folio"][];
+            /**
+             * Total
+             * @description Cantidad total con los filtros aplicados, sin contar el cursor.
+             */
+            total: number;
+            /**
+             * Siguiente
+             * @description Cursor de la página siguiente, o null si no hay más.
+             */
+            siguiente: string | null;
+            /**
+             * Ultimo
+             * @description Número del último folio del expediente (sin filtros).
+             */
+            ultimo: number;
+            /**
+             * Nuevos
+             * @description Folios del expediente sin revisar.
+             */
+            nuevos: number;
+        };
         /** PaginaProcesos */
         PaginaProcesos: {
             /** Items */
@@ -317,6 +533,13 @@ export interface components {
         };
         /** PersonaBreve */
         PersonaBreve: {
+            /** Id */
+            id: number;
+            /** Nombre */
+            nombre: string;
+        };
+        /** ProcesoDelFolio */
+        ProcesoDelFolio: {
             /** Id */
             id: number;
             /** Nombre */
@@ -413,6 +636,14 @@ export interface components {
              * @description Agrupados por tipo: procesos, clientes y tareas.
              */
             items: components["schemas"]["Resultado"][];
+        };
+        /** RevisarFolios */
+        RevisarFolios: {
+            /**
+             * Numeros
+             * @description Folios a marcar revisados; si se omite, todos los nuevos del proceso.
+             */
+            numeros?: number[] | null;
         };
         /** UsuarioSesion */
         UsuarioSesion: {
@@ -1136,6 +1367,275 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ProcesoDetalle"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+        };
+    };
+    listar_folios: {
+        parameters: {
+            query?: {
+                /** @description Solo actuaciones, documentos, mensajes o tareas. */
+                grupo?: ("actuaciones" | "documentos" | "mensajes" | "tareas") | null;
+                orden?: "recientes" | "antiguos";
+                /** @description Empieza en este folio (para «Ir al folio»). */
+                desde?: number | null;
+                /** @description Elementos por página. */
+                limite?: number;
+                /** @description Valor de `siguiente` de la página anterior. */
+                cursor?: string | null;
+            };
+            header?: never;
+            path: {
+                proceso_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PaginaFolios"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+        };
+    };
+    revisar_folios: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                proceso_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": components["schemas"]["RevisarFolios"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FoliosRevisados"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+        };
+    };
+    folios_nuevos: {
+        parameters: {
+            query?: {
+                limite?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FoliosNuevos"];
                 };
             };
             /** @description Bad Request */
