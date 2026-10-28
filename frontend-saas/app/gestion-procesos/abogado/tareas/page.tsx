@@ -1,6 +1,6 @@
 "use client";
 
-import { apiRequest } from "@/lib/api";
+import { apiRequest, TOKEN_EN_COOKIE } from "@/lib/api";
 
 import {
   FormEvent,
@@ -236,7 +236,7 @@ export default function TareasPage() {
     () => ({
       Authorization: `Bearer ${
         typeof window !== "undefined"
-          ? localStorage.getItem("token") || ""
+          ? TOKEN_EN_COOKIE
           : ""
       }`,
     }),
@@ -989,7 +989,7 @@ function NuevaTareaModal({
       const response = await apiRequest(`/api/tareas`, {
         method: "POST",
         headers: {
-          Authorization: `Bearer ${localStorage.getItem("token") || ""}`,
+          Authorization: `Bearer ${TOKEN_EN_COOKIE}`,
           "Content-Type": "application/json",
         },
         body: JSON.stringify({

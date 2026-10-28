@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { start } from "workflow/api";
+import { encabezadosDeSesion } from "@/lib/sesion-servidor";
 import { consultationSweep } from "@/workflows/consultation-sweep";
 
 function fechaColombia(date: Date): string {
@@ -14,14 +15,8 @@ function fechaColombia(date: Date): string {
 }
 
 async function adminId(request: Request): Promise<number | Response> {
-  const authorization = request.headers.get("authorization");
-  if (!authorization?.startsWith("Bearer ")) {
-    return Response.json({ detail: "Autenticación requerida." }, { status: 401 });
-  }
-
-  const headers = new Headers({ Authorization: authorization });
-  const cookie = request.headers.get("cookie");
-  if (cookie) headers.set("cookie", cookie);
+  const headers = encabezadosDeSesion(request);
+  if (headers instanceof Response) return headers;
 
   let response: Response;
   try {

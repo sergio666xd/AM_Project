@@ -4,7 +4,7 @@ import hmac
 from datetime import datetime, timedelta, timezone
 from passlib.context import CryptContext
 from jose import jwt, JWTError
-from fastapi import Depends, HTTPException, status
+from fastapi import Depends, HTTPException, Request, status
 from fastapi.security import OAuth2PasswordBearer
 from sqlalchemy.orm import Session
 
@@ -16,7 +16,32 @@ ACCESS_TOKEN_EXPIRE_MINUTES = 60 * 24  # 24 horas
 PERSISTENT_TOKEN_EXPIRE_MINUTES = 60 * 24 * 15  # 15 días para sesión persistente
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/auth/login")
+
+
+class _EsquemaSesion(OAuth2PasswordBearer):
+    """Token del encabezado `Authorization` o, si no viene, de la cookie de sesión.
+
+    Es el mismo token en los dos casos; la cookie es como lo guarda el
+    navegador desde la API v2. Los cambios autenticados con la cookie deben
+    traer un encabezado propio (ver `app.nucleo.sesion`).
+    """
+
+    async def __call__(self, request: Request) -> str:
+        from app.nucleo.sesion import MENSAJE_CSRF, falta_encabezado_csrf_v1, token_de_solicitud
+
+        token, _origen = token_de_solicitud(request)
+        if not token:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Not authenticated",
+                headers={"WWW-Authenticate": "Bearer"},
+            )
+        if falta_encabezado_csrf_v1(request):
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=MENSAJE_CSRF)
+        return token
+
+
+oauth2_scheme = _EsquemaSesion(tokenUrl="/api/auth/login")
 
 
 def get_jwt_secret() -> str:

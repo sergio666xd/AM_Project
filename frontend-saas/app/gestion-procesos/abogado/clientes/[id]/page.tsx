@@ -1,6 +1,6 @@
 "use client";
 
-import { apiRequest } from "@/lib/api";
+import { apiRequest, TOKEN_EN_COOKIE } from "@/lib/api";
 
 import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 
@@ -80,7 +80,7 @@ export default function ClienteDetalle() {
 
   const headers = useCallback(
     () => ({
-      Authorization: `Bearer ${localStorage.getItem("token") || ""}`,
+      Authorization: `Bearer ${TOKEN_EN_COOKIE}`,
     }),
     []
   );

@@ -1,6 +1,6 @@
 "use client";
 
-import { apiRequest } from "@/lib/api";
+import { apiRequest, TOKEN_EN_COOKIE } from "@/lib/api";
 import Image from "next/image";
 import Link from "next/link";
 import { useSession } from "@/context/SessionContext";
@@ -139,7 +139,7 @@ export default function DocumentosPage() {
     () => ({
       Authorization: `Bearer ${
         typeof window !== "undefined"
-          ? localStorage.getItem("token") || ""
+          ? TOKEN_EN_COOKIE
           : ""
       }`,
     }),
@@ -1004,7 +1004,7 @@ function getAuthHeaders() {
   return {
     Authorization: `Bearer ${
       typeof window !== "undefined"
-        ? localStorage.getItem("token") || ""
+        ? TOKEN_EN_COOKIE
         : ""
     }`,
   };

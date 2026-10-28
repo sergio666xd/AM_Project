@@ -1,6 +1,6 @@
 "use client";
 
-import { apiRequest } from "@/lib/api";
+import { apiRequest, TOKEN_EN_COOKIE } from "@/lib/api";
 import { iniciarWorkflowConsultaRadicado } from "@/lib/api";
 import ProcessContracts from "@/components/contracts/ProcessContracts";
 import { SummaryStrip } from "@/components/ui/SummaryStrip";
@@ -209,7 +209,7 @@ export default function ProcesoDetallePage({ section }: { section?: string }) {
 
   const headers = useCallback(
     () => ({
-      Authorization: `Bearer ${localStorage.getItem("token") || ""}`,
+      Authorization: `Bearer ${TOKEN_EN_COOKIE}`,
     }),
     []
   );
@@ -219,7 +219,7 @@ export default function ProcesoDetallePage({ section }: { section?: string }) {
     setError("");
 
     try {
-      const result = await requestProcessDetail(id, localStorage.getItem("token") || "");
+      const result = await requestProcessDetail(id, TOKEN_EN_COOKIE);
       setProcess(result.processData);
       setNombre(result.processData.nombre);
       setDescripcion(result.processData.descripcion || "");
@@ -238,7 +238,7 @@ export default function ProcesoDetallePage({ section }: { section?: string }) {
 
   useEffect(() => {
     let active = true;
-    requestProcessDetail(id, localStorage.getItem("token") || "")
+    requestProcessDetail(id, TOKEN_EN_COOKIE)
       .then((result) => {
         if (!active) return;
         setProcess(result.processData);
@@ -325,7 +325,7 @@ export default function ProcesoDetallePage({ section }: { section?: string }) {
       if (typeof data.consulta_id === "number") {
         try {
           await iniciarWorkflowConsultaRadicado(
-            localStorage.getItem("token") || "",
+            TOKEN_EN_COOKIE,
             {
               tipo: "AUTOMATICA_NUEVO",
               radicado_id: Number(data.id),

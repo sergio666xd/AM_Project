@@ -207,6 +207,7 @@ def refresh_token(
     usuario_actual: models.Usuario = Depends(security.obtener_usuario_actual),
     token: str = Depends(security.oauth2_scheme),
     db: Session = Depends(get_db),
+    response: Response = None,
 ):
     """Renueva el token JWT manteniendo la misma politica de expiracion (sliding window).
 
@@ -222,6 +223,8 @@ def refresh_token(
     new_token = security.create_access_token(
         data={"sub": str(usuario_actual.id)}, persistent=persistent,
     )
+    if response is not None:
+        fijar_cookie_sesion(response, new_token, persistente=persistent)
     return {"access_token": new_token, "token_type": "bearer", "debe_cambiar_password": usuario_actual.debe_cambiar_password}
 
 
@@ -231,6 +234,7 @@ def cambiar_password(
     usuario_actual: models.Usuario = Depends(security.obtener_usuario_para_cambio_password),
     token: str = Depends(security.oauth2_scheme),
     db: Session = Depends(get_db),
+    response: Response = None,
 ):
     if not usuario_actual.debe_cambiar_password:
         raise HTTPException(status_code=403, detail="Para cambiar tu contraseña, solicita y verifica un código desde Configuración > Seguridad.")
@@ -250,6 +254,8 @@ def cambiar_password(
     new_token = security.create_access_token(
         data={"sub": str(usuario_actual.id)}, persistent=persistent,
     )
+    if response is not None:
+        fijar_cookie_sesion(response, new_token, persistente=persistent)
     rol_str = (
         usuario_actual.rol.value
         if hasattr(usuario_actual.rol, "value")
