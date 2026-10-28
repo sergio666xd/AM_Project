@@ -8,7 +8,6 @@ cliente) entra como nuevo hasta que alguien de la firma lo marca revisado.
 """
 
 from collections import defaultdict
-from datetime import datetime, time, timezone
 
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
@@ -35,7 +34,8 @@ from app.modulos.folios.repositorio import GRUPOS, ORDEN_TIPOS, Contenido, Repos
 from app.modulos.identidad.modelos import Usuario
 from app.nucleo.errores import Conflicto, ErrorDominio, NoEncontrado, SinPermiso
 from app.nucleo.paginacion import ParametrosPagina, codificar_cursor
-from app.timezone import COLOMBIA, utc_ahora
+from app.nucleo.zona_horaria import fin_del_dia_utc
+from app.timezone import utc_ahora
 from app.workflow_service import user_portal_url
 
 NO_ENCONTRADO = "No encontramos el proceso, o no tienes acceso a él."
@@ -231,7 +231,7 @@ class ServicioFolios:
 
     def crear_tarea(self, usuario: Usuario, proceso_id: int, numero: int, datos: TareaDesdeFolio) -> TareaCreada:
         """Crea una tarea del proceso a partir de un folio y lo deja revisado."""
-        # Los recordatorios de las tareas viven en la API v1 hasta la Fase 4.
+        # Los recordatorios de las tareas viven en la API v1 hasta retirarla (Fase 7).
         from app.routers.tareas import _crear_recordatorios_sistema, _lanzar_recordatorios_pendientes
 
         proceso = self._proceso_de_firma(usuario, proceso_id)
@@ -239,9 +239,7 @@ class ServicioFolios:
         actuacion = self._db.get(models.Actuacion, folio.origen_id) if folio.tipo == "actuacion" else None
         fecha_limite = None
         if datos.fecha_limite is not None:
-            # Vence al final del día en Colombia; la base guarda UTC sin zona.
-            fin = datetime.combine(datos.fecha_limite, time(23, 59), COLOMBIA)
-            fecha_limite = fin.astimezone(timezone.utc).replace(tzinfo=None)
+            fecha_limite = fin_del_dia_utc(datos.fecha_limite)
             if fecha_limite <= utc_ahora():
                 raise ErrorDominio("La fecha límite ya pasó.", codigo="fecha_pasada",
                                    campos={"fecha_limite": "Elige hoy o una fecha futura."})

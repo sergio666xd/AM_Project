@@ -1,248 +1,213 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { AlertCircle, Bell, CalendarDays, Clock3, RefreshCw } from "lucide-react";
-import { fetchApi } from "@/lib/api";
-import { useSession } from "@/context/SessionContext";
-import TaskMonthCalendar, { type CalendarTask } from "@/components/calendar/TaskMonthCalendar";
-import { PageHeader } from "@/components/ui/PageHeader";
+import { useCallback, useMemo, useState } from "react";
+import { CalendarPlus, CalendarSync, ChevronLeft, ChevronRight, RefreshCw } from "lucide-react";
+
+import { NuevoEventoModal } from "@/components/agenda/NuevoEventoModal";
+import { SuscripcionCalendario } from "@/components/agenda/SuscripcionCalendario";
+import { CalendarioMes, type ElementoCalendario } from "@/components/calendario/CalendarioMes";
 import { Button } from "@/components/ui/Button";
+import { LoadingState } from "@/components/ui/LoadingState";
+import { PageHeader } from "@/components/ui/PageHeader";
+import { SegmentedControl } from "@/components/ui/SegmentedControl";
+import { Tag, type TonoTag } from "@/components/ui/Tag";
+import { api, mensajeDeError, type Esquemas } from "@/lib/api-v2/cliente";
+import { cx } from "@/lib/cx";
+import { diaCorto, diaDe, diaLargo, horaDe, hoyISO, lunesDe, sumarDias } from "@/lib/fechas";
+import { useAccionDeUrl } from "@/lib/useAccionDeUrl";
+import { useLoadEffect } from "@/lib/useLoadEffect";
 
-type Reminder = { id: number; activo: boolean; fecha_hora?: string | null };
-type Task = {
-  id: number;
-  titulo: string;
-  estado: "PENDIENTE" | "EN_CURSO" | "COMPLETADA" | "CANCELADA";
-  prioridad: "BAJA" | "MEDIA" | "ALTA" | "URGENTE";
-  fecha_limite?: string | null;
-  proceso_id?: number | null;
-  radicado_id?: number | null;
-  cliente_id?: number | null;
-  usuario_id: number;
-  recordatorios: Reminder[];
-};
-type Process = { id: number; nombre: string };
-type Client = { id: number; nombre_completo: string };
-type Radicado = { id: number; numero: string };
-type AgendaEvent = { id: number; titulo: string; descripcion?: string | null; tipo: "EVENTO" | "AUDIENCIA" | "REUNION" | "FIRMA_CONTRATO"; estado: "PROGRAMADO" | "COMPLETADO" | "CANCELADO"; fecha_inicio: string; proceso_id: number; proceso: string; cliente_id?: number | null; cliente?: string | null; responsable_id?: number | null };
-type AgendaActuacion = { id: number; titulo: string; descripcion: string; fecha: string; proceso_id: number; proceso: string; abogado_id: number; cliente_ids: number[]; radicado_id: number; radicado: string };
-type AgendaData = { tasks: Task[]; processes: Process[]; clients: Client[]; radicados: Radicado[]; events: AgendaEvent[]; actuaciones: AgendaActuacion[] };
-type AgendaFilter = "TODAS" | "VENCIDAS" | "HOY" | "PROXIMAS";
-type AgendaView = "DIA" | "SEMANA" | "MES" | "LISTA";
+type Elemento = Esquemas["ElementoAgenda"];
+type Vista = "semana" | "mes" | "proximos";
 
-async function cargarAgenda(token: string): Promise<AgendaData> {
-  const [tasks, processes, clients, radicados, events, actuaciones] = await Promise.all([
-    fetchApi("/api/tareas", { method: "GET", token }),
-    fetchApi("/api/expedientes/procesos", { method: "GET", token }),
-    fetchApi("/api/expedientes/clientes", { method: "GET", token }),
-    fetchApi("/api/radicados?resumen=true", { method: "GET", token }),
-    fetchApi("/api/expedientes/agenda/eventos", { method: "GET", token }),
-    fetchApi("/api/expedientes/agenda/actuaciones", { method: "GET", token }),
-  ]);
-  return { tasks, processes, clients, radicados, events, actuaciones };
+const DIAS_SEMANA = ["Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom"];
+
+function tono(e: Elemento): TonoTag {
+  if (e.estado === "CANCELADO") return "neutral";
+  if (e.tipo === "tarea") return e.vencida ? "bad" : "neutral";
+  return e.etiqueta === "Audiencia" ? "gold" : "navy";
 }
 
-function inicioDelDia(value: string) {
-  const date = new Date(value);
-  date.setHours(0, 0, 0, 0);
-  return date;
-}
-
-function claveFecha(date: Date) {
-  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
-}
-
-function claveFechaIso(value: string) {
-  return claveFecha(new Date(value));
-}
-
-function sumarDias(value: string, amount: number) {
-  const date = new Date(`${value}T12:00:00`);
-  date.setDate(date.getDate() + amount);
-  return claveFecha(date);
-}
-
-function formatoFecha(value: string) {
-  return new Date(value).toLocaleString("es-CO", {
-    timeZone: "America/Bogota",
-    weekday: "long",
-    day: "2-digit",
-    month: "short",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
-}
-
-function etiquetaTipoEvento(tipo: AgendaEvent["tipo"]) {
-  return { AUDIENCIA: "Audiencia", REUNION: "Reunión", FIRMA_CONTRATO: "Firma de contrato", EVENTO: "Evento" }[tipo];
-}
-
-function etiquetaPrioridad(priority: Task["prioridad"]) {
-  return { BAJA: "Baja", MEDIA: "Media", ALTA: "Alta", URGENTE: "Urgente" }[priority];
+function rango(vista: Vista, ancla: string): [string, string] {
+  if (vista === "semana") {
+    const lunes = lunesDe(ancla);
+    return [lunes, sumarDias(lunes, 6)];
+  }
+  if (vista === "mes") {
+    const inicio = lunesDe(`${ancla.slice(0, 7)}-01`);
+    return [inicio, sumarDias(inicio, 41)];
+  }
+  return [hoyISO(), sumarDias(hoyISO(), 30)];
 }
 
 export default function AgendaPage() {
-  const { token, user, loading: sessionLoading } = useSession();
-  const [data, setData] = useState<AgendaData>({ tasks: [], processes: [], clients: [], radicados: [], events: [], actuaciones: [] });
-  const [filter, setFilter] = useState<AgendaFilter>("TODAS");
-  const [view, setView] = useState<AgendaView>("SEMANA");
-  const [selectedDate, setSelectedDate] = useState(() => claveFecha(new Date()));
-  const [responsibleFilter, setResponsibleFilter] = useState("TODOS");
-  const [processFilter, setProcessFilter] = useState("TODOS");
-  const [clientFilter, setClientFilter] = useState("TODOS");
-  const [typeFilter, setTypeFilter] = useState("TODOS");
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
+  const [vista, setVista] = useState<Vista>("semana");
+  const [ancla, setAncla] = useState(hoyISO());
+  const [conTareas, setConTareas] = useState(true);
+  const [agenda, setAgenda] = useState<Esquemas["Agenda"] | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [suscripcion, setSuscripcion] = useState(false);
+  const [nuevo, setNuevo] = useState(false);
+  const [desde, hasta] = rango(vista, ancla);
 
-  useEffect(() => {
-    if (sessionLoading || !token) return;
-    let active = true;
-    cargarAgenda(token)
-      .then((result) => { if (active) setData(result); })
-      .catch((cause: unknown) => { if (active) setError(cause instanceof Error ? cause.message : "No fue posible cargar la agenda."); })
-      .finally(() => { if (active) setLoading(false); });
-    return () => { active = false; };
-  }, [sessionLoading, token]);
+  useAccionDeUrl("nuevo", useCallback(() => setNuevo(true), []));
 
-  async function actualizar() {
-    if (!token) return;
-    setLoading(true);
-    setError("");
-    try {
-      setData(await cargarAgenda(token));
-    } catch (cause) {
-      setError(cause instanceof Error ? cause.message : "No fue posible cargar la agenda.");
-    } finally {
-      setLoading(false);
+  const cargar = useCallback(async () => {
+    setError(null);
+    const { data, error: fallo } = await api.GET("/api/v2/agenda", { params: { query: { desde, hasta } } });
+    if (fallo || !data) setError(mensajeDeError(fallo));
+    else setAgenda(data);
+  }, [desde, hasta]);
+  useLoadEffect(cargar);
+
+  const elementos = useMemo(
+    () => (agenda?.items ?? []).filter((e) => conTareas || e.tipo !== "tarea"),
+    [agenda, conTareas],
+  );
+  const porDia = useMemo(() => {
+    const mapa = new Map<string, Elemento[]>();
+    for (const e of elementos) {
+      const dia = diaDe(e.inicio);
+      mapa.set(dia, [...(mapa.get(dia) ?? []), e]);
     }
-  }
+    return mapa;
+  }, [elementos]);
+  const delCalendario = useMemo<ElementoCalendario[]>(() => elementos.map((e) => ({
+    clave: e.clave,
+    titulo: e.titulo,
+    dia: diaDe(e.inicio),
+    hora: e.todo_el_dia ? undefined : horaDe(e.inicio),
+    etiqueta: e.estado === "CANCELADO" ? "Cancelado" : e.vencida ? "Vencida" : e.etiqueta,
+    tono: tono(e),
+    detalle: e.proceso?.nombre,
+    href: e.enlace,
+    tachado: e.estado === "CANCELADO",
+  })), [elementos]);
 
-  const tareasConVencimiento = useMemo(() => {
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    const nextWeek = new Date(today);
-    nextWeek.setDate(nextWeek.getDate() + 7);
-    return data.tasks
-      .filter((task) => task.fecha_limite && task.estado !== "COMPLETADA" && task.estado !== "CANCELADA")
-      .filter((task) => {
-        if (responsibleFilter === "YO" && task.usuario_id !== user?.id) return false;
-        if (responsibleFilter === "OTROS" && task.usuario_id === user?.id) return false;
-        if (processFilter !== "TODOS" && String(task.proceso_id || "") !== processFilter) return false;
-        if (clientFilter !== "TODOS" && String(task.cliente_id || "") !== clientFilter) return false;
-        const due = inicioDelDia(task.fecha_limite!);
-        if (filter === "VENCIDAS") return due < today;
-        if (filter === "HOY") return due.getTime() === today.getTime();
-        if (filter === "PROXIMAS") return due >= today && due <= nextWeek;
-        return true;
-      })
-      .sort((left, right) => new Date(left.fecha_limite!).getTime() - new Date(right.fecha_limite!).getTime());
-  }, [data.tasks, filter, responsibleFilter, processFilter, clientFilter, user?.id]);
-
-  const processes = new Map(data.processes.map((process) => [process.id, process.nombre]));
-  const clients = new Map(data.clients.map((client) => [client.id, client.nombre_completo]));
-  const radicados = new Map(data.radicados.map((radicado) => [radicado.id, radicado.numero]));
-  const taskBase = user?.rol === "ABOGADO" ? "/gestion-procesos/dashboard/tareas" : "/gestion-procesos/abogado/tareas";
-  const weekStart = (() => { const date = new Date(`${selectedDate}T12:00:00`); return sumarDias(selectedDate, -((date.getDay() + 6) % 7)); })();
-  const taskItemsForView = view === "DIA" ? tareasConVencimiento.filter((task) => claveFechaIso(task.fecha_limite!) === selectedDate)
-    : view === "SEMANA" ? tareasConVencimiento.filter((task) => { const date = claveFechaIso(task.fecha_limite!); return date >= weekStart && date <= sumarDias(weekStart, 6); })
-    : view === "MES" ? tareasConVencimiento.filter((task) => claveFechaIso(task.fecha_limite!).slice(0, 7) === selectedDate.slice(0, 7)) : tareasConVencimiento;
-  const filteredEvents = data.events.filter((event) => (processFilter === "TODOS" || String(event.proceso_id) === processFilter)
-    && (clientFilter === "TODOS" || String(event.cliente_id || "") === clientFilter)
-    && (responsibleFilter === "TODOS" || (responsibleFilter === "YO" ? event.responsable_id === user?.id : event.responsable_id !== user?.id))
-    && (typeFilter === "TODOS" || event.tipo === typeFilter));
-  const eventsForView = filteredEvents.filter((event) => view === "DIA" ? claveFechaIso(event.fecha_inicio) === selectedDate
-    : view === "SEMANA" ? claveFechaIso(event.fecha_inicio) >= weekStart && claveFechaIso(event.fecha_inicio) <= sumarDias(weekStart, 6)
-    : view === "MES" ? claveFechaIso(event.fecha_inicio).slice(0, 7) === selectedDate.slice(0, 7) : true);
-  const filteredActuations = data.actuaciones.filter((item) => (processFilter === "TODOS" || String(item.proceso_id) === processFilter)
-    && (clientFilter === "TODOS" || item.cliente_ids.includes(Number(clientFilter)))
-    && (responsibleFilter === "TODOS" || (responsibleFilter === "YO" ? item.abogado_id === user?.id : item.abogado_id !== user?.id))
-    && (typeFilter === "TODOS" || typeFilter === "ACTUACION"));
-  const actuacionesForView = filteredActuations.filter((item) => view === "DIA" ? claveFechaIso(item.fecha) === selectedDate
-    : view === "SEMANA" ? claveFechaIso(item.fecha) >= weekStart && claveFechaIso(item.fecha) <= sumarDias(weekStart, 6)
-    : view === "MES" ? claveFechaIso(item.fecha).slice(0, 7) === selectedDate.slice(0, 7) : true);
-  const calendarItems: CalendarTask[] = [
-    ...tareasConVencimiento.map((task) => ({ id: task.id, titulo: task.titulo, estado: task.estado, prioridad: task.prioridad, fecha_limite: task.fecha_limite ?? null, href: `${taskBase}/${task.id}` })),
-    ...filteredEvents.map((event) => ({ id: -event.id, titulo: `${etiquetaTipoEvento(event.tipo)}: ${event.titulo}`, estado: event.estado, fecha_limite: event.fecha_inicio, href: `/gestion-procesos/abogado/procesos/${event.proceso_id}/agenda` })),
-    ...filteredActuations.map((item) => ({ id: -1000000 - item.id, titulo: `Actuación judicial: ${item.titulo}`, estado: "REGISTRADA", fecha_limite: item.fecha, href: `/gestion-procesos/abogado/procesos/${item.proceso_id}/actividad`, soloFecha: true })),
-  ];
-  const filters: { id: AgendaFilter; label: string }[] = [
-    { id: "TODAS", label: "Todas" },
-    { id: "VENCIDAS", label: "Vencidas" },
-    { id: "HOY", label: "Hoy" },
-    { id: "PROXIMAS", label: "Próximos 7 días" },
-  ];
-  const fechaColombia = (value: string) => new Intl.DateTimeFormat("es-CO", { dateStyle: "medium", timeZone: "America/Bogota" }).format(new Date(`${value}T12:00:00-05:00`));
-  const activeRangeLabel = view === "DIA"
-    ? fechaColombia(selectedDate)
-    : view === "SEMANA"
-      ? `${fechaColombia(weekStart)} – ${fechaColombia(sumarDias(weekStart, 6))}`
-      : view === "MES"
-        ? new Intl.DateTimeFormat("es-CO", { month: "long", year: "numeric", timeZone: "America/Bogota" }).format(new Date(`${selectedDate.slice(0, 7)}-15T12:00:00-05:00`))
-        : "todas las fechas";
-  const activeFilterCount = [responsibleFilter !== "TODOS", processFilter !== "TODOS", clientFilter !== "TODOS", typeFilter !== "TODOS"].filter(Boolean).length;
+  const cargando = agenda === null && !error;
+  const hoy = hoyISO();
 
   return (
-    <section className="motion-swap mx-auto max-w-5xl space-y-5 pb-24">
+    <div>
       <PageHeader
-        overline="Trabajo jurídico"
         title="Agenda"
-        description="Tareas, eventos y actuaciones judiciales de tus procesos."
+        description="Audiencias, reuniones y vencimientos de los procesos que llevas."
         action={
-          <Button
-            variant="outline"
-            onClick={() => void actualizar()}
-            disabled={loading || sessionLoading}
-            icon={<RefreshCw className={`size-4 ${loading ? "animate-spin" : ""}`} />}
-          >
-            Actualizar
-          </Button>
+          <div className="flex flex-wrap gap-2">
+            <Button variant="secondary" icon={<CalendarSync size={16} />} onClick={() => setSuscripcion(true)}>Ver en mi calendario</Button>
+            <Button icon={<CalendarPlus size={16} />} onClick={() => setNuevo(true)}>Agendar evento</Button>
+          </div>
         }
       />
 
-      <div role="group" aria-label="Filtrar agenda" className="inline-flex flex-wrap gap-1 rounded-lg border border-border p-1">
-        {filters.map((item) => (
-          <button
-            key={item.id}
-            type="button"
-            aria-pressed={filter === item.id}
-            onClick={() => setFilter(item.id)}
-            className={`rounded-md px-3 py-1.5 text-sm transition-colors ${filter === item.id ? "bg-brand-900 text-white" : "text-(--foreground-muted) hover:bg-surface-secondary"}`}
-          >
-            {item.label}
-          </button>
-        ))}
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-3">
+        <SegmentedControl<Vista>
+          label="Vista de la agenda"
+          value={vista}
+          onChange={(v) => { setVista(v); setAncla(hoyISO()); }}
+          options={[{ value: "semana", label: "Semana" }, { value: "mes", label: "Mes" }, { value: "proximos", label: "Próximos 30 días" }]}
+        />
+        <label className="inline-flex min-h-10 cursor-pointer items-center gap-2 text-[14px] text-ink-2">
+          <input type="checkbox" checked={conTareas} onChange={(e) => setConTareas(e.target.checked)} className="size-4 accent-[var(--navy)]" />
+          Vencimientos de tareas
+        </label>
       </div>
 
-      <details className="rounded-lg border border-border bg-surface p-3">
-        <summary className="flex min-h-11 cursor-pointer items-center justify-between gap-3 font-medium"><span>Filtros por equipo y proceso</span><span className="text-sm text-(--foreground-muted)">{activeFilterCount ? `${activeFilterCount} activos` : "Opcionales"}</span></summary>
-        <div className="mt-3 grid gap-2 border-t border-border pt-3 sm:grid-cols-2 lg:grid-cols-4">
-        <select aria-label="Filtrar por responsable" value={responsibleFilter} onChange={(event) => setResponsibleFilter(event.target.value)} className="h-10 rounded-md border border-border bg-surface-secondary px-3 text-sm"><option value="TODOS">Todos los responsables</option><option value="YO">Asignados a mí</option><option value="OTROS">Otros responsables</option></select>
-        <select aria-label="Filtrar por proceso" value={processFilter} onChange={(event) => setProcessFilter(event.target.value)} className="h-10 rounded-md border border-border bg-surface-secondary px-3 text-sm"><option value="TODOS">Todos los procesos</option>{data.processes.map((process) => <option key={process.id} value={process.id}>{process.nombre}</option>)}</select>
-        <select aria-label="Filtrar por cliente" value={clientFilter} onChange={(event) => setClientFilter(event.target.value)} className="h-10 rounded-md border border-border bg-surface-secondary px-3 text-sm"><option value="TODOS">Todos los clientes</option>{data.clients.map((client) => <option key={client.id} value={client.id}>{client.nombre_completo}</option>)}</select>
-        <select aria-label="Filtrar por tipo de evento" value={typeFilter} onChange={(event) => setTypeFilter(event.target.value)} className="h-10 rounded-md border border-border bg-surface-secondary px-3 text-sm"><option value="TODOS">Todos los tipos</option><option value="AUDIENCIA">Audiencias</option><option value="REUNION">Reuniones</option><option value="FIRMA_CONTRATO">Firmas de contrato</option><option value="EVENTO">Eventos</option><option value="ACTUACION">Actuaciones judiciales</option></select>
-        </div>
-      </details>
+      <div className="mt-4">
+        {error ? (
+          <div role="alert" className="flex flex-wrap items-center gap-3 rounded-[var(--radius-lg)] bg-bad-soft px-4 py-3 text-bad">
+            <p className="flex-1 text-[14px]">{error}</p>
+            <Button size="sm" variant="secondary" icon={<RefreshCw size={14} />} onClick={() => void cargar()}>Reintentar</Button>
+          </div>
+        ) : cargando ? (
+          <LoadingState label="Cargando la agenda" rows={4} />
+        ) : vista === "mes" ? (
+          <CalendarioMes elementos={delCalendario} mes={ancla} onMes={setAncla} vacio="Nada agendado este día." />
+        ) : vista === "semana" ? (
+          <section aria-label={`Semana del ${diaCorto(desde)} al ${diaCorto(hasta)}`} className="overflow-hidden rounded-[var(--radius-lg)] bg-sheet shadow-[0_0_0_1px_var(--line)]">
+            <header className="flex items-center justify-between gap-3 border-b border-line px-4 py-3 sm:px-5">
+              <h2 aria-live="polite" className="font-display text-[19px] text-ink">{diaCorto(desde)} – {diaCorto(hasta)}</h2>
+              <div className="flex items-center gap-1.5">
+                <button type="button" onClick={() => setAncla(sumarDias(desde, -7))} aria-label="Semana anterior" className="grid size-10 place-items-center rounded-lg text-ink-2 hover:bg-manila hover:text-ink"><ChevronLeft size={18} aria-hidden="true" /></button>
+                <button type="button" onClick={() => setAncla(hoyISO())} className="min-h-10 rounded-lg px-3 text-[13px] font-semibold text-ink-2 hover:bg-manila hover:text-ink">Hoy</button>
+                <button type="button" onClick={() => setAncla(sumarDias(desde, 7))} aria-label="Semana siguiente" className="grid size-10 place-items-center rounded-lg text-ink-2 hover:bg-manila hover:text-ink"><ChevronRight size={18} aria-hidden="true" /></button>
+              </div>
+            </header>
+            <ol className="divide-y divide-line lg:grid lg:grid-cols-7 lg:divide-x lg:divide-y-0">
+              {Array.from({ length: 7 }, (_, i) => sumarDias(desde, i)).map((dia, i) => {
+                const items = porDia.get(dia) ?? [];
+                return (
+                  <li key={dia} className={cx("min-w-0 lg:min-h-[22rem]", items.length === 0 && dia !== hoy && "max-lg:hidden", dia === hoy && "bg-navy-soft/40")}>
+                    <h3 className="flex items-baseline gap-2 px-4 pb-1.5 pt-3 lg:flex-col lg:items-start lg:gap-0 lg:px-3">
+                      <span className="text-[12px] font-semibold uppercase tracking-[0.06em] text-ink-3">{DIAS_SEMANA[i]}</span>
+                      <span className={cx("text-[15px] font-semibold tabular-nums lg:text-[22px] lg:font-normal lg:font-display", dia === hoy ? "text-navy-ink" : "text-ink")}>
+                        <span className="lg:hidden">{diaLargo(dia).replace(/^\S+\s/, "")}</span>
+                        <span className="hidden lg:inline">{Number(dia.slice(8))}</span>
+                      </span>
+                    </h3>
+                    <ul className="space-y-1.5 px-3 pb-3">
+                      {items.map((e) => <TarjetaElemento key={e.clave} elemento={e} compacta />)}
+                      {items.length === 0 && <li className="px-1 py-2 text-[13px] text-ink-3">{dia === hoy ? "Nada agendado hoy." : "Libre."}</li>}
+                    </ul>
+                  </li>
+                );
+              })}
+            </ol>
+            {elementos.length === 0 && (
+              <p className="border-t border-line px-5 py-4 text-[14px] text-ink-3 lg:hidden">No hay nada agendado esta semana.</p>
+            )}
+          </section>
+        ) : elementos.length === 0 ? (
+          <div className="rounded-[var(--radius-lg)] bg-sheet px-6 py-12 text-center shadow-[0_0_0_1px_var(--line)]">
+            <p className="font-display text-[19px] text-ink">Nada en los próximos 30 días</p>
+            <p className="mx-auto mt-1 max-w-sm text-[14px] text-ink-3">Cuando agendes una audiencia o una tarea tenga fecha límite, aparecerá aquí.</p>
+          </div>
+        ) : (
+          <ol className="space-y-5">
+            {[...porDia.entries()].map(([dia, items]) => (
+              <li key={dia}>
+                <h3 className="mb-2 text-[14px] font-semibold first-letter:uppercase text-ink">
+                  {dia === hoy ? "Hoy, " : dia === sumarDias(hoy, 1) ? "Mañana, " : ""}{diaLargo(dia)}
+                </h3>
+                <ul className="space-y-2">{items.map((e) => <TarjetaElemento key={e.clave} elemento={e} />)}</ul>
+              </li>
+            ))}
+          </ol>
+        )}
+      </div>
 
-      <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-border bg-surface p-3"><div role="group" aria-label="Vista de agenda" className="flex gap-1">{(["DIA", "SEMANA", "MES", "LISTA"] as const).map((mode) => <button key={mode} type="button" aria-pressed={view === mode} onClick={() => setView(mode)} className={`rounded-md px-3 py-1.5 text-sm ${view === mode ? "bg-primary !text-white" : "text-(--foreground-muted) hover:bg-surface-secondary"}`}>{mode === "DIA" ? "Día" : mode === "SEMANA" ? "Semana" : mode === "MES" ? "Mes" : "Lista"}</button>)}</div>{view === "MES" ? <input aria-label="Mes de agenda" type="month" value={selectedDate.slice(0, 7)} onChange={(event) => setSelectedDate(`${event.target.value}-01`)} className="h-9 rounded-md border border-border bg-surface-secondary px-3 text-sm" /> : view !== "LISTA" ? <input aria-label="Fecha de agenda" type="date" value={selectedDate} onChange={(event) => setSelectedDate(event.target.value)} className="h-9 rounded-md border border-border bg-surface-secondary px-3 text-sm" /> : null}</div>
+      <SuscripcionCalendario open={suscripcion} onClose={() => setSuscripcion(false)} />
+      <NuevoEventoModal open={nuevo} onClose={() => setNuevo(false)} onCreado={() => void cargar()} />
+    </div>
+  );
+}
 
-      {error && <div role="alert" className="flex items-center gap-2 rounded-lg border border-red-500/20 bg-red-500/5 p-4 text-sm text-red-700"><AlertCircle className="size-4 shrink-0" />{error}</div>}
-
-      {!loading && !sessionLoading && <p className="text-sm text-(--foreground-muted)">Rango consultado: <span className="font-medium text-foreground">{activeRangeLabel}</span></p>}
-      {loading || sessionLoading ? <div className="motion-delayed-in flex min-h-48 items-center justify-center gap-3 text-sm text-(--foreground-muted)"><RefreshCw className="size-5 animate-spin" />Cargando agenda...</div> : view === "MES" ? <TaskMonthCalendar tasks={calendarItems} /> : taskItemsForView.length || eventsForView.length || actuacionesForView.length ? <div className="space-y-2">
-        {eventsForView.map((event) => <Link key={`event-${event.id}`} href={`/gestion-procesos/abogado/procesos/${event.proceso_id}/agenda`} className="flex flex-wrap items-center justify-between gap-4 rounded-lg border border-amber-500/20 bg-amber-500/5 px-4 py-3 transition hover:bg-amber-500/10"><div className="flex min-w-0 items-start gap-3"><div className="mt-0.5 flex size-9 shrink-0 items-center justify-center rounded-lg bg-amber-500/10 text-amber-700"><CalendarDays className="size-4" /></div><div className="min-w-0"><p className="font-medium text-foreground">{etiquetaTipoEvento(event.tipo)}: {event.titulo}</p><p className="mt-1 text-xs text-(--foreground-muted)">{event.proceso}{event.cliente ? ` · ${event.cliente}` : ""}</p></div></div><span className="rounded-md bg-surface px-2 py-1 text-xs text-(--foreground-secondary)">{formatoFecha(event.fecha_inicio)}</span></Link>)}
-        {actuacionesForView.map((item) => <Link key={`actuacion-${item.proceso_id}-${item.id}`} href={`/gestion-procesos/abogado/procesos/${item.proceso_id}/actividad`} className="flex flex-wrap items-center justify-between gap-4 rounded-lg border border-indigo-500/20 bg-indigo-500/5 px-4 py-3 transition hover:bg-indigo-500/10"><div className="flex min-w-0 items-start gap-3"><div className="mt-0.5 flex size-9 shrink-0 items-center justify-center rounded-lg bg-indigo-500/10 text-indigo-700"><CalendarDays className="size-4" /></div><div className="min-w-0"><p className="font-medium text-foreground">Actuación judicial: {item.titulo}</p><p className="mt-1 text-xs text-(--foreground-muted)">{item.proceso} · Radicado {item.radicado}{item.descripcion ? ` · ${item.descripcion}` : ""}</p></div></div><span className="rounded-md bg-surface px-2 py-1 text-xs text-(--foreground-secondary)">{new Date(item.fecha).toLocaleDateString("es-CO", { timeZone: "America/Bogota", weekday: "long", day: "2-digit", month: "short" })}</span></Link>)}
-        {taskItemsForView.map((task) => {
-          const due = inicioDelDia(task.fecha_limite!);
-          const today = inicioDelDia(new Date().toISOString());
-          const overdue = due < today;
-          const activeReminders = task.recordatorios.filter((reminder) => reminder.activo).length;
-          return <Link key={task.id} href={`${taskBase}/${task.id}`} className="flex flex-wrap items-center justify-between gap-4 rounded-lg border border-border bg-surface px-4 py-3 transition hover:border-primary/40 hover:bg-surface-hover">
-            <div className="flex min-w-0 items-start gap-3"><div className={`mt-0.5 flex size-9 shrink-0 items-center justify-center rounded-lg ${overdue ? "bg-red-500/10 text-red-600" : "bg-primary/10 text-primary"}`}><CalendarDays className="size-4" /></div><div className="min-w-0"><p className="font-medium text-foreground">{task.titulo}</p><p className="mt-1 text-xs text-(--foreground-muted)">{[task.proceso_id ? processes.get(task.proceso_id) : null, task.radicado_id ? radicados.get(task.radicado_id) : null, task.cliente_id ? clients.get(task.cliente_id) : null].filter(Boolean).join(" · ") || "Tarea general"}</p></div></div>
-            <div className="flex flex-wrap items-center gap-2 text-xs"><span className={`rounded-md px-2 py-1 ${overdue ? "bg-red-500/10 text-red-700" : "bg-surface-secondary text-(--foreground-secondary)"}`}>{formatoFecha(task.fecha_limite!)}</span><span className="rounded-md bg-surface-secondary px-2 py-1 text-(--foreground-secondary)">{etiquetaPrioridad(task.prioridad)}</span>{activeReminders > 0 && <span title={`${activeReminders} recordatorio(s) activo(s)`} className="inline-flex items-center gap-1 rounded-md bg-amber-500/10 px-2 py-1 text-amber-700"><Bell className="size-3.5" />{activeReminders}</span>}<span className="inline-flex items-center gap-1 text-primary"><Clock3 className="size-3.5" />{task.estado === "EN_CURSO" ? "En curso" : "Pendiente"}</span></div>
-          </Link>;
-        })}
-      </div> : <div className="flex min-h-56 flex-col items-center justify-center rounded-lg border border-dashed border-border px-6 text-center"><CalendarDays className="size-8 text-(--foreground-muted)" /><h2 className="mt-3 font-semibold text-foreground">No hay actividades en esta vista</h2><p className="mt-1 text-sm text-(--foreground-muted)">Tareas y eventos del despacho aparecerán aquí.</p></div>}
-    </section>
+function TarjetaElemento({ elemento: e, compacta = false }: { elemento: Elemento; compacta?: boolean }) {
+  const cancelado = e.estado === "CANCELADO";
+  return (
+    <li>
+      <Link
+        href={e.enlace}
+        className={cx(
+          "block rounded-lg bg-sheet px-3 py-2.5 shadow-[0_0_0_1px_var(--line)] transition-colors hover:bg-manila/60",
+          e.tipo === "evento" && !cancelado && (e.etiqueta === "Audiencia" ? "shadow-[inset_3px_0_0_var(--gold),0_0_0_1px_var(--line)]" : "shadow-[inset_3px_0_0_var(--navy),0_0_0_1px_var(--line)]"),
+          e.vencida && "shadow-[inset_3px_0_0_var(--bad),0_0_0_1px_var(--line)]",
+          compacta ? "lg:px-2.5 lg:py-2" : "sm:flex sm:items-start sm:gap-4",
+        )}
+      >
+        <span className={cx("block text-[12.5px] tabular-nums text-ink-3", !compacta && "sm:w-24 sm:shrink-0 sm:pt-0.5 sm:text-[13.5px]")}>
+          {e.todo_el_dia ? (e.vencida ? "Venció" : "Vence") : horaDe(e.inicio)}
+          {!e.todo_el_dia && e.fin && <span className={cx(compacta && "lg:hidden")}> – {horaDe(e.fin)}</span>}
+        </span>
+        <span className="block min-w-0 flex-1">
+          <span className={cx("block font-semibold leading-snug text-pretty text-ink", compacta && "lg:text-[13.5px]", cancelado && "line-through opacity-60")}>{e.titulo}</span>
+          {e.proceso && <span className="block truncate text-[12.5px] text-ink-3">{e.proceso.nombre}</span>}
+          <span className="mt-1.5 flex flex-wrap gap-1.5">
+            <Tag tone={tono(e)}>{cancelado ? "Cancelado" : e.etiqueta}</Tag>
+          </span>
+        </span>
+      </Link>
+    </li>
   );
 }
