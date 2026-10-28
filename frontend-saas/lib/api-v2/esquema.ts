@@ -377,10 +377,207 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v2/tareas": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Tareas del equipo
+         * @description Tareas de los procesos activos que el usuario ve y sus tareas generales, con el resumen
+         *     de abiertas, vencidas, de la semana y completadas (con los mismos filtros de proceso y responsable).
+         */
+        get: operations["listar_tareas"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v2/tareas/lote": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /**
+         * Cambiar varias tareas a la vez
+         * @description Cambia estado, prioridad o fecha límite de todas las tareas elegidas, o las elimina.
+         *     Si alguna no existe o el usuario no la ve, no se cambia ninguna.
+         */
+        patch: operations["cambiar_tareas_en_lote"];
+        trace?: never;
+    };
+    "/api/v2/tareas/plantillas": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Plantillas de tareas */
+        get: operations["listar_plantillas"];
+        put?: never;
+        /** Crear una plantilla */
+        post: operations["crear_plantilla"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v2/tareas/plantillas/{plantilla_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Editar una plantilla */
+        put: operations["editar_plantilla"];
+        post?: never;
+        /** Eliminar una plantilla */
+        delete: operations["eliminar_plantilla"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v2/tareas/plantillas/{plantilla_id}/aplicar": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Crear las tareas de una plantilla
+         * @description Crea una tarea por paso en el proceso. Cada fecha límite se cuenta en días hábiles
+         *     desde la notificación, con la misma calculadora de términos.
+         */
+        post: operations["aplicar_plantilla"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v2/agenda": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Agenda del equipo
+         * @description Audiencias, reuniones y demás eventos de los procesos activos que el usuario ve, y los
+         *     vencimientos de las tareas abiertas, entre las dos fechas (hora de Colombia).
+         */
+        get: operations["agenda"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v2/agenda/suscripcion": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Estado de la suscripción de calendario */
+        get: operations["suscripcion"];
+        put?: never;
+        /**
+         * Crear o renovar el enlace de calendario
+         * @description Devuelve el enlace .ics una sola vez. Si ya había uno, deja de funcionar.
+         */
+        post: operations["crear_suscripcion"];
+        /** Desactivar el enlace de calendario */
+        delete: operations["eliminar_suscripcion"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v2/agenda/feed.ics": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Agenda en formato iCalendar
+         * @description Lo leen Google Calendar, Outlook y Apple Calendar con el enlace de la suscripción.
+         *     No usa la sesión: el token del enlace identifica al usuario.
+         */
+        get: operations["feed"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        /** Agenda */
+        Agenda: {
+            /**
+             * Desde
+             * Format: date
+             */
+            desde: string;
+            /**
+             * Hasta
+             * Format: date
+             */
+            hasta: string;
+            /**
+             * Items
+             * @description Ordenados por inicio.
+             */
+            items: components["schemas"]["ElementoAgenda"][];
+        };
+        /** AplicarPlantilla */
+        AplicarPlantilla: {
+            /** Proceso Id */
+            proceso_id: number;
+            /**
+             * Notificacion
+             * Format: date
+             * @description Desde cuándo se cuentan los días hábiles de cada paso.
+             */
+            notificacion: string;
+            /**
+             * Folio
+             * @description Folio del expediente que originó las tareas, para la descripción.
+             */
+            folio?: number | null;
+        };
         /** ArchivoFolio */
         ArchivoFolio: {
             /** Nombre */
@@ -390,6 +587,13 @@ export interface components {
              * @description Ruta de descarga del archivo, con la sesión del usuario.
              */
             url: string;
+        };
+        /** AvanceSubtareas */
+        AvanceSubtareas: {
+            /** Total */
+            total: number;
+            /** Hechas */
+            hechas: number;
         };
         /** AvisarCliente */
         AvisarCliente: {
@@ -478,6 +682,28 @@ export interface components {
             /** Nota */
             nota?: string | null;
         };
+        /**
+         * CambioEnLote
+         * @description Lo que se cambia a todas las tareas elegidas. Solo se aplican los campos enviados.
+         */
+        CambioEnLote: {
+            /** Ids */
+            ids: number[];
+            /** Estado */
+            estado?: ("PENDIENTE" | "EN_CURSO" | "COMPLETADA" | "CANCELADA") | null;
+            /** Prioridad */
+            prioridad?: ("BAJA" | "MEDIA" | "ALTA" | "URGENTE") | null;
+            /**
+             * Fecha Limite
+             * @description Vencen al final de ese día. `null` quita la fecha.
+             */
+            fecha_limite?: string | null;
+            /**
+             * Eliminar
+             * @default false
+             */
+            eliminar: boolean;
+        };
         /** CambioEtapa */
         CambioEtapa: {
             /**
@@ -505,6 +731,82 @@ export interface components {
              * @description Clientes a los que se envió el aviso (id y nombre).
              */
             clientes: components["schemas"]["ProcesoDelFolio"][];
+        };
+        /** DatosPlantilla */
+        DatosPlantilla: {
+            /** Nombre */
+            nombre: string;
+            /** Descripcion */
+            descripcion?: string | null;
+            /** Palabras Clave */
+            palabras_clave?: string[];
+            /** Pasos */
+            pasos: components["schemas"]["PasoPlantilla"][];
+        };
+        /** ElementoAgenda */
+        ElementoAgenda: {
+            /**
+             * Clave
+             * @description Identificador estable, como «evento:4» o «tarea:12».
+             */
+            clave: string;
+            /**
+             * Tipo
+             * @enum {string}
+             */
+            tipo: "evento" | "tarea";
+            /**
+             * Etiqueta
+             * @description Audiencia, Reunión, Firma de contrato, Evento o Vence tarea.
+             */
+            etiqueta: string;
+            /** Titulo */
+            titulo: string;
+            /** Detalle */
+            detalle?: string | null;
+            /**
+             * Inicio
+             * Format: date-time
+             */
+            inicio: string;
+            /** Fin */
+            fin?: string | null;
+            /**
+             * Todo El Dia
+             * @description Las tareas vencen en un día, sin hora de inicio.
+             */
+            todo_el_dia: boolean;
+            /**
+             * Estado
+             * @description PROGRAMADO, COMPLETADO o CANCELADO en eventos; el estado de la tarea en tareas.
+             */
+            estado: string;
+            /**
+             * Vencida
+             * @default false
+             */
+            vencida: boolean;
+            proceso?: components["schemas"]["ProcesoBreve"] | null;
+            /** Responsable */
+            responsable?: string | null;
+            /**
+             * Enlace
+             * @description Ruta del panel del abogado donde se atiende.
+             */
+            enlace: string;
+        };
+        /** EnlaceSuscripcion */
+        EnlaceSuscripcion: {
+            /**
+             * Ruta
+             * @description Ruta del feed con el token, para unir al dominio del sitio. Solo se muestra esta vez.
+             */
+            ruta: string;
+            /**
+             * Creada En
+             * Format: date-time
+             */
+            creada_en: string;
         };
         /** ErrorRespuesta */
         ErrorRespuesta: {
@@ -663,6 +965,22 @@ export interface components {
              */
             recordarme: boolean;
         };
+        /** ListaPlantillas */
+        ListaPlantillas: {
+            /** Items */
+            items: components["schemas"]["Plantilla"][];
+        };
+        /** ListaTareas */
+        ListaTareas: {
+            /** Items */
+            items: components["schemas"]["TareaResumen"][];
+            /**
+             * Total
+             * @description Tareas que cumplen los filtros; `items` trae como máximo 500.
+             */
+            total: number;
+            resumen: components["schemas"]["ResumenTareas"];
+        };
         /** Marcados */
         Marcados: {
             /** Marcados */
@@ -712,6 +1030,22 @@ export interface components {
              * @description Cursor de la página siguiente, o null si no hay más.
              */
             siguiente: string | null;
+        };
+        /** PasoPlantilla */
+        PasoPlantilla: {
+            /** Titulo */
+            titulo: string;
+            /**
+             * Dias Habiles
+             * @description Días hábiles desde la notificación; null: sin fecha.
+             */
+            dias_habiles?: number | null;
+            /**
+             * Prioridad
+             * @default MEDIA
+             * @enum {string}
+             */
+            prioridad: "BAJA" | "MEDIA" | "ALTA" | "URGENTE";
         };
         /** Pendiente */
         Pendiente: {
@@ -768,6 +1102,27 @@ export interface components {
             id: number;
             /** Nombre */
             nombre: string;
+        };
+        /** Plantilla */
+        Plantilla: {
+            /** Nombre */
+            nombre: string;
+            /** Descripcion */
+            descripcion?: string | null;
+            /** Palabras Clave */
+            palabras_clave?: string[];
+            /** Pasos */
+            pasos: components["schemas"]["PasoPlantilla"][];
+            /** Id */
+            id: number;
+            /**
+             * Coincide
+             * @description Si sus palabras clave aparecen en el texto de `para`.
+             * @default false
+             */
+            coincide: boolean;
+            /** Puede Editar */
+            puede_editar: boolean;
         };
         /** ProcesoBreve */
         ProcesoBreve: {
@@ -882,6 +1237,13 @@ export interface components {
             /** Href */
             href: string;
         };
+        /** ResultadoLote */
+        ResultadoLote: {
+            /** Ids */
+            ids: number[];
+            /** Mensaje */
+            mensaje: string;
+        };
         /** Resultados */
         Resultados: {
             /**
@@ -904,6 +1266,23 @@ export interface components {
             /** Documentos Por Revisar */
             documentos_por_revisar: number;
         };
+        /** ResumenTareas */
+        ResumenTareas: {
+            /** Abiertas */
+            abiertas: number;
+            /** Vencidas */
+            vencidas: number;
+            /**
+             * Semana
+             * @description Abiertas que vencen en los próximos 7 días.
+             */
+            semana: number;
+            /**
+             * Completadas
+             * @description Completadas en los últimos 30 días.
+             */
+            completadas: number;
+        };
         /** RevisarFolios */
         RevisarFolios: {
             /**
@@ -911,6 +1290,18 @@ export interface components {
              * @description Folios a marcar revisados; si se omite, todos los nuevos del proceso.
              */
             numeros?: number[] | null;
+        };
+        /** Suscripcion */
+        Suscripcion: {
+            /** Activa */
+            activa: boolean;
+            /** Creada En */
+            creada_en?: string | null;
+            /**
+             * Ultimo Uso
+             * @description Última vez que un calendario leyó el enlace.
+             */
+            ultimo_uso?: string | null;
         };
         /** TareaCreada */
         TareaCreada: {
@@ -938,6 +1329,46 @@ export interface components {
              * @enum {string}
              */
             prioridad: "BAJA" | "MEDIA" | "ALTA" | "URGENTE";
+        };
+        /** TareaResumen */
+        TareaResumen: {
+            /** Id */
+            id: number;
+            /** Titulo */
+            titulo: string;
+            /** Descripcion */
+            descripcion?: string | null;
+            /**
+             * Estado
+             * @enum {string}
+             */
+            estado: "PENDIENTE" | "EN_CURSO" | "COMPLETADA" | "CANCELADA";
+            /**
+             * Prioridad
+             * @enum {string}
+             */
+            prioridad: "BAJA" | "MEDIA" | "ALTA" | "URGENTE";
+            /** Fecha Limite */
+            fecha_limite?: string | null;
+            /** Completada En */
+            completada_en?: string | null;
+            /**
+             * Vencida
+             * @description Abierta y con la fecha límite ya pasada.
+             */
+            vencida: boolean;
+            proceso?: components["schemas"]["ProcesoBreve"] | null;
+            /** Radicado */
+            radicado?: string | null;
+            /** @description Cliente al que se le asignó la tarea. */
+            cliente?: components["schemas"]["PersonaBreve"] | null;
+            responsable: components["schemas"]["PersonaBreve"];
+            subtareas: components["schemas"]["AvanceSubtareas"];
+        };
+        /** TareasCreadas */
+        TareasCreadas: {
+            /** Items */
+            items: components["schemas"]["TareaResumen"][];
         };
         /** Termino */
         Termino: {
@@ -2738,6 +3169,1035 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["Termino"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+        };
+    };
+    listar_tareas: {
+        parameters: {
+            query?: {
+                /** @description abiertas, vencidas, semana (vencen en 7 días), completadas o todas. */
+                grupo?: "abiertas" | "vencidas" | "semana" | "completadas" | "todas";
+                proceso_id?: number | null;
+                /** @description Solo las tareas de las que el usuario es responsable. */
+                solo_mias?: boolean;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ListaTareas"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+        };
+    };
+    cambiar_tareas_en_lote: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CambioEnLote"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ResultadoLote"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+        };
+    };
+    listar_plantillas: {
+        parameters: {
+            query?: {
+                /** @description Texto de una actuación: las plantillas que coinciden van primero. */
+                para?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ListaPlantillas"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+        };
+    };
+    crear_plantilla: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DatosPlantilla"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Plantilla"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+        };
+    };
+    editar_plantilla: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                plantilla_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DatosPlantilla"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Plantilla"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+        };
+    };
+    eliminar_plantilla: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                plantilla_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+        };
+    };
+    aplicar_plantilla: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                plantilla_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AplicarPlantilla"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TareasCreadas"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+        };
+    };
+    agenda: {
+        parameters: {
+            query: {
+                desde: string;
+                /** @description Inclusive. Como máximo 62 días después de «desde». */
+                hasta: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Agenda"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+        };
+    };
+    suscripcion: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Suscripcion"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+        };
+    };
+    crear_suscripcion: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnlaceSuscripcion"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+        };
+    };
+    eliminar_suscripcion: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+        };
+    };
+    feed: {
+        parameters: {
+            query: {
+                token: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Calendario .ics */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/calendar": unknown;
                 };
             };
             /** @description Bad Request */

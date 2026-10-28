@@ -3,6 +3,8 @@
 from fastapi import Depends
 from sqlalchemy.orm import Session
 
+from app.modulos.agenda.repositorio import RepositorioAgenda
+from app.modulos.agenda.servicio import ServicioAgenda
 from app.modulos.avisos.servicio import ServicioAvisos
 from app.modulos.bandeja.repositorio import RepositorioBandeja
 from app.modulos.bandeja.servicio import ServicioBandeja
@@ -13,6 +15,8 @@ from app.modulos.folios.repositorio import RepositorioFolios
 from app.modulos.folios.servicio import ServicioFolios
 from app.modulos.identidad.repositorio import RepositorioUsuarios
 from app.modulos.identidad.servicio import ServicioSesion
+from app.modulos.tareas.repositorio import RepositorioTareas
+from app.modulos.tareas.servicio import ServicioTareas
 from app.nucleo.bd import obtener_bd
 
 
@@ -38,3 +42,11 @@ def servicio_folios(db: Session = Depends(obtener_bd)) -> ServicioFolios:
 
 def servicio_bandeja(db: Session = Depends(obtener_bd)) -> ServicioBandeja:
     return ServicioBandeja(RepositorioBandeja(db))
+
+
+def servicio_tareas(db: Session = Depends(obtener_bd)) -> ServicioTareas:
+    return ServicioTareas(db, RepositorioTareas(db))
+
+
+def servicio_agenda(db: Session = Depends(obtener_bd)) -> ServicioAgenda:
+    return ServicioAgenda(db, RepositorioAgenda(db))

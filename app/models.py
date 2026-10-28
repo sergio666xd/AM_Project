@@ -1100,6 +1100,39 @@ class RecordatorioTarea(Base):
         )
 
 
+class PlantillaTarea(Base):
+    """Pasos que la firma suele seguir ante un tipo de actuación, para crearlos como tareas de una vez.
+
+    `palabras_clave` sirve para sugerirla cuando el texto de la actuación las contiene.
+    `pasos` es una lista de `{"titulo", "dias_habiles", "prioridad"}`: la fecha límite de
+    cada tarea se cuenta en días hábiles desde la notificación.
+    """
+    __tablename__ = "plantillas_tarea"
+
+    id = Column(Integer, primary_key=True)
+    nombre = Column(String(120), nullable=False)
+    descripcion = Column(Text, nullable=True)
+    palabras_clave = Column(JSON, nullable=False, default=list)
+    pasos = Column(JSON, nullable=False, default=list)
+    creado_por_id = Column(Integer, ForeignKey("usuarios.id", ondelete="SET NULL"), nullable=True)
+    created_at = Column(DateTime, nullable=False, default=utc_ahora)
+    updated_at = Column(DateTime, nullable=False, default=utc_ahora, onupdate=utc_ahora)
+
+
+class SuscripcionCalendario(Base):
+    """Enlace secreto con el que Google Calendar u Outlook leen la agenda de un usuario.
+
+    Solo se guarda el SHA-256 del token: el enlace completo se muestra una vez, al crearlo.
+    """
+    __tablename__ = "suscripciones_calendario"
+
+    id = Column(Integer, primary_key=True)
+    usuario_id = Column(Integer, ForeignKey("usuarios.id", ondelete="CASCADE"), nullable=False, unique=True)
+    token_hash = Column(String(64), nullable=False, unique=True)
+    created_at = Column(DateTime, nullable=False, default=utc_ahora)
+    ultimo_uso = Column(DateTime, nullable=True)
+
+
 class ContratoServicio(Base):
     __tablename__ = "contratos_servicios"
     __table_args__ = (

@@ -2289,10 +2289,1323 @@
           }
         }
       }
+    },
+    "/api/v2/tareas": {
+      "get": {
+        "tags": [
+          "Tareas"
+        ],
+        "summary": "Tareas del equipo",
+        "description": "Tareas de los procesos activos que el usuario ve y sus tareas generales, con el resumen\nde abiertas, vencidas, de la semana y completadas (con los mismos filtros de proceso y responsable).",
+        "operationId": "listar_tareas",
+        "parameters": [
+          {
+            "name": "grupo",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "enum": [
+                "abiertas",
+                "vencidas",
+                "semana",
+                "completadas",
+                "todas"
+              ],
+              "type": "string",
+              "description": "abiertas, vencidas, semana (vencen en 7 días), completadas o todas.",
+              "default": "abiertas",
+              "title": "Grupo"
+            },
+            "description": "abiertas, vencidas, semana (vencen en 7 días), completadas o todas."
+          },
+          {
+            "name": "proceso_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Proceso Id"
+            }
+          },
+          {
+            "name": "solo_mias",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "description": "Solo las tareas de las que el usuario es responsable.",
+              "default": false,
+              "title": "Solo Mias"
+            },
+            "description": "Solo las tareas de las que el usuario es responsable."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ListaTareas"
+                }
+              }
+            }
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Too Many Requests"
+          }
+        }
+      }
+    },
+    "/api/v2/tareas/lote": {
+      "patch": {
+        "tags": [
+          "Tareas"
+        ],
+        "summary": "Cambiar varias tareas a la vez",
+        "description": "Cambia estado, prioridad o fecha límite de todas las tareas elegidas, o las elimina.\nSi alguna no existe o el usuario no la ve, no se cambia ninguna.",
+        "operationId": "cambiar_tareas_en_lote",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CambioEnLote"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResultadoLote"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too Many Requests",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v2/tareas/plantillas": {
+      "get": {
+        "tags": [
+          "Tareas"
+        ],
+        "summary": "Plantillas de tareas",
+        "operationId": "listar_plantillas",
+        "parameters": [
+          {
+            "name": "para",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "maxLength": 2000
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Texto de una actuación: las plantillas que coinciden van primero.",
+              "title": "Para"
+            },
+            "description": "Texto de una actuación: las plantillas que coinciden van primero."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ListaPlantillas"
+                }
+              }
+            }
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Too Many Requests"
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Tareas"
+        ],
+        "summary": "Crear una plantilla",
+        "operationId": "crear_plantilla",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DatosPlantilla"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Plantilla"
+                }
+              }
+            }
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Too Many Requests"
+          }
+        }
+      }
+    },
+    "/api/v2/tareas/plantillas/{plantilla_id}": {
+      "put": {
+        "tags": [
+          "Tareas"
+        ],
+        "summary": "Editar una plantilla",
+        "operationId": "editar_plantilla",
+        "parameters": [
+          {
+            "name": "plantilla_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Plantilla Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DatosPlantilla"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Plantilla"
+                }
+              }
+            }
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Too Many Requests"
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Tareas"
+        ],
+        "summary": "Eliminar una plantilla",
+        "operationId": "eliminar_plantilla",
+        "parameters": [
+          {
+            "name": "plantilla_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Plantilla Id"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Too Many Requests"
+          }
+        }
+      }
+    },
+    "/api/v2/tareas/plantillas/{plantilla_id}/aplicar": {
+      "post": {
+        "tags": [
+          "Tareas"
+        ],
+        "summary": "Crear las tareas de una plantilla",
+        "description": "Crea una tarea por paso en el proceso. Cada fecha límite se cuenta en días hábiles\ndesde la notificación, con la misma calculadora de términos.",
+        "operationId": "aplicar_plantilla",
+        "parameters": [
+          {
+            "name": "plantilla_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Plantilla Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AplicarPlantilla"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TareasCreadas"
+                }
+              }
+            }
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Too Many Requests"
+          }
+        }
+      }
+    },
+    "/api/v2/agenda": {
+      "get": {
+        "tags": [
+          "Agenda"
+        ],
+        "summary": "Agenda del equipo",
+        "description": "Audiencias, reuniones y demás eventos de los procesos activos que el usuario ve, y los\nvencimientos de las tareas abiertas, entre las dos fechas (hora de Colombia).",
+        "operationId": "agenda",
+        "parameters": [
+          {
+            "name": "desde",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "date",
+              "title": "Desde"
+            }
+          },
+          {
+            "name": "hasta",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "date",
+              "description": "Inclusive. Como máximo 62 días después de «desde».",
+              "title": "Hasta"
+            },
+            "description": "Inclusive. Como máximo 62 días después de «desde»."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Agenda"
+                }
+              }
+            }
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Too Many Requests"
+          }
+        }
+      }
+    },
+    "/api/v2/agenda/suscripcion": {
+      "get": {
+        "tags": [
+          "Agenda"
+        ],
+        "summary": "Estado de la suscripción de calendario",
+        "operationId": "suscripcion",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Suscripcion"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too Many Requests",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Agenda"
+        ],
+        "summary": "Crear o renovar el enlace de calendario",
+        "description": "Devuelve el enlace .ics una sola vez. Si ya había uno, deja de funcionar.",
+        "operationId": "crear_suscripcion",
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EnlaceSuscripcion"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too Many Requests",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Agenda"
+        ],
+        "summary": "Desactivar el enlace de calendario",
+        "operationId": "eliminar_suscripcion",
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too Many Requests",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v2/agenda/feed.ics": {
+      "get": {
+        "tags": [
+          "Agenda"
+        ],
+        "summary": "Agenda en formato iCalendar",
+        "description": "Lo leen Google Calendar, Outlook y Apple Calendar con el enlace de la suscripción.\nNo usa la sesión: el token del enlace identifica al usuario.",
+        "operationId": "feed",
+        "parameters": [
+          {
+            "name": "token",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "maxLength": 100,
+              "title": "Token"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Calendario .ics",
+            "content": {
+              "text/calendar": {}
+            }
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Too Many Requests"
+          }
+        }
+      }
     }
   },
   "components": {
     "schemas": {
+      "Agenda": {
+        "properties": {
+          "desde": {
+            "type": "string",
+            "format": "date",
+            "title": "Desde"
+          },
+          "hasta": {
+            "type": "string",
+            "format": "date",
+            "title": "Hasta"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/ElementoAgenda"
+            },
+            "type": "array",
+            "title": "Items",
+            "description": "Ordenados por inicio."
+          }
+        },
+        "type": "object",
+        "required": [
+          "desde",
+          "hasta",
+          "items"
+        ],
+        "title": "Agenda"
+      },
+      "AplicarPlantilla": {
+        "properties": {
+          "proceso_id": {
+            "type": "integer",
+            "title": "Proceso Id"
+          },
+          "notificacion": {
+            "type": "string",
+            "format": "date",
+            "title": "Notificacion",
+            "description": "Desde cuándo se cuentan los días hábiles de cada paso."
+          },
+          "folio": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 1.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Folio",
+            "description": "Folio del expediente que originó las tareas, para la descripción."
+          }
+        },
+        "type": "object",
+        "required": [
+          "proceso_id",
+          "notificacion"
+        ],
+        "title": "AplicarPlantilla"
+      },
       "ArchivoFolio": {
         "properties": {
           "nombre": {
@@ -2311,6 +3624,24 @@
           "url"
         ],
         "title": "ArchivoFolio"
+      },
+      "AvanceSubtareas": {
+        "properties": {
+          "total": {
+            "type": "integer",
+            "title": "Total"
+          },
+          "hechas": {
+            "type": "integer",
+            "title": "Hechas"
+          }
+        },
+        "type": "object",
+        "required": [
+          "total",
+          "hechas"
+        ],
+        "title": "AvanceSubtareas"
       },
       "AvisarCliente": {
         "properties": {
@@ -2515,6 +3846,77 @@
         ],
         "title": "CambiarEtapa"
       },
+      "CambioEnLote": {
+        "properties": {
+          "ids": {
+            "items": {
+              "type": "integer"
+            },
+            "type": "array",
+            "maxItems": 200,
+            "minItems": 1,
+            "title": "Ids"
+          },
+          "estado": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "PENDIENTE",
+                  "EN_CURSO",
+                  "COMPLETADA",
+                  "CANCELADA"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Estado"
+          },
+          "prioridad": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "BAJA",
+                  "MEDIA",
+                  "ALTA",
+                  "URGENTE"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Prioridad"
+          },
+          "fecha_limite": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fecha Limite",
+            "description": "Vencen al final de ese día. `null` quita la fecha."
+          },
+          "eliminar": {
+            "type": "boolean",
+            "title": "Eliminar",
+            "default": false
+          }
+        },
+        "type": "object",
+        "required": [
+          "ids"
+        ],
+        "title": "CambioEnLote",
+        "description": "Lo que se cambia a todas las tareas elegidas. Solo se aplican los campos enviados."
+      },
       "CambioEtapa": {
         "properties": {
           "etapa": {
@@ -2580,6 +3982,178 @@
           "clientes"
         ],
         "title": "ClientesAvisados"
+      },
+      "DatosPlantilla": {
+        "properties": {
+          "nombre": {
+            "type": "string",
+            "maxLength": 120,
+            "minLength": 1,
+            "title": "Nombre"
+          },
+          "descripcion": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 1000
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Descripcion"
+          },
+          "palabras_clave": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "maxItems": 20,
+            "title": "Palabras Clave"
+          },
+          "pasos": {
+            "items": {
+              "$ref": "#/components/schemas/PasoPlantilla"
+            },
+            "type": "array",
+            "maxItems": 20,
+            "minItems": 1,
+            "title": "Pasos"
+          }
+        },
+        "type": "object",
+        "required": [
+          "nombre",
+          "pasos"
+        ],
+        "title": "DatosPlantilla"
+      },
+      "ElementoAgenda": {
+        "properties": {
+          "clave": {
+            "type": "string",
+            "title": "Clave",
+            "description": "Identificador estable, como «evento:4» o «tarea:12»."
+          },
+          "tipo": {
+            "type": "string",
+            "enum": [
+              "evento",
+              "tarea"
+            ],
+            "title": "Tipo"
+          },
+          "etiqueta": {
+            "type": "string",
+            "title": "Etiqueta",
+            "description": "Audiencia, Reunión, Firma de contrato, Evento o Vence tarea."
+          },
+          "titulo": {
+            "type": "string",
+            "title": "Titulo"
+          },
+          "detalle": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Detalle"
+          },
+          "inicio": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Inicio"
+          },
+          "fin": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fin"
+          },
+          "todo_el_dia": {
+            "type": "boolean",
+            "title": "Todo El Dia",
+            "description": "Las tareas vencen en un día, sin hora de inicio."
+          },
+          "estado": {
+            "type": "string",
+            "title": "Estado",
+            "description": "PROGRAMADO, COMPLETADO o CANCELADO en eventos; el estado de la tarea en tareas."
+          },
+          "vencida": {
+            "type": "boolean",
+            "title": "Vencida",
+            "default": false
+          },
+          "proceso": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ProcesoBreve"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "responsable": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Responsable"
+          },
+          "enlace": {
+            "type": "string",
+            "title": "Enlace",
+            "description": "Ruta del panel del abogado donde se atiende."
+          }
+        },
+        "type": "object",
+        "required": [
+          "clave",
+          "tipo",
+          "etiqueta",
+          "titulo",
+          "inicio",
+          "todo_el_dia",
+          "estado",
+          "enlace"
+        ],
+        "title": "ElementoAgenda"
+      },
+      "EnlaceSuscripcion": {
+        "properties": {
+          "ruta": {
+            "type": "string",
+            "title": "Ruta",
+            "description": "Ruta del feed con el token, para unir al dominio del sitio. Solo se muestra esta vez."
+          },
+          "creada_en": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Creada En"
+          }
+        },
+        "type": "object",
+        "required": [
+          "ruta",
+          "creada_en"
+        ],
+        "title": "EnlaceSuscripcion"
       },
       "ErrorRespuesta": {
         "properties": {
@@ -2898,6 +4472,48 @@
         ],
         "title": "IniciarSesion"
       },
+      "ListaPlantillas": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/Plantilla"
+            },
+            "type": "array",
+            "title": "Items"
+          }
+        },
+        "type": "object",
+        "required": [
+          "items"
+        ],
+        "title": "ListaPlantillas"
+      },
+      "ListaTareas": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/TareaResumen"
+            },
+            "type": "array",
+            "title": "Items"
+          },
+          "total": {
+            "type": "integer",
+            "title": "Total",
+            "description": "Tareas que cumplen los filtros; `items` trae como máximo 500."
+          },
+          "resumen": {
+            "$ref": "#/components/schemas/ResumenTareas"
+          }
+        },
+        "type": "object",
+        "required": [
+          "items",
+          "total",
+          "resumen"
+        ],
+        "title": "ListaTareas"
+      },
       "Marcados": {
         "properties": {
           "marcados": {
@@ -3010,6 +4626,46 @@
           "siguiente"
         ],
         "title": "PaginaProcesos"
+      },
+      "PasoPlantilla": {
+        "properties": {
+          "titulo": {
+            "type": "string",
+            "maxLength": 255,
+            "minLength": 1,
+            "title": "Titulo"
+          },
+          "dias_habiles": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "maximum": 365.0,
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Dias Habiles",
+            "description": "Días hábiles desde la notificación; null: sin fecha."
+          },
+          "prioridad": {
+            "type": "string",
+            "enum": [
+              "BAJA",
+              "MEDIA",
+              "ALTA",
+              "URGENTE"
+            ],
+            "title": "Prioridad",
+            "default": "MEDIA"
+          }
+        },
+        "type": "object",
+        "required": [
+          "titulo"
+        ],
+        "title": "PasoPlantilla"
       },
       "Pendiente": {
         "properties": {
@@ -3134,6 +4790,67 @@
           "nombre"
         ],
         "title": "PersonaBreve"
+      },
+      "Plantilla": {
+        "properties": {
+          "nombre": {
+            "type": "string",
+            "maxLength": 120,
+            "minLength": 1,
+            "title": "Nombre"
+          },
+          "descripcion": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 1000
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Descripcion"
+          },
+          "palabras_clave": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "maxItems": 20,
+            "title": "Palabras Clave"
+          },
+          "pasos": {
+            "items": {
+              "$ref": "#/components/schemas/PasoPlantilla"
+            },
+            "type": "array",
+            "maxItems": 20,
+            "minItems": 1,
+            "title": "Pasos"
+          },
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "coincide": {
+            "type": "boolean",
+            "title": "Coincide",
+            "description": "Si sus palabras clave aparecen en el texto de `para`.",
+            "default": false
+          },
+          "puede_editar": {
+            "type": "boolean",
+            "title": "Puede Editar"
+          }
+        },
+        "type": "object",
+        "required": [
+          "nombre",
+          "pasos",
+          "id",
+          "puede_editar"
+        ],
+        "title": "Plantilla"
       },
       "ProcesoBreve": {
         "properties": {
@@ -3437,6 +5154,27 @@
         ],
         "title": "Resultado"
       },
+      "ResultadoLote": {
+        "properties": {
+          "ids": {
+            "items": {
+              "type": "integer"
+            },
+            "type": "array",
+            "title": "Ids"
+          },
+          "mensaje": {
+            "type": "string",
+            "title": "Mensaje"
+          }
+        },
+        "type": "object",
+        "required": [
+          "ids",
+          "mensaje"
+        ],
+        "title": "ResultadoLote"
+      },
       "Resultados": {
         "properties": {
           "items": {
@@ -3483,6 +5221,36 @@
         ],
         "title": "ResumenBandeja"
       },
+      "ResumenTareas": {
+        "properties": {
+          "abiertas": {
+            "type": "integer",
+            "title": "Abiertas"
+          },
+          "vencidas": {
+            "type": "integer",
+            "title": "Vencidas"
+          },
+          "semana": {
+            "type": "integer",
+            "title": "Semana",
+            "description": "Abiertas que vencen en los próximos 7 días."
+          },
+          "completadas": {
+            "type": "integer",
+            "title": "Completadas",
+            "description": "Completadas en los últimos 30 días."
+          }
+        },
+        "type": "object",
+        "required": [
+          "abiertas",
+          "vencidas",
+          "semana",
+          "completadas"
+        ],
+        "title": "ResumenTareas"
+      },
       "RevisarFolios": {
         "properties": {
           "numeros": {
@@ -3504,6 +5272,44 @@
         },
         "type": "object",
         "title": "RevisarFolios"
+      },
+      "Suscripcion": {
+        "properties": {
+          "activa": {
+            "type": "boolean",
+            "title": "Activa"
+          },
+          "creada_en": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Creada En"
+          },
+          "ultimo_uso": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ultimo Uso",
+            "description": "Última vez que un calendario leyó el enlace."
+          }
+        },
+        "type": "object",
+        "required": [
+          "activa"
+        ],
+        "title": "Suscripcion"
       },
       "TareaCreada": {
         "properties": {
@@ -3586,6 +5392,143 @@
           "titulo"
         ],
         "title": "TareaDesdeFolio"
+      },
+      "TareaResumen": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "titulo": {
+            "type": "string",
+            "title": "Titulo"
+          },
+          "descripcion": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Descripcion"
+          },
+          "estado": {
+            "type": "string",
+            "enum": [
+              "PENDIENTE",
+              "EN_CURSO",
+              "COMPLETADA",
+              "CANCELADA"
+            ],
+            "title": "Estado"
+          },
+          "prioridad": {
+            "type": "string",
+            "enum": [
+              "BAJA",
+              "MEDIA",
+              "ALTA",
+              "URGENTE"
+            ],
+            "title": "Prioridad"
+          },
+          "fecha_limite": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fecha Limite"
+          },
+          "completada_en": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Completada En"
+          },
+          "vencida": {
+            "type": "boolean",
+            "title": "Vencida",
+            "description": "Abierta y con la fecha límite ya pasada."
+          },
+          "proceso": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ProcesoBreve"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "radicado": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Radicado"
+          },
+          "cliente": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PersonaBreve"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Cliente al que se le asignó la tarea."
+          },
+          "responsable": {
+            "$ref": "#/components/schemas/PersonaBreve"
+          },
+          "subtareas": {
+            "$ref": "#/components/schemas/AvanceSubtareas"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "titulo",
+          "estado",
+          "prioridad",
+          "vencida",
+          "responsable",
+          "subtareas"
+        ],
+        "title": "TareaResumen"
+      },
+      "TareasCreadas": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/TareaResumen"
+            },
+            "type": "array",
+            "title": "Items"
+          }
+        },
+        "type": "object",
+        "required": [
+          "items"
+        ],
+        "title": "TareasCreadas"
       },
       "Termino": {
         "properties": {

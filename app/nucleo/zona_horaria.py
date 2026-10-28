@@ -5,7 +5,7 @@ API v2 toda fecha y hora sale en ISO 8601 con la zona de Bogotá
 (`2026-10-27T08:20:00-05:00`), así el navegador no tiene que adivinar.
 """
 
-from datetime import datetime, timezone
+from datetime import date, datetime, time, timezone
 from typing import Annotated
 
 from pydantic import PlainSerializer, WithJsonSchema
@@ -24,10 +24,20 @@ def ahora_utc() -> datetime:
     return datetime.now(timezone.utc)
 
 
+def fin_del_dia_utc(dia: date) -> datetime:
+    """23:59 de ese día en Colombia, como UTC sin zona: así vencen las tareas con solo fecha."""
+    return datetime.combine(dia, time(23, 59), COLOMBIA).astimezone(timezone.utc).replace(tzinfo=None)
+
+
+def inicio_del_dia_utc(dia: date) -> datetime:
+    """Medianoche de ese día en Colombia, como UTC sin zona."""
+    return datetime.combine(dia, time.min, COLOMBIA).astimezone(timezone.utc).replace(tzinfo=None)
+
+
 FechaHora = Annotated[
     datetime,
     PlainSerializer(lambda valor: a_colombia(valor).isoformat(), return_type=str, when_used="json"),
     WithJsonSchema({"type": "string", "format": "date-time"}),
 ]
 
-__all__ = ["COLOMBIA", "FechaHora", "a_colombia", "ahora_utc", "utc_ahora"]
+__all__ = ["COLOMBIA", "FechaHora", "a_colombia", "ahora_utc", "fin_del_dia_utc", "inicio_del_dia_utc", "utc_ahora"]
