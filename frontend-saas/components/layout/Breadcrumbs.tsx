@@ -16,7 +16,7 @@ const labels: Record<string, string> = {
   radicados: "Radicados",
   tareas: "Tareas",
   documentos: "Documentos",
-  contratos: "Contratos y Documentos Legales",
+  contratos: "Contratos",
   clientes: "Clientes",
   agenda: "Agenda",
   notificaciones: "Notificaciones",
