@@ -41,3 +41,25 @@ export function fechaConHora(valor: string | Date | null | undefined): string {
   const fecha = valor ? aFecha(valor) : null;
   return fecha ? `${fechaCorta(fecha)}, ${hora.format(fecha)}` : "";
 }
+
+/** Un día del calendario ("2026-11-12") a mediodía de Bogotá, para que ninguna zona lo corra de día. */
+function dia(iso: string): Date | null {
+  return /^\d{4}-\d{2}-\d{2}$/.test(iso) ? aFecha(`${iso}T12:00:00-05:00`) : null;
+}
+
+/** "jueves 12 de noviembre" para un día del calendario. */
+export function diaLargo(iso: string): string {
+  const fecha = dia(iso);
+  return fecha ? larga.format(fecha) : "";
+}
+
+/** "12 nov." (o "12 nov. 2027" en otro año) para un día del calendario. */
+export function diaCorto(iso: string, ahora = new Date()): string {
+  const fecha = dia(iso);
+  return fecha ? fechaCorta(fecha, ahora) : "";
+}
+
+/** Hoy en Bogotá como "2026-10-28". */
+export function hoyISO(ahora = new Date()): string {
+  return clave.format(ahora);
+}

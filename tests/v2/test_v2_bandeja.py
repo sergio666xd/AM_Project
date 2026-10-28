@@ -26,10 +26,17 @@ def test_bandeja_ordena_lo_urgente(iniciar, crear_usuario, crear_proceso, client
     _tarea(sesion_bd, abogada, ajeno, "De otro abogado", -timedelta(days=1))
     sesion_bd.add(models.EventoAgenda(titulo="Audiencia inicial", tipo="AUDIENCIA", fecha_inicio=utc_ahora() + timedelta(days=3),
                                       proceso_id=proceso.id))
-    sesion_bd.add(models.DocumentoProceso(proceso_id=proceso.id, cliente_id=cliente.id, nombre_archivo="registro-civil.pdf",
-                                          ruta_archivo="x", mime_type="application/pdf", estado_revision="RECIBIDO"))
-    sesion_bd.add(models.DocumentoProceso(proceso_id=proceso.id, cliente_id=cliente.id, nombre_archivo="aprobado.pdf",
-                                          ruta_archivo="y", mime_type="application/pdf", estado_revision="APROBADO"))
+    solicitud = models.SolicitudDocumento(proceso_id=proceso.id, cliente_id=cliente.id, titulo="Registro civil",
+                                          documentos_requeridos=[{"id": "a1", "nombre": "Registro civil"}])
+    sesion_bd.add(solicitud)
+    sesion_bd.flush()
+    for nombre, estado in [("registro-civil.pdf", "RECIBIDO"), ("aprobado.pdf", "APROBADO")]:
+        sesion_bd.add(models.DocumentoProceso(proceso_id=proceso.id, cliente_id=cliente.id, solicitud_id=solicitud.id,
+                                              nombre_archivo=nombre, ruta_archivo=nombre, mime_type="application/pdf",
+                                              estado_revision=estado))
+    # El contrato firmado que sube la firma lleva el cliente pero no es una entrega suya.
+    sesion_bd.add(models.DocumentoProceso(proceso_id=proceso.id, cliente_id=cliente.id, nombre_archivo="contrato.pdf",
+                                          ruta_archivo="c", mime_type="application/pdf", estado_revision="RECIBIDO"))
     sesion_bd.commit()
     iniciar(abogada)
 

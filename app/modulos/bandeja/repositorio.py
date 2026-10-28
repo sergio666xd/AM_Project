@@ -40,7 +40,8 @@ class RepositorioBandeja:
 
     def documentos_sin_revisar(self, proceso_ids: list[int], limite: int) -> tuple[list[tuple[models.DocumentoProceso, str | None]], int]:
         D, U = models.DocumentoProceso, models.Usuario
-        condicion = (D.proceso_id.in_(proceso_ids), D.cliente_id.is_not(None), D.estado_revision.in_(SIN_REVISAR))
+        # Lo que responde a una solicitud lo entregó el cliente (como en los folios).
+        condicion = (D.proceso_id.in_(proceso_ids), D.solicitud_id.is_not(None), D.estado_revision.in_(SIN_REVISAR))
         total = self._db.scalar(select(func.count()).select_from(D).where(*condicion)) or 0
         filas = self._db.execute(
             select(D, U.nombre_completo).outerjoin(U, U.id == D.cliente_id).where(*condicion).order_by(D.created_at.desc()).limit(limite)
