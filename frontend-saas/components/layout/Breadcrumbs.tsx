@@ -93,15 +93,15 @@ export default function Breadcrumbs() {
         ? [currentChatLabel.titulo]
         : [...(processChat && currentChatLabel.subtitulo !== "Conversación directa" ? [currentChatLabel.subtitulo] : []), currentChatLabel.titulo]
       : chatTail.length ? ["Abriendo chat..."] : [];
-    return <nav aria-label="Ruta de navegación" className="min-w-0"><ol className="flex min-w-0 flex-wrap items-center gap-1.5 text-sm text-foreground-muted">
-      {prefix.map((segment, index) => <li key={index} className="flex min-w-0 items-center gap-1.5">{index > 0 && <span aria-hidden="true">/</span>}{index === prefix.length - 1 ? <span className="truncate font-medium text-foreground">Chats</span> : <Link href={`/${prefix.slice(0, index + 1).join("/")}`} className="truncate transition-colors hover:text-foreground">{labelFor(segment)}</Link>}</li>)}
-      {labelsToShow.map((label, index) => <li key={`${label}-${index}`} className="flex min-w-0 items-center gap-1.5"><span aria-hidden="true">/</span><span aria-current={index === labelsToShow.length - 1 ? "page" : undefined} className={`truncate ${index === labelsToShow.length - 1 ? "font-medium text-foreground" : ""}`}>{label}</span></li>)}
+    return <nav aria-label="Ruta de navegación" className="min-w-0"><ol className="flex min-w-0 items-center gap-1.5 overflow-hidden whitespace-nowrap text-[13px] text-ink-3">
+      {prefix.map((segment, index) => <li key={index} className="flex min-w-0 items-center gap-1.5">{index > 0 && <span aria-hidden="true" className="text-line-strong">/</span>}{index === prefix.length - 1 ? <span className="truncate font-semibold text-ink">Chats</span> : <Link href={`/${prefix.slice(0, index + 1).join("/")}`} className="truncate transition-colors hover:text-ink">{labelFor(segment)}</Link>}</li>)}
+      {labelsToShow.map((label, index) => <li key={`${label}-${index}`} className="flex min-w-0 items-center gap-1.5"><span aria-hidden="true" className="text-line-strong">/</span><span aria-current={index === labelsToShow.length - 1 ? "page" : undefined} className={`truncate ${index === labelsToShow.length - 1 ? "font-semibold text-ink" : ""}`}>{label}</span></li>)}
     </ol></nav>;
   }
 
   return (
     <nav aria-label="Ruta de navegación" className="min-w-0">
-      <ol className="flex min-w-0 flex-wrap items-center gap-1.5 text-sm text-foreground-muted">
+      <ol className="flex min-w-0 items-center gap-1.5 overflow-hidden whitespace-nowrap text-[13px] text-ink-3">
         {segments.map((segment, index) => {
           // «Gestión de procesos» no aporta dentro de los paneles: la ruta empieza en el área.
           if (index === 0 && segment === "gestion-procesos" && segments.length > 1) return null;
@@ -110,11 +110,11 @@ export default function Breadcrumbs() {
           const label = labelFor(segment);
           return (
             <li key={href} className="flex min-w-0 items-center gap-1.5">
-              {index > (segments[0] === "gestion-procesos" ? 1 : 0) && <span aria-hidden="true">/</span>}
+              {index > (segments[0] === "gestion-procesos" ? 1 : 0) && <span aria-hidden="true" className="text-line-strong">/</span>}
               {current ? (
-                <span aria-current="page" className="truncate font-medium text-foreground">{label}</span>
+                <span aria-current="page" className="truncate font-semibold text-ink">{label}</span>
               ) : (
-                <Link href={href} className="truncate transition-colors hover:text-foreground">{label}</Link>
+                <Link href={href} className="truncate transition-colors hover:text-ink">{label}</Link>
               )}
             </li>
           );

@@ -17,10 +17,10 @@ const homeByRole: Record<Role, string> = {
 };
 
 export function RoleGate({ roles, children, restrictedBehavior = "redirect" }: { roles: Role[]; children: React.ReactNode; restrictedBehavior?: "redirect" | "page" }) {
-  const { user, loading, token, sessionError, retrySession } = useSession();
-  // Con token pero sin usuario por un fallo de red o servidor: se ofrece
-  // reintentar en lugar de enviar a iniciar sesión.
-  const backendUnavailable = !user && Boolean(token && sessionError);
+  const { user, loading, sessionError, retrySession } = useSession();
+  // Sin usuario por un fallo de red o servidor (la cookie sigue ahí): se
+  // ofrece reintentar en lugar de enviar a iniciar sesión.
+  const backendUnavailable = !user && Boolean(sessionError);
   const router = useRouter();
   const pathname = usePathname();
 
