@@ -16,7 +16,7 @@ from app.whatsapp import PIE_WHATSAPP, formatear_mensaje_whatsapp
 
 RAIZ = Path(__file__).resolve().parents[1]
 _spec = importlib.util.spec_from_file_location(
-    "mensajes_legibles", RAIZ / "alembic_migrations" / "versions" / "2026_10_29_0010_mensajes_legibles.py"
+    "mensajes_legibles", RAIZ / "alembic_migrations" / "versions" / "2026_10_29_0011_mensajes_legibles.py"
 )
 MIGRACION = importlib.util.module_from_spec(_spec)
 _spec.loader.exec_module(MIGRACION)
