@@ -1,4 +1,5 @@
-import type { ButtonHTMLAttributes, ReactNode } from "react";
+import type { ButtonHTMLAttributes, ComponentProps, ReactNode } from "react";
+import Link from "next/link";
 import { Loader2 } from "lucide-react";
 
 type ButtonVariant = "primary" | "secondary" | "outline" | "ghost" | "danger" | "gold";
@@ -32,6 +33,14 @@ export type ButtonProps = Omit<ButtonHTMLAttributes<HTMLButtonElement>, "size"> 
   icon?: ReactNode;
 };
 
+const BASE =
+  "relative inline-flex select-none items-center justify-center whitespace-nowrap font-semibold transition-[background-color,box-shadow,color,scale,filter] duration-150 active:scale-[0.96]";
+
+/** Clases de un botón, para lo que debe verse como botón sin serlo (un enlace). */
+export function clasesBoton(variant: ButtonVariant = "primary", size: ButtonSize = "md"): string {
+  return `${BASE} ${variants[variant]} ${sizes[size]}`;
+}
+
 export function Button({
   variant = "primary",
   size = "md",
@@ -49,7 +58,7 @@ export function Button({
       type={type}
       disabled={isDisabled}
       aria-busy={loading || undefined}
-      className={`relative inline-flex select-none items-center justify-center whitespace-nowrap font-semibold transition-[background-color,box-shadow,color,scale,filter] duration-150 active:scale-[0.96] disabled:pointer-events-none disabled:opacity-50 ${variants[variant]} ${sizes[size]} ${className}`}
+      className={`${clasesBoton(variant, size)} disabled:pointer-events-none disabled:opacity-50 ${className}`}
       {...props}
     >
       {loading ? (
@@ -59,5 +68,22 @@ export function Button({
       ) : null}
       {children}
     </button>
+  );
+}
+
+/** Un enlace con aspecto de botón: navega, no ejecuta una acción. */
+export function EnlaceBoton({
+  variant = "primary",
+  size = "md",
+  icon,
+  className = "",
+  children,
+  ...props
+}: ComponentProps<typeof Link> & { variant?: ButtonVariant; size?: ButtonSize; icon?: ReactNode }) {
+  return (
+    <Link className={`${clasesBoton(variant, size)} ${className}`} {...props}>
+      {icon && <span className="-ml-0.5 inline-flex shrink-0">{icon}</span>}
+      {children}
+    </Link>
   );
 }

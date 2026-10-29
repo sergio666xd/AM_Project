@@ -1,406 +1,147 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useState } from "react";
+import { ArrowRight, FolderOpen, MessageCircle, RefreshCw } from "lucide-react";
+
 import {
-  Bell,
-  CheckCircle2,
-  CheckSquare,
-  ClipboardCheck,
-  Upload,
-  FolderOpen,
-  MessageSquare,
-  RefreshCw,
-  ArrowRight,
-} from "lucide-react";
-import { useSession } from "@/context/SessionContext";
-import { fetchApi } from "@/lib/api";
-import { ApiErrorState } from "@/components/ui/ApiErrorState";
+  AlDia,
+  EnQueVa,
+  EntradaCliente,
+  FilasCargando,
+  PendientesCliente,
+  ProximaFecha,
+  TituloCliente,
+} from "@/components/portal-cliente/piezas";
+import { Button, EnlaceBoton } from "@/components/ui/Button";
 import { EmptyState } from "@/components/ui/EmptyState";
-import { PageHeader } from "@/components/ui/PageHeader";
-import { Button } from "@/components/ui/Button";
-import { Badge } from "@/components/ui/Badge";
+import { Sheet } from "@/components/ui/Sheet";
+import { api, mensajeDeError } from "@/lib/api-v2/cliente";
+import { fechaLarga } from "@/lib/fechas";
+import {
+  primerNombre,
+  rutaMensajeAbogado,
+  rutaProceso,
+  saludo,
+  type InicioCliente,
+  type ResumenProcesoCliente,
+} from "@/lib/portalCliente";
+import { useLoadEffect } from "@/lib/useLoadEffect";
+import { useNow } from "@/lib/useNow";
 
-type Process = {
-  id: number;
-  nombre: string;
-  descripcion?: string | null;
-  estado_visible: string;
-  explicacion_estado: string;
-  responsable?: { nombre_completo: string };
-  tareas_pendientes: number;
-  documentos_pendientes: number;
-  ultima_actividad?: string | null;
-  proxima_actividad?: string | null;
-  proxima_actividad_titulo?: string | null;
-  radicados: { id: number }[];
-};
+export default function InicioClientePage() {
+  const [inicio, setInicio] = useState<InicioCliente | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
-type Task = {
-  id: number;
-  titulo: string;
-  descripcion?: string | null;
-  estado: string;
-  fecha_limite?: string | null;
-  proceso_id?: number | null;
-  cliente_id?: number | null;
-  subtareas?: { id: number; completada: boolean }[];
-};
+  const cargar = useCallback(async () => {
+    setError(null);
+    const { data, error: fallo } = await api.GET("/api/v2/cliente/inicio");
+    if (data) setInicio(data);
+    else setError(mensajeDeError(fallo));
+  }, []);
+  useLoadEffect(cargar);
 
-type Docs = {
-  solicitudes: { id: number; titulo: string; proceso: string; atendida_en?: string | null }[];
-  documentos: unknown[];
-};
-
-type Agenda = {
-  eventos: { id: number; titulo: string; fecha_inicio: string; proceso: string }[];
-  tareas: unknown[];
-};
-
-type Notice = { id: string; leida: boolean };
-
-type Activity = {
-  id: string;
-  titulo: string;
-  descripcion?: string | null;
-  fecha?: string | null;
-  proceso: string;
-  href: string;
-};
-
-const dateText = (value?: string | null) =>
-  value
-    ? new Intl.DateTimeFormat("es-CO", {
-        dateStyle: "medium",
-        timeStyle: "short",
-        timeZone: "America/Bogota",
-      }).format(new Date(value))
-    : "Sin fecha";
-
-const monthText = (value: string) =>
-  new Intl.DateTimeFormat("es-CO", { month: "short", timeZone: "America/Bogota" }).format(new Date(value)).replace(".", "");
-const dayText = (value: string) =>
-  new Intl.DateTimeFormat("es-CO", { day: "numeric", timeZone: "America/Bogota" }).format(new Date(value));
-
-const isUpcoming = (value: string) => Date.parse(value) >= Date.now();
-
-export default function ClienteHomePage() {
-  const { user, token, loading: sessionLoading } = useSession();
-  const [processes, setProcesses] = useState<Process[]>([]);
-  const [tasks, setTasks] = useState<Task[]>([]);
-  const [docs, setDocs] = useState<Docs>({ solicitudes: [], documentos: [] });
-  const [agenda, setAgenda] = useState<Agenda>({ eventos: [], tareas: [] });
-  const [activity, setActivity] = useState<Activity[]>([]);
-  const [unread, setUnread] = useState(0);
-  const [loading, setLoading] = useState(true);
-  const [hasLoaded, setHasLoaded] = useState(false);
-  const [error, setError] = useState("");
-
-  const load = useCallback(async () => {
-    if (!token) return;
-    try {
-      const [p, t, d, a, n, recent] = await Promise.all([
-        fetchApi("/api/expedientes/procesos", { token }) as Promise<Process[]>,
-        fetchApi("/api/tareas", { token }) as Promise<Task[]>,
-        fetchApi("/api/expedientes/documentos", { token }) as Promise<Docs>,
-        fetchApi("/api/expedientes/cliente/agenda", { token }) as Promise<Agenda>,
-        fetchApi("/api/expedientes/cliente/notificaciones", { token }) as Promise<Notice[]>,
-        fetchApi("/api/expedientes/cliente/actividad", { token }) as Promise<Activity[]>,
-      ]);
-      setProcesses(p);
-      setTasks(t);
-      setDocs(d);
-      setAgenda(a);
-      setUnread(n.filter((item) => !item.leida).length);
-      setActivity(recent);
-      setError("");
-      setHasLoaded(true);
-    } catch (cause) {
-      setError(cause instanceof Error ? cause.message : "No fue posible cargar el portal.");
-    } finally {
-      setLoading(false);
-    }
-  }, [token]);
-
-  useEffect(() => {
-    if (sessionLoading || !token) return;
-    let active = true;
-    Promise.all([
-      fetchApi("/api/expedientes/procesos", { token }) as Promise<Process[]>,
-      fetchApi("/api/tareas", { token }) as Promise<Task[]>,
-      fetchApi("/api/expedientes/documentos", { token }) as Promise<Docs>,
-      fetchApi("/api/expedientes/cliente/agenda", { token }) as Promise<Agenda>,
-      fetchApi("/api/expedientes/cliente/notificaciones", { token }) as Promise<Notice[]>,
-      fetchApi("/api/expedientes/cliente/actividad", { token }) as Promise<Activity[]>,
-    ])
-      .then(([p, t, d, a, n, recent]) => {
-        if (!active) return;
-        setProcesses(p);
-        setTasks(t);
-        setDocs(d);
-        setAgenda(a);
-        setUnread(n.filter((item) => !item.leida).length);
-        setActivity(recent);
-        setError("");
-        setHasLoaded(true);
-      })
-      .catch((cause: unknown) => {
-        if (active) setError(cause instanceof Error ? cause.message : "No fue posible cargar el portal.");
-      })
-      .finally(() => {
-        if (active) setLoading(false);
-      });
-    return () => {
-      active = false;
-    };
-  }, [sessionLoading, token]);
-
-  const taskAssignedToClient = (task: Task) => Boolean(user && task.cliente_id === user.id);
-  const pendingTasks = tasks.filter(
-    (task) =>
-      (taskAssignedToClient(task) && task.estado !== "COMPLETADA" && task.estado !== "CANCELADA") ||
-      Boolean(task.subtareas?.some((subtask) => !subtask.completada)),
-  );
-  const pendingDocs = docs.solicitudes.filter((request) => !request.atendida_en);
-  const nextEvents = agenda.eventos.filter((event) => isUpcoming(event.fecha_inicio)).slice(0, 3);
-  const attention = [
-    ...pendingDocs.slice(0, 3).map((item) => ({
-      kind: "documento" as const,
-      title: item.titulo,
-      detail: `Documento solicitado · ${item.proceso}`,
-      href: `/gestion-procesos/cliente/documentos#solicitud-${item.id}`,
-    })),
-    ...pendingTasks.slice(0, 3).map((item) => ({
-      kind: "tarea" as const,
-      title: item.titulo,
-      detail: taskAssignedToClient(item)
-        ? item.descripcion || "Tarea principal asignada por el despacho"
-        : "Tienes una subtarea asignada; la tarea principal sigue a cargo del despacho",
-      href: `/gestion-procesos/cliente/tareas?tarea=${item.id}#tarea-${item.id}`,
-    })),
-  ].slice(0, 5);
-
+  const ahora = new Date(useNow());
+  const variosProcesos = (inicio?.procesos.length ?? 0) > 1;
   return (
-    <section className="motion-swap mx-auto max-w-6xl space-y-6 pb-24">
-      <PageHeader
-        overline="Portal del cliente"
-        title={`Hola, ${user?.nombre_completo?.split(" ")[0] || "bienvenido"}`}
-        description="Aquí ves en qué va tu proceso y lo que necesitamos de ti."
-        action={
-          <div className="flex items-center gap-2">
-            <Link href="/gestion-procesos/cliente/notificaciones">
-              <Button
-                variant="outline"
-                size="sm"
-                icon={<Bell className="size-4" />}
-              >
-                Notificaciones
-                {unread > 0 && (
-                  <span className="ml-1 rounded-full bg-brand-900 px-1.5 py-0.5 text-[10px] font-semibold text-white">
-                    {unread}
-                  </span>
-                )}
-              </Button>
-            </Link>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => {
-                setLoading(true);
-                void load();
-              }}
-              loading={loading}
-              icon={<RefreshCw className="size-4" />}
-            >
-              Actualizar
-            </Button>
-          </div>
-        }
-      />
+    <div>
+      <TituloCliente sub={<span className="inline-block first-letter:uppercase" suppressHydrationWarning>{fechaLarga(ahora)}</span>}>
+        <span suppressHydrationWarning>{saludo(ahora)}</span>{inicio?.nombre ? `, ${inicio.nombre}` : ""}
+      </TituloCliente>
 
-      {error && hasLoaded && (
-        <ApiErrorState
-          error={error}
-          onRetry={() => {
-            setLoading(true);
-            void load();
-          }}
-          retrying={loading}
-          compact
-        />
-      )}
-
-      {loading || sessionLoading ? (
-        <div role="status" aria-live="polite" className="grid min-h-56 place-items-center text-sm text-muted">
-          <div className="flex items-center gap-2">
-            <RefreshCw aria-hidden="true" className="motion-delayed-in size-4 animate-spin text-brand-700" />
-            <span>Cargando tu información...</span>
-          </div>
+      {error && !inicio ? (
+        <Sheet className="flex flex-col items-center gap-4 px-6 py-12 text-center">
+          <p role="alert" className="text-bad">{error}</p>
+          <Button variant="secondary" size="lg" icon={<RefreshCw aria-hidden="true" size={16} />} onClick={() => void cargar()}>
+            Intentar de nuevo
+          </Button>
+        </Sheet>
+      ) : !inicio ? (
+        <div aria-busy="true" className="space-y-8">
+          <Sheet><FilasCargando filas={2} /></Sheet>
+          <Sheet><FilasCargando filas={3} /></Sheet>
         </div>
-      ) : error && !hasLoaded ? (
-        <ApiErrorState
-          error={error}
-          onRetry={() => {
-            setLoading(true);
-            void load();
-          }}
-          retrying={loading}
-        />
       ) : (
-        <>
-          {/* Lo que la firma necesita del cliente va primero. */}
-          {attention.length > 0 ? (
-            <section aria-labelledby="pendientes-titulo" className="rounded-[var(--radius-xl)] border border-gold-200 bg-gold-50 p-4 sm:p-6 dark:border-gold-600/30 dark:bg-gold-600/10">
-              <div className="mb-3 flex items-center gap-2">
-                <ClipboardCheck aria-hidden="true" className="size-5 text-gold-600 dark:text-gold-400" />
-                <h2 id="pendientes-titulo" className="font-semibold text-foreground">
-                  {attention.length === 1 ? "Necesitamos 1 cosa de ti" : `Necesitamos ${attention.length} cosas de ti`}
-                </h2>
-              </div>
-              <ul className="flex flex-col gap-2">
-                {attention.map((item, index) => (
-                  <li key={`${item.href}-${index}`} className="flex flex-col gap-3 rounded-[var(--radius-lg)] bg-surface p-4 sm:flex-row sm:items-center">
-                    <div className="min-w-0 flex-1">
-                      <p className="font-semibold text-foreground">{item.title}</p>
-                      <p className="mt-0.5 text-sm text-foreground-muted">{item.detail}</p>
-                    </div>
-                    <Link
-                      href={item.href}
-                      className="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-[var(--radius-md)] bg-brand-900 px-4 text-sm font-semibold !text-white hover:bg-brand-800 sm:w-auto"
-                    >
-                      {item.kind === "documento" ? <Upload aria-hidden="true" className="size-4" /> : <CheckSquare aria-hidden="true" className="size-4" />}
-                      {item.kind === "documento" ? "Subir documento" : "Ver tarea"}
-                    </Link>
-                  </li>
-                ))}
-              </ul>
-            </section>
-          ) : processes.length > 0 ? (
-            <p className="flex items-center gap-2 rounded-[var(--radius-lg)] bg-success-light px-4 py-3 text-sm text-foreground">
-              <CheckCircle2 aria-hidden="true" className="size-4 shrink-0 text-success" />
-              No tienes documentos ni tareas pendientes. Te avisaremos si necesitamos algo.
-            </p>
+        <div className="space-y-8">
+          {inicio.pendientes.length > 0 ? (
+            <PendientesCliente pendientes={inicio.pendientes} conProceso={variosProcesos} />
+          ) : inicio.procesos.length > 0 ? (
+            <AlDia />
           ) : null}
 
-          <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_340px]">
-            <section className="space-y-4" aria-labelledby="procesos-titulo">
-              <div className="flex items-center justify-between">
-                <h2 id="procesos-titulo" className="text-[17px] font-semibold text-foreground">{processes.length === 1 ? "Tu proceso" : "Tus procesos"}</h2>
-                {processes.length > 1 && (
-                  <Link className="inline-flex min-h-9 items-center gap-1 text-sm font-semibold text-primary hover:underline" href="/gestion-procesos/cliente/procesos">
-                    Ver todos <ArrowRight aria-hidden="true" className="size-3.5" />
+          {inicio.procesos.length === 0 ? (
+            <Sheet>
+              <EmptyState
+                icon={FolderOpen}
+                title="Aún no tiene procesos activos"
+                description="Cuando la firma abra su proceso, aquí verá en qué va y lo que necesitamos de usted."
+              />
+            </Sheet>
+          ) : (
+            inicio.procesos.map((proceso) => <TarjetaProceso key={proceso.id} proceso={proceso} />)
+          )}
+
+          {inicio.recientes.length > 0 && (
+            <section aria-labelledby="lo-ultimo">
+              <div className="mb-3 flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
+                <h2 id="lo-ultimo" className="font-display text-[22px] text-ink">
+                  {variosProcesos ? "Lo último en sus procesos" : "Lo último en su proceso"}
+                </h2>
+                {!variosProcesos && (
+                  <Link
+                    href={rutaProceso(inicio.procesos[0].id, "historia")}
+                    className="inline-flex min-h-11 items-center gap-1 text-[16px] font-semibold text-navy-ink hover:underline"
+                  >
+                    Ver toda la historia <ArrowRight aria-hidden="true" size={16} />
                   </Link>
                 )}
               </div>
-
-              {processes.length > 0 ? (
-                processes.slice(0, 3).map((process) => (
-                  <article key={process.id} className="rounded-[var(--radius-xl)] border border-border bg-surface p-4 sm:p-6">
-                    <div className="flex flex-wrap items-start justify-between gap-2">
-                      <h3 className="font-display text-[22px] font-medium leading-snug text-foreground sm:text-2xl">{process.nombre}</h3>
-                      <Badge tone="normal">{process.estado_visible}</Badge>
-                    </div>
-                    <p className="mt-1 text-sm text-foreground-muted">Abogada: {process.responsable?.nombre_completo || "Despacho"}</p>
-                    <p className="mt-4 max-w-[62ch] text-base leading-relaxed text-foreground">{process.explicacion_estado}</p>
-                    {process.proxima_actividad && (
-                      <div className="mt-5 flex items-center gap-4 rounded-[var(--radius-lg)] bg-primary-light p-4">
-                        <span className="flex w-14 shrink-0 flex-col items-center rounded-[var(--radius-md)] bg-surface py-1.5">
-                          <span className="text-[10px] font-semibold uppercase text-primary">{monthText(process.proxima_actividad)}</span>
-                          <span className="font-display text-2xl leading-none text-foreground">{dayText(process.proxima_actividad)}</span>
-                        </span>
-                        <div className="min-w-0">
-                          <p className="font-semibold text-foreground">{process.proxima_actividad_titulo || "Próxima actividad"}</p>
-                          <p className="text-sm text-foreground-secondary">{dateText(process.proxima_actividad)}</p>
-                        </div>
-                      </div>
-                    )}
-                    <div className="mt-4 flex flex-wrap gap-x-4 gap-y-1 text-sm text-foreground-muted">
-                      <span>{process.tareas_pendientes} {process.tareas_pendientes === 1 ? "tarea pendiente" : "tareas pendientes"}</span>
-                      <span>{process.documentos_pendientes} {process.documentos_pendientes === 1 ? "documento por entregar" : "documentos por entregar"}</span>
-                    </div>
-                    <Link
-                      href={`/gestion-procesos/cliente/procesos/${process.id}`}
-                      className="mt-4 inline-flex min-h-11 items-center gap-2 rounded-[var(--radius-md)] border border-border px-4 text-sm font-semibold text-foreground hover:bg-surface-hover"
-                    >
-                      Ver detalle del proceso <ArrowRight aria-hidden="true" className="size-4" />
-                    </Link>
-                  </article>
-                ))
-              ) : (
-                <div className="rounded-[var(--radius-xl)] border border-dashed border-border bg-surface">
-                  <EmptyState
-                    title="Aún no tienes procesos compartidos"
-                    description="Cuando el despacho te vincule a un expediente, podrás consultar aquí su estado, documentos y próximas actividades."
-                    icon={FolderOpen}
-                    action={
-                      <Link href="/gestion-procesos/cliente/chat">
-                        <Button variant="outline" icon={<MessageSquare className="size-4" />}>Escribir al despacho</Button>
-                      </Link>
-                    }
-                  />
-                </div>
-              )}
+              <Sheet className="overflow-hidden">
+                <ul className="divide-y divide-line">
+                  {inicio.recientes.map((entrada) => (
+                    <EntradaCliente
+                      key={`${entrada.proceso.id}:${entrada.folio}`}
+                      entrada={entrada}
+                      proceso={variosProcesos ? entrada.proceso.nombre : undefined}
+                    />
+                  ))}
+                </ul>
+              </Sheet>
             </section>
-
-            <aside className="space-y-6">
-              <section className="rounded-[var(--radius-xl)] border border-border bg-surface p-4 sm:p-5">
-                <h2 className="text-[17px] font-semibold text-foreground">¿Tienes dudas?</h2>
-                <p className="mt-1 text-sm text-foreground-secondary">Escríbele a tu abogada. Responde en horario hábil.</p>
-                <Link
-                  href="/gestion-procesos/cliente/chat"
-                  className="mt-4 inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-[var(--radius-md)] bg-brand-900 px-4 text-sm font-semibold !text-white hover:bg-brand-800"
-                >
-                  <MessageSquare aria-hidden="true" className="size-4" /> Escribir mensaje
-                </Link>
-              </section>
-
-              <section>
-                <div className="mb-3 flex items-center justify-between">
-                  <h2 className="text-[17px] font-semibold text-foreground">Próximas fechas</h2>
-                  <Link className="text-sm font-semibold text-primary hover:underline" href="/gestion-procesos/cliente/calendario">Calendario</Link>
-                </div>
-                {nextEvents.length > 0 ? (
-                  <ul className="divide-y divide-border overflow-hidden rounded-[var(--radius-lg)] border border-border bg-surface">
-                    {nextEvents.map((event) => (
-                      <li key={event.id} className="flex items-start gap-3 px-4 py-3">
-                        <span className="flex w-11 shrink-0 flex-col items-center rounded-[var(--radius-sm)] bg-surface-hover py-1">
-                          <span className="text-[10px] font-semibold uppercase text-foreground-muted">{monthText(event.fecha_inicio)}</span>
-                          <span className="font-display text-lg leading-none text-foreground">{dayText(event.fecha_inicio)}</span>
-                        </span>
-                        <div className="min-w-0">
-                          <p className="text-sm font-semibold text-foreground">{event.titulo}</p>
-                          <p className="truncate text-xs text-foreground-muted">{event.proceso}</p>
-                        </div>
-                      </li>
-                    ))}
-                  </ul>
-                ) : (
-                  <p className="rounded-[var(--radius-lg)] border border-border bg-surface px-4 py-5 text-sm text-foreground-muted">No tienes fechas próximas.</p>
-                )}
-              </section>
-
-              <section>
-                <h2 className="mb-3 text-[17px] font-semibold text-foreground">Últimas novedades</h2>
-                {activity.length > 0 ? (
-                  <ul className="space-y-3">
-                    {activity.slice(0, 5).map((entry) => (
-                      <li key={entry.id} className="flex gap-3">
-                        <span aria-hidden="true" className="mt-2 size-2 shrink-0 rounded-full bg-primary" />
-                        <div className="min-w-0">
-                          <Link href={entry.href} className="text-sm font-medium text-foreground hover:text-primary">{entry.titulo}</Link>
-                          <p className="text-xs text-foreground-muted">{entry.proceso} · {dateText(entry.fecha)}</p>
-                        </div>
-                      </li>
-                    ))}
-                  </ul>
-                ) : (
-                  <p className="text-sm text-foreground-muted">Aún no hay novedades en tus procesos.</p>
-                )}
-              </section>
-            </aside>
-          </div>
-        </>
+          )}
+        </div>
       )}
-    </section>
+    </div>
+  );
+}
+
+function TarjetaProceso({ proceso }: { proceso: ResumenProcesoCliente }) {
+  return (
+    <Sheet className="overflow-hidden" aria-labelledby={`proceso-${proceso.id}`}>
+      <div className="border-b border-line px-5 py-5 sm:px-7">
+        <h2 id={`proceso-${proceso.id}`} className="font-display text-[24px] leading-snug text-ink [text-wrap:balance]">{proceso.nombre}</h2>
+        {proceso.descripcion && <p className="mt-2 max-w-[62ch] text-ink-2 [text-wrap:pretty]">{proceso.descripcion}</p>}
+      </div>
+      <div className="grid grid-cols-[minmax(0,1fr)] gap-6 px-5 py-6 sm:px-7 md:grid-cols-[minmax(0,1fr)_280px]">
+        <div>
+          <p className="mb-4 text-[15px] font-semibold text-ink">En qué va</p>
+          <EnQueVa proceso={proceso} />
+        </div>
+        <ProximaFecha fecha={proceso.proxima_fecha} />
+      </div>
+      <div className="flex flex-col gap-3 border-t border-line bg-sheet-2 px-5 py-4 sm:flex-row sm:flex-wrap sm:px-7">
+        <EnlaceBoton size="lg" href={rutaProceso(proceso.id)} icon={<ArrowRight aria-hidden="true" size={18} />}>
+          Ver todo el proceso
+          {proceso.nuevos > 0 && (
+            <span className="ml-1 rounded bg-gold-soft px-1.5 text-[13px] font-semibold text-gold-ink tabular-nums">
+              {proceso.nuevos} {proceso.nuevos === 1 ? "nuevo" : "nuevos"}
+            </span>
+          )}
+        </EnlaceBoton>
+        <EnlaceBoton size="lg" variant="secondary" href={rutaMensajeAbogado(proceso)} icon={<MessageCircle aria-hidden="true" size={18} />}>
+          Escribirle a {primerNombre(proceso.abogado.nombre)}
+        </EnlaceBoton>
+      </div>
+    </Sheet>
   );
 }

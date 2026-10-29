@@ -6048,6 +6048,932 @@
           }
         }
       }
+    },
+    "/api/v2/glosario": {
+      "get": {
+        "tags": [
+          "Lenguaje claro"
+        ],
+        "summary": "Glosario de lenguaje claro",
+        "description": "Cómo se le explica al cliente cada tipo de actuación judicial.",
+        "operationId": "listar_glosario",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ListaGlosario"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too Many Requests",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Lenguaje claro"
+        ],
+        "summary": "Agregar un término",
+        "operationId": "crear_termino",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DatosTermino"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TerminoDelGlosario"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too Many Requests",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v2/glosario/{termino_id}": {
+      "put": {
+        "tags": [
+          "Lenguaje claro"
+        ],
+        "summary": "Corregir un término",
+        "operationId": "editar_termino",
+        "parameters": [
+          {
+            "name": "termino_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Termino Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DatosTermino"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TerminoDelGlosario"
+                }
+              }
+            }
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Too Many Requests"
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Lenguaje claro"
+        ],
+        "summary": "Quitar un término",
+        "operationId": "eliminar_termino",
+        "parameters": [
+          {
+            "name": "termino_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Termino Id"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Too Many Requests"
+          }
+        }
+      }
+    },
+    "/api/v2/actuaciones/{actuacion_id}/explicacion": {
+      "get": {
+        "tags": [
+          "Lenguaje claro"
+        ],
+        "summary": "Explicar una actuación",
+        "description": "La actuación en lenguaje claro: el comentario que la firma envió al cliente o, si no hay, el del glosario.",
+        "operationId": "explicar_actuacion",
+        "parameters": [
+          {
+            "name": "actuacion_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Actuacion Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Explicacion"
+                }
+              }
+            }
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Too Many Requests"
+          }
+        }
+      }
+    },
+    "/api/v2/cliente/inicio": {
+      "get": {
+        "tags": [
+          "Portal del cliente"
+        ],
+        "summary": "Inicio del cliente",
+        "description": "Lo que la firma necesita del cliente, en qué va cada uno de sus procesos y lo último que pasó.",
+        "operationId": "inicio_cliente",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InicioCliente"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too Many Requests",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v2/cliente/procesos/{proceso_id}": {
+      "get": {
+        "tags": [
+          "Portal del cliente"
+        ],
+        "summary": "Un proceso del cliente",
+        "description": "Etapa, próxima fecha, pendientes y documentos de un proceso del cliente.",
+        "operationId": "proceso_cliente",
+        "parameters": [
+          {
+            "name": "proceso_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Proceso Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProcesoCliente"
+                }
+              }
+            }
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Too Many Requests"
+          }
+        }
+      }
+    },
+    "/api/v2/cliente/procesos/{proceso_id}/historia": {
+      "get": {
+        "tags": [
+          "Portal del cliente"
+        ],
+        "summary": "Historia del proceso",
+        "description": "Los folios del expediente que le corresponden al cliente, del más reciente al más antiguo y en lenguaje claro.",
+        "operationId": "historia_proceso_cliente",
+        "parameters": [
+          {
+            "name": "proceso_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Proceso Id"
+            }
+          },
+          {
+            "name": "limite",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 100,
+              "minimum": 1,
+              "description": "Elementos por página.",
+              "default": 25,
+              "title": "Limite"
+            },
+            "description": "Elementos por página."
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "maxLength": 500
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Valor de `siguiente` de la página anterior.",
+              "title": "Cursor"
+            },
+            "description": "Valor de `siguiente` de la página anterior."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PaginaHistoria"
+                }
+              }
+            }
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Too Many Requests"
+          }
+        }
+      }
+    },
+    "/api/v2/cliente/procesos/{proceso_id}/visto": {
+      "post": {
+        "tags": [
+          "Portal del cliente"
+        ],
+        "summary": "Marcar el proceso como visto",
+        "description": "Lo que hay hasta ahora deja de aparecerle como nuevo.",
+        "operationId": "marcar_proceso_visto",
+        "parameters": [
+          {
+            "name": "proceso_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Proceso Id"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Too Many Requests"
+          }
+        }
+      }
     }
   },
   "components": {
@@ -6237,6 +7163,25 @@
         ],
         "title": "Archivo",
         "description": "Un documento del proceso. Si responde a una solicitud, es la versión vigente\nde lo pedido y `versiones` trae todas las entregas, de la más reciente a la primera."
+      },
+      "ArchivoEntrada": {
+        "properties": {
+          "nombre": {
+            "type": "string",
+            "title": "Nombre"
+          },
+          "url": {
+            "type": "string",
+            "title": "Url",
+            "description": "Ruta de descarga del archivo, con la sesión del cliente."
+          }
+        },
+        "type": "object",
+        "required": [
+          "nombre",
+          "url"
+        ],
+        "title": "ArchivoEntrada"
       },
       "ArchivoFolio": {
         "properties": {
@@ -7418,6 +8363,97 @@
         ],
         "title": "DatosPlantilla"
       },
+      "DatosTermino": {
+        "properties": {
+          "patron": {
+            "type": "string",
+            "maxLength": 160,
+            "minLength": 3,
+            "title": "Patron",
+            "description": "Sin tildes ni mayúsculas también coincide."
+          },
+          "explicacion": {
+            "type": "string",
+            "maxLength": 600,
+            "minLength": 10,
+            "title": "Explicacion",
+            "description": "Una o dos frases, tratando al cliente de usted."
+          },
+          "activo": {
+            "type": "boolean",
+            "title": "Activo",
+            "default": true
+          }
+        },
+        "type": "object",
+        "required": [
+          "patron",
+          "explicacion"
+        ],
+        "title": "DatosTermino"
+      },
+      "DocumentoCliente": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "nombre": {
+            "type": "string",
+            "title": "Nombre"
+          },
+          "fecha": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Fecha"
+          },
+          "origen": {
+            "type": "string",
+            "enum": [
+              "cliente",
+              "firma",
+              "contrato"
+            ],
+            "title": "Origen"
+          },
+          "estado": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Estado",
+            "description": "Revisión de lo que envió el cliente: «en revisión», «aprobado»..."
+          },
+          "nota": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Nota"
+          },
+          "url": {
+            "type": "string",
+            "title": "Url"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "nombre",
+          "fecha",
+          "origen",
+          "url"
+        ],
+        "title": "DocumentoCliente"
+      },
       "DocumentoFirmado": {
         "properties": {
           "id": {
@@ -7569,6 +8605,241 @@
         ],
         "title": "EnlaceSuscripcion"
       },
+      "EntradaHistoria": {
+        "properties": {
+          "folio": {
+            "type": "integer",
+            "title": "Folio",
+            "description": "El mismo número de folio que ve la firma."
+          },
+          "tipo": {
+            "type": "string",
+            "enum": [
+              "actuacion",
+              "documento",
+              "solicitud",
+              "contrato",
+              "evento",
+              "tarea",
+              "etapa"
+            ],
+            "title": "Tipo"
+          },
+          "fecha": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Fecha"
+          },
+          "con_hora": {
+            "type": "boolean",
+            "title": "Con Hora",
+            "description": "Falso cuando el origen solo trae el día (las actuaciones)."
+          },
+          "texto": {
+            "type": "string",
+            "title": "Texto",
+            "description": "Lo que pasó, en lenguaje claro."
+          },
+          "texto_juzgado": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Texto Juzgado",
+            "description": "Cómo lo escribió el juzgado, cuando `texto` es su explicación en lenguaje claro."
+          },
+          "explicada": {
+            "type": "boolean",
+            "title": "Explicada",
+            "description": "Falso en una actuación que nadie ha explicado todavía.",
+            "default": true
+          },
+          "estado": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Estado",
+            "description": "Estado corto cuando aplica: «en revisión», «aprobado»..."
+          },
+          "nota": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Nota",
+            "description": "Comentario de la firma, como el motivo de una corrección."
+          },
+          "archivo": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ArchivoEntrada"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "actuacion_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Actuacion Id"
+          },
+          "nuevo": {
+            "type": "boolean",
+            "title": "Nuevo",
+            "description": "Llegó después de la última vez que el cliente abrió el proceso."
+          }
+        },
+        "type": "object",
+        "required": [
+          "folio",
+          "tipo",
+          "fecha",
+          "con_hora",
+          "texto",
+          "nuevo"
+        ],
+        "title": "EntradaHistoria",
+        "description": "Un folio del expediente contado al cliente."
+      },
+      "EntradaReciente": {
+        "properties": {
+          "folio": {
+            "type": "integer",
+            "title": "Folio",
+            "description": "El mismo número de folio que ve la firma."
+          },
+          "tipo": {
+            "type": "string",
+            "enum": [
+              "actuacion",
+              "documento",
+              "solicitud",
+              "contrato",
+              "evento",
+              "tarea",
+              "etapa"
+            ],
+            "title": "Tipo"
+          },
+          "fecha": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Fecha"
+          },
+          "con_hora": {
+            "type": "boolean",
+            "title": "Con Hora",
+            "description": "Falso cuando el origen solo trae el día (las actuaciones)."
+          },
+          "texto": {
+            "type": "string",
+            "title": "Texto",
+            "description": "Lo que pasó, en lenguaje claro."
+          },
+          "texto_juzgado": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Texto Juzgado",
+            "description": "Cómo lo escribió el juzgado, cuando `texto` es su explicación en lenguaje claro."
+          },
+          "explicada": {
+            "type": "boolean",
+            "title": "Explicada",
+            "description": "Falso en una actuación que nadie ha explicado todavía.",
+            "default": true
+          },
+          "estado": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Estado",
+            "description": "Estado corto cuando aplica: «en revisión», «aprobado»..."
+          },
+          "nota": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Nota",
+            "description": "Comentario de la firma, como el motivo de una corrección."
+          },
+          "archivo": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ArchivoEntrada"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "actuacion_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Actuacion Id"
+          },
+          "nuevo": {
+            "type": "boolean",
+            "title": "Nuevo",
+            "description": "Llegó después de la última vez que el cliente abrió el proceso."
+          },
+          "proceso": {
+            "$ref": "#/components/schemas/ProcesoBreve"
+          }
+        },
+        "type": "object",
+        "required": [
+          "folio",
+          "tipo",
+          "fecha",
+          "con_hora",
+          "texto",
+          "nuevo",
+          "proceso"
+        ],
+        "title": "EntradaReciente"
+      },
       "Entrega": {
         "properties": {
           "estado": {
@@ -7647,6 +8918,190 @@
           "mensaje"
         ],
         "title": "ErrorRespuesta"
+      },
+      "EtapaCliente": {
+        "properties": {
+          "clave": {
+            "type": "string",
+            "enum": [
+              "demanda",
+              "admision",
+              "pruebas",
+              "audiencia",
+              "sentencia"
+            ],
+            "title": "Clave"
+          },
+          "nombre": {
+            "type": "string",
+            "title": "Nombre"
+          },
+          "fecha": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fecha",
+            "description": "Cuándo llegó el proceso a esta etapa, si ya pasó por ella."
+          }
+        },
+        "type": "object",
+        "required": [
+          "clave",
+          "nombre",
+          "fecha"
+        ],
+        "title": "EtapaCliente"
+      },
+      "Explicacion": {
+        "properties": {
+          "actuacion_id": {
+            "type": "integer",
+            "title": "Actuacion Id"
+          },
+          "fecha": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fecha",
+            "description": "Día de la actuación tal como lo publica la Rama Judicial (AAAA-MM-DD)."
+          },
+          "texto_juzgado": {
+            "type": "string",
+            "title": "Texto Juzgado",
+            "description": "La actuación como la escribió el juzgado."
+          },
+          "anotacion": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Anotacion",
+            "description": "Anotación del juzgado. Al cliente no le llega."
+          },
+          "explicacion": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Explicacion",
+            "description": "La actuación en lenguaje claro, o null si nadie la ha explicado."
+          },
+          "fuente": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "abogado",
+                  "glosario"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fuente",
+            "description": "«abogado» si viene del aviso que envió la firma; «glosario» si sale del glosario."
+          },
+          "patron": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Patron",
+            "description": "Fragmento del glosario que coincidió."
+          }
+        },
+        "type": "object",
+        "required": [
+          "actuacion_id",
+          "texto_juzgado",
+          "explicacion",
+          "fuente"
+        ],
+        "title": "Explicacion"
+      },
+      "FechaProxima": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "titulo": {
+            "type": "string",
+            "title": "Titulo"
+          },
+          "tipo": {
+            "type": "string",
+            "title": "Tipo",
+            "description": "AUDIENCIA, REUNION, FIRMA_CONTRATO o EVENTO."
+          },
+          "tipo_legible": {
+            "type": "string",
+            "title": "Tipo Legible"
+          },
+          "inicio": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Inicio"
+          },
+          "fin": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fin"
+          },
+          "descripcion": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Descripcion"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "titulo",
+          "tipo",
+          "tipo_legible",
+          "inicio",
+          "fin",
+          "descripcion"
+        ],
+        "title": "FechaProxima"
       },
       "Folio": {
         "properties": {
@@ -7973,6 +9428,45 @@
         ],
         "title": "IniciarSesion"
       },
+      "InicioCliente": {
+        "properties": {
+          "nombre": {
+            "type": "string",
+            "title": "Nombre",
+            "description": "Nombre de pila del cliente, para saludarlo."
+          },
+          "pendientes": {
+            "items": {
+              "$ref": "#/components/schemas/PendienteCliente"
+            },
+            "type": "array",
+            "title": "Pendientes"
+          },
+          "procesos": {
+            "items": {
+              "$ref": "#/components/schemas/ResumenProcesoCliente"
+            },
+            "type": "array",
+            "title": "Procesos"
+          },
+          "recientes": {
+            "items": {
+              "$ref": "#/components/schemas/EntradaReciente"
+            },
+            "type": "array",
+            "title": "Recientes",
+            "description": "Lo último en todos sus procesos."
+          }
+        },
+        "type": "object",
+        "required": [
+          "nombre",
+          "pendientes",
+          "procesos",
+          "recientes"
+        ],
+        "title": "InicioCliente"
+      },
       "Leido": {
         "properties": {
           "hasta": {
@@ -8071,6 +9565,27 @@
           "resumen"
         ],
         "title": "ListaConversaciones"
+      },
+      "ListaGlosario": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/TerminoDelGlosario"
+            },
+            "type": "array",
+            "title": "Items"
+          },
+          "total": {
+            "type": "integer",
+            "title": "Total"
+          }
+        },
+        "type": "object",
+        "required": [
+          "items",
+          "total"
+        ],
+        "title": "ListaGlosario"
       },
       "ListaPlantillas": {
         "properties": {
@@ -8560,6 +10075,47 @@
         ],
         "title": "PaginaFolios"
       },
+      "PaginaHistoria": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/EntradaHistoria"
+            },
+            "type": "array",
+            "title": "Items"
+          },
+          "total": {
+            "type": "integer",
+            "title": "Total",
+            "description": "Cantidad total con los filtros aplicados, sin contar el cursor."
+          },
+          "siguiente": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Siguiente",
+            "description": "Cursor de la página siguiente, o null si no hay más."
+          },
+          "nuevos": {
+            "type": "integer",
+            "title": "Nuevos",
+            "description": "Entradas nuevas para el cliente en todo el proceso."
+          }
+        },
+        "type": "object",
+        "required": [
+          "items",
+          "total",
+          "siguiente",
+          "nuevos"
+        ],
+        "title": "PaginaHistoria"
+      },
       "PaginaProcesos": {
         "properties": {
           "items": {
@@ -8764,6 +10320,69 @@
         ],
         "title": "Pendiente"
       },
+      "PendienteCliente": {
+        "properties": {
+          "clave": {
+            "type": "string",
+            "title": "Clave",
+            "description": "«solicitud:3», «tarea:5» o «subtarea:9»."
+          },
+          "tipo": {
+            "type": "string",
+            "enum": [
+              "documento",
+              "tarea"
+            ],
+            "title": "Tipo"
+          },
+          "titulo": {
+            "type": "string",
+            "title": "Titulo"
+          },
+          "detalle": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Detalle",
+            "description": "Qué falta: «Faltan 2 de 3 documentos», «Parte de: …»."
+          },
+          "proceso": {
+            "$ref": "#/components/schemas/ProcesoBreve"
+          },
+          "vence": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Vence"
+          },
+          "vencido": {
+            "type": "boolean",
+            "title": "Vencido"
+          }
+        },
+        "type": "object",
+        "required": [
+          "clave",
+          "tipo",
+          "titulo",
+          "proceso",
+          "vence",
+          "vencido"
+        ],
+        "title": "PendienteCliente",
+        "description": "Algo que la firma le pidió al cliente."
+      },
       "PendienteDelCliente": {
         "properties": {
           "solicitud_id": {
@@ -8940,6 +10559,153 @@
           "nombre"
         ],
         "title": "ProcesoBreve"
+      },
+      "ProcesoCliente": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "nombre": {
+            "type": "string",
+            "title": "Nombre"
+          },
+          "descripcion": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Descripcion"
+          },
+          "abogado": {
+            "$ref": "#/components/schemas/PersonaBreve"
+          },
+          "etapa": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "demanda",
+                  "admision",
+                  "pruebas",
+                  "audiencia",
+                  "sentencia"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Etapa"
+          },
+          "etapa_explicacion": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Etapa Explicacion",
+            "description": "Qué se hace en la etapa actual, en lenguaje claro."
+          },
+          "etapas": {
+            "items": {
+              "$ref": "#/components/schemas/EtapaCliente"
+            },
+            "type": "array",
+            "title": "Etapas",
+            "description": "Las cinco etapas en orden, con la fecha de las ya recorridas."
+          },
+          "proxima_fecha": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/FechaProxima"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "nuevos": {
+            "type": "integer",
+            "title": "Nuevos"
+          },
+          "ultima": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/EntradaHistoria"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "despacho": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Despacho"
+          },
+          "radicados": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Radicados"
+          },
+          "equipo": {
+            "items": {
+              "$ref": "#/components/schemas/PersonaBreve"
+            },
+            "type": "array",
+            "title": "Equipo",
+            "description": "Abogados colaboradores que la firma muestra al cliente."
+          },
+          "pendientes": {
+            "items": {
+              "$ref": "#/components/schemas/PendienteCliente"
+            },
+            "type": "array",
+            "title": "Pendientes"
+          },
+          "documentos": {
+            "items": {
+              "$ref": "#/components/schemas/DocumentoCliente"
+            },
+            "type": "array",
+            "title": "Documentos"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "nombre",
+          "descripcion",
+          "abogado",
+          "etapa",
+          "etapa_explicacion",
+          "etapas",
+          "proxima_fecha",
+          "nuevos",
+          "ultima",
+          "despacho",
+          "radicados",
+          "equipo",
+          "pendientes",
+          "documentos"
+        ],
+        "title": "ProcesoCliente"
       },
       "ProcesoDelCliente": {
         "properties": {
@@ -9578,6 +11344,108 @@
         ],
         "title": "ResumenMensajes"
       },
+      "ResumenProcesoCliente": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "nombre": {
+            "type": "string",
+            "title": "Nombre"
+          },
+          "descripcion": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Descripcion"
+          },
+          "abogado": {
+            "$ref": "#/components/schemas/PersonaBreve"
+          },
+          "etapa": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "demanda",
+                  "admision",
+                  "pruebas",
+                  "audiencia",
+                  "sentencia"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Etapa"
+          },
+          "etapa_explicacion": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Etapa Explicacion",
+            "description": "Qué se hace en la etapa actual, en lenguaje claro."
+          },
+          "etapas": {
+            "items": {
+              "$ref": "#/components/schemas/EtapaCliente"
+            },
+            "type": "array",
+            "title": "Etapas",
+            "description": "Las cinco etapas en orden, con la fecha de las ya recorridas."
+          },
+          "proxima_fecha": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/FechaProxima"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "nuevos": {
+            "type": "integer",
+            "title": "Nuevos"
+          },
+          "ultima": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/EntradaHistoria"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "nombre",
+          "descripcion",
+          "abogado",
+          "etapa",
+          "etapa_explicacion",
+          "etapas",
+          "proxima_fecha",
+          "nuevos",
+          "ultima"
+        ],
+        "title": "ResumenProcesoCliente"
+      },
       "ResumenTareas": {
         "properties": {
           "abiertas": {
@@ -10078,6 +11946,53 @@
           "inhabiles"
         ],
         "title": "Termino"
+      },
+      "TerminoDelGlosario": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "patron": {
+            "type": "string",
+            "title": "Patron",
+            "description": "Fragmento del texto del juzgado que reconoce la actuación."
+          },
+          "explicacion": {
+            "type": "string",
+            "title": "Explicacion",
+            "description": "Lo que lee el cliente."
+          },
+          "activo": {
+            "type": "boolean",
+            "title": "Activo"
+          },
+          "actualizado_en": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Actualizado En"
+          },
+          "actualizado_por": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Actualizado Por"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "patron",
+          "explicacion",
+          "activo",
+          "actualizado_en"
+        ],
+        "title": "TerminoDelGlosario"
       },
       "UltimoMensaje": {
         "properties": {
