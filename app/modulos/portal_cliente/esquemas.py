@@ -112,3 +112,42 @@ class ProcesoCliente(ResumenProcesoCliente):
     equipo: list[PersonaBreve] = Field(description="Abogados colaboradores que la firma muestra al cliente.")
     pendientes: list[PendienteCliente]
     documentos: list[DocumentoCliente]
+
+
+EstadoPedido = Literal["falta", "por_corregir", "no_aceptado", "en_revision", "aprobado"]
+
+
+class PedidoDocumento(BaseModel):
+    """Uno de los documentos de una solicitud, con lo último que el cliente envió."""
+
+    id: str
+    nombre: str
+    estado: EstadoPedido
+    nota: str | None = Field(None, description="Por qué la firma lo devolvió.")
+    archivo: ArchivoEntrada | None = Field(None, description="La última versión que envió el cliente.")
+    puede_enviar: bool = Field(description="Falta o hay que corregirlo: el cliente puede subir un archivo.")
+
+
+class DetallePendiente(PendienteCliente):
+    """Un pendiente con lo necesario para resolverlo desde la misma tarjeta."""
+
+    instrucciones: str | None = Field(None, description="Lo que escribió la firma al pedirlo.")
+    pedido_por: PersonaBreve
+    pedidos: list[PedidoDocumento] = Field(default_factory=list, description="Solo en las solicitudes de documentos.")
+    tarea: str | None = Field(None, description="En una subtarea, el título de la tarea a la que pertenece.")
+
+
+class HechoReciente(BaseModel):
+    """Algo que el cliente ya entregó o hizo, para que vea que llegó."""
+
+    clave: str
+    tipo: TipoPendiente
+    titulo: str
+    proceso: ProcesoBreve
+    fecha: FechaHora
+    estado: Literal["en_revision", "aprobado", "hecha"]
+
+
+class PendientesCliente(BaseModel):
+    pendientes: list[DetallePendiente]
+    recientes: list[HechoReciente] = Field(description="Lo entregado o hecho en los últimos 30 días, lo más nuevo primero.")

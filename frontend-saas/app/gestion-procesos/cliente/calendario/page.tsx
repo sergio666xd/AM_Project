@@ -70,7 +70,7 @@ export default function CalendarioClientePage() {
         estado: "PENDIENTE",
         prioridad: "MEDIA",
         fecha_limite: task.fecha_limite,
-        href: `/gestion-procesos/cliente/tareas?tarea=${task.id}#tarea-${task.id}`,
+        href: `/gestion-procesos/cliente/pendientes#tarea-${task.id}`,
       })),
     [data.tareas],
   );
@@ -93,7 +93,7 @@ export default function CalendarioClientePage() {
           detail: task.proceso,
           date: task.fecha_limite,
           description: null,
-          href: `/gestion-procesos/cliente/tareas?tarea=${task.id}#tarea-${task.id}`,
+          href: `/gestion-procesos/cliente/pendientes#tarea-${task.id}`,
           kind: "Tarea",
         })),
       ]

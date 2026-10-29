@@ -6,13 +6,19 @@ actuación lleva la explicación que la firma le envió o la del glosario, y el
 texto del juzgado queda como referencia.
 """
 
+import logging
+import os
 from datetime import datetime, timedelta
+from uuid import uuid4
 
+from botocore.exceptions import BotoCoreError, ClientError
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
-from app import models
-from app.modulos.documentos.servicio import DEVUELTOS, estado_de, fecha_limite_de
+from app import models, storage
+from app.audit import registrar_evento_auditoria
+from app.document_validation import ALLOWED_DOCUMENT_TYPES, MAX_DOCUMENT_BYTES, document_content_matches_type
+from app.modulos.documentos.servicio import DEVUELTOS, EstadoDeSolicitud, estado_de, fecha_limite_de, notificar
 from app.modulos.expedientes import politicas
 from app.modulos.expedientes.esquemas import ETAPAS, NOMBRES_ETAPA, PersonaBreve
 from app.modulos.folios.servicio import ServicioFolios
@@ -21,29 +27,41 @@ from app.modulos.glosario.servicio import ServicioGlosario, texto_juzgado
 from app.modulos.identidad.modelos import Usuario
 from app.modulos.portal_cliente.esquemas import (
     ArchivoEntrada,
+    DetallePendiente,
     DocumentoCliente,
     EntradaHistoria,
     EntradaReciente,
     EtapaCliente,
     FechaProxima,
+    HechoReciente,
     InicioCliente,
     PaginaHistoria,
+    PedidoDocumento,
     PendienteCliente,
+    PendientesCliente,
     ProcesoBreve,
     ProcesoCliente,
     ResumenProcesoCliente,
 )
 from app.modulos.portal_cliente.repositorio import RepositorioPortal
-from app.nucleo.errores import DatosInvalidos, NoEncontrado, SinPermiso
+from app.nucleo.errores import Conflicto, DatosInvalidos, ErrorDominio, NoEncontrado, SinPermiso
 from app.nucleo.paginacion import ParametrosPagina, codificar_cursor
 from app.nucleo.zona_horaria import a_colombia
-from app.timezone import utc_ahora
+from app.timezone import format_colombia_datetime, utc_ahora
+from app.workflow_service import user_portal_url
+
+logger = logging.getLogger(__name__)
 
 SOLO_CLIENTES = "El portal del cliente es para los clientes de la firma."
 NO_ENCONTRADO = "No encontramos ese proceso entre los suyos."
 # Si el cliente nunca abrió el proceso, se le marca como nuevo lo de estos últimos días.
 DIAS_NUEVO_SIN_VISTA = 14
 RECIENTES = 3
+# Lo entregado o hecho en estos días sigue a la vista en Pendientes, como constancia.
+DIAS_HECHOS = 30
+HECHOS = 10
+ESTADO_PEDIDO = {"FALTANTE": "falta", "REQUIERE_CORRECCION": "por_corregir", "RECHAZADO": "no_aceptado",
+                 "RECIBIDO": "en_revision", "EN_REVISION": "en_revision", "APROBADO": "aprobado"}
 
 EXPLICACION_ETAPA = {
     "demanda": "Se prepara y se presenta la demanda o la solicitud ante el juzgado.",
@@ -67,6 +85,11 @@ def fecha_legible(valor) -> str:
     hora = local.hour % 12 or 12
     sufijo = "a. m." if local.hour < 12 else "p. m."
     return f"{DIAS[local.weekday()]} {local.day} de {MESES[local.month - 1]} a las {hora}:{local.minute:02d} {sufijo}"
+
+
+class AlmacenamientoNoDisponible(ErrorDominio):
+    estado = 503
+    codigo = "almacenamiento_no_disponible"
 
 
 def _persona(usuario: Usuario) -> PersonaBreve:
@@ -150,6 +173,109 @@ class ServicioPortalCliente:
         except IntegrityError:
             # Dos pestañas marcaron a la vez; cualquiera de las dos vale.
             self._db.rollback()
+
+    def pendientes(self, usuario: Usuario) -> PendientesCliente:
+        self._exigir_cliente(usuario)
+        procesos = self._repo.procesos(usuario.id)
+        return PendientesCliente(pendientes=self._detalles(usuario, procesos), recientes=self._hechos(usuario, procesos))
+
+    def enviar_documento(self, usuario: Usuario, solicitud_id: int, pedido_id: str, *,
+                         nombre: str, tipo: str | None, contenido: bytes) -> PedidoDocumento:
+        self._exigir_cliente(usuario)
+        ids = [p.id for p in self._repo.procesos(usuario.id)]
+        solicitud = self._repo.solicitud(usuario.id, solicitud_id, ids)
+        if solicitud is None:
+            raise NoEncontrado("No encontramos esa solicitud entre las suyas.")
+        estado = estado_de(solicitud)
+        pedido = next((p for p in estado.pedidos if p["id"] == pedido_id), None)
+        if pedido is None:
+            raise NoEncontrado("Ese documento no está en la solicitud.")
+        actual = estado.estado_pedido(pedido_id)
+        if actual != "FALTANTE" and actual not in DEVUELTOS:
+            raise Conflicto("Ya recibimos este documento y lo estamos revisando.", codigo="ya_enviado")
+        if tipo not in ALLOWED_DOCUMENT_TYPES:
+            raise DatosInvalidos("Puede enviar archivos PDF, JPG, PNG o Word (.docx).", codigo="tipo_no_permitido",
+                                 campos={"archivo": "Tipo de archivo no permitido."})
+        if not contenido or len(contenido) > MAX_DOCUMENT_BYTES:
+            raise DatosInvalidos("El archivo debe pesar máximo 15 MB.", codigo="tamano_no_permitido",
+                                 campos={"archivo": "Máximo 15 MB."})
+        if not document_content_matches_type(tipo, contenido):
+            raise DatosInvalidos("El archivo parece dañado o no es del tipo que dice ser.", codigo="contenido_no_coincide",
+                                 campos={"archivo": "Revise el archivo."})
+
+        extension = os.path.splitext(nombre or "")[1].lower()
+        clave = f"procesos/{solicitud.proceso_id}/clientes/{usuario.id}/{uuid4().hex}{extension}"
+        r2, cubeta = storage.get_r2_client(), storage.get_r2_bucket()
+        try:
+            r2.put_object(Bucket=cubeta, Key=clave, Body=contenido, ContentType=tipo)
+        except (BotoCoreError, ClientError) as exc:
+            raise AlmacenamientoNoDisponible("No pudimos guardar el archivo. Inténtelo de nuevo en unos minutos.") from exc
+        try:
+            documento = models.DocumentoProceso(
+                proceso_id=solicitud.proceso_id, cliente_id=usuario.id, solicitud_id=solicitud.id,
+                solicitud_item_id=pedido_id, nombre_archivo=nombre or "documento", ruta_archivo=clave, mime_type=tipo,
+            )
+            self._repo.agregar(documento)
+            self._db.flush()
+            self._db.refresh(solicitud)
+            nuevo_estado = estado_de(solicitud)
+            solicitud.atendida_en = utc_ahora() if nuevo_estado.atendida() else None
+            registrar_evento_auditoria(self._db, usuario, "documento.cargar", "documento_proceso", documento.id)
+            self._db.commit()
+        except Exception:
+            self._db.rollback()
+            try:
+                r2.delete_object(Bucket=cubeta, Key=clave)
+            except Exception:
+                logger.exception("No se pudo limpiar el archivo %s tras fallar la carga.", clave)
+            raise
+        self._avisar_entrega(usuario, solicitud, pedido["nombre"], documento)
+        return self._pedidos(estado_de(solicitud), pedido_id)[0]
+
+    def marcar_tarea_hecha(self, usuario: Usuario, tarea_id: int) -> None:
+        from app.routers.tareas import _descartar_recordatorios_tarea, _notificar_cambio_tarea
+
+        self._exigir_cliente(usuario)
+        tarea = self._repo.tarea(usuario.id, tarea_id, [p.id for p in self._repo.procesos(usuario.id)])
+        if tarea is None:
+            raise NoEncontrado("No encontramos esa tarea entre las suyas.")
+        if tarea.estado == models.EstadoTarea.COMPLETADA:
+            return
+        if tarea.estado == models.EstadoTarea.CANCELADA:
+            raise Conflicto("La firma canceló esta tarea; ya no hace falta.", codigo="tarea_cancelada")
+        tarea.estado = models.EstadoTarea.COMPLETADA
+        tarea.completada_en = utc_ahora()
+        _descartar_recordatorios_tarea(self._db, tarea)
+        registrar_evento_auditoria(self._db, usuario, "tarea.completar", "tarea", tarea.id)
+        self._db.commit()
+        try:
+            _notificar_cambio_tarea(self._db, tarea, usuario, "marcó como hecha la tarea", "El cliente la marcó desde su portal.")
+        except Exception:
+            self._db.rollback()
+            logger.exception("No se pudo avisar que el cliente completó la tarea %s.", tarea.id)
+
+    def marcar_subtarea_hecha(self, usuario: Usuario, subtarea_id: int) -> None:
+        from app.routers.tareas import _notificar_cambio_tarea
+
+        self._exigir_cliente(usuario)
+        fila = self._repo.subtarea(usuario.id, subtarea_id, [p.id for p in self._repo.procesos(usuario.id)])
+        if fila is None:
+            raise NoEncontrado("No encontramos esa tarea entre las suyas.")
+        subtarea, tarea = fila
+        if subtarea.completada:
+            return
+        if tarea.estado == models.EstadoTarea.CANCELADA:
+            raise Conflicto("La firma canceló esta tarea; ya no hace falta.", codigo="tarea_cancelada")
+        subtarea.completada = True
+        subtarea.completada_en = utc_ahora()
+        registrar_evento_auditoria(self._db, usuario, "subtarea.actualizar", "subtarea", subtarea.id)
+        self._db.commit()
+        try:
+            _notificar_cambio_tarea(self._db, tarea, usuario, f"completó «{subtarea.titulo}»",
+                                    "Una parte de la tarea que le tocaba al cliente.")
+        except Exception:
+            self._db.rollback()
+            logger.exception("No se pudo avisar que el cliente completó la subtarea %s.", subtarea.id)
 
     # ---- Resumen de cada proceso ----------------------------------------
 
@@ -272,10 +398,15 @@ class ServicioPortalCliente:
     # ---- Pendientes y documentos ----------------------------------------
 
     def _pendientes(self, usuario: Usuario, procesos: list[models.Proceso]) -> list[PendienteCliente]:
+        campos = set(PendienteCliente.model_fields)
+        return [PendienteCliente(**d.model_dump(include=campos)) for d in self._detalles(usuario, procesos)]
+
+    def _detalles(self, usuario: Usuario, procesos: list[models.Proceso]) -> list[DetallePendiente]:
         breves = {p.id: ProcesoBreve(id=p.id, nombre=p.nombre) for p in procesos}
+        abogados = {p.id: _persona(p.abogado) for p in procesos}
         ids = list(breves)
         hoy = a_colombia(utc_ahora()).date()
-        items: list[PendienteCliente] = []
+        items: list[DetallePendiente] = []
         for solicitud in self._repo.solicitudes(usuario.id, ids):
             estado = estado_de(solicitud)
             if estado.estado != "esperando_cliente":
@@ -289,19 +420,94 @@ class ServicioPortalCliente:
                 detalle = (f"Falta {len(faltan)}" if len(faltan) == 1 else f"Faltan {len(faltan)}") + f" de {total} documentos"
                 detalle += f" · {corregir} por corregir" if corregir else ""
             vence = fecha_limite_de(solicitud)
-            items.append(PendienteCliente(clave=f"solicitud:{solicitud.id}", tipo="documento", titulo=solicitud.titulo,
-                                   detalle=detalle, proceso=breves[solicitud.proceso_id], vence=vence,
-                                   vencido=bool(vence and vence < hoy)))
+            items.append(DetallePendiente(
+                clave=f"solicitud:{solicitud.id}", tipo="documento", titulo=solicitud.titulo, detalle=detalle,
+                proceso=breves[solicitud.proceso_id], vence=vence, vencido=bool(vence and vence < hoy),
+                instrucciones=(solicitud.instrucciones or "").strip() or None, pedido_por=abogados[solicitud.proceso_id],
+                pedidos=self._pedidos(estado),
+            ))
         for tarea in self._repo.tareas(usuario.id, ids):
             vence = a_colombia(tarea.fecha_limite).date() if tarea.fecha_limite else None
-            items.append(PendienteCliente(clave=f"tarea:{tarea.id}", tipo="tarea", titulo=tarea.titulo,
-                                   proceso=breves[tarea.proceso_id], vence=vence, vencido=bool(vence and vence < hoy)))
+            items.append(DetallePendiente(
+                clave=f"tarea:{tarea.id}", tipo="tarea", titulo=tarea.titulo, proceso=breves[tarea.proceso_id],
+                vence=vence, vencido=bool(vence and vence < hoy), instrucciones=(tarea.descripcion or "").strip() or None,
+                pedido_por=_persona(tarea.usuario) if tarea.usuario else abogados[tarea.proceso_id],
+            ))
         for subtarea, tarea in self._repo.subtareas(usuario.id, ids):
             vence = a_colombia(tarea.fecha_limite).date() if tarea.fecha_limite else None
-            items.append(PendienteCliente(clave=f"subtarea:{subtarea.id}", tipo="tarea", titulo=subtarea.titulo,
-                                   detalle=f"Parte de: {tarea.titulo}", proceso=breves[tarea.proceso_id], vence=vence,
-                                   vencido=bool(vence and vence < hoy)))
+            items.append(DetallePendiente(
+                clave=f"subtarea:{subtarea.id}", tipo="tarea", titulo=subtarea.titulo, detalle=f"Parte de: {tarea.titulo}",
+                proceso=breves[tarea.proceso_id], vence=vence, vencido=bool(vence and vence < hoy),
+                pedido_por=_persona(tarea.usuario) if tarea.usuario else abogados[tarea.proceso_id], tarea=tarea.titulo,
+            ))
         return sorted(items, key=lambda p: (p.vence is None, p.vence or hoy, p.titulo.casefold()))
+
+    @staticmethod
+    def _pedidos(estado: EstadoDeSolicitud, solo: str | None = None) -> list[PedidoDocumento]:
+        salida = []
+        for pedido in estado.pedidos:
+            if solo is not None and pedido["id"] != solo:
+                continue
+            vigente = estado.vigente(pedido["id"])
+            clave = vigente.estado_revision if vigente else "FALTANTE"
+            devuelto = clave in DEVUELTOS
+            salida.append(PedidoDocumento(
+                id=pedido["id"], nombre=pedido["nombre"], estado=ESTADO_PEDIDO.get(clave, "en_revision"),
+                nota=((vigente.comentario_revision or "").strip() or None) if vigente and devuelto else None,
+                archivo=_archivo(vigente) if vigente else None,
+                puede_enviar=clave == "FALTANTE" or devuelto,
+            ))
+        return salida
+
+    def _hechos(self, usuario: Usuario, procesos: list[models.Proceso]) -> list[HechoReciente]:
+        breves = {p.id: ProcesoBreve(id=p.id, nombre=p.nombre) for p in procesos}
+        ids = list(breves)
+        desde = utc_ahora() - timedelta(days=DIAS_HECHOS)
+        items: list[HechoReciente] = []
+        for solicitud in self._repo.solicitudes(usuario.id, ids):
+            estado = estado_de(solicitud)
+            vigentes = [v for v in (estado.vigente(p["id"]) for p in estado.pedidos) if v is not None]
+            if estado.estado == "esperando_cliente" or not vigentes:
+                continue
+            if estado.estado == "por_revisar":
+                fecha, situacion = max(v.created_at for v in vigentes), "en_revision"
+            else:
+                fecha, situacion = max(v.revisado_en or v.created_at for v in vigentes), "aprobado"
+                if fecha < desde:
+                    continue
+            items.append(HechoReciente(clave=f"solicitud:{solicitud.id}", tipo="documento", titulo=solicitud.titulo,
+                                       proceso=breves[solicitud.proceso_id], fecha=fecha, estado=situacion))
+        for tarea in self._repo.tareas_hechas(usuario.id, ids, desde):
+            items.append(HechoReciente(clave=f"tarea:{tarea.id}", tipo="tarea", titulo=tarea.titulo,
+                                       proceso=breves[tarea.proceso_id], fecha=tarea.completada_en, estado="hecha"))
+        for subtarea, tarea in self._repo.subtareas_hechas(usuario.id, ids, desde):
+            items.append(HechoReciente(clave=f"subtarea:{subtarea.id}", tipo="tarea", titulo=subtarea.titulo,
+                                       proceso=breves[tarea.proceso_id], fecha=subtarea.completada_en, estado="hecha"))
+        return sorted(items, key=lambda h: a_colombia(h.fecha), reverse=True)[:HECHOS]
+
+    def _avisar_entrega(self, usuario: Usuario, solicitud: models.SolicitudDocumento, pedido: str,
+                        documento: models.DocumentoProceso) -> None:
+        proceso = solicitud.proceso
+        abogado = proceso.abogado
+        enlace = user_portal_url(abogado, f"/gestion-procesos/abogado/procesos/{proceso.id}/documentos")
+        recibido = format_colombia_datetime(documento.created_at)
+        try:
+            notificar(
+                self._db, abogado,
+                asunto=f"Documentos recibidos: {solicitud.titulo}",
+                cuerpo=(f"Hola {abogado.nombre_completo},\n\n{usuario.nombre_completo} cargó un archivo para la solicitud "
+                        f"{solicitud.titulo}.\n\nDocumento solicitado: {pedido}\nArchivo recibido: {documento.nombre_archivo}\n"
+                        f"Proceso: {proceso.nombre}\nFecha de carga: {recibido}\n\nAbrir enlace: Revisar documentos | {enlace}"),
+                tipo="DOCUMENTOS", origen=f"DOCUMENTO_RECIBIDO:{documento.id}", emisor=usuario,
+                plantilla_clave="DOCUMENTO_RECIBIDO",
+                variables={"nombre": abogado.nombre_completo, "actor": usuario.nombre_completo, "proceso": proceso.nombre,
+                           "documento": pedido, "archivo": documento.nombre_archivo, "solicitud": solicitud.titulo,
+                           "tipo": documento.mime_type, "fecha": recibido},
+                enlace_texto="Revisar documentos", enlace_url=enlace,
+            )
+        except Exception:
+            self._db.rollback()
+            logger.exception("No se pudo avisar la entrega del documento %s.", documento.id)
 
     def _documentos(self, usuario: Usuario, proceso: models.Proceso) -> list[DocumentoCliente]:
         salida = []
