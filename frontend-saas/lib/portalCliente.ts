@@ -11,6 +11,9 @@ export type PendientesCliente = Esquemas["PendientesCliente"];
 export type DetallePendiente = Esquemas["DetallePendiente"];
 export type PedidoDocumento = Esquemas["PedidoDocumento"];
 export type HechoReciente = Esquemas["HechoReciente"];
+export type PerfilCliente = Esquemas["PerfilCliente"];
+export type GrupoAvisos = Esquemas["GrupoAvisos"];
+export type SolicitudCambio = Esquemas["SolicitudCambio"];
 
 export const RUTA_CLIENTE = "/gestion-procesos/cliente";
 

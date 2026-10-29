@@ -12,6 +12,7 @@ from sqlalchemy.orm import Session
 from app import models, schemas
 from app.audit import registrar_evento_auditoria
 from app.database import get_db
+from app.notification_policy import preferencia_de_cliente
 from app.notification_service import emitir_notificacion_workflow
 from app.reminder_workflow import iniciar_workflow_recordatorio
 from app.routers.admin.comun import logger, verificar_admin
@@ -307,8 +308,9 @@ def _notificar_agenda_tras_reactivacion(db: Session, usuario: models.Usuario, ac
         active_system_reminders = [item for item in task.recordatorios if item.interno_sistema and item.activo and item.enviado_en is None]
         if task.fecha_limite and destinatario_recordatorio and destinatario_recordatorio.estado == models.EstadoUsuario.ACTIVO and not active_system_reminders:
             if destinatario_recordatorio.rol == models.RolUsuario.CLIENTE:
-                email_enabled = bool(destinatario_recordatorio.notificaciones_email and destinatario_recordatorio.email)
-                whatsapp_enabled = bool(destinatario_recordatorio.notificaciones_whatsapp and destinatario_recordatorio.whatsapp_numero.strip())
+                email_enabled, whatsapp_enabled = preferencia_de_cliente(destinatario_recordatorio, "RECORDATORIOS")
+                email_enabled = email_enabled and bool(destinatario_recordatorio.email)
+                whatsapp_enabled = whatsapp_enabled and destinatario_recordatorio.notificaciones_whatsapp and bool(destinatario_recordatorio.whatsapp_numero.strip())
             else:
                 reminder_preferences = (destinatario_recordatorio.preferencias_notificacion or {}).get("RECORDATORIOS", {})
                 email_enabled = bool(reminder_preferences.get("email", destinatario_recordatorio.notificaciones_email)) and bool(destinatario_recordatorio.email)

@@ -118,7 +118,8 @@ function EncabezadoCliente({ nav, areaHref }: { nav: ReturnType<typeof navegacio
         </nav>
         <div className="ml-auto flex items-center gap-1">
           <Campana todosHref={`${areaHref}/notificaciones`} />
-          <MenuCuenta areaHref={areaHref} />
+          {/* Lo que no cabe en el encabezado (calendario, perfil y avisos, ayuda) va en la cuenta. */}
+          <MenuCuenta areaHref={areaHref} enlaces={nav.todos.slice(5).map(({ label, href, icon }) => ({ label, href, icon }))} />
         </div>
       </div>
     </header>

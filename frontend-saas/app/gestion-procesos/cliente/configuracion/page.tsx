@@ -1,5 +1,6 @@
-import ClientSettingsPage from "@/components/client/ClientSettingsPage";
+import { redirect } from "next/navigation";
 
-export default function ClientSettingsRoute() {
-  return <ClientSettingsPage />;
+// La configuración del cliente (avisos y seguridad) vive ahora en su perfil.
+export default function ConfiguracionClientePage() {
+  redirect("/gestion-procesos/cliente/perfil#avisos");
 }

@@ -112,6 +112,18 @@ def usuario_tiene_push_activo(usuario: models.Usuario, db: "Session | None" = No
     )
 
 
+def preferencia_de_cliente(usuario: models.Usuario, tipo: str) -> tuple[bool, bool]:
+    """Correo y WhatsApp que el cliente quiere para un tipo de aviso.
+
+    Si eligió por tipo desde el portal manda esa elección; si no, sus dos
+    interruptores generales valen para todo, como antes.
+    """
+    if getattr(usuario, "avisos_por_tipo", False):
+        canales = (usuario.preferencias_notificacion or {}).get(tipo) or {}
+        return bool(canales.get("email", usuario.notificaciones_email)), bool(canales.get("whatsapp", False))
+    return bool(usuario.notificaciones_email), bool(usuario.notificaciones_whatsapp)
+
+
 def canales_habilitados(
     usuario: models.Usuario | None,
     tipo: str,
@@ -131,10 +143,11 @@ def canales_habilitados(
     silenciar_whatsapp = tiene_push and getattr(usuario, "silenciar_whatsapp_si_push", False)
 
     if usuario.rol == models.RolUsuario.CLIENTE:
+        email, whatsapp = preferencia_de_cliente(usuario, tipo)
         resultado = []
-        if usuario.notificaciones_email and usuario.email and not silenciar_email:
+        if email and usuario.email and not silenciar_email:
             resultado.append("EMAIL")
-        if usuario.notificaciones_whatsapp and whatsapp_habilitado(usuario) and not silenciar_whatsapp:
+        if whatsapp and whatsapp_habilitado(usuario) and not silenciar_whatsapp:
             resultado.append("WHATSAPP")
         return tuple(resultado)
 

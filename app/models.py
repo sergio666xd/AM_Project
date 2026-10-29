@@ -1,6 +1,6 @@
 import enum
 from app.timezone import utc_ahora
-from sqlalchemy import Boolean, CheckConstraint, Column, DateTime, Enum, ForeignKey, Index, Integer, JSON, Numeric, String, Table, Text, UniqueConstraint, event, select
+from sqlalchemy import Boolean, CheckConstraint, Column, DateTime, Enum, ForeignKey, Index, Integer, JSON, Numeric, String, Table, Text, UniqueConstraint, event, false, select
 from sqlalchemy.orm import relationship, synonym
 from app.database import Base
 
@@ -242,6 +242,8 @@ class Usuario(Base):
     canal_notificacion_cliente = Column(String(16), nullable=True)
     silenciar_email_si_push = Column(Boolean, nullable=False, default=False)
     silenciar_whatsapp_si_push = Column(Boolean, nullable=False, default=False)
+    # El cliente eligió sus avisos por tipo en el portal: manda `preferencias_notificacion`.
+    avisos_por_tipo = Column(Boolean, nullable=False, default=False, server_default=false())
     created_at = Column(DateTime, default=utc_ahora)
     ultimo_acceso = Column(DateTime, nullable=True)
     # Los tokens emitidos antes de este instante dejan de valer.

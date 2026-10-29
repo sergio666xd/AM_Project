@@ -12,6 +12,7 @@ import {
   ListChecks,
   MessageSquare,
   UserCheck,
+  UserRound,
   Users,
   type LucideIcon,
 } from "lucide-react";
@@ -73,17 +74,18 @@ export function gruposAbogado(esAdminFirma: boolean): GrupoNav[] {
   ];
 }
 
-// Perfil, configuración y avisos viven en el menú de cuenta y la campana.
+// En escritorio se ven los cinco primeros; en celular, las cuatro pestañas y el resto en "Más".
 export const gruposCliente: GrupoNav[] = [
   {
     titulo: null,
     items: [
       { id: "inicio", label: "Inicio", href: C, icon: Home },
       { id: "procesos", label: "Mis procesos", corto: "Procesos", href: `${C}/procesos`, icon: FolderOpen },
-      { id: "documentos", label: "Documentos", corto: "Archivos", href: `${C}/documentos`, icon: FileText },
-      { id: "mensajes", label: "Mensajes", href: `${C}/chat`, icon: MessageSquare },
       { id: "pendientes", label: "Pendientes", href: `${C}/pendientes`, icon: ListChecks },
+      { id: "mensajes", label: "Mensajes", href: `${C}/chat`, icon: MessageSquare },
+      { id: "documentos", label: "Documentos", href: `${C}/documentos`, icon: FileText },
       { id: "calendario", label: "Calendario", href: `${C}/calendario`, icon: CalendarDays },
+      { id: "perfil", label: "Mi perfil y avisos", href: `${C}/perfil`, icon: UserRound },
       { id: "ayuda", label: "Ayuda", href: `${C}/ayuda`, icon: CircleHelp },
     ],
   },
@@ -103,7 +105,7 @@ const gruposSaas: GrupoNav[] = [
 /** Las cuatro pestañas de la barra inferior en celular; el resto va en "Más". */
 const PESTANAS: Record<Exclude<Variante, "platform-admin">, string[]> = {
   lawyer: ["hoy", "procesos", "tareas", "mensajes"],
-  client: ["inicio", "procesos", "documentos", "mensajes"],
+  client: ["inicio", "procesos", "pendientes", "mensajes"],
   saas: ["resumen", "radicados", "tareas"],
 };
 
