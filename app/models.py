@@ -703,6 +703,35 @@ class LecturaNotificacionCliente(Base):
     leida_en = Column(DateTime, nullable=False, default=utc_ahora)
 
 
+class VistaProcesoCliente(Base):
+    """Hasta qué folio vio el cliente su proceso: lo que llega después le aparece como nuevo."""
+    __tablename__ = "vistas_proceso_cliente"
+    __table_args__ = (UniqueConstraint("usuario_id", "proceso_id", name="uq_vista_proceso_cliente"),)
+
+    id = Column(Integer, primary_key=True)
+    usuario_id = Column(Integer, ForeignKey("usuarios.id", ondelete="CASCADE"), nullable=False, index=True)
+    proceso_id = Column(Integer, ForeignKey("procesos.id", ondelete="CASCADE"), nullable=False)
+    ultimo_folio = Column(Integer, nullable=False, default=0)
+    visto_en = Column(DateTime, nullable=False, default=utc_ahora)
+
+
+class TerminoGlosario(Base):
+    """Cómo se le explica al cliente un tipo de actuación judicial.
+
+    `patron` es un fragmento del texto que publica la Rama Judicial («auto admite
+    demanda»). Para cada actuación gana el patrón más largo que contiene, sin
+    importar tildes ni mayúsculas.
+    """
+    __tablename__ = "glosario_actuaciones"
+
+    id = Column(Integer, primary_key=True)
+    patron = Column(String(160), nullable=False, unique=True)
+    explicacion = Column(Text, nullable=False)
+    activo = Column(Boolean, nullable=False, default=True)
+    actualizado_por_id = Column(Integer, ForeignKey("usuarios.id", ondelete="SET NULL"), nullable=True)
+    actualizado_en = Column(DateTime, nullable=False, default=utc_ahora)
+
+
 class EntregaNotificacion(Base):
     __tablename__ = "entregas_notificacion"
     __table_args__ = (

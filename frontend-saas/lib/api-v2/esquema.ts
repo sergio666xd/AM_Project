@@ -916,6 +916,145 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v2/glosario": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Glosario de lenguaje claro
+         * @description Cómo se le explica al cliente cada tipo de actuación judicial.
+         */
+        get: operations["listar_glosario"];
+        put?: never;
+        /** Agregar un término */
+        post: operations["crear_termino"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v2/glosario/{termino_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Corregir un término */
+        put: operations["editar_termino"];
+        post?: never;
+        /** Quitar un término */
+        delete: operations["eliminar_termino"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v2/actuaciones/{actuacion_id}/explicacion": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Explicar una actuación
+         * @description La actuación en lenguaje claro: el comentario que la firma envió al cliente o, si no hay, el del glosario.
+         */
+        get: operations["explicar_actuacion"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v2/cliente/inicio": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Inicio del cliente
+         * @description Lo que la firma necesita del cliente, en qué va cada uno de sus procesos y lo último que pasó.
+         */
+        get: operations["inicio_cliente"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v2/cliente/procesos/{proceso_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Un proceso del cliente
+         * @description Etapa, próxima fecha, pendientes y documentos de un proceso del cliente.
+         */
+        get: operations["proceso_cliente"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v2/cliente/procesos/{proceso_id}/historia": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Historia del proceso
+         * @description Los folios del expediente que le corresponden al cliente, del más reciente al más antiguo y en lenguaje claro.
+         */
+        get: operations["historia_proceso_cliente"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v2/cliente/procesos/{proceso_id}/visto": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Marcar el proceso como visto
+         * @description Lo que hay hasta ahora deja de aparecerle como nuevo.
+         */
+        post: operations["marcar_proceso_visto"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -1005,6 +1144,16 @@ export interface components {
              * Format: date-time
              */
             recibido_en: string;
+        };
+        /** ArchivoEntrada */
+        ArchivoEntrada: {
+            /** Nombre */
+            nombre: string;
+            /**
+             * Url
+             * @description Ruta de descarga del archivo, con la sesión del cliente.
+             */
+            url: string;
         };
         /** ArchivoFolio */
         ArchivoFolio: {
@@ -1425,6 +1574,50 @@ export interface components {
             /** Pasos */
             pasos: components["schemas"]["PasoPlantilla"][];
         };
+        /** DatosTermino */
+        DatosTermino: {
+            /**
+             * Patron
+             * @description Sin tildes ni mayúsculas también coincide.
+             */
+            patron: string;
+            /**
+             * Explicacion
+             * @description Una o dos frases, tratando al cliente de usted.
+             */
+            explicacion: string;
+            /**
+             * Activo
+             * @default true
+             */
+            activo: boolean;
+        };
+        /** DocumentoCliente */
+        DocumentoCliente: {
+            /** Id */
+            id: number;
+            /** Nombre */
+            nombre: string;
+            /**
+             * Fecha
+             * Format: date-time
+             */
+            fecha: string;
+            /**
+             * Origen
+             * @enum {string}
+             */
+            origen: "cliente" | "firma" | "contrato";
+            /**
+             * Estado
+             * @description Revisión de lo que envió el cliente: «en revisión», «aprobado»...
+             */
+            estado?: string | null;
+            /** Nota */
+            nota?: string | null;
+            /** Url */
+            url: string;
+        };
         /** DocumentoFirmado */
         DocumentoFirmado: {
             /** Id */
@@ -1502,6 +1695,124 @@ export interface components {
              */
             creada_en: string;
         };
+        /**
+         * EntradaHistoria
+         * @description Un folio del expediente contado al cliente.
+         */
+        EntradaHistoria: {
+            /**
+             * Folio
+             * @description El mismo número de folio que ve la firma.
+             */
+            folio: number;
+            /**
+             * Tipo
+             * @enum {string}
+             */
+            tipo: "actuacion" | "documento" | "solicitud" | "contrato" | "evento" | "tarea" | "etapa";
+            /**
+             * Fecha
+             * Format: date-time
+             */
+            fecha: string;
+            /**
+             * Con Hora
+             * @description Falso cuando el origen solo trae el día (las actuaciones).
+             */
+            con_hora: boolean;
+            /**
+             * Texto
+             * @description Lo que pasó, en lenguaje claro.
+             */
+            texto: string;
+            /**
+             * Texto Juzgado
+             * @description Cómo lo escribió el juzgado, cuando `texto` es su explicación en lenguaje claro.
+             */
+            texto_juzgado?: string | null;
+            /**
+             * Explicada
+             * @description Falso en una actuación que nadie ha explicado todavía.
+             * @default true
+             */
+            explicada: boolean;
+            /**
+             * Estado
+             * @description Estado corto cuando aplica: «en revisión», «aprobado»...
+             */
+            estado?: string | null;
+            /**
+             * Nota
+             * @description Comentario de la firma, como el motivo de una corrección.
+             */
+            nota?: string | null;
+            archivo?: components["schemas"]["ArchivoEntrada"] | null;
+            /** Actuacion Id */
+            actuacion_id?: number | null;
+            /**
+             * Nuevo
+             * @description Llegó después de la última vez que el cliente abrió el proceso.
+             */
+            nuevo: boolean;
+        };
+        /** EntradaReciente */
+        EntradaReciente: {
+            /**
+             * Folio
+             * @description El mismo número de folio que ve la firma.
+             */
+            folio: number;
+            /**
+             * Tipo
+             * @enum {string}
+             */
+            tipo: "actuacion" | "documento" | "solicitud" | "contrato" | "evento" | "tarea" | "etapa";
+            /**
+             * Fecha
+             * Format: date-time
+             */
+            fecha: string;
+            /**
+             * Con Hora
+             * @description Falso cuando el origen solo trae el día (las actuaciones).
+             */
+            con_hora: boolean;
+            /**
+             * Texto
+             * @description Lo que pasó, en lenguaje claro.
+             */
+            texto: string;
+            /**
+             * Texto Juzgado
+             * @description Cómo lo escribió el juzgado, cuando `texto` es su explicación en lenguaje claro.
+             */
+            texto_juzgado?: string | null;
+            /**
+             * Explicada
+             * @description Falso en una actuación que nadie ha explicado todavía.
+             * @default true
+             */
+            explicada: boolean;
+            /**
+             * Estado
+             * @description Estado corto cuando aplica: «en revisión», «aprobado»...
+             */
+            estado?: string | null;
+            /**
+             * Nota
+             * @description Comentario de la firma, como el motivo de una corrección.
+             */
+            nota?: string | null;
+            archivo?: components["schemas"]["ArchivoEntrada"] | null;
+            /** Actuacion Id */
+            actuacion_id?: number | null;
+            /**
+             * Nuevo
+             * @description Llegó después de la última vez que el cliente abrió el proceso.
+             */
+            nuevo: boolean;
+            proceso: components["schemas"]["ProcesoBreve"];
+        };
         /** Entrega */
         Entrega: {
             /**
@@ -1541,6 +1852,79 @@ export interface components {
             campos?: {
                 [key: string]: string;
             };
+        };
+        /** EtapaCliente */
+        EtapaCliente: {
+            /**
+             * Clave
+             * @enum {string}
+             */
+            clave: "demanda" | "admision" | "pruebas" | "audiencia" | "sentencia";
+            /** Nombre */
+            nombre: string;
+            /**
+             * Fecha
+             * @description Cuándo llegó el proceso a esta etapa, si ya pasó por ella.
+             */
+            fecha: string | null;
+        };
+        /** Explicacion */
+        Explicacion: {
+            /** Actuacion Id */
+            actuacion_id: number;
+            /**
+             * Fecha
+             * @description Día de la actuación tal como lo publica la Rama Judicial (AAAA-MM-DD).
+             */
+            fecha?: string | null;
+            /**
+             * Texto Juzgado
+             * @description La actuación como la escribió el juzgado.
+             */
+            texto_juzgado: string;
+            /**
+             * Anotacion
+             * @description Anotación del juzgado. Al cliente no le llega.
+             */
+            anotacion?: string | null;
+            /**
+             * Explicacion
+             * @description La actuación en lenguaje claro, o null si nadie la ha explicado.
+             */
+            explicacion: string | null;
+            /**
+             * Fuente
+             * @description «abogado» si viene del aviso que envió la firma; «glosario» si sale del glosario.
+             */
+            fuente: ("abogado" | "glosario") | null;
+            /**
+             * Patron
+             * @description Fragmento del glosario que coincidió.
+             */
+            patron?: string | null;
+        };
+        /** FechaProxima */
+        FechaProxima: {
+            /** Id */
+            id: number;
+            /** Titulo */
+            titulo: string;
+            /**
+             * Tipo
+             * @description AUDIENCIA, REUNION, FIRMA_CONTRATO o EVENTO.
+             */
+            tipo: string;
+            /** Tipo Legible */
+            tipo_legible: string;
+            /**
+             * Inicio
+             * Format: date-time
+             */
+            inicio: string;
+            /** Fin */
+            fin: string | null;
+            /** Descripcion */
+            descripcion: string | null;
         };
         /** Folio */
         Folio: {
@@ -1698,6 +2082,23 @@ export interface components {
              */
             recordarme: boolean;
         };
+        /** InicioCliente */
+        InicioCliente: {
+            /**
+             * Nombre
+             * @description Nombre de pila del cliente, para saludarlo.
+             */
+            nombre: string;
+            /** Pendientes */
+            pendientes: components["schemas"]["PendienteCliente"][];
+            /** Procesos */
+            procesos: components["schemas"]["ResumenProcesoCliente"][];
+            /**
+             * Recientes
+             * @description Lo último en todos sus procesos.
+             */
+            recientes: components["schemas"]["EntradaReciente"][];
+        };
         /** Leido */
         Leido: {
             /**
@@ -1731,6 +2132,13 @@ export interface components {
             /** Items */
             items: components["schemas"]["Conversacion"][];
             resumen: components["schemas"]["ResumenMensajes"];
+        };
+        /** ListaGlosario */
+        ListaGlosario: {
+            /** Items */
+            items: components["schemas"]["TerminoDelGlosario"][];
+            /** Total */
+            total: number;
         };
         /** ListaPlantillas */
         ListaPlantillas: {
@@ -1893,6 +2301,26 @@ export interface components {
              */
             nuevos: number;
         };
+        /** PaginaHistoria */
+        PaginaHistoria: {
+            /** Items */
+            items: components["schemas"]["EntradaHistoria"][];
+            /**
+             * Total
+             * @description Cantidad total con los filtros aplicados, sin contar el cursor.
+             */
+            total: number;
+            /**
+             * Siguiente
+             * @description Cursor de la página siguiente, o null si no hay más.
+             */
+            siguiente: string | null;
+            /**
+             * Nuevos
+             * @description Entradas nuevas para el cliente en todo el proceso.
+             */
+            nuevos: number;
+        };
         /** PaginaProcesos */
         PaginaProcesos: {
             /** Items */
@@ -1977,6 +2405,34 @@ export interface components {
              */
             enlace: string;
         };
+        /**
+         * PendienteCliente
+         * @description Algo que la firma le pidió al cliente.
+         */
+        PendienteCliente: {
+            /**
+             * Clave
+             * @description «solicitud:3», «tarea:5» o «subtarea:9».
+             */
+            clave: string;
+            /**
+             * Tipo
+             * @enum {string}
+             */
+            tipo: "documento" | "tarea";
+            /** Titulo */
+            titulo: string;
+            /**
+             * Detalle
+             * @description Qué falta: «Faltan 2 de 3 documentos», «Parte de: …».
+             */
+            detalle?: string | null;
+            proceso: components["schemas"]["ProcesoBreve"];
+            /** Vence */
+            vence: string | null;
+            /** Vencido */
+            vencido: boolean;
+        };
         /** PendienteDelCliente */
         PendienteDelCliente: {
             /** Solicitud Id */
@@ -2048,6 +2504,45 @@ export interface components {
             id: number;
             /** Nombre */
             nombre: string;
+        };
+        /** ProcesoCliente */
+        ProcesoCliente: {
+            /** Id */
+            id: number;
+            /** Nombre */
+            nombre: string;
+            /** Descripcion */
+            descripcion: string | null;
+            abogado: components["schemas"]["PersonaBreve"];
+            /** Etapa */
+            etapa: ("demanda" | "admision" | "pruebas" | "audiencia" | "sentencia") | null;
+            /**
+             * Etapa Explicacion
+             * @description Qué se hace en la etapa actual, en lenguaje claro.
+             */
+            etapa_explicacion: string | null;
+            /**
+             * Etapas
+             * @description Las cinco etapas en orden, con la fecha de las ya recorridas.
+             */
+            etapas: components["schemas"]["EtapaCliente"][];
+            proxima_fecha: components["schemas"]["FechaProxima"] | null;
+            /** Nuevos */
+            nuevos: number;
+            ultima: components["schemas"]["EntradaHistoria"] | null;
+            /** Despacho */
+            despacho: string | null;
+            /** Radicados */
+            radicados: string[];
+            /**
+             * Equipo
+             * @description Abogados colaboradores que la firma muestra al cliente.
+             */
+            equipo: components["schemas"]["PersonaBreve"][];
+            /** Pendientes */
+            pendientes: components["schemas"]["PendienteCliente"][];
+            /** Documentos */
+            documentos: components["schemas"]["DocumentoCliente"][];
         };
         /** ProcesoDelCliente */
         ProcesoDelCliente: {
@@ -2303,6 +2798,32 @@ export interface components {
              */
             por_responder: number;
         };
+        /** ResumenProcesoCliente */
+        ResumenProcesoCliente: {
+            /** Id */
+            id: number;
+            /** Nombre */
+            nombre: string;
+            /** Descripcion */
+            descripcion: string | null;
+            abogado: components["schemas"]["PersonaBreve"];
+            /** Etapa */
+            etapa: ("demanda" | "admision" | "pruebas" | "audiencia" | "sentencia") | null;
+            /**
+             * Etapa Explicacion
+             * @description Qué se hace en la etapa actual, en lenguaje claro.
+             */
+            etapa_explicacion: string | null;
+            /**
+             * Etapas
+             * @description Las cinco etapas en orden, con la fecha de las ya recorridas.
+             */
+            etapas: components["schemas"]["EtapaCliente"][];
+            proxima_fecha: components["schemas"]["FechaProxima"] | null;
+            /** Nuevos */
+            nuevos: number;
+            ultima: components["schemas"]["EntradaHistoria"] | null;
+        };
         /** ResumenTareas */
         ResumenTareas: {
             /** Abiertas */
@@ -2492,6 +3013,30 @@ export interface components {
              * @description Festivos y vacancia judicial dentro del término. Los fines de semana no se listan.
              */
             inhabiles: components["schemas"]["PeriodoInhabil"][];
+        };
+        /** TerminoDelGlosario */
+        TerminoDelGlosario: {
+            /** Id */
+            id: number;
+            /**
+             * Patron
+             * @description Fragmento del texto del juzgado que reconoce la actuación.
+             */
+            patron: string;
+            /**
+             * Explicacion
+             * @description Lo que lee el cliente.
+             */
+            explicacion: string;
+            /** Activo */
+            activo: boolean;
+            /**
+             * Actualizado En
+             * Format: date-time
+             */
+            actualizado_en: string;
+            /** Actualizado Por */
+            actualizado_por?: string | null;
         };
         /** UltimoMensaje */
         UltimoMensaje: {
@@ -7340,6 +7885,774 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["OpcionReferencia"][];
                 };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+        };
+    };
+    listar_glosario: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ListaGlosario"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+        };
+    };
+    crear_termino: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DatosTermino"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TerminoDelGlosario"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+        };
+    };
+    editar_termino: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                termino_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DatosTermino"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TerminoDelGlosario"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+        };
+    };
+    eliminar_termino: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                termino_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+        };
+    };
+    explicar_actuacion: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                actuacion_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Explicacion"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+        };
+    };
+    inicio_cliente: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InicioCliente"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+        };
+    };
+    proceso_cliente: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                proceso_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProcesoCliente"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+        };
+    };
+    historia_proceso_cliente: {
+        parameters: {
+            query?: {
+                /** @description Elementos por página. */
+                limite?: number;
+                /** @description Valor de `siguiente` de la página anterior. */
+                cursor?: string | null;
+            };
+            header?: never;
+            path: {
+                proceso_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PaginaHistoria"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+        };
+    };
+    marcar_proceso_visto: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                proceso_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
             /** @description Bad Request */
             400: {

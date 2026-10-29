@@ -1,168 +1,83 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
-import { FolderOpen, RefreshCw, Search } from "lucide-react";
-import { useSession } from "@/context/SessionContext";
-import { fetchApi } from "@/lib/api";
-import { PageHeader } from "@/components/ui/PageHeader";
-import { Badge } from "@/components/ui/Badge";
-import { EmptyState } from "@/components/ui/EmptyState";
+import { useCallback, useState } from "react";
+import { CalendarDays, ChevronRight, FolderOpen, RefreshCw } from "lucide-react";
 
-type Process = {
-  id: number;
-  nombre: string;
-  estado_visible: string;
-  explicacion_estado: string;
-  responsable?: { nombre_completo: string };
-  tareas_pendientes: number;
-  documentos_pendientes: number;
-  ultima_actividad?: string | null;
-  radicados: { id: number; numero: string }[];
-};
+import { FilasCargando, TituloCliente } from "@/components/portal-cliente/piezas";
+import { Button } from "@/components/ui/Button";
+import { EmptyState } from "@/components/ui/EmptyState";
+import { Etapas } from "@/components/ui/Etapas";
+import { Sheet } from "@/components/ui/Sheet";
+import { api, mensajeDeError } from "@/lib/api-v2/cliente";
+import { ETAPAS, indiceEtapa, nombreEtapa } from "@/lib/etapas";
+import { fechaLarga, horaDe } from "@/lib/fechas";
+import { rutaProceso, type ResumenProcesoCliente } from "@/lib/portalCliente";
+import { useLoadEffect } from "@/lib/useLoadEffect";
 
 export default function ProcesosClientePage() {
-  const { token, loading: sessionLoading } = useSession();
-  const [items, setItems] = useState<Process[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
-  const [search, setSearch] = useState("");
-  const [status, setStatus] = useState("TODOS");
+  const [procesos, setProcesos] = useState<ResumenProcesoCliente[] | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    if (!token || sessionLoading) return;
-    let active = true;
-    fetchApi("/api/expedientes/procesos", { token })
-      .then((data: Process[]) => {
-        if (active) setItems(data);
-      })
-      .catch((cause: unknown) => {
-        if (active) setError(cause instanceof Error ? cause.message : "No fue posible cargar tus procesos.");
-      })
-      .finally(() => {
-        if (active) setLoading(false);
-      });
-    return () => {
-      active = false;
-    };
-  }, [token, sessionLoading]);
-
-  const statuses = useMemo(
-    () => Array.from(new Set(items.map((item) => item.estado_visible).filter(Boolean))).sort((a, b) => a.localeCompare(b, "es")),
-    [items],
-  );
-
-  const filtered = useMemo(() => {
-    const term = search.trim().toLocaleLowerCase("es-CO");
-    return items.filter(
-      (item) =>
-        (status === "TODOS" || item.estado_visible === status) &&
-        (!term ||
-          [item.nombre, item.estado_visible, item.explicacion_estado, ...item.radicados.map((radicado) => radicado.numero)]
-            .some((value) => value?.toLocaleLowerCase("es-CO").includes(term))),
-    );
-  }, [items, search, status]);
+  const cargar = useCallback(async () => {
+    setError(null);
+    const { data, error: fallo } = await api.GET("/api/v2/cliente/inicio");
+    if (data) setProcesos(data.procesos);
+    else setError(mensajeDeError(fallo));
+  }, []);
+  useLoadEffect(cargar);
 
   return (
-    <section className="motion-swap mx-auto max-w-5xl space-y-6 pb-24">
-      <PageHeader
-        overline="Portal del cliente"
-        title="Mis procesos"
-        description="Consulta el estado, las novedades y las acciones de cada expediente."
-      />
-
-      {error && (
-        <div role="alert" className="rounded-lg border border-risk/30 bg-risk/10 p-3.5 text-sm font-medium text-risk">
-          {error}
-        </div>
-      )}
-
-      {!loading && items.length > 0 && (
-        <div className="grid gap-3 rounded-xl border border-border bg-surface p-3 sm:grid-cols-[minmax(0,1fr)_15rem] shadow-xs">
-          <div className="relative">
-            <Search aria-hidden="true" className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted" />
-            <input
-              type="search"
-              value={search}
-              onChange={(event) => setSearch(event.target.value)}
-              placeholder="Buscar proceso o radicado..."
-              className="min-h-10 w-full rounded-lg border border-border bg-surface-secondary py-2 pl-9 pr-3 text-sm text-foreground placeholder:text-muted focus:border-brand-500 focus:outline-none"
-            />
+    <div>
+      <TituloCliente sub="Sus procesos activos con la firma.">Mis procesos</TituloCliente>
+      <Sheet className="overflow-hidden">
+        {error && !procesos ? (
+          <div className="flex flex-col items-center gap-4 px-6 py-12 text-center">
+            <p role="alert" className="text-bad">{error}</p>
+            <Button variant="secondary" size="lg" icon={<RefreshCw aria-hidden="true" size={16} />} onClick={() => void cargar()}>Intentar de nuevo</Button>
           </div>
-          <select
-            id="process-status"
-            value={status}
-            onChange={(event) => setStatus(event.target.value)}
-            aria-label="Filtrar por estado"
-            className="min-h-10 rounded-lg border border-border bg-surface-secondary px-3 py-2 text-sm text-foreground focus:border-brand-500 focus:outline-none"
-          >
-            <option value="TODOS">Todos los estados</option>
-            {statuses.map((itemStatus) => (
-              <option key={itemStatus} value={itemStatus}>
-                {itemStatus}
-              </option>
-            ))}
-          </select>
-        </div>
-      )}
-
-      {loading || sessionLoading ? (
-        <div className="py-16 text-center text-sm text-muted">
-          <RefreshCw className="mr-2 inline size-4 animate-spin text-brand-700" />
-          Cargando procesos...
-        </div>
-      ) : filtered.length > 0 ? (
-        <div className="grid gap-4 md:grid-cols-2">
-          {filtered.map((item) => (
-            <Link
-              href={`/gestion-procesos/cliente/procesos/${item.id}`}
-              key={item.id}
-              className="group flex flex-col justify-between rounded-xl border border-border bg-surface p-5 shadow-xs transition hover:border-brand-500/50 hover:bg-surface-hover/70"
-            >
-              <div>
-                <div className="flex items-start justify-between gap-3">
-                  <div className="flex size-10 items-center justify-center rounded-lg bg-brand-50 text-brand-700 dark:bg-brand-950 dark:text-brand-300">
-                    <FolderOpen className="size-5" />
-                  </div>
-                  <Badge tone="normal">
-                    {item.radicados.length} radicado{item.radicados.length === 1 ? "" : "s"}
-                  </Badge>
-                </div>
-
-                <h2 className="mt-3.5 text-base font-semibold text-foreground group-hover:text-brand-900 dark:group-hover:text-brand-200">
-                  {item.nombre}
-                </h2>
-                <p className="mt-1 text-xs font-semibold text-brand-700 dark:text-brand-300">
-                  {item.estado_visible}
-                </p>
-                <p className="mt-1 text-xs text-muted leading-relaxed">
-                  {item.explicacion_estado}
-                </p>
-                <p className="mt-3 text-xs text-muted">
-                  Responsable: <span className="font-medium text-foreground">{item.responsable?.nombre_completo || "Despacho"}</span>
-                </p>
-              </div>
-
-              <div className="mt-4 flex flex-wrap gap-x-4 gap-y-1 border-t border-border/70 pt-3 text-xs text-muted">
-                <span>{item.tareas_pendientes} tareas pendientes</span>
-                <span>{item.documentos_pendientes} documentos por entregar</span>
-              </div>
-            </Link>
-          ))}
-        </div>
-      ) : (
-        <div className="rounded-xl border border-dashed border-border bg-surface">
-          <EmptyState
-            icon={FolderOpen}
-            title={items.length ? "Sin coincidencias" : "Aún no tienes procesos compartidos"}
-            description={
-              items.length
-                ? "No hay procesos que coincidan con la búsqueda y el estado seleccionados."
-                : "Cuando el despacho te vincule a un expediente judicial, aparecerá organizado en esta sección."
-            }
-          />
-        </div>
-      )}
-    </section>
+        ) : !procesos ? (
+          <div aria-busy="true"><FilasCargando filas={3} /></div>
+        ) : procesos.length === 0 ? (
+          <EmptyState icon={FolderOpen} title="Aún no tiene procesos activos" description="Cuando la firma abra su proceso, aparecerá aquí." />
+        ) : (
+          <ul className="divide-y divide-line">
+            {procesos.map((proceso) => {
+              const indice = indiceEtapa(proceso.etapa);
+              return (
+                <li key={proceso.id}>
+                  <Link href={rutaProceso(proceso.id)} className="group flex items-center gap-4 px-5 py-5 transition-colors hover:bg-sheet-2 sm:px-7">
+                    <div className="min-w-0 flex-1">
+                      <p className="flex flex-wrap items-center gap-2 font-display text-[21px] leading-snug text-ink">
+                        {proceso.nombre}
+                        {proceso.nuevos > 0 && (
+                          <span className="rounded bg-gold-soft px-1.5 font-sans text-[13px] font-semibold text-gold-ink tabular-nums">
+                            {proceso.nuevos} {proceso.nuevos === 1 ? "nuevo" : "nuevos"}
+                          </span>
+                        )}
+                      </p>
+                      <p className="mt-1 text-[15px] text-ink-2">
+                        {indice >= 0 ? `Etapa de ${nombreEtapa(proceso.etapa).toLowerCase()}` : "Etapa sin marcar"} · Lleva su caso {proceso.abogado.nombre}
+                      </p>
+                      {indice >= 0 && <Etapas etapas={ETAPAS.map((e) => e.nombre)} actual={indice} compacta className="mt-3 max-w-sm" />}
+                      {proceso.proxima_fecha && (
+                        <p className="mt-3 flex items-start gap-2 text-[15px] text-ink-2">
+                          <CalendarDays aria-hidden="true" size={16} strokeWidth={1.75} className="mt-1 shrink-0" />
+                          <span>
+                            <span className="inline-block first-letter:uppercase">{fechaLarga(proceso.proxima_fecha.inicio)}</span>, {horaDe(proceso.proxima_fecha.inicio)}
+                            <span className="text-ink-3"> · {proceso.proxima_fecha.titulo}</span>
+                          </span>
+                        </p>
+                      )}
+                    </div>
+                    <ChevronRight aria-hidden="true" size={22} className="shrink-0 text-ink-3 transition-transform group-hover:translate-x-0.5" />
+                  </Link>
+                </li>
+              );
+            })}
+          </ul>
+        )}
+      </Sheet>
+    </div>
   );
 }
