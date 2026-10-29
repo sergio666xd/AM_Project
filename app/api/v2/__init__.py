@@ -7,8 +7,8 @@ formato de error de `app.nucleo.errores` y la protección CSRF de la sesión.
 from fastapi import APIRouter, Depends
 
 from app.api.v2 import (
-    agenda, avisos, bandeja, busqueda, cliente, clientes, contratos, documentos, folios, glosario, mensajes, procesos, sesion,
-    tareas, terminos,
+    agenda, avisos, bandeja, busqueda, cliente, clientes, contratos, documentos, finanzas, folios, glosario, mensajes, procesos,
+    sesion, tareas, terminos,
 )
 from app.nucleo.errores import PREFIJO_V2, RESPUESTAS_ERROR
 from app.nucleo.sesion import proteger_csrf
@@ -35,3 +35,4 @@ router.include_router(contratos.router)
 router.include_router(mensajes.router)
 router.include_router(glosario.router)
 router.include_router(cliente.router)
+router.include_router(finanzas.router)

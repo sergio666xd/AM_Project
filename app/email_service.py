@@ -202,8 +202,14 @@ def _html_correo(
     cuerpo: str,
     firma: dict[str, str | bool] | None = None,
     preferencias_url: str | None = None,
+    *,
+    admite_respuesta: bool = False,
 ) -> str:
-    """Envuelve el contenido del mensaje con el diseño común de la firma."""
+    """Envuelve el contenido del mensaje con el diseño común de la firma.
+
+    Con `admite_respuesta` (los correos financieros, que llevan Reply-To) el pie
+    invita a responder en lugar de pedir que no se responda.
+    """
     bloques = _bloques(cuerpo)
     contenido = _contenido(bloques)
     preencabezado = escape(_preencabezado(bloques))
@@ -225,6 +231,10 @@ def _html_correo(
         if preferencias_url else ""
     )
     pie_texto = f"font-family:{_SANS};font-size:14px;line-height:1.6;color:{_INK_2};"
+    respuesta = (
+        "Si tiene preguntas, puede responder este correo o escribirnos:"
+        if admite_respuesta else "Este correo es automático; por favor no lo responda. Si necesita ayuda, escríbanos:"
+    )
     return f"""<!doctype html>
 <html lang="es" xmlns:v="urn:schemas-microsoft-com:vml" xmlns:o="urn:schemas-microsoft-com:office:office">
 <head>
@@ -255,7 +265,7 @@ def _html_correo(
         </td></tr>
         <tr><td class="hoja-px" style="padding:24px 32px;background:{_SHEET_2};border-top:1px solid {_LINE};border-radius:0 0 12px 12px;">
           <p style="margin:0 0 10px;{pie_texto}">Le escribimos porque tiene una cuenta en el portal de {nombre_firma}.{preferencias}</p>
-          <p style="margin:0 0 10px;{pie_texto}">Este correo es automático; por favor no lo responda. Si necesita ayuda, escríbanos:</p>
+          <p style="margin:0 0 10px;{pie_texto}">{respuesta}</p>
           <p style="margin:0 0 16px;{pie_texto}">
             Correo: <a href="mailto:{correo_contacto}" style="color:{_NAVY};text-decoration:underline;">{correo_contacto}</a><br>
             Peticiones, quejas y reclamos: <a href="mailto:{correo_pqr}" style="color:{_NAVY};text-decoration:underline;">{correo_pqr}</a><br>
@@ -278,7 +288,12 @@ def enviar_correo(
     cuerpo: str,
     adjunto: tuple[str, bytes, str] | None = None,
     preferencias_url: str | None = None,
+    *,
+    remitente_nombre: str | None = None,
+    remitente_email: str | None = None,
+    reply_to: str | None = None,
 ) -> bool:
+    """Envía el correo. Los correos financieros pasan su propio remitente y Reply-To."""
     config = get_integration_settings()
     firma = get_firm_settings()
     host = config["smtp_host"]
@@ -289,15 +304,17 @@ def enviar_correo(
     mensaje = EmailMessage(policy=SMTP)
     mensaje["Subject"] = asunto
     _, sender_address = parseaddr(str(remitente))
-    mensaje["From"] = formataddr((_SENDER_NAME, sender_address or str(remitente)))
+    mensaje["From"] = formataddr((remitente_nombre or _SENDER_NAME, remitente_email or sender_address or str(remitente)))
     mensaje["To"] = destinatario
+    if reply_to:
+        mensaje["Reply-To"] = reply_to
     mensaje.set_content(
         texto_plano(cuerpo),
         subtype="plain",
         charset="utf-8",
         cte="quoted-printable",
     )
-    mensaje.add_alternative(_html_correo(cuerpo, firma, preferencias_url), subtype="html", charset="utf-8")
+    mensaje.add_alternative(_html_correo(cuerpo, firma, preferencias_url, admite_respuesta=bool(reply_to)), subtype="html", charset="utf-8")
     if adjunto:
         nombre_archivo, contenido, mime_type = adjunto
         maintype, _, subtype = mime_type.partition("/")

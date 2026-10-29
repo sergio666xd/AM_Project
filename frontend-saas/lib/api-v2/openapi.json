@@ -7684,6 +7684,2164 @@
           }
         }
       }
+    },
+    "/api/v2/cuentas-cobro": {
+      "get": {
+        "tags": [
+          "Finanzas"
+        ],
+        "summary": "Cuentas de cobro",
+        "description": "Las cuentas que el usuario ve, con el resumen de lo que hay por cobrar. El cliente ve las suyas emitidas.",
+        "operationId": "listar_cuentas_cobro",
+        "parameters": [
+          {
+            "name": "filtro",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "enum": [
+                "por_cobrar",
+                "vencidas",
+                "pagadas",
+                "borradores",
+                "anuladas",
+                "todas"
+              ],
+              "type": "string",
+              "description": "por_cobrar, vencidas, pagadas, borradores, anuladas o todas.",
+              "default": "por_cobrar",
+              "title": "Filtro"
+            },
+            "description": "por_cobrar, vencidas, pagadas, borradores, anuladas o todas."
+          },
+          {
+            "name": "cliente_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Cliente Id"
+            }
+          },
+          {
+            "name": "proceso_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Proceso Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ListaCuentas"
+                }
+              }
+            }
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Too Many Requests"
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Finanzas"
+        ],
+        "summary": "Crear cuenta de cobro",
+        "description": "La deja en borrador o, con `emitir`, la numera y se la envía al cliente con el PDF.",
+        "operationId": "crear_cuenta_cobro",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CuentaNueva"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DetalleCuenta"
+                }
+              }
+            }
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Too Many Requests"
+          }
+        }
+      }
+    },
+    "/api/v2/cuentas-cobro/{cuenta_id}": {
+      "get": {
+        "tags": [
+          "Finanzas"
+        ],
+        "summary": "Detalle de una cuenta de cobro",
+        "operationId": "detalle_cuenta_cobro",
+        "parameters": [
+          {
+            "name": "cuenta_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Cuenta Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DetalleCuenta"
+                }
+              }
+            }
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Too Many Requests"
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "Finanzas"
+        ],
+        "summary": "Editar un borrador",
+        "operationId": "editar_cuenta_cobro",
+        "parameters": [
+          {
+            "name": "cuenta_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Cuenta Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CambioCuenta"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DetalleCuenta"
+                }
+              }
+            }
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Too Many Requests"
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Finanzas"
+        ],
+        "summary": "Descartar un borrador",
+        "operationId": "descartar_cuenta_cobro",
+        "parameters": [
+          {
+            "name": "cuenta_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Cuenta Id"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Too Many Requests"
+          }
+        }
+      }
+    },
+    "/api/v2/cuentas-cobro/{cuenta_id}/emitir": {
+      "post": {
+        "tags": [
+          "Finanzas"
+        ],
+        "summary": "Emitir y enviar al cliente",
+        "operationId": "emitir_cuenta_cobro",
+        "parameters": [
+          {
+            "name": "cuenta_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Cuenta Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DetalleCuenta"
+                }
+              }
+            }
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Too Many Requests"
+          }
+        }
+      }
+    },
+    "/api/v2/cuentas-cobro/{cuenta_id}/anular": {
+      "post": {
+        "tags": [
+          "Finanzas"
+        ],
+        "summary": "Anular una cuenta emitida",
+        "description": "Solo si no tiene pagos abonados.",
+        "operationId": "anular_cuenta_cobro",
+        "parameters": [
+          {
+            "name": "cuenta_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Cuenta Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Motivo"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DetalleCuenta"
+                }
+              }
+            }
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Too Many Requests"
+          }
+        }
+      }
+    },
+    "/api/v2/cuentas-cobro/{cuenta_id}/ajustes": {
+      "post": {
+        "tags": [
+          "Finanzas"
+        ],
+        "summary": "Agregar un descuento o un cargo",
+        "operationId": "ajustar_cuenta_cobro",
+        "parameters": [
+          {
+            "name": "cuenta_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Cuenta Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AjusteNuevo"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DetalleCuenta"
+                }
+              }
+            }
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Too Many Requests"
+          }
+        }
+      }
+    },
+    "/api/v2/cuentas-cobro/{cuenta_id}/reenviar": {
+      "post": {
+        "tags": [
+          "Finanzas"
+        ],
+        "summary": "Volver a enviar al cliente",
+        "operationId": "reenviar_cuenta_cobro",
+        "parameters": [
+          {
+            "name": "cuenta_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Cuenta Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EntregaVista"
+                }
+              }
+            }
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Too Many Requests"
+          }
+        }
+      }
+    },
+    "/api/v2/cuentas-cobro/{cuenta_id}/pdf": {
+      "get": {
+        "tags": [
+          "Finanzas"
+        ],
+        "summary": "PDF de la cuenta de cobro",
+        "operationId": "pdf_cuenta_cobro",
+        "parameters": [
+          {
+            "name": "cuenta_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Cuenta Id"
+            }
+          },
+          {
+            "name": "descargar",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "description": "true lo descarga; false lo abre en el navegador.",
+              "default": false,
+              "title": "Descargar"
+            },
+            "description": "true lo descarga; false lo abre en el navegador."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "El PDF.",
+            "content": {
+              "application/pdf": {}
+            }
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Too Many Requests"
+          }
+        }
+      }
+    },
+    "/api/v2/pagos": {
+      "get": {
+        "tags": [
+          "Finanzas"
+        ],
+        "summary": "Pagos recibidos",
+        "operationId": "listar_pagos",
+        "parameters": [
+          {
+            "name": "cliente_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Cliente Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ListaPagos"
+                }
+              }
+            }
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Too Many Requests"
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Finanzas"
+        ],
+        "summary": "Registrar un pago",
+        "description": "Registra un pago recibido fuera del portal y lo abona a las cuentas indicadas. El cliente recibe el recibo.",
+        "operationId": "registrar_pago",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PagoNuevo"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PagoVista"
+                }
+              }
+            }
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Too Many Requests"
+          }
+        }
+      }
+    },
+    "/api/v2/pagos/{pago_id}/aplicaciones": {
+      "post": {
+        "tags": [
+          "Finanzas"
+        ],
+        "summary": "Abonar un pago a cuentas",
+        "description": "Abona lo que queda a favor de un pago a una o varias cuentas del mismo cliente.",
+        "operationId": "abonar_pago",
+        "parameters": [
+          {
+            "name": "pago_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Pago Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/AplicacionNueva"
+                },
+                "title": "Datos"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PagoVista"
+                }
+              }
+            }
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Too Many Requests"
+          }
+        }
+      }
+    },
+    "/api/v2/pagos/{pago_id}/revertir": {
+      "post": {
+        "tags": [
+          "Finanzas"
+        ],
+        "summary": "Revertir un pago",
+        "description": "El pago no se borra: queda revertido con su motivo y deja de contar en los saldos.",
+        "operationId": "revertir_pago",
+        "parameters": [
+          {
+            "name": "pago_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Pago Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Motivo"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PagoVista"
+                }
+              }
+            }
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Too Many Requests"
+          }
+        }
+      }
+    },
+    "/api/v2/pagos/{pago_id}/reenviar": {
+      "post": {
+        "tags": [
+          "Finanzas"
+        ],
+        "summary": "Volver a enviar el recibo",
+        "operationId": "reenviar_recibo",
+        "parameters": [
+          {
+            "name": "pago_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Pago Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EntregaVista"
+                }
+              }
+            }
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Too Many Requests"
+          }
+        }
+      }
+    },
+    "/api/v2/pagos/{pago_id}/recibo": {
+      "get": {
+        "tags": [
+          "Finanzas"
+        ],
+        "summary": "PDF del recibo de pago",
+        "operationId": "recibo_pago",
+        "parameters": [
+          {
+            "name": "pago_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Pago Id"
+            }
+          },
+          {
+            "name": "descargar",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "description": "true lo descarga; false lo abre en el navegador.",
+              "default": false,
+              "title": "Descargar"
+            },
+            "description": "true lo descarga; false lo abre en el navegador."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "El PDF.",
+            "content": {
+              "application/pdf": {}
+            }
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Too Many Requests"
+          }
+        }
+      }
+    },
+    "/api/v2/estado-cuenta": {
+      "get": {
+        "tags": [
+          "Finanzas"
+        ],
+        "summary": "Estado de cuenta de un cliente",
+        "operationId": "estado_de_cuenta",
+        "parameters": [
+          {
+            "name": "cliente_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Obligatorio para el equipo; el cliente ve el suyo.",
+              "title": "Cliente Id"
+            },
+            "description": "Obligatorio para el equipo; el cliente ve el suyo."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EstadoDeCuenta"
+                }
+              }
+            }
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Too Many Requests"
+          }
+        }
+      }
+    },
+    "/api/v2/estado-cuenta/pdf": {
+      "get": {
+        "tags": [
+          "Finanzas"
+        ],
+        "summary": "PDF del estado de cuenta",
+        "operationId": "pdf_estado_de_cuenta",
+        "parameters": [
+          {
+            "name": "cliente_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Cliente Id"
+            }
+          },
+          {
+            "name": "descargar",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "default": false,
+              "title": "Descargar"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "El PDF.",
+            "content": {
+              "application/pdf": {}
+            }
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Too Many Requests"
+          }
+        }
+      }
+    },
+    "/api/v2/finanzas/configuracion": {
+      "get": {
+        "tags": [
+          "Finanzas"
+        ],
+        "summary": "Configuración financiera",
+        "description": "Remitente de los correos financieros, datos para pagar y nota de los PDF. Solo ADMIN.",
+        "operationId": "configuracion_finanzas",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConfiguracionFinanzas"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too Many Requests",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "Finanzas"
+        ],
+        "summary": "Guardar la configuración financiera",
+        "operationId": "guardar_configuracion_finanzas",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ConfiguracionFinanzas"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConfiguracionFinanzas"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too Many Requests",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -7739,6 +9897,199 @@
           "items"
         ],
         "title": "Agenda"
+      },
+      "AjusteNuevo": {
+        "properties": {
+          "tipo": {
+            "type": "string",
+            "enum": [
+              "descuento",
+              "cargo"
+            ],
+            "title": "Tipo"
+          },
+          "importe": {
+            "type": "integer",
+            "maximum": 999999999999.0,
+            "exclusiveMinimum": 0.0,
+            "title": "Importe"
+          },
+          "motivo": {
+            "type": "string",
+            "maxLength": 1000,
+            "minLength": 3,
+            "title": "Motivo"
+          }
+        },
+        "type": "object",
+        "required": [
+          "tipo",
+          "importe",
+          "motivo"
+        ],
+        "title": "AjusteNuevo"
+      },
+      "AjusteVista": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "tipo": {
+            "type": "string",
+            "enum": [
+              "descuento",
+              "cargo"
+            ],
+            "title": "Tipo"
+          },
+          "importe": {
+            "type": "integer",
+            "title": "Importe"
+          },
+          "motivo": {
+            "type": "string",
+            "title": "Motivo"
+          },
+          "creado_en": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Creado En"
+          },
+          "por": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Por"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "tipo",
+          "importe",
+          "motivo",
+          "creado_en",
+          "por"
+        ],
+        "title": "AjusteVista"
+      },
+      "AplicacionDePago": {
+        "properties": {
+          "cuenta_id": {
+            "type": "integer",
+            "title": "Cuenta Id"
+          },
+          "numero": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Numero"
+          },
+          "concepto": {
+            "type": "string",
+            "title": "Concepto"
+          },
+          "importe": {
+            "type": "integer",
+            "title": "Importe"
+          }
+        },
+        "type": "object",
+        "required": [
+          "cuenta_id",
+          "numero",
+          "concepto",
+          "importe"
+        ],
+        "title": "AplicacionDePago"
+      },
+      "AplicacionNueva": {
+        "properties": {
+          "cuenta_id": {
+            "type": "integer",
+            "title": "Cuenta Id"
+          },
+          "importe": {
+            "type": "integer",
+            "maximum": 999999999999.0,
+            "exclusiveMinimum": 0.0,
+            "title": "Importe"
+          }
+        },
+        "type": "object",
+        "required": [
+          "cuenta_id",
+          "importe"
+        ],
+        "title": "AplicacionNueva"
+      },
+      "AplicacionVista": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "pago_id": {
+            "type": "integer",
+            "title": "Pago Id"
+          },
+          "numero_recibo": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Numero Recibo"
+          },
+          "importe": {
+            "type": "integer",
+            "title": "Importe"
+          },
+          "pagado_el": {
+            "type": "string",
+            "format": "date",
+            "title": "Pagado El"
+          },
+          "metodo": {
+            "type": "string",
+            "enum": [
+              "transferencia",
+              "consignacion",
+              "efectivo",
+              "otro"
+            ],
+            "title": "Metodo"
+          },
+          "revertido": {
+            "type": "boolean",
+            "title": "Revertido"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "pago_id",
+          "numero_recibo",
+          "importe",
+          "pagado_el",
+          "metodo",
+          "revertido"
+        ],
+        "title": "AplicacionVista"
       },
       "AplicarPlantilla": {
         "properties": {
@@ -8217,6 +10568,54 @@
         ],
         "title": "CambioAvisos"
       },
+      "CambioCuenta": {
+        "properties": {
+          "proceso_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Proceso Id"
+          },
+          "concepto": {
+            "type": "string",
+            "maxLength": 255,
+            "minLength": 1,
+            "title": "Concepto"
+          },
+          "lineas": {
+            "items": {
+              "$ref": "#/components/schemas/LineaNueva"
+            },
+            "type": "array",
+            "maxItems": 50,
+            "minItems": 1,
+            "title": "Lineas"
+          },
+          "vence_el": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Vence El"
+          }
+        },
+        "type": "object",
+        "required": [
+          "concepto",
+          "lineas"
+        ],
+        "title": "CambioCuenta"
+      },
       "CambioEnLote": {
         "properties": {
           "ids": {
@@ -8694,6 +11093,72 @@
         ],
         "title": "ClientesAvisados"
       },
+      "ConfiguracionFinanzas": {
+        "properties": {
+          "remitente_nombre": {
+            "type": "string",
+            "maxLength": 180,
+            "minLength": 2,
+            "title": "Remitente Nombre"
+          },
+          "remitente_email": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 320
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Remitente Email",
+            "description": "Vacío usa el remitente general del correo."
+          },
+          "reply_to": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 320
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reply To"
+          },
+          "datos_pago": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 2000
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Datos Pago",
+            "description": "Cuentas bancarias y medios de pago que salen en la cuenta de cobro."
+          },
+          "nota_documentos": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 1000
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Nota Documentos",
+            "description": "Nota de alcance al pie de los PDF."
+          }
+        },
+        "type": "object",
+        "required": [
+          "remitente_nombre"
+        ],
+        "title": "ConfiguracionFinanzas"
+      },
       "Contacto": {
         "properties": {
           "id": {
@@ -8989,6 +11454,187 @@
         ],
         "title": "Conversacion"
       },
+      "CuentaBreve": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "numero": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Numero",
+            "description": "Se asigna al emitirla."
+          },
+          "concepto": {
+            "type": "string",
+            "title": "Concepto"
+          },
+          "estado": {
+            "type": "string",
+            "enum": [
+              "borrador",
+              "pendiente",
+              "parcial",
+              "pagada",
+              "anulada"
+            ],
+            "title": "Estado"
+          },
+          "vencida": {
+            "type": "boolean",
+            "title": "Vencida",
+            "description": "Tiene saldo y ya pasó la fecha de vencimiento."
+          },
+          "cliente": {
+            "$ref": "#/components/schemas/PersonaBreve"
+          },
+          "abogado": {
+            "$ref": "#/components/schemas/PersonaBreve"
+          },
+          "proceso": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ProcesoBreve"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "total": {
+            "type": "integer",
+            "title": "Total"
+          },
+          "pagado": {
+            "type": "integer",
+            "title": "Pagado",
+            "description": "Pagos aplicados que no se han revertido."
+          },
+          "ajustes": {
+            "type": "integer",
+            "title": "Ajustes",
+            "description": "Cargos menos descuentos."
+          },
+          "saldo": {
+            "type": "integer",
+            "title": "Saldo"
+          },
+          "emitida_en": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Emitida En"
+          },
+          "vence_el": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Vence El"
+          },
+          "creada_en": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Creada En"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "numero",
+          "concepto",
+          "estado",
+          "vencida",
+          "cliente",
+          "abogado",
+          "proceso",
+          "total",
+          "pagado",
+          "ajustes",
+          "saldo",
+          "emitida_en",
+          "vence_el",
+          "creada_en"
+        ],
+        "title": "CuentaBreve"
+      },
+      "CuentaNueva": {
+        "properties": {
+          "cliente_id": {
+            "type": "integer",
+            "title": "Cliente Id"
+          },
+          "proceso_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Proceso Id"
+          },
+          "concepto": {
+            "type": "string",
+            "maxLength": 255,
+            "minLength": 1,
+            "title": "Concepto"
+          },
+          "lineas": {
+            "items": {
+              "$ref": "#/components/schemas/LineaNueva"
+            },
+            "type": "array",
+            "maxItems": 50,
+            "minItems": 1,
+            "title": "Lineas"
+          },
+          "vence_el": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Vence El"
+          },
+          "emitir": {
+            "type": "boolean",
+            "title": "Emitir",
+            "description": "true la emite y se la envía al cliente; false la deja en borrador.",
+            "default": false
+          }
+        },
+        "type": "object",
+        "required": [
+          "cliente_id",
+          "concepto",
+          "lineas"
+        ],
+        "title": "CuentaNueva"
+      },
       "DatosCambio": {
         "properties": {
           "nombre": {
@@ -9210,6 +11856,186 @@
           "explicacion"
         ],
         "title": "DatosTermino"
+      },
+      "DetalleCuenta": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "numero": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Numero",
+            "description": "Se asigna al emitirla."
+          },
+          "concepto": {
+            "type": "string",
+            "title": "Concepto"
+          },
+          "estado": {
+            "type": "string",
+            "enum": [
+              "borrador",
+              "pendiente",
+              "parcial",
+              "pagada",
+              "anulada"
+            ],
+            "title": "Estado"
+          },
+          "vencida": {
+            "type": "boolean",
+            "title": "Vencida",
+            "description": "Tiene saldo y ya pasó la fecha de vencimiento."
+          },
+          "cliente": {
+            "$ref": "#/components/schemas/PersonaBreve"
+          },
+          "abogado": {
+            "$ref": "#/components/schemas/PersonaBreve"
+          },
+          "proceso": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ProcesoBreve"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "total": {
+            "type": "integer",
+            "title": "Total"
+          },
+          "pagado": {
+            "type": "integer",
+            "title": "Pagado",
+            "description": "Pagos aplicados que no se han revertido."
+          },
+          "ajustes": {
+            "type": "integer",
+            "title": "Ajustes",
+            "description": "Cargos menos descuentos."
+          },
+          "saldo": {
+            "type": "integer",
+            "title": "Saldo"
+          },
+          "emitida_en": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Emitida En"
+          },
+          "vence_el": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Vence El"
+          },
+          "creada_en": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Creada En"
+          },
+          "lineas": {
+            "items": {
+              "$ref": "#/components/schemas/Linea"
+            },
+            "type": "array",
+            "title": "Lineas"
+          },
+          "aplicaciones": {
+            "items": {
+              "$ref": "#/components/schemas/AplicacionVista"
+            },
+            "type": "array",
+            "title": "Aplicaciones"
+          },
+          "ajustes_detalle": {
+            "items": {
+              "$ref": "#/components/schemas/AjusteVista"
+            },
+            "type": "array",
+            "title": "Ajustes Detalle"
+          },
+          "entregas": {
+            "items": {
+              "$ref": "#/components/schemas/EntregaVista"
+            },
+            "type": "array",
+            "title": "Entregas",
+            "description": "Envíos por correo al cliente. Vacío para el cliente."
+          },
+          "anulada_en": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Anulada En"
+          },
+          "motivo_anulacion": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Motivo Anulacion"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "numero",
+          "concepto",
+          "estado",
+          "vencida",
+          "cliente",
+          "abogado",
+          "proceso",
+          "total",
+          "pagado",
+          "ajustes",
+          "saldo",
+          "emitida_en",
+          "vence_el",
+          "creada_en",
+          "lineas",
+          "aplicaciones",
+          "ajustes_detalle",
+          "entregas",
+          "anulada_en",
+          "motivo_anulacion"
+        ],
+        "title": "DetalleCuenta"
       },
       "DetallePendiente": {
         "properties": {
@@ -9809,6 +12635,51 @@
         ],
         "title": "EntregaDeMensaje"
       },
+      "EntregaVista": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "destinatario": {
+            "type": "string",
+            "title": "Destinatario"
+          },
+          "estado": {
+            "type": "string",
+            "enum": [
+              "enviado",
+              "error"
+            ],
+            "title": "Estado"
+          },
+          "error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error"
+          },
+          "creado_en": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Creado En"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "destinatario",
+          "estado",
+          "error",
+          "creado_en"
+        ],
+        "title": "EntregaVista"
+      },
       "ErrorRespuesta": {
         "properties": {
           "codigo": {
@@ -9836,6 +12707,38 @@
           "mensaje"
         ],
         "title": "ErrorRespuesta"
+      },
+      "EstadoDeCuenta": {
+        "properties": {
+          "cliente": {
+            "$ref": "#/components/schemas/PersonaBreve"
+          },
+          "cuentas": {
+            "items": {
+              "$ref": "#/components/schemas/CuentaBreve"
+            },
+            "type": "array",
+            "title": "Cuentas"
+          },
+          "pagos": {
+            "items": {
+              "$ref": "#/components/schemas/PagoVista"
+            },
+            "type": "array",
+            "title": "Pagos"
+          },
+          "totales": {
+            "$ref": "#/components/schemas/TotalesEstado"
+          }
+        },
+        "type": "object",
+        "required": [
+          "cliente",
+          "cuentas",
+          "pagos",
+          "totales"
+        ],
+        "title": "EstadoDeCuenta"
       },
       "EtapaCliente": {
         "properties": {
@@ -10485,6 +13388,63 @@
         ],
         "title": "Leido"
       },
+      "Linea": {
+        "properties": {
+          "descripcion": {
+            "type": "string",
+            "title": "Descripcion"
+          },
+          "cantidad": {
+            "type": "integer",
+            "title": "Cantidad"
+          },
+          "valor_unitario": {
+            "type": "integer",
+            "title": "Valor Unitario"
+          },
+          "total": {
+            "type": "integer",
+            "title": "Total"
+          }
+        },
+        "type": "object",
+        "required": [
+          "descripcion",
+          "cantidad",
+          "valor_unitario",
+          "total"
+        ],
+        "title": "Linea"
+      },
+      "LineaNueva": {
+        "properties": {
+          "descripcion": {
+            "type": "string",
+            "maxLength": 500,
+            "minLength": 1,
+            "title": "Descripcion"
+          },
+          "cantidad": {
+            "type": "integer",
+            "maximum": 1000.0,
+            "minimum": 1.0,
+            "title": "Cantidad",
+            "default": 1
+          },
+          "valor_unitario": {
+            "type": "integer",
+            "maximum": 999999999999.0,
+            "minimum": 0.0,
+            "title": "Valor Unitario"
+          }
+        },
+        "type": "object",
+        "required": [
+          "descripcion",
+          "valor_unitario"
+        ],
+        "title": "LineaNueva"
+      },
       "ListaArchivos": {
         "properties": {
           "items": {
@@ -10570,6 +13530,26 @@
         ],
         "title": "ListaConversaciones"
       },
+      "ListaCuentas": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/CuentaBreve"
+            },
+            "type": "array",
+            "title": "Items"
+          },
+          "resumen": {
+            "$ref": "#/components/schemas/ResumenCobros"
+          }
+        },
+        "type": "object",
+        "required": [
+          "items",
+          "resumen"
+        ],
+        "title": "ListaCuentas"
+      },
       "ListaGlosario": {
         "properties": {
           "items": {
@@ -10590,6 +13570,22 @@
           "total"
         ],
         "title": "ListaGlosario"
+      },
+      "ListaPagos": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/PagoVista"
+            },
+            "type": "array",
+            "title": "Items"
+          }
+        },
+        "type": "object",
+        "required": [
+          "items"
+        ],
+        "title": "ListaPagos"
       },
       "ListaPlantillas": {
         "properties": {
@@ -10777,6 +13773,21 @@
           "folio"
         ],
         "title": "Mensaje"
+      },
+      "Motivo": {
+        "properties": {
+          "motivo": {
+            "type": "string",
+            "maxLength": 1000,
+            "minLength": 3,
+            "title": "Motivo"
+          }
+        },
+        "type": "object",
+        "required": [
+          "motivo"
+        ],
+        "title": "Motivo"
       },
       "NuevaSolicitud": {
         "properties": {
@@ -11154,6 +14165,202 @@
           "siguiente"
         ],
         "title": "PaginaProcesos"
+      },
+      "PagoNuevo": {
+        "properties": {
+          "cliente_id": {
+            "type": "integer",
+            "title": "Cliente Id"
+          },
+          "proceso_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Proceso Id"
+          },
+          "importe": {
+            "type": "integer",
+            "maximum": 999999999999.0,
+            "exclusiveMinimum": 0.0,
+            "title": "Importe"
+          },
+          "metodo": {
+            "type": "string",
+            "enum": [
+              "transferencia",
+              "consignacion",
+              "efectivo",
+              "otro"
+            ],
+            "title": "Metodo"
+          },
+          "referencia": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 120
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Referencia"
+          },
+          "pagado_el": {
+            "type": "string",
+            "format": "date",
+            "title": "Pagado El"
+          },
+          "clave": {
+            "type": "string",
+            "maxLength": 100,
+            "minLength": 8,
+            "title": "Clave",
+            "description": "Única por pago: si se reenvía, no se duplica."
+          },
+          "aplicaciones": {
+            "items": {
+              "$ref": "#/components/schemas/AplicacionNueva"
+            },
+            "type": "array",
+            "title": "Aplicaciones",
+            "description": "A qué cuentas se abona. Lo que sobre queda a favor del cliente."
+          }
+        },
+        "type": "object",
+        "required": [
+          "cliente_id",
+          "importe",
+          "metodo",
+          "pagado_el",
+          "clave"
+        ],
+        "title": "PagoNuevo"
+      },
+      "PagoVista": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "numero_recibo": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Numero Recibo"
+          },
+          "cliente": {
+            "$ref": "#/components/schemas/PersonaBreve"
+          },
+          "abogado": {
+            "$ref": "#/components/schemas/PersonaBreve"
+          },
+          "proceso": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ProcesoBreve"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "importe": {
+            "type": "integer",
+            "title": "Importe"
+          },
+          "aplicado": {
+            "type": "integer",
+            "title": "Aplicado"
+          },
+          "disponible": {
+            "type": "integer",
+            "title": "Disponible",
+            "description": "Lo que queda por abonar a alguna cuenta."
+          },
+          "metodo": {
+            "type": "string",
+            "enum": [
+              "transferencia",
+              "consignacion",
+              "efectivo",
+              "otro"
+            ],
+            "title": "Metodo"
+          },
+          "referencia": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Referencia"
+          },
+          "pagado_el": {
+            "type": "string",
+            "format": "date",
+            "title": "Pagado El"
+          },
+          "revertido": {
+            "type": "boolean",
+            "title": "Revertido"
+          },
+          "motivo_reversion": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Motivo Reversion"
+          },
+          "registrado_en": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Registrado En"
+          },
+          "aplicaciones": {
+            "items": {
+              "$ref": "#/components/schemas/AplicacionDePago"
+            },
+            "type": "array",
+            "title": "Aplicaciones"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "numero_recibo",
+          "cliente",
+          "abogado",
+          "proceso",
+          "importe",
+          "aplicado",
+          "disponible",
+          "metodo",
+          "referencia",
+          "pagado_el",
+          "revertido",
+          "motivo_reversion",
+          "registrado_en",
+          "aplicaciones"
+        ],
+        "title": "PagoVista"
       },
       "PasoPlantilla": {
         "properties": {
@@ -12454,6 +15661,41 @@
         ],
         "title": "ResumenClientes"
       },
+      "ResumenCobros": {
+        "properties": {
+          "por_cobrar": {
+            "type": "integer",
+            "title": "Por Cobrar",
+            "description": "Saldo de las cuentas emitidas sin pagar."
+          },
+          "vencido": {
+            "type": "integer",
+            "title": "Vencido"
+          },
+          "cuentas_vencidas": {
+            "type": "integer",
+            "title": "Cuentas Vencidas"
+          },
+          "cobrado_mes": {
+            "type": "integer",
+            "title": "Cobrado Mes",
+            "description": "Pagos registrados este mes, sin los revertidos."
+          },
+          "borradores": {
+            "type": "integer",
+            "title": "Borradores"
+          }
+        },
+        "type": "object",
+        "required": [
+          "por_cobrar",
+          "vencido",
+          "cuentas_vencidas",
+          "cobrado_mes",
+          "borradores"
+        ],
+        "title": "ResumenCobros"
+      },
       "ResumenContratos": {
         "properties": {
           "en_preparacion": {
@@ -13239,6 +16481,41 @@
           "actualizado_en"
         ],
         "title": "TerminoDelGlosario"
+      },
+      "TotalesEstado": {
+        "properties": {
+          "cobrado": {
+            "type": "integer",
+            "title": "Cobrado",
+            "description": "Total de las cuentas emitidas, con sus ajustes."
+          },
+          "pagado": {
+            "type": "integer",
+            "title": "Pagado"
+          },
+          "saldo": {
+            "type": "integer",
+            "title": "Saldo"
+          },
+          "vencido": {
+            "type": "integer",
+            "title": "Vencido"
+          },
+          "a_favor": {
+            "type": "integer",
+            "title": "A Favor",
+            "description": "Pagos recibidos que aún no se abonan a ninguna cuenta."
+          }
+        },
+        "type": "object",
+        "required": [
+          "cobrado",
+          "pagado",
+          "saldo",
+          "vencido",
+          "a_favor"
+        ],
+        "title": "TotalesEstado"
       },
       "UltimoMensaje": {
         "properties": {
