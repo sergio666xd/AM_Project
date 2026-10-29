@@ -14,6 +14,7 @@ import {
   UserCheck,
   UserRound,
   Users,
+  Wallet,
   type LucideIcon,
 } from "lucide-react";
 
@@ -42,7 +43,7 @@ const A = "/gestion-procesos/abogado";
 const C = "/gestion-procesos/cliente";
 const D = "/gestion-procesos/dashboard";
 
-/** Navegación del abogado. Contratos y Métricas son de la administración de la firma. */
+/** Navegación del abogado. Contratos, Cobros y Métricas son de la administración de la firma. */
 export function gruposAbogado(esAdminFirma: boolean): GrupoNav[] {
   return [
     {
@@ -66,7 +67,10 @@ export function gruposAbogado(esAdminFirma: boolean): GrupoNav[] {
     {
       titulo: "Firma",
       items: [
-        ...(esAdminFirma ? [{ id: "contratos", label: "Contratos", href: `${A}/contratos`, icon: FileSignature }] : []),
+        ...(esAdminFirma ? [
+          { id: "contratos", label: "Contratos", href: `${A}/contratos`, icon: FileSignature },
+          { id: "cobros", label: "Cobros", href: `${A}/cobros`, icon: Wallet },
+        ] : []),
         { id: "solicitudes-perfil", label: "Cambios de perfil", href: `${A}/solicitudes-perfil`, icon: UserCheck },
         ...(esAdminFirma ? [{ id: "metricas", label: "Métricas", href: `${A}/metricas`, icon: BarChart3 }] : []),
       ],

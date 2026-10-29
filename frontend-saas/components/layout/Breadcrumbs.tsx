@@ -19,6 +19,8 @@ const labels: Record<string, string> = {
   tareas: "Tareas",
   documentos: "Documentos",
   contratos: "Contratos",
+  cobros: "Cobros",
+  pagos: "Pagos",
   clientes: "Clientes",
   agenda: "Agenda",
   notificaciones: "Notificaciones",
