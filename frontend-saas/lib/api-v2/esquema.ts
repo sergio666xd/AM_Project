@@ -1195,6 +1195,287 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v2/cuentas-cobro": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Cuentas de cobro
+         * @description Las cuentas que el usuario ve, con el resumen de lo que hay por cobrar. El cliente ve las suyas emitidas.
+         */
+        get: operations["listar_cuentas_cobro"];
+        put?: never;
+        /**
+         * Crear cuenta de cobro
+         * @description La deja en borrador o, con `emitir`, la numera y se la envía al cliente con el PDF.
+         */
+        post: operations["crear_cuenta_cobro"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v2/cuentas-cobro/{cuenta_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Detalle de una cuenta de cobro */
+        get: operations["detalle_cuenta_cobro"];
+        /** Editar un borrador */
+        put: operations["editar_cuenta_cobro"];
+        post?: never;
+        /** Descartar un borrador */
+        delete: operations["descartar_cuenta_cobro"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v2/cuentas-cobro/{cuenta_id}/emitir": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Emitir y enviar al cliente */
+        post: operations["emitir_cuenta_cobro"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v2/cuentas-cobro/{cuenta_id}/anular": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Anular una cuenta emitida
+         * @description Solo si no tiene pagos abonados.
+         */
+        post: operations["anular_cuenta_cobro"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v2/cuentas-cobro/{cuenta_id}/ajustes": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Agregar un descuento o un cargo */
+        post: operations["ajustar_cuenta_cobro"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v2/cuentas-cobro/{cuenta_id}/reenviar": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Volver a enviar al cliente */
+        post: operations["reenviar_cuenta_cobro"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v2/cuentas-cobro/{cuenta_id}/pdf": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** PDF de la cuenta de cobro */
+        get: operations["pdf_cuenta_cobro"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v2/pagos": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Pagos recibidos */
+        get: operations["listar_pagos"];
+        put?: never;
+        /**
+         * Registrar un pago
+         * @description Registra un pago recibido fuera del portal y lo abona a las cuentas indicadas. El cliente recibe el recibo.
+         */
+        post: operations["registrar_pago"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v2/pagos/{pago_id}/aplicaciones": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Abonar un pago a cuentas
+         * @description Abona lo que queda a favor de un pago a una o varias cuentas del mismo cliente.
+         */
+        post: operations["abonar_pago"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v2/pagos/{pago_id}/revertir": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Revertir un pago
+         * @description El pago no se borra: queda revertido con su motivo y deja de contar en los saldos.
+         */
+        post: operations["revertir_pago"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v2/pagos/{pago_id}/reenviar": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Volver a enviar el recibo */
+        post: operations["reenviar_recibo"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v2/pagos/{pago_id}/recibo": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** PDF del recibo de pago */
+        get: operations["recibo_pago"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v2/estado-cuenta": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Estado de cuenta de un cliente */
+        get: operations["estado_de_cuenta"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v2/estado-cuenta/pdf": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** PDF del estado de cuenta */
+        get: operations["pdf_estado_de_cuenta"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v2/finanzas/configuracion": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Configuración financiera
+         * @description Remitente de los correos financieros, datos para pagar y nota de los PDF. Solo ADMIN.
+         */
+        get: operations["configuracion_finanzas"];
+        /** Guardar la configuración financiera */
+        put: operations["guardar_configuracion_finanzas"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -1229,6 +1510,80 @@ export interface components {
              * @description Ordenados por inicio.
              */
             items: components["schemas"]["ElementoAgenda"][];
+        };
+        /** AjusteNuevo */
+        AjusteNuevo: {
+            /**
+             * Tipo
+             * @enum {string}
+             */
+            tipo: "descuento" | "cargo";
+            /** Importe */
+            importe: number;
+            /** Motivo */
+            motivo: string;
+        };
+        /** AjusteVista */
+        AjusteVista: {
+            /** Id */
+            id: number;
+            /**
+             * Tipo
+             * @enum {string}
+             */
+            tipo: "descuento" | "cargo";
+            /** Importe */
+            importe: number;
+            /** Motivo */
+            motivo: string;
+            /**
+             * Creado En
+             * Format: date-time
+             */
+            creado_en: string;
+            /** Por */
+            por: string | null;
+        };
+        /** AplicacionDePago */
+        AplicacionDePago: {
+            /** Cuenta Id */
+            cuenta_id: number;
+            /** Numero */
+            numero: string | null;
+            /** Concepto */
+            concepto: string;
+            /** Importe */
+            importe: number;
+        };
+        /** AplicacionNueva */
+        AplicacionNueva: {
+            /** Cuenta Id */
+            cuenta_id: number;
+            /** Importe */
+            importe: number;
+        };
+        /** AplicacionVista */
+        AplicacionVista: {
+            /** Id */
+            id: number;
+            /** Pago Id */
+            pago_id: number;
+            /** Numero Recibo */
+            numero_recibo: string | null;
+            /** Importe */
+            importe: number;
+            /**
+             * Pagado El
+             * Format: date
+             */
+            pagado_el: string;
+            /**
+             * Metodo
+             * @enum {string}
+             */
+            metodo: "transferencia" | "consignacion" | "efectivo" | "otro";
+            /** Revertido */
+            revertido: boolean;
         };
         /** AplicarPlantilla */
         AplicarPlantilla: {
@@ -1437,6 +1792,17 @@ export interface components {
             /** Whatsapp */
             whatsapp: boolean;
         };
+        /** CambioCuenta */
+        CambioCuenta: {
+            /** Proceso Id */
+            proceso_id?: number | null;
+            /** Concepto */
+            concepto: string;
+            /** Lineas */
+            lineas: components["schemas"]["LineaNueva"][];
+            /** Vence El */
+            vence_el?: string | null;
+        };
         /**
          * CambioEnLote
          * @description Lo que se cambia a todas las tareas elegidas. Solo se aplican los campos enviados.
@@ -1606,6 +1972,28 @@ export interface components {
              */
             clientes: components["schemas"]["ProcesoDelFolio"][];
         };
+        /** ConfiguracionFinanzas */
+        ConfiguracionFinanzas: {
+            /** Remitente Nombre */
+            remitente_nombre: string;
+            /**
+             * Remitente Email
+             * @description Vacío usa el remitente general del correo.
+             */
+            remitente_email?: string | null;
+            /** Reply To */
+            reply_to?: string | null;
+            /**
+             * Datos Pago
+             * @description Cuentas bancarias y medios de pago que salen en la cuenta de cobro.
+             */
+            datos_pago?: string | null;
+            /**
+             * Nota Documentos
+             * @description Nota de alcance al pie de los PDF.
+             */
+            nota_documentos?: string | null;
+        };
         /** Contacto */
         Contacto: {
             /** Id */
@@ -1708,6 +2096,73 @@ export interface components {
              */
             actualizada_en: string;
         };
+        /** CuentaBreve */
+        CuentaBreve: {
+            /** Id */
+            id: number;
+            /**
+             * Numero
+             * @description Se asigna al emitirla.
+             */
+            numero: string | null;
+            /** Concepto */
+            concepto: string;
+            /**
+             * Estado
+             * @enum {string}
+             */
+            estado: "borrador" | "pendiente" | "parcial" | "pagada" | "anulada";
+            /**
+             * Vencida
+             * @description Tiene saldo y ya pasó la fecha de vencimiento.
+             */
+            vencida: boolean;
+            cliente: components["schemas"]["PersonaBreve"];
+            abogado: components["schemas"]["PersonaBreve"];
+            proceso: components["schemas"]["ProcesoBreve"] | null;
+            /** Total */
+            total: number;
+            /**
+             * Pagado
+             * @description Pagos aplicados que no se han revertido.
+             */
+            pagado: number;
+            /**
+             * Ajustes
+             * @description Cargos menos descuentos.
+             */
+            ajustes: number;
+            /** Saldo */
+            saldo: number;
+            /** Emitida En */
+            emitida_en: string | null;
+            /** Vence El */
+            vence_el: string | null;
+            /**
+             * Creada En
+             * Format: date-time
+             */
+            creada_en: string;
+        };
+        /** CuentaNueva */
+        CuentaNueva: {
+            /** Cliente Id */
+            cliente_id: number;
+            /** Proceso Id */
+            proceso_id?: number | null;
+            /** Concepto */
+            concepto: string;
+            /** Lineas */
+            lineas: components["schemas"]["LineaNueva"][];
+            /** Vence El */
+            vence_el?: string | null;
+            /**
+             * Emitir
+             * @description true la emite y se la envía al cliente; false la deja en borrador.
+             * @default false
+             */
+            emitir: boolean;
+        };
         /** DatosCambio */
         DatosCambio: {
             /** Nombre */
@@ -1764,6 +2219,69 @@ export interface components {
              * @default true
              */
             activo: boolean;
+        };
+        /** DetalleCuenta */
+        DetalleCuenta: {
+            /** Id */
+            id: number;
+            /**
+             * Numero
+             * @description Se asigna al emitirla.
+             */
+            numero: string | null;
+            /** Concepto */
+            concepto: string;
+            /**
+             * Estado
+             * @enum {string}
+             */
+            estado: "borrador" | "pendiente" | "parcial" | "pagada" | "anulada";
+            /**
+             * Vencida
+             * @description Tiene saldo y ya pasó la fecha de vencimiento.
+             */
+            vencida: boolean;
+            cliente: components["schemas"]["PersonaBreve"];
+            abogado: components["schemas"]["PersonaBreve"];
+            proceso: components["schemas"]["ProcesoBreve"] | null;
+            /** Total */
+            total: number;
+            /**
+             * Pagado
+             * @description Pagos aplicados que no se han revertido.
+             */
+            pagado: number;
+            /**
+             * Ajustes
+             * @description Cargos menos descuentos.
+             */
+            ajustes: number;
+            /** Saldo */
+            saldo: number;
+            /** Emitida En */
+            emitida_en: string | null;
+            /** Vence El */
+            vence_el: string | null;
+            /**
+             * Creada En
+             * Format: date-time
+             */
+            creada_en: string;
+            /** Lineas */
+            lineas: components["schemas"]["Linea"][];
+            /** Aplicaciones */
+            aplicaciones: components["schemas"]["AplicacionVista"][];
+            /** Ajustes Detalle */
+            ajustes_detalle: components["schemas"]["AjusteVista"][];
+            /**
+             * Entregas
+             * @description Envíos por correo al cliente. Vacío para el cliente.
+             */
+            entregas: components["schemas"]["EntregaVista"][];
+            /** Anulada En */
+            anulada_en: string | null;
+            /** Motivo Anulacion */
+            motivo_anulacion: string | null;
         };
         /**
          * DetallePendiente
@@ -2050,6 +2568,25 @@ export interface components {
             id: number;
             entrega: components["schemas"]["Entrega"];
         };
+        /** EntregaVista */
+        EntregaVista: {
+            /** Id */
+            id: number;
+            /** Destinatario */
+            destinatario: string;
+            /**
+             * Estado
+             * @enum {string}
+             */
+            estado: "enviado" | "error";
+            /** Error */
+            error: string | null;
+            /**
+             * Creado En
+             * Format: date-time
+             */
+            creado_en: string;
+        };
         /** ErrorRespuesta */
         ErrorRespuesta: {
             /**
@@ -2069,6 +2606,15 @@ export interface components {
             campos?: {
                 [key: string]: string;
             };
+        };
+        /** EstadoDeCuenta */
+        EstadoDeCuenta: {
+            cliente: components["schemas"]["PersonaBreve"];
+            /** Cuentas */
+            cuentas: components["schemas"]["CuentaBreve"][];
+            /** Pagos */
+            pagos: components["schemas"]["PagoVista"][];
+            totales: components["schemas"]["TotalesEstado"];
         };
         /** EtapaCliente */
         EtapaCliente: {
@@ -2366,6 +2912,29 @@ export interface components {
              */
             hasta: number;
         };
+        /** Linea */
+        Linea: {
+            /** Descripcion */
+            descripcion: string;
+            /** Cantidad */
+            cantidad: number;
+            /** Valor Unitario */
+            valor_unitario: number;
+            /** Total */
+            total: number;
+        };
+        /** LineaNueva */
+        LineaNueva: {
+            /** Descripcion */
+            descripcion: string;
+            /**
+             * Cantidad
+             * @default 1
+             */
+            cantidad: number;
+            /** Valor Unitario */
+            valor_unitario: number;
+        };
         /** ListaArchivos */
         ListaArchivos: {
             /** Items */
@@ -2392,12 +2961,23 @@ export interface components {
             items: components["schemas"]["Conversacion"][];
             resumen: components["schemas"]["ResumenMensajes"];
         };
+        /** ListaCuentas */
+        ListaCuentas: {
+            /** Items */
+            items: components["schemas"]["CuentaBreve"][];
+            resumen: components["schemas"]["ResumenCobros"];
+        };
         /** ListaGlosario */
         ListaGlosario: {
             /** Items */
             items: components["schemas"]["TerminoDelGlosario"][];
             /** Total */
             total: number;
+        };
+        /** ListaPagos */
+        ListaPagos: {
+            /** Items */
+            items: components["schemas"]["PagoVista"][];
         };
         /** ListaPlantillas */
         ListaPlantillas: {
@@ -2460,6 +3040,11 @@ export interface components {
              * @description Número de folio en el expediente, en las conversaciones de un proceso.
              */
             folio: number | null;
+        };
+        /** Motivo */
+        Motivo: {
+            /** Motivo */
+            motivo: string;
         };
         /** NuevaSolicitud */
         NuevaSolicitud: {
@@ -2594,6 +3179,79 @@ export interface components {
              * @description Cursor de la página siguiente, o null si no hay más.
              */
             siguiente: string | null;
+        };
+        /** PagoNuevo */
+        PagoNuevo: {
+            /** Cliente Id */
+            cliente_id: number;
+            /** Proceso Id */
+            proceso_id?: number | null;
+            /** Importe */
+            importe: number;
+            /**
+             * Metodo
+             * @enum {string}
+             */
+            metodo: "transferencia" | "consignacion" | "efectivo" | "otro";
+            /** Referencia */
+            referencia?: string | null;
+            /**
+             * Pagado El
+             * Format: date
+             */
+            pagado_el: string;
+            /**
+             * Clave
+             * @description Única por pago: si se reenvía, no se duplica.
+             */
+            clave: string;
+            /**
+             * Aplicaciones
+             * @description A qué cuentas se abona. Lo que sobre queda a favor del cliente.
+             */
+            aplicaciones?: components["schemas"]["AplicacionNueva"][];
+        };
+        /** PagoVista */
+        PagoVista: {
+            /** Id */
+            id: number;
+            /** Numero Recibo */
+            numero_recibo: string | null;
+            cliente: components["schemas"]["PersonaBreve"];
+            abogado: components["schemas"]["PersonaBreve"];
+            proceso: components["schemas"]["ProcesoBreve"] | null;
+            /** Importe */
+            importe: number;
+            /** Aplicado */
+            aplicado: number;
+            /**
+             * Disponible
+             * @description Lo que queda por abonar a alguna cuenta.
+             */
+            disponible: number;
+            /**
+             * Metodo
+             * @enum {string}
+             */
+            metodo: "transferencia" | "consignacion" | "efectivo" | "otro";
+            /** Referencia */
+            referencia: string | null;
+            /**
+             * Pagado El
+             * Format: date
+             */
+            pagado_el: string;
+            /** Revertido */
+            revertido: boolean;
+            /** Motivo Reversion */
+            motivo_reversion: string | null;
+            /**
+             * Registrado En
+             * Format: date-time
+             */
+            registrado_en: string;
+            /** Aplicaciones */
+            aplicaciones: components["schemas"]["AplicacionDePago"][];
         };
         /** PasoPlantilla */
         PasoPlantilla: {
@@ -3067,6 +3725,25 @@ export interface components {
             /** Sin Procesos */
             sin_procesos: number;
         };
+        /** ResumenCobros */
+        ResumenCobros: {
+            /**
+             * Por Cobrar
+             * @description Saldo de las cuentas emitidas sin pagar.
+             */
+            por_cobrar: number;
+            /** Vencido */
+            vencido: number;
+            /** Cuentas Vencidas */
+            cuentas_vencidas: number;
+            /**
+             * Cobrado Mes
+             * @description Pagos registrados este mes, sin los revertidos.
+             */
+            cobrado_mes: number;
+            /** Borradores */
+            borradores: number;
+        };
         /** ResumenContratos */
         ResumenContratos: {
             /**
@@ -3381,6 +4058,25 @@ export interface components {
             actualizado_en: string;
             /** Actualizado Por */
             actualizado_por?: string | null;
+        };
+        /** TotalesEstado */
+        TotalesEstado: {
+            /**
+             * Cobrado
+             * @description Total de las cuentas emitidas, con sus ajustes.
+             */
+            cobrado: number;
+            /** Pagado */
+            pagado: number;
+            /** Saldo */
+            saldo: number;
+            /** Vencido */
+            vencido: number;
+            /**
+             * A Favor
+             * @description Pagos recibidos que aún no se abonan a ninguna cuenta.
+             */
+            a_favor: number;
         };
         /** UltimoMensaje */
         UltimoMensaje: {
@@ -9592,6 +10288,1739 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["SolicitudCambio"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+        };
+    };
+    listar_cuentas_cobro: {
+        parameters: {
+            query?: {
+                /** @description por_cobrar, vencidas, pagadas, borradores, anuladas o todas. */
+                filtro?: "por_cobrar" | "vencidas" | "pagadas" | "borradores" | "anuladas" | "todas";
+                cliente_id?: number | null;
+                proceso_id?: number | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ListaCuentas"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+        };
+    };
+    crear_cuenta_cobro: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CuentaNueva"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DetalleCuenta"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+        };
+    };
+    detalle_cuenta_cobro: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                cuenta_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DetalleCuenta"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+        };
+    };
+    editar_cuenta_cobro: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                cuenta_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CambioCuenta"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DetalleCuenta"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+        };
+    };
+    descartar_cuenta_cobro: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                cuenta_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+        };
+    };
+    emitir_cuenta_cobro: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                cuenta_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DetalleCuenta"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+        };
+    };
+    anular_cuenta_cobro: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                cuenta_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["Motivo"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DetalleCuenta"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+        };
+    };
+    ajustar_cuenta_cobro: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                cuenta_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AjusteNuevo"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DetalleCuenta"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+        };
+    };
+    reenviar_cuenta_cobro: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                cuenta_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EntregaVista"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+        };
+    };
+    pdf_cuenta_cobro: {
+        parameters: {
+            query?: {
+                /** @description true lo descarga; false lo abre en el navegador. */
+                descargar?: boolean;
+            };
+            header?: never;
+            path: {
+                cuenta_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description El PDF. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/pdf": unknown;
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+        };
+    };
+    listar_pagos: {
+        parameters: {
+            query?: {
+                cliente_id?: number | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ListaPagos"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+        };
+    };
+    registrar_pago: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PagoNuevo"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PagoVista"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+        };
+    };
+    abonar_pago: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                pago_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AplicacionNueva"][];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PagoVista"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+        };
+    };
+    revertir_pago: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                pago_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["Motivo"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PagoVista"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+        };
+    };
+    reenviar_recibo: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                pago_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EntregaVista"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+        };
+    };
+    recibo_pago: {
+        parameters: {
+            query?: {
+                /** @description true lo descarga; false lo abre en el navegador. */
+                descargar?: boolean;
+            };
+            header?: never;
+            path: {
+                pago_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description El PDF. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/pdf": unknown;
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+        };
+    };
+    estado_de_cuenta: {
+        parameters: {
+            query?: {
+                /** @description Obligatorio para el equipo; el cliente ve el suyo. */
+                cliente_id?: number | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EstadoDeCuenta"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+        };
+    };
+    pdf_estado_de_cuenta: {
+        parameters: {
+            query?: {
+                cliente_id?: number | null;
+                descargar?: boolean;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description El PDF. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/pdf": unknown;
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+        };
+    };
+    configuracion_finanzas: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ConfiguracionFinanzas"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+        };
+    };
+    guardar_configuracion_finanzas: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ConfiguracionFinanzas"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ConfiguracionFinanzas"];
                 };
             };
             /** @description Bad Request */

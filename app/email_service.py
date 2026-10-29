@@ -76,7 +76,12 @@ def enviar_correo(
     asunto: str,
     cuerpo: str,
     adjunto: tuple[str, bytes, str] | None = None,
+    *,
+    remitente_nombre: str | None = None,
+    remitente_email: str | None = None,
+    reply_to: str | None = None,
 ) -> bool:
+    """Envía el correo. Los correos financieros pasan su propio remitente y Reply-To."""
     config = get_integration_settings()
     firma = get_firm_settings()
     host = config["smtp_host"]
@@ -87,8 +92,10 @@ def enviar_correo(
     mensaje = EmailMessage(policy=SMTP)
     mensaje["Subject"] = asunto
     _, sender_address = parseaddr(str(remitente))
-    mensaje["From"] = formataddr((_SENDER_NAME, sender_address or str(remitente)))
+    mensaje["From"] = formataddr((remitente_nombre or _SENDER_NAME, remitente_email or sender_address or str(remitente)))
     mensaje["To"] = destinatario
+    if reply_to:
+        mensaje["Reply-To"] = reply_to
     mensaje.set_content(
         cuerpo,
         subtype="plain",

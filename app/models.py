@@ -1353,6 +1353,8 @@ class ConfiguracionCorreoFinanciero(Base):
     remitente_nombre = Column(String(180), nullable=False, default="Alejandra Muñoz | Abogada y Asociados")
     remitente_email = Column(String(320), nullable=True)
     reply_to = Column(String(320), nullable=True)
+    datos_pago = Column(Text, nullable=True)
+    nota_documentos = Column(Text, nullable=True)
     actualizado_por_id = Column(Integer, ForeignKey("usuarios.id", ondelete="SET NULL"), nullable=True)
     updated_at = Column(DateTime, nullable=False, default=utc_ahora, onupdate=utc_ahora)
 
