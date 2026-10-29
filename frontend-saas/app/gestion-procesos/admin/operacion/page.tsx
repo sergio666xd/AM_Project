@@ -1,5 +1,5 @@
-import AdminOperationsPage from "@/components/admin/console/AdminOperationsPage";
+import { redirect } from "next/navigation";
 
-export default function AdminOperationsRoute() {
-  return <AdminOperationsPage />;
+export default function OperacionPage() {
+  redirect("/gestion-procesos/admin/operacion/consultas");
 }

@@ -5,7 +5,7 @@ from fastapi import APIRouter, Depends, Query, status
 from app import models
 from app.api.v2.dependencias import servicio_administracion, servicio_usuarios_admin
 from app.modulos.administracion.esquemas import (
-    AccesoEnviado,
+    EnlaceEnviado,
     CambioEstado,
     CambioEstadoVarios,
     CambioUsuario,
@@ -127,7 +127,7 @@ def cambiar_estado_usuario(
     return servicio.cambiar_estado(usuario, usuario_id, datos)
 
 
-@router.post("/usuarios/{usuario_id}/acceso", response_model=AccesoEnviado, summary="Reenviar el acceso")
+@router.post("/usuarios/{usuario_id}/acceso", response_model=EnlaceEnviado, summary="Reenviar el acceso")
 def reenviar_acceso_usuario(
     usuario_id: int,
     usuario: models.Usuario = Depends(usuario_actual),
@@ -137,7 +137,7 @@ def reenviar_acceso_usuario(
     return servicio.reenviar_acceso(usuario, usuario_id)
 
 
-@router.post("/usuarios/{usuario_id}/enlace-contrasena", response_model=AccesoEnviado, summary="Enviar enlace para cambiar la contraseña")
+@router.post("/usuarios/{usuario_id}/enlace-contrasena", response_model=EnlaceEnviado, summary="Enviar enlace para cambiar la contraseña")
 def enviar_enlace_contrasena(
     usuario_id: int,
     usuario: models.Usuario = Depends(usuario_actual),

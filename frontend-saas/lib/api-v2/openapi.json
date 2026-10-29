@@ -4980,7 +4980,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/app__modulos__clientes__esquemas__AccesoEnviado"
+                  "$ref": "#/components/schemas/AccesoEnviado"
                 }
               }
             }
@@ -11094,7 +11094,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/app__modulos__administracion__esquemas__AccesoEnviado"
+                  "$ref": "#/components/schemas/EnlaceEnviado"
                 }
               }
             }
@@ -11197,7 +11197,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/app__modulos__administracion__esquemas__AccesoEnviado"
+                  "$ref": "#/components/schemas/EnlaceEnviado"
                 }
               }
             }
@@ -11377,10 +11377,1882 @@
           }
         }
       }
+    },
+    "/api/v2/admin/consultas": {
+      "get": {
+        "tags": [
+          "Operación"
+        ],
+        "summary": "Consultas judiciales",
+        "description": "La programación y los radicados cuya última consulta falló.",
+        "operationId": "panel_consultas",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PanelConsultas"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too Many Requests",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v2/admin/consultas/programacion": {
+      "put": {
+        "tags": [
+          "Operación"
+        ],
+        "summary": "Programar las consultas automáticas",
+        "operationId": "programar_consultas",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CambioConsultas"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConfiguracionConsultas"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too Many Requests",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v2/admin/consultas/ejecuciones": {
+      "get": {
+        "tags": [
+          "Operación"
+        ],
+        "summary": "Consultas realizadas",
+        "operationId": "listar_ejecuciones",
+        "parameters": [
+          {
+            "name": "limite",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 100,
+              "minimum": 1,
+              "description": "Elementos por página.",
+              "default": 25,
+              "title": "Limite"
+            },
+            "description": "Elementos por página."
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "maxLength": 500
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Valor de `siguiente` de la página anterior.",
+              "title": "Cursor"
+            },
+            "description": "Valor de `siguiente` de la página anterior."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PaginaEjecuciones"
+                }
+              }
+            }
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Too Many Requests"
+          }
+        }
+      }
+    },
+    "/api/v2/admin/consultas/ejecuciones/{ejecucion_id}": {
+      "get": {
+        "tags": [
+          "Operación"
+        ],
+        "summary": "Resultado de una consulta",
+        "description": "Cada radicado consultado, con los errores primero.",
+        "operationId": "detalle_ejecucion",
+        "parameters": [
+          {
+            "name": "ejecucion_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Ejecucion Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DetalleEjecucion"
+                }
+              }
+            }
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Too Many Requests"
+          }
+        }
+      }
+    },
+    "/api/v2/admin/consultas/radicados": {
+      "get": {
+        "tags": [
+          "Operación"
+        ],
+        "summary": "Buscar radicados para consultar",
+        "operationId": "buscar_radicados",
+        "parameters": [
+          {
+            "name": "q",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "maxLength": 120
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Dígitos del radicado o nombre del proceso.",
+              "title": "Q"
+            },
+            "description": "Dígitos del radicado o nombre del proceso."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/RadicadoConsultable"
+                  },
+                  "title": "Response Buscar Radicados"
+                }
+              }
+            }
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Too Many Requests"
+          }
+        }
+      }
+    },
+    "/api/v2/admin/envios": {
+      "get": {
+        "tags": [
+          "Operación"
+        ],
+        "summary": "Avisos enviados",
+        "operationId": "listar_envios",
+        "parameters": [
+          {
+            "name": "filtro",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "enum": [
+                "fallidos",
+                "pendientes",
+                "enviados",
+                "todos"
+              ],
+              "type": "string",
+              "default": "todos",
+              "title": "Filtro"
+            }
+          },
+          {
+            "name": "canal",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "enum": [
+                    "EMAIL",
+                    "WHATSAPP",
+                    "PUSH"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Canal"
+            }
+          },
+          {
+            "name": "q",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "maxLength": 120
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Destinatario o asunto.",
+              "title": "Q"
+            },
+            "description": "Destinatario o asunto."
+          },
+          {
+            "name": "limite",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 100,
+              "minimum": 1,
+              "description": "Elementos por página.",
+              "default": 25,
+              "title": "Limite"
+            },
+            "description": "Elementos por página."
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "maxLength": 500
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Valor de `siguiente` de la página anterior.",
+              "title": "Cursor"
+            },
+            "description": "Valor de `siguiente` de la página anterior."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PaginaEnvios"
+                }
+              }
+            }
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Too Many Requests"
+          }
+        }
+      }
+    },
+    "/api/v2/admin/envios/reintentar": {
+      "post": {
+        "tags": [
+          "Operación"
+        ],
+        "summary": "Reintentar avisos fallidos",
+        "description": "Vuelven a la cola con tres intentos nuevos. Solo correo y WhatsApp.",
+        "operationId": "reintentar_envios",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Reintento"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Reintentados"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too Many Requests",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v2/admin/envios/{envio_id}": {
+      "get": {
+        "tags": [
+          "Operación"
+        ],
+        "summary": "Un aviso",
+        "operationId": "detalle_envio",
+        "parameters": [
+          {
+            "name": "envio_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Envio Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DetalleEnvio"
+                }
+              }
+            }
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Too Many Requests"
+          }
+        }
+      }
+    },
+    "/api/v2/admin/integraciones": {
+      "get": {
+        "tags": [
+          "Operación"
+        ],
+        "summary": "Integraciones",
+        "description": "Estado de cada servicio y la configuración del correo y WhatsApp (sin las claves).",
+        "operationId": "panel_integraciones",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PanelIntegraciones"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too Many Requests",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v2/admin/integraciones/correo": {
+      "put": {
+        "tags": [
+          "Operación"
+        ],
+        "summary": "Configurar el servidor de correo",
+        "operationId": "guardar_correo",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CambioCorreo"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PanelIntegraciones"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too Many Requests",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v2/admin/integraciones/whatsapp": {
+      "put": {
+        "tags": [
+          "Operación"
+        ],
+        "summary": "Configurar WhatsApp",
+        "operationId": "guardar_whatsapp",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CambioWhatsapp"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PanelIntegraciones"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too Many Requests",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v2/admin/integraciones/envio-prueba": {
+      "post": {
+        "tags": [
+          "Operación"
+        ],
+        "summary": "Enviar un mensaje de prueba",
+        "description": "Envía de verdad la plantilla PRUEBA_INTEGRACION al destinatario indicado.",
+        "operationId": "enviar_prueba",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EnvioPrueba"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PruebaEnviada"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too Many Requests",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v2/admin/integraciones/{clave}/probar": {
+      "post": {
+        "tags": [
+          "Operación"
+        ],
+        "summary": "Probar la conexión",
+        "description": "No envía mensajes.",
+        "operationId": "probar_integracion",
+        "parameters": [
+          {
+            "name": "clave",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "enum": [
+                "rama_judicial",
+                "correo",
+                "whatsapp",
+                "tareas_programadas"
+              ],
+              "type": "string",
+              "title": "Clave"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResultadoPrueba"
+                }
+              }
+            }
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Too Many Requests"
+          }
+        }
+      }
+    },
+    "/api/v2/admin/plantillas": {
+      "get": {
+        "tags": [
+          "Operación"
+        ],
+        "summary": "Plantillas de los avisos",
+        "operationId": "listar_plantillas_avisos",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/PlantillaAvisoFila"
+                  },
+                  "type": "array",
+                  "title": "Response Listar Plantillas Avisos"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too Many Requests",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v2/admin/plantillas/{clave}": {
+      "get": {
+        "tags": [
+          "Operación"
+        ],
+        "summary": "Una plantilla",
+        "operationId": "detalle_plantilla_aviso",
+        "parameters": [
+          {
+            "name": "clave",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Clave"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlantillaAviso"
+                }
+              }
+            }
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Too Many Requests"
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "Operación"
+        ],
+        "summary": "Guardar una plantilla",
+        "operationId": "guardar_plantilla_aviso",
+        "parameters": [
+          {
+            "name": "clave",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Clave"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TextosPlantillaAviso"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlantillaAviso"
+                }
+              }
+            }
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Too Many Requests"
+          }
+        }
+      }
+    },
+    "/api/v2/admin/plantillas/{clave}/vista-previa": {
+      "post": {
+        "tags": [
+          "Operación"
+        ],
+        "summary": "Vista previa de una plantilla",
+        "description": "Los textos (sin guardar) con los valores de ejemplo y el diseño del correo.",
+        "operationId": "vista_previa_plantilla",
+        "parameters": [
+          {
+            "name": "clave",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Clave"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TextosPlantillaAviso"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VistaPrevia"
+                }
+              }
+            }
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Too Many Requests"
+          }
+        }
+      }
     }
   },
   "components": {
     "schemas": {
+      "AccesoEnviado": {
+        "properties": {
+          "canal": {
+            "type": "string",
+            "enum": [
+              "EMAIL",
+              "WHATSAPP"
+            ],
+            "title": "Canal"
+          },
+          "destino": {
+            "type": "string",
+            "title": "Destino",
+            "description": "Correo o WhatsApp al que se envió."
+          }
+        },
+        "type": "object",
+        "required": [
+          "canal",
+          "destino"
+        ],
+        "title": "AccesoEnviado"
+      },
       "Agenda": {
         "properties": {
           "desde": {
@@ -12161,6 +14033,84 @@
         ],
         "title": "CambioAvisos"
       },
+      "CambioConsultas": {
+        "properties": {
+          "activa": {
+            "type": "boolean",
+            "title": "Activa"
+          },
+          "dias": {
+            "items": {
+              "type": "integer"
+            },
+            "type": "array",
+            "maxItems": 7,
+            "title": "Dias"
+          }
+        },
+        "type": "object",
+        "required": [
+          "activa",
+          "dias"
+        ],
+        "title": "CambioConsultas"
+      },
+      "CambioCorreo": {
+        "properties": {
+          "servidor": {
+            "type": "string",
+            "maxLength": 255,
+            "title": "Servidor"
+          },
+          "puerto": {
+            "type": "integer",
+            "maximum": 65535.0,
+            "minimum": 1.0,
+            "title": "Puerto"
+          },
+          "remitente": {
+            "type": "string",
+            "maxLength": 320,
+            "title": "Remitente"
+          },
+          "starttls": {
+            "type": "boolean",
+            "title": "Starttls",
+            "default": true
+          },
+          "usuario": {
+            "type": "string",
+            "maxLength": 320,
+            "title": "Usuario",
+            "default": ""
+          },
+          "clave": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 500
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Clave",
+            "description": "Solo si cambia. Vacío deja la actual."
+          },
+          "borrar_clave": {
+            "type": "boolean",
+            "title": "Borrar Clave",
+            "default": false
+          }
+        },
+        "type": "object",
+        "required": [
+          "servidor",
+          "puerto",
+          "remitente"
+        ],
+        "title": "CambioCorreo"
+      },
       "CambioCuenta": {
         "properties": {
           "proceso_id": {
@@ -12451,6 +14401,38 @@
         },
         "type": "object",
         "title": "CambioUsuario"
+      },
+      "CambioWhatsapp": {
+        "properties": {
+          "url": {
+            "type": "string",
+            "maxLength": 1000,
+            "title": "Url"
+          },
+          "token": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 2000
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Token",
+            "description": "Solo si cambia. Vacío deja el actual."
+          },
+          "borrar_token": {
+            "type": "boolean",
+            "title": "Borrar Token",
+            "default": false
+          }
+        },
+        "type": "object",
+        "required": [
+          "url"
+        ],
+        "title": "CambioWhatsapp"
       },
       "CifraFirma": {
         "properties": {
@@ -12828,6 +14810,102 @@
         ],
         "title": "ClientesAvisados"
       },
+      "ConfiguracionConsultas": {
+        "properties": {
+          "activa": {
+            "type": "boolean",
+            "title": "Activa",
+            "description": "Si las consultas automáticas están encendidas."
+          },
+          "dias": {
+            "items": {
+              "type": "integer"
+            },
+            "type": "array",
+            "title": "Dias",
+            "description": "Días de la semana: 0 es lunes, 6 es domingo."
+          },
+          "horas": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Horas",
+            "description": "Horas fijas de Colombia, por ejemplo «12:00»."
+          },
+          "proxima": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Proxima",
+            "description": "Próxima consulta automática, si está encendida."
+          }
+        },
+        "type": "object",
+        "required": [
+          "activa",
+          "dias",
+          "horas",
+          "proxima"
+        ],
+        "title": "ConfiguracionConsultas"
+      },
+      "ConfiguracionCorreo": {
+        "properties": {
+          "servidor": {
+            "type": "string",
+            "title": "Servidor"
+          },
+          "puerto": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Puerto"
+          },
+          "remitente": {
+            "type": "string",
+            "title": "Remitente"
+          },
+          "starttls": {
+            "type": "boolean",
+            "title": "Starttls"
+          },
+          "usuario": {
+            "type": "string",
+            "title": "Usuario"
+          },
+          "tiene_clave": {
+            "type": "boolean",
+            "title": "Tiene Clave"
+          },
+          "configurado": {
+            "type": "boolean",
+            "title": "Configurado"
+          }
+        },
+        "type": "object",
+        "required": [
+          "servidor",
+          "puerto",
+          "remitente",
+          "starttls",
+          "usuario",
+          "tiene_clave",
+          "configurado"
+        ],
+        "title": "ConfiguracionCorreo"
+      },
       "ConfiguracionFinanzas": {
         "properties": {
           "remitente_nombre": {
@@ -12894,6 +14972,29 @@
         ],
         "title": "ConfiguracionFinanzas"
       },
+      "ConfiguracionWhatsapp": {
+        "properties": {
+          "url": {
+            "type": "string",
+            "title": "Url"
+          },
+          "tiene_token": {
+            "type": "boolean",
+            "title": "Tiene Token"
+          },
+          "configurado": {
+            "type": "boolean",
+            "title": "Configurado"
+          }
+        },
+        "type": "object",
+        "required": [
+          "url",
+          "tiene_token",
+          "configurado"
+        ],
+        "title": "ConfiguracionWhatsapp"
+      },
       "Contacto": {
         "properties": {
           "id": {
@@ -12921,6 +15022,25 @@
           "rol"
         ],
         "title": "Contacto"
+      },
+      "ConteoEnvios": {
+        "properties": {
+          "fallidos": {
+            "type": "integer",
+            "title": "Fallidos",
+            "description": "Agotados en los últimos 30 días."
+          },
+          "pendientes": {
+            "type": "integer",
+            "title": "Pendientes"
+          }
+        },
+        "type": "object",
+        "required": [
+          "fallidos",
+          "pendientes"
+        ],
+        "title": "ConteoEnvios"
       },
       "ConteoUsuarios": {
         "properties": {
@@ -13805,6 +15925,198 @@
         ],
         "title": "DetalleCuenta"
       },
+      "DetalleEjecucion": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "manual": {
+            "type": "boolean",
+            "title": "Manual"
+          },
+          "estado": {
+            "type": "string",
+            "enum": [
+              "en_cola",
+              "en_proceso",
+              "completada",
+              "con_errores",
+              "fallida"
+            ],
+            "title": "Estado"
+          },
+          "inicio": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Inicio"
+          },
+          "fin": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fin"
+          },
+          "total": {
+            "type": "integer",
+            "title": "Total"
+          },
+          "procesados": {
+            "type": "integer",
+            "title": "Procesados"
+          },
+          "errores": {
+            "type": "integer",
+            "title": "Errores"
+          },
+          "actuaciones_nuevas": {
+            "type": "integer",
+            "title": "Actuaciones Nuevas"
+          },
+          "radicados": {
+            "items": {
+              "$ref": "#/components/schemas/ResultadoRadicado"
+            },
+            "type": "array",
+            "title": "Radicados"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "manual",
+          "estado",
+          "inicio",
+          "fin",
+          "total",
+          "procesados",
+          "errores",
+          "actuaciones_nuevas",
+          "radicados"
+        ],
+        "title": "DetalleEjecucion"
+      },
+      "DetalleEnvio": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "tipo": {
+            "type": "string",
+            "title": "Tipo",
+            "description": "De qué trata, en palabras: «Actuación judicial», «Tarea»."
+          },
+          "canal": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "EMAIL",
+                  "WHATSAPP",
+                  "PUSH"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Canal",
+            "description": "None cuando no salió por ningún canal (omitido)."
+          },
+          "estado": {
+            "type": "string",
+            "enum": [
+              "pendiente",
+              "enviando",
+              "enviado",
+              "fallido",
+              "agotado",
+              "omitido"
+            ],
+            "title": "Estado",
+            "description": "`agotado`: falló los tres intentos y ya no se reintenta solo."
+          },
+          "asunto": {
+            "type": "string",
+            "title": "Asunto"
+          },
+          "destinatario": {
+            "$ref": "#/components/schemas/PersonaBreve"
+          },
+          "contacto": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Contacto",
+            "description": "Correo o WhatsApp al que iba."
+          },
+          "intentos": {
+            "type": "integer",
+            "title": "Intentos"
+          },
+          "error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error"
+          },
+          "creado_en": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Creado En"
+          },
+          "enviado_en": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Enviado En"
+          },
+          "cuerpo": {
+            "type": "string",
+            "title": "Cuerpo",
+            "description": "El texto que se envió o se intentó enviar, sin marcas."
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "tipo",
+          "canal",
+          "estado",
+          "asunto",
+          "destinatario",
+          "contacto",
+          "intentos",
+          "error",
+          "creado_en",
+          "enviado_en",
+          "cuerpo"
+        ],
+        "title": "DetalleEnvio"
+      },
       "DetallePendiente": {
         "properties": {
           "clave": {
@@ -13990,6 +16302,75 @@
         ],
         "title": "DocumentoFirmado"
       },
+      "Ejecucion": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "manual": {
+            "type": "boolean",
+            "title": "Manual"
+          },
+          "estado": {
+            "type": "string",
+            "enum": [
+              "en_cola",
+              "en_proceso",
+              "completada",
+              "con_errores",
+              "fallida"
+            ],
+            "title": "Estado"
+          },
+          "inicio": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Inicio"
+          },
+          "fin": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fin"
+          },
+          "total": {
+            "type": "integer",
+            "title": "Total"
+          },
+          "procesados": {
+            "type": "integer",
+            "title": "Procesados"
+          },
+          "errores": {
+            "type": "integer",
+            "title": "Errores"
+          },
+          "actuaciones_nuevas": {
+            "type": "integer",
+            "title": "Actuaciones Nuevas"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "manual",
+          "estado",
+          "inicio",
+          "fin",
+          "total",
+          "procesados",
+          "errores",
+          "actuaciones_nuevas"
+        ],
+        "title": "Ejecucion"
+      },
       "ElementoAgenda": {
         "properties": {
           "clave": {
@@ -14096,6 +16477,20 @@
           "enlace"
         ],
         "title": "ElementoAgenda"
+      },
+      "EnlaceEnviado": {
+        "properties": {
+          "destino": {
+            "type": "string",
+            "title": "Destino",
+            "description": "Correo al que se envió."
+          }
+        },
+        "type": "object",
+        "required": [
+          "destino"
+        ],
+        "title": "EnlaceEnviado"
       },
       "EnlaceSuscripcion": {
         "properties": {
@@ -14447,6 +16842,139 @@
           "creado_en"
         ],
         "title": "EntregaVista"
+      },
+      "Envio": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "tipo": {
+            "type": "string",
+            "title": "Tipo",
+            "description": "De qué trata, en palabras: «Actuación judicial», «Tarea»."
+          },
+          "canal": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "EMAIL",
+                  "WHATSAPP",
+                  "PUSH"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Canal",
+            "description": "None cuando no salió por ningún canal (omitido)."
+          },
+          "estado": {
+            "type": "string",
+            "enum": [
+              "pendiente",
+              "enviando",
+              "enviado",
+              "fallido",
+              "agotado",
+              "omitido"
+            ],
+            "title": "Estado",
+            "description": "`agotado`: falló los tres intentos y ya no se reintenta solo."
+          },
+          "asunto": {
+            "type": "string",
+            "title": "Asunto"
+          },
+          "destinatario": {
+            "$ref": "#/components/schemas/PersonaBreve"
+          },
+          "contacto": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Contacto",
+            "description": "Correo o WhatsApp al que iba."
+          },
+          "intentos": {
+            "type": "integer",
+            "title": "Intentos"
+          },
+          "error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error"
+          },
+          "creado_en": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Creado En"
+          },
+          "enviado_en": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Enviado En"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "tipo",
+          "canal",
+          "estado",
+          "asunto",
+          "destinatario",
+          "contacto",
+          "intentos",
+          "error",
+          "creado_en",
+          "enviado_en"
+        ],
+        "title": "Envio"
+      },
+      "EnvioPrueba": {
+        "properties": {
+          "canal": {
+            "type": "string",
+            "enum": [
+              "EMAIL",
+              "WHATSAPP"
+            ],
+            "title": "Canal"
+          },
+          "destinatario": {
+            "type": "string",
+            "maxLength": 320,
+            "minLength": 3,
+            "title": "Destinatario"
+          }
+        },
+        "type": "object",
+        "required": [
+          "canal",
+          "destinatario"
+        ],
+        "title": "EnvioPrueba"
       },
       "ErrorRespuesta": {
         "properties": {
@@ -16193,6 +18721,80 @@
         ],
         "title": "OpcionReferencia"
       },
+      "PaginaEjecuciones": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/Ejecucion"
+            },
+            "type": "array",
+            "title": "Items"
+          },
+          "total": {
+            "type": "integer",
+            "title": "Total",
+            "description": "Cantidad total con los filtros aplicados, sin contar el cursor."
+          },
+          "siguiente": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Siguiente",
+            "description": "Cursor de la página siguiente, o null si no hay más."
+          }
+        },
+        "type": "object",
+        "required": [
+          "items",
+          "total",
+          "siguiente"
+        ],
+        "title": "PaginaEjecuciones"
+      },
+      "PaginaEnvios": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/Envio"
+            },
+            "type": "array",
+            "title": "Items"
+          },
+          "total": {
+            "type": "integer",
+            "title": "Total",
+            "description": "Cantidad total con los filtros aplicados, sin contar el cursor."
+          },
+          "siguiente": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Siguiente",
+            "description": "Cursor de la página siguiente, o null si no hay más."
+          },
+          "conteo": {
+            "$ref": "#/components/schemas/ConteoEnvios"
+          }
+        },
+        "type": "object",
+        "required": [
+          "items",
+          "total",
+          "siguiente",
+          "conteo"
+        ],
+        "title": "PaginaEnvios"
+      },
       "PaginaFolios": {
         "properties": {
           "items": {
@@ -16550,6 +19152,51 @@
           "aplicaciones"
         ],
         "title": "PagoVista"
+      },
+      "PanelConsultas": {
+        "properties": {
+          "configuracion": {
+            "$ref": "#/components/schemas/ConfiguracionConsultas"
+          },
+          "con_error": {
+            "items": {
+              "$ref": "#/components/schemas/RadicadoConError"
+            },
+            "type": "array",
+            "title": "Con Error",
+            "description": "Radicados de procesos activos cuya última consulta falló."
+          }
+        },
+        "type": "object",
+        "required": [
+          "configuracion",
+          "con_error"
+        ],
+        "title": "PanelConsultas"
+      },
+      "PanelIntegraciones": {
+        "properties": {
+          "estados": {
+            "items": {
+              "$ref": "#/components/schemas/EstadoIntegracion"
+            },
+            "type": "array",
+            "title": "Estados"
+          },
+          "correo": {
+            "$ref": "#/components/schemas/ConfiguracionCorreo"
+          },
+          "whatsapp": {
+            "$ref": "#/components/schemas/ConfiguracionWhatsapp"
+          }
+        },
+        "type": "object",
+        "required": [
+          "estados",
+          "correo",
+          "whatsapp"
+        ],
+        "title": "PanelIntegraciones"
       },
       "PasoPlantilla": {
         "properties": {
@@ -17129,6 +19776,135 @@
         ],
         "title": "Plantilla"
       },
+      "PlantillaAviso": {
+        "properties": {
+          "clave": {
+            "type": "string",
+            "title": "Clave"
+          },
+          "nombre": {
+            "type": "string",
+            "title": "Nombre"
+          },
+          "tiene_push": {
+            "type": "boolean",
+            "title": "Tiene Push"
+          },
+          "actualizada_en": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Actualizada En"
+          },
+          "asunto": {
+            "type": "string",
+            "title": "Asunto"
+          },
+          "cuerpo_email": {
+            "type": "string",
+            "title": "Cuerpo Email"
+          },
+          "cuerpo_whatsapp": {
+            "type": "string",
+            "title": "Cuerpo Whatsapp"
+          },
+          "titulo_push": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Titulo Push"
+          },
+          "cuerpo_push": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cuerpo Push"
+          },
+          "variables": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Variables",
+            "description": "Las que se pueden usar como {{variable}}."
+          },
+          "ejemplo": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "type": "object",
+            "title": "Ejemplo",
+            "description": "Valores de ejemplo de cada variable para la vista previa."
+          }
+        },
+        "type": "object",
+        "required": [
+          "clave",
+          "nombre",
+          "tiene_push",
+          "actualizada_en",
+          "asunto",
+          "cuerpo_email",
+          "cuerpo_whatsapp",
+          "titulo_push",
+          "cuerpo_push",
+          "variables",
+          "ejemplo"
+        ],
+        "title": "PlantillaAviso"
+      },
+      "PlantillaAvisoFila": {
+        "properties": {
+          "clave": {
+            "type": "string",
+            "title": "Clave"
+          },
+          "nombre": {
+            "type": "string",
+            "title": "Nombre"
+          },
+          "tiene_push": {
+            "type": "boolean",
+            "title": "Tiene Push"
+          },
+          "actualizada_en": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Actualizada En"
+          }
+        },
+        "type": "object",
+        "required": [
+          "clave",
+          "nombre",
+          "tiene_push",
+          "actualizada_en"
+        ],
+        "title": "PlantillaAvisoFila"
+      },
       "ProcesoBreve": {
         "properties": {
           "id": {
@@ -17675,6 +20451,103 @@
         ],
         "title": "ProcesoSinContrato"
       },
+      "PruebaEnviada": {
+        "properties": {
+          "destino": {
+            "type": "string",
+            "title": "Destino"
+          }
+        },
+        "type": "object",
+        "required": [
+          "destino"
+        ],
+        "title": "PruebaEnviada"
+      },
+      "RadicadoConError": {
+        "properties": {
+          "radicado_id": {
+            "type": "integer",
+            "title": "Radicado Id"
+          },
+          "numero": {
+            "type": "string",
+            "title": "Numero",
+            "description": "Agrupado en sus siete segmentos."
+          },
+          "proceso": {
+            "type": "string",
+            "title": "Proceso"
+          },
+          "proceso_id": {
+            "type": "integer",
+            "title": "Proceso Id"
+          },
+          "error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error"
+          },
+          "fecha": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fecha"
+          }
+        },
+        "type": "object",
+        "required": [
+          "radicado_id",
+          "numero",
+          "proceso",
+          "proceso_id",
+          "error",
+          "fecha"
+        ],
+        "title": "RadicadoConError"
+      },
+      "RadicadoConsultable": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "numero": {
+            "type": "string",
+            "title": "Numero"
+          },
+          "proceso": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Proceso"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "numero",
+          "proceso"
+        ],
+        "title": "RadicadoConsultable"
+      },
       "Referencia": {
         "properties": {
           "tipo": {
@@ -17743,6 +20616,37 @@
           "id"
         ],
         "title": "ReferenciaElegida"
+      },
+      "Reintentados": {
+        "properties": {
+          "reintentados": {
+            "type": "integer",
+            "title": "Reintentados"
+          }
+        },
+        "type": "object",
+        "required": [
+          "reintentados"
+        ],
+        "title": "Reintentados"
+      },
+      "Reintento": {
+        "properties": {
+          "ids": {
+            "items": {
+              "type": "integer"
+            },
+            "type": "array",
+            "maxItems": 200,
+            "minItems": 1,
+            "title": "Ids"
+          }
+        },
+        "type": "object",
+        "required": [
+          "ids"
+        ],
+        "title": "Reintento"
       },
       "Resultado": {
         "properties": {
@@ -17820,6 +20724,74 @@
           "mensaje"
         ],
         "title": "ResultadoLote"
+      },
+      "ResultadoPrueba": {
+        "properties": {
+          "estado": {
+            "type": "string",
+            "enum": [
+              "ok",
+              "falla",
+              "sin_configurar"
+            ],
+            "title": "Estado"
+          },
+          "mensaje": {
+            "type": "string",
+            "title": "Mensaje"
+          }
+        },
+        "type": "object",
+        "required": [
+          "estado",
+          "mensaje"
+        ],
+        "title": "ResultadoPrueba"
+      },
+      "ResultadoRadicado": {
+        "properties": {
+          "radicado_id": {
+            "type": "integer",
+            "title": "Radicado Id"
+          },
+          "numero": {
+            "type": "string",
+            "title": "Numero"
+          },
+          "estado": {
+            "type": "string",
+            "enum": [
+              "consultado",
+              "con_error",
+              "pendiente"
+            ],
+            "title": "Estado"
+          },
+          "actuaciones_nuevas": {
+            "type": "integer",
+            "title": "Actuaciones Nuevas"
+          },
+          "error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error"
+          }
+        },
+        "type": "object",
+        "required": [
+          "radicado_id",
+          "numero",
+          "estado",
+          "actuaciones_nuevas",
+          "error"
+        ],
+        "title": "ResultadoRadicado"
       },
       "Resultados": {
         "properties": {
@@ -18762,6 +21734,59 @@
         ],
         "title": "TerminoDelGlosario"
       },
+      "TextosPlantillaAviso": {
+        "properties": {
+          "asunto": {
+            "type": "string",
+            "maxLength": 1000,
+            "minLength": 1,
+            "title": "Asunto"
+          },
+          "cuerpo_email": {
+            "type": "string",
+            "maxLength": 30000,
+            "minLength": 1,
+            "title": "Cuerpo Email"
+          },
+          "cuerpo_whatsapp": {
+            "type": "string",
+            "maxLength": 10000,
+            "minLength": 1,
+            "title": "Cuerpo Whatsapp"
+          },
+          "titulo_push": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 500
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Titulo Push"
+          },
+          "cuerpo_push": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 5000
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cuerpo Push"
+          }
+        },
+        "type": "object",
+        "required": [
+          "asunto",
+          "cuerpo_email",
+          "cuerpo_whatsapp"
+        ],
+        "title": "TextosPlantillaAviso"
+      },
       "TotalesEstado": {
         "properties": {
           "cobrado": {
@@ -19112,42 +22137,53 @@
         ],
         "title": "Version"
       },
-      "app__modulos__administracion__esquemas__AccesoEnviado": {
+      "VistaPrevia": {
         "properties": {
-          "destino": {
+          "asunto": {
             "type": "string",
-            "title": "Destino",
-            "description": "Correo al que se envió."
-          }
-        },
-        "type": "object",
-        "required": [
-          "destino"
-        ],
-        "title": "AccesoEnviado"
-      },
-      "app__modulos__clientes__esquemas__AccesoEnviado": {
-        "properties": {
-          "canal": {
-            "type": "string",
-            "enum": [
-              "EMAIL",
-              "WHATSAPP"
-            ],
-            "title": "Canal"
+            "title": "Asunto"
           },
-          "destino": {
+          "html": {
             "type": "string",
-            "title": "Destino",
-            "description": "Correo o WhatsApp al que se envió."
+            "title": "Html",
+            "description": "El correo completo, como le llega a la persona."
+          },
+          "whatsapp": {
+            "type": "string",
+            "title": "Whatsapp"
+          },
+          "titulo_push": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Titulo Push"
+          },
+          "cuerpo_push": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cuerpo Push"
           }
         },
         "type": "object",
         "required": [
-          "canal",
-          "destino"
+          "asunto",
+          "html",
+          "whatsapp",
+          "titulo_push",
+          "cuerpo_push"
         ],
-        "title": "AccesoEnviado"
+        "title": "VistaPrevia"
       }
     }
   }

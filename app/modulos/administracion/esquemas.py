@@ -174,5 +174,5 @@ class EstadoActualizado(BaseModel):
     actualizados: int
 
 
-class AccesoEnviado(BaseModel):
+class EnlaceEnviado(BaseModel):
     destino: str = Field(description="Correo al que se envió.")

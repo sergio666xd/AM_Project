@@ -25,6 +25,11 @@ from app.modulos.finanzas.servicio import ServicioFinanzas
 from app.modulos.folios.repositorio import RepositorioFolios
 from app.modulos.folios.servicio import ServicioFolios
 from app.modulos.glosario.repositorio import RepositorioGlosario
+from app.modulos.operacion.consultas import ServicioConsultas
+from app.modulos.operacion.envios import ServicioEnvios
+from app.modulos.operacion.integraciones import ServicioIntegraciones
+from app.modulos.operacion.plantillas import ServicioPlantillas
+from app.modulos.operacion.repositorio import RepositorioOperacion
 from app.modulos.glosario.servicio import ServicioGlosario
 from app.modulos.mensajes.repositorio import RepositorioMensajes
 from app.modulos.mensajes.servicio import ServicioMensajes
@@ -108,3 +113,19 @@ def servicio_administracion(db: Session = Depends(obtener_bd)) -> ServicioAdmini
 
 def servicio_usuarios_admin(db: Session = Depends(obtener_bd)) -> ServicioUsuariosAdmin:
     return ServicioUsuariosAdmin(db, RepositorioAdministracion(db))
+
+
+def servicio_consultas(db: Session = Depends(obtener_bd)) -> ServicioConsultas:
+    return ServicioConsultas(db, RepositorioOperacion(db))
+
+
+def servicio_envios(db: Session = Depends(obtener_bd)) -> ServicioEnvios:
+    return ServicioEnvios(db, RepositorioOperacion(db))
+
+
+def servicio_integraciones(db: Session = Depends(obtener_bd)) -> ServicioIntegraciones:
+    return ServicioIntegraciones(db, RepositorioOperacion(db))
+
+
+def servicio_plantillas(db: Session = Depends(obtener_bd)) -> ServicioPlantillas:
+    return ServicioPlantillas(db, RepositorioOperacion(db))

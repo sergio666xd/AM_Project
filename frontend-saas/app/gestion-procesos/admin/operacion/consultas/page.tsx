@@ -1,5 +1,5 @@
-import AdminOperationsPage from "@/components/admin/console/AdminOperationsPage";
+import { PanelConsultas } from "@/components/admin/operacion/PanelConsultas";
 
-export default function AdminOperationsConsultationsPage() {
-  return <AdminOperationsPage section="consultas" />;
+export default function ConsultasPage() {
+  return <PanelConsultas />;
 }
