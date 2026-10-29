@@ -1,877 +1,282 @@
 "use client";
 
-import { apiRequest, TOKEN_EN_COOKIE } from "@/lib/api";
-
-import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
-
+import { useCallback, useState, type ReactNode } from "react";
 import Link from "next/link";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
+import { ArrowLeft, ChevronRight, Edit3, FileSignature, KeyRound, Mail, MessageCircle, Phone, RefreshCw, Send } from "lucide-react";
 
-import {
-  ArrowLeft,
-  BriefcaseBusiness,
-  Check,
-  ChevronRight,
-  Clock3,
-  FileText,
-  Mail,
-  MessageCircle,
-  RefreshCw,
-  Save,
-  ShieldCheck,
-  User,
-  X,
-} from "lucide-react";
+import { ClienteFormModal } from "@/components/clientes/ClienteFormModal";
+import { ReenviarAccesoDialog } from "@/components/clientes/ReenviarAccesoDialog";
+import { SolicitarDocumentosModal } from "@/components/documentos/SolicitarDocumentosModal";
+import { Button } from "@/components/ui/Button";
+import { Radicado } from "@/components/ui/Radicado";
+import { RowActionsMenu } from "@/components/ui/RowActionsMenu";
+import { Tag } from "@/components/ui/Tag";
+import { api, mensajeDeError } from "@/lib/api-v2/cliente";
+import { ACCESO, CANAL, RUTA_CLIENTES, enlaceChat, iniciales, textoPendientes, whatsappDigitos, type FichaCliente } from "@/lib/clientes";
+import { ESTADO_CONTRATO, enlaceContratosDelProceso } from "@/lib/contratos";
+import { RUTA_DOCUMENTOS } from "@/lib/documentos";
+import { nombreEtapa } from "@/lib/etapas";
+import { diaCorto, fechaCorta, fechaRelativa } from "@/lib/fechas";
+import { useLoadEffect } from "@/lib/useLoadEffect";
 
+const RUTA_PROCESOS = "/gestion-procesos/abogado/procesos";
 
-type Client = {
-  id: number;
-  nombre_completo: string;
-  email: string;
-  whatsapp_numero: string;
-  genero?: "MASCULINO" | "FEMENINO" | null;
-  numero_documento?: string | null;
-  domicilio?: string | null;
-  direccion?: string | null;
-  chat_href?: string | null;
-  canal_notificacion_cliente?: "EMAIL" | "WHATSAPP" | null;
-  notificaciones_email?: boolean;
-  notificaciones_whatsapp?: boolean;
-  estado_relacion: "ACTIVO" | "SIN_PROCESOS";
-  ultimo_contacto?: string | null;
-  procesos: {
-    id: number;
-    nombre: string;
-  }[];
-  tareas: {
-    id: number;
-    titulo: string;
-    estado: string;
-    fecha_limite?: string | null;
-  }[];
-  solicitudes_documento: {
-    id: number;
-    titulo: string;
-    proceso: string;
-    atendida_en?: string | null;
-    created_at?: string;
-  }[];
-  actividad: { tipo: string; titulo: string; descripcion: string; fecha?: string | null; proceso_id?: number | null; proceso?: string | null; actor?: string | null; visibilidad: string }[];
-  comunicaciones: { id: number; asunto: string; contenido: string; visibilidad: string; canal: string; created_at: string; proceso_id: number; proceso: string; actor: string }[];
-};
-
-export default function ClienteDetalle() {
+export default function FichaClientePage() {
   const { id } = useParams<{ id: string }>();
+  const router = useRouter();
+  const clienteId = Number(id);
+  const [ficha, setFicha] = useState<FichaCliente | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [editando, setEditando] = useState(false);
+  const [reenviando, setReenviando] = useState(false);
+  const [pidiendo, setPidiendo] = useState(false);
 
-  const [client, setClient] = useState<Client | null>(null);
+  const cargar = useCallback(async () => {
+    setError(null);
+    const { data, error: fallo } = await api.GET("/api/v2/clientes/{cliente_id}", { params: { path: { cliente_id: clienteId } } });
+    if (data) setFicha(data);
+    else setError(mensajeDeError(fallo));
+  }, [clienteId]);
+  useLoadEffect(cargar);
 
-  const [name, setName] = useState("");
-  const [whatsapp, setWhatsapp] = useState("");
-  const [gender, setGender] = useState<"" | "MASCULINO" | "FEMENINO">("");
-  const [documentNumber, setDocumentNumber] = useState("");
-  const [domicile, setDomicile] = useState("");
-  const [address, setAddress] = useState("");
-
-  const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
-
-  const [notice, setNotice] = useState("");
-  const [error, setError] = useState("");
-
-  const headers = useCallback(
-    () => ({
-      Authorization: `Bearer ${TOKEN_EN_COOKIE}`,
-    }),
-    []
-  );
-
-  const load = useCallback(async () => {
-    setLoading(true);
-    setError("");
-
-    try {
-      const response = await apiRequest(
-        `/api/expedientes/clientes/${id}`,
-        {
-          headers: headers(),
-        }
-      );
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(
-          data.detail || "No fue posible cargar el cliente."
-        );
-      }
-
-      setClient(data);
-      setName(data.nombre_completo || "");
-      setWhatsapp(data.whatsapp_numero || "");
-      setGender(data.genero || "");
-      setDocumentNumber(data.numero_documento || "");
-      setDomicile(data.domicilio || "");
-      setAddress(data.direccion || "");
-    } catch (err) {
-      setError(
-        err instanceof Error
-          ? err.message
-          : "Error al cargar el cliente."
-      );
-    } finally {
-      setLoading(false);
-    }
-  }, [id, headers]);
-
-  useEffect(() => {
-    const timer = window.setTimeout(() => void load(), 0);
-    return () => window.clearTimeout(timer);
-  }, [load]);
-
-  const initials = useMemo(() => {
-    if (!client?.nombre_completo) return "?";
-
-    const parts = client.nombre_completo
-      .trim()
-      .split(/\s+/)
-      .filter(Boolean);
-
-    if (parts.length === 1) {
-      return parts[0].slice(0, 2).toUpperCase();
-    }
-
-    return `${parts[0][0]}${
-      parts[parts.length - 1][0]
-    }`.toUpperCase();
-  }, [client]);
-
-  const pendingTasks = useMemo(
-    () =>
-      client?.tareas.filter(
-        (task) =>
-          task.estado.toLowerCase() !== "completada" &&
-          task.estado.toLowerCase() !== "completado"
-      ).length || 0,
-    [client]
-  );
-
-  const pendingDocuments = useMemo(
-    () =>
-      client?.solicitudes_documento.filter(
-        (document) => !document.atendida_en
-      ).length || 0,
-    [client]
-  );
-
-  async function save(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-
-    setError("");
-    setNotice("");
-    setSaving(true);
-
-    try {
-      const response = await apiRequest(
-        `/api/expedientes/clientes/${id}`,
-        {
-          method: "PUT",
-          headers: {
-            ...headers(),
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            nombre_completo: name.trim(),
-            whatsapp_numero: whatsapp.trim(),
-            genero: gender || null,
-            numero_documento: documentNumber.trim(),
-            domicilio: domicile.trim(),
-            direccion: address.trim(),
-          }),
-        }
-      );
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(
-          data.detail || "No fue posible actualizar el cliente."
-        );
-      }
-
-      setNotice(data.mensaje || "Cliente actualizado correctamente.");
-
-      await load();
-    } catch (err) {
-      setError(
-        err instanceof Error
-          ? err.message
-          : "Error al guardar los cambios."
-      );
-    } finally {
-      setSaving(false);
-    }
-  }
-
-  if (loading && !client) {
+  if (error) {
     return (
-      <section className="mx-auto max-w-7xl space-y-5 px-4 py-5 sm:px-6 lg:px-8">
-        <div className="h-5 w-24 animate-pulse rounded bg-surface-secondary" />
-
-        <div className="rounded-[var(--radius-lg)] border border-border bg-surface p-6">
-          <div className="flex items-center gap-4">
-            <div className="size-16 animate-pulse rounded-full bg-surface-secondary" />
-
-            <div className="space-y-2">
-              <div className="h-5 w-48 animate-pulse rounded bg-surface-secondary" />
-              <div className="h-3 w-64 animate-pulse rounded bg-surface-secondary" />
-            </div>
-          </div>
+      <div>
+        <Volver />
+        <div role="alert" className="mt-4 flex flex-wrap items-center gap-3 rounded-[var(--radius-lg)] bg-bad-soft px-4 py-3 text-bad">
+          <p className="flex-1 text-[14px]">{error}</p>
+          <Button size="sm" variant="secondary" icon={<RefreshCw size={14} />} onClick={() => void cargar()}>Reintentar</Button>
         </div>
-
-        <div className="grid gap-4 lg:grid-cols-3">
-          {Array.from({ length: 3 }).map((_, index) => (
-            <div
-              key={index}
-              className="h-36 animate-pulse rounded-[var(--radius-lg)] border border-border bg-surface-secondary"
-            />
-          ))}
-        </div>
-      </section>
+      </div>
     );
   }
 
-  if (!client) {
+  if (!ficha) {
     return (
-      <section className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
-        <Link
-          href="/gestion-procesos/abogado/clientes"
-          className="inline-flex items-center gap-2 text-sm text-brand-900"
-        >
-          <ArrowLeft className="size-4" />
-          Volver a clientes
-        </Link>
-
-        <div className="mt-6 rounded-[var(--radius-lg)] border border-red-500/20 bg-red-500/10 p-6">
-          <p className="font-medium text-red-700 dark:text-red-400">
-            {error || "No fue posible encontrar el cliente."}
-          </p>
+      <div aria-label="Cargando la ficha" aria-busy="true">
+        <Volver />
+        <div className="mt-4 h-24 animate-pulse rounded-[var(--radius-lg)] bg-manila" />
+        <div className="mt-6 grid gap-4 lg:grid-cols-[minmax(0,1fr)_320px]">
+          <div className="h-72 animate-pulse rounded-[var(--radius-lg)] bg-manila" />
+          <div className="h-72 animate-pulse rounded-[var(--radius-lg)] bg-manila" />
         </div>
-      </section>
+      </div>
     );
   }
+
+  const chat = enlaceChat(ficha);
+  const pendiente = textoPendientes(ficha);
+  const acceso = ACCESO[ficha.acceso];
 
   return (
-    <section className="motion-swap mx-auto max-w-7xl space-y-5 px-4 py-5 sm:px-6 lg:px-8">
-      {/* Back */}
-      <Link
-        href="/gestion-procesos/abogado/clientes"
-        className="inline-flex items-center gap-2 text-sm font-medium text-foreground-muted transition hover:text-brand-900"
-      >
-        <ArrowLeft className="size-4" />
-        Clientes
-      </Link>
-
-      {/* Alerts */}
-      {error && (
-        <div
-          role="alert"
-          className="flex items-start justify-between gap-3 rounded-[var(--radius-lg)] border border-red-500/20 bg-red-500/10 px-4 py-3 text-sm text-red-600 dark:text-red-400"
-        >
-          <span>{error}</span>
-
-          <button
-            type="button"
-            onClick={() => setError("")}
-            className="rounded p-1 hover:bg-red-500/10"
-          >
-            <X className="size-4" />
-          </button>
-        </div>
-      )}
-
-      {notice && (
-        <div
-          role="status"
-          className="flex items-start justify-between gap-3 rounded-[var(--radius-lg)] border border-emerald-500/20 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-700 dark:text-emerald-400"
-        >
-          <span>{notice}</span>
-
-          <button
-            type="button"
-            onClick={() => setNotice("")}
-            className="rounded p-1 hover:bg-emerald-500/10"
-          >
-            <X className="size-4" />
-          </button>
-        </div>
-      )}
-
-      {/* Client header */}
-      <header className="rounded-[var(--radius-lg)] border border-border bg-surface p-5 sm:p-6">
-        <div className="flex flex-col gap-5 sm:flex-row sm:items-center sm:justify-between">
-          <div className="flex items-center gap-4">
-            <div className="flex size-16 shrink-0 items-center justify-center rounded-full bg-brand-900/10 text-lg font-semibold text-brand-900">
-              {initials}
-            </div>
-
-            <div className="min-w-0">
-              <div className="mb-1 flex items-center gap-2 text-xs font-medium uppercase tracking-wide text-foreground-muted">
-                <User className="size-3.5" />
-                Ficha de cliente
-              </div>
-
-              <h1 className="truncate text-2xl font-semibold tracking-tight text-foreground sm:text-3xl">
-                {client.nombre_completo}
-              </h1>
-
-              <div className="mt-1 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-foreground-muted">
-                <span className="inline-flex items-center gap-1.5">
-                  <Mail className="size-3.5" />
-                  {client.email}
-                </span>
-
-                {client.whatsapp_numero && (
-                  <span className="inline-flex items-center gap-1.5">
-                    <MessageCircle className="size-3.5" />
-                    {client.whatsapp_numero}
-                  </span>
-                )}
-              </div>
+    <div>
+      <Volver />
+      <header className="mt-3 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+        <div className="flex min-w-0 items-center gap-4">
+          <span aria-hidden="true" className="grid size-14 shrink-0 place-items-center rounded-full bg-navy-soft font-display text-[20px] text-navy-ink">
+            {iniciales(ficha.nombre)}
+          </span>
+          <div className="min-w-0">
+            <h1 className="font-display text-[28px] leading-tight text-balance text-ink sm:text-[32px]">{ficha.nombre}</h1>
+            <div className="mt-1.5 flex flex-wrap items-center gap-2">
+              {ficha.acceso === "activo"
+                ? <span className="text-[13.5px] text-ink-2">{ficha.ultimo_acceso ? `Entró al portal ${fechaRelativa(ficha.ultimo_acceso).toLowerCase()}` : "Entra al portal"}</span>
+                : <Tag tone={acceso.tono}>{acceso.nombre} al portal</Tag>}
+              {pendiente && <Tag tone={pendiente.tono}>{pendiente.texto}</Tag>}
             </div>
           </div>
-
-          <div className="flex items-center gap-2 self-start">
-            {client.chat_href && <Link
-              href={client.chat_href}
-              className="inline-flex min-h-9 items-center gap-2 rounded-lg bg-brand-900 px-3 text-sm font-medium !text-white transition hover:opacity-90"
-            >
-              <MessageCircle className="size-4" />
-              Chat
-            </Link>}
-
-            <span className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-medium ${client.estado_relacion === "ACTIVO" ? "border-emerald-500/20 bg-emerald-500/10 text-emerald-700 dark:text-emerald-400" : "border-amber-500/20 bg-amber-500/10 text-amber-700 dark:text-amber-400"}`}>
-              <ShieldCheck className="size-3.5" />
-              {client.estado_relacion === "ACTIVO" ? "Con procesos activos" : "Sin procesos asociados"}
-            </span>
-
-            <button
-              type="button"
-              onClick={() => void load()}
-              disabled={loading}
-              className="inline-flex size-9 items-center justify-center rounded-lg border border-border text-foreground-muted transition hover:bg-surface-secondary hover:text-foreground disabled:opacity-50"
-              title="Actualizar"
-            >
-              <RefreshCw
-                className={`size-4 ${
-                  loading ? "animate-spin" : ""
-                }`}
-              />
-            </button>
-          </div>
+        </div>
+        <div className="flex shrink-0 flex-wrap items-center gap-2">
+          {chat && <Button icon={<MessageCircle size={16} />} onClick={() => router.push(chat)}>Escribirle</Button>}
+          <Button variant="secondary" icon={<Send size={16} />} disabled={!ficha.procesos.length} title={ficha.procesos.length ? undefined : "Vincúlalo a un proceso para pedirle documentos."} onClick={() => setPidiendo(true)}>
+            Pedir documentos
+          </Button>
+          <RowActionsMenu
+            row={ficha}
+            label={`Más acciones de ${ficha.nombre}`}
+            actions={[
+              { label: "Editar datos", icon: <Edit3 size={16} />, onSelect: () => setEditando(true) },
+              { label: "Reenviar acceso", icon: <KeyRound size={16} />, hidden: () => ficha.acceso !== "sin_ingreso", onSelect: () => setReenviando(true) },
+              { label: "Enviar correo", icon: <Mail size={16} />, href: () => `mailto:${ficha.email}`, separated: true },
+              { label: "Abrir WhatsApp", icon: <Phone size={16} />, href: () => `https://wa.me/${whatsappDigitos(ficha.whatsapp)}`, hidden: () => !ficha.whatsapp },
+            ]}
+          />
         </div>
       </header>
 
-      {/* Summary */}
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <SummaryCard
-          icon={<BriefcaseBusiness className="size-5" />}
-          label="Procesos"
-          value={client.procesos.length}
-        />
+      {ficha.acceso === "sin_ingreso" && (
+        <div className="mt-5 flex flex-wrap items-center gap-x-4 gap-y-2 rounded-[var(--radius-lg)] bg-warn-soft px-4 py-3 sm:px-5">
+          <KeyRound aria-hidden="true" size={18} className="shrink-0 text-ink-2" />
+          <p className="min-w-0 flex-1 text-[14px] text-pretty text-ink">
+            Aún no ha entrado al portal con su contraseña temporal. Si no le llegó o la perdió, envíale una nueva.
+          </p>
+          <Button size="sm" variant="secondary" icon={<KeyRound size={14} />} onClick={() => setReenviando(true)}>Reenviar acceso</Button>
+        </div>
+      )}
 
-        <SummaryCard
-          icon={<Clock3 className="size-5" />}
-          label="Tareas pendientes"
-          value={pendingTasks}
-        />
-
-        <SummaryCard
-          icon={<FileText className="size-5" />}
-          label="Documentos pendientes"
-          value={pendingDocuments}
-        />
-
-        <SummaryCard
-          icon={<Check className="size-5" />}
-          label="Solicitudes"
-          value={client.solicitudes_documento.length}
-        />
-      </div>
-
-      <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_360px]">
-        {/* Main */}
+      <div className="mt-6 grid items-start gap-5 lg:grid-cols-[minmax(0,1fr)_320px]">
         <div className="space-y-5">
-          {/* Processes */}
-          <section className="overflow-hidden rounded-[var(--radius-lg)] border border-border bg-surface">
-            <SectionHeader
-              icon={<BriefcaseBusiness className="size-5" />}
-              title="Procesos"
-              count={client.procesos.length}
-            />
+          {ficha.expedientes.length > 0 && (
+            <Seccion titulo="Le falta entregar" cuenta={ficha.pendientes.length}>
+              {ficha.pendientes.length ? (
+                <ul className="divide-y divide-line">
+                  {ficha.pendientes.map((p) => (
+                    <li key={p.solicitud_id}>
+                      <Link href={`${RUTA_DOCUMENTOS}?proceso=${p.proceso.id}#solicitud-${p.solicitud_id}`} className="group flex items-start gap-3 px-4 py-3.5 transition-colors hover:bg-manila/60 sm:px-5">
+                        <div className="min-w-0 flex-1">
+                          <p className="font-semibold text-ink">{p.titulo}</p>
+                          <p className="mt-0.5 text-[13px] text-ink-3">{p.proceso.nombre}</p>
+                          <p className="mt-1.5 text-[14px] text-pretty text-ink-2">
+                            {p.faltan.length === p.total ? "Todo: " : `${p.faltan.length} de ${p.total}: `}
+                            {p.faltan.join(", ")}
+                          </p>
+                        </div>
+                        {p.fecha_limite && (
+                          <Tag tone={p.vencida ? "bad" : "gold"}>{p.vencida ? `Venció el ${diaCorto(p.fecha_limite)}` : `Para el ${diaCorto(p.fecha_limite)}`}</Tag>
+                        )}
+                        <ChevronRight aria-hidden="true" size={16} className="mt-0.5 shrink-0 text-ink-3 transition-transform group-hover:translate-x-0.5" />
+                      </Link>
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <Vacio>Está al día con los documentos.</Vacio>
+              )}
+            </Seccion>
+          )}
 
-            {client.procesos.length === 0 ? (
-              <EmptySection
-                icon={<BriefcaseBusiness className="size-5" />}
-                title="Sin procesos asociados"
-                description="Este cliente todavía no está asociado a ningún proceso."
-              />
-            ) : (
-              <div className="divide-y divide-border">
-                {client.procesos.map((process) => (
-                  <div
-                    key={process.id}
-                    className="flex items-center justify-between gap-4 px-5 py-4 transition hover:bg-surface-secondary"
-                  >
-                    <div className="flex min-w-0 items-center gap-3">
-                      <div className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-brand-900/10 text-brand-900">
-                        <BriefcaseBusiness className="size-4" />
+          <Seccion titulo="Procesos activos" cuenta={ficha.expedientes.length}>
+            {ficha.expedientes.length ? (
+              <ul className="divide-y divide-line">
+                {ficha.expedientes.map((p) => (
+                  <li key={p.id}>
+                    <Link href={`${RUTA_PROCESOS}/${p.id}`} className="group flex items-center gap-3 px-4 py-3.5 transition-colors hover:bg-manila/60 sm:px-5">
+                      <div className="min-w-0 flex-1">
+                        <p className="font-semibold text-ink">{p.nombre}</p>
+                        <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-[13px] text-ink-3">
+                          <span>{nombreEtapa(p.etapa)}</span>
+                          {p.radicados.map((numero) => <Radicado key={numero} numero={numero} copiable={false} />)}
+                          <span>{p.responsable}</span>
+                        </div>
                       </div>
-
-                      <div className="min-w-0">
-                        <p className="truncate text-sm font-medium text-foreground">
-                          {process.nombre}
-                        </p>
-
-                        <p className="text-xs text-foreground-muted">
-                          Proceso #{process.id}
-                        </p>
-                      </div>
-                    </div>
-
-                    <Link
-                      href={`/gestion-procesos/abogado/procesos/${process.id}`}
-                      className="inline-flex shrink-0 items-center gap-1 text-xs font-medium text-brand-900 hover:underline"
-                    >
-                      Abrir
-                      <ChevronRight className="size-3.5" />
+                      <ChevronRight aria-hidden="true" size={16} className="shrink-0 text-ink-3 transition-transform group-hover:translate-x-0.5" />
                     </Link>
-                  </div>
+                  </li>
                 ))}
-              </div>
-            )}
-          </section>
-
-          {/* Tasks */}
-          <section className="overflow-hidden rounded-[var(--radius-lg)] border border-border bg-surface">
-            <SectionHeader
-              icon={<Clock3 className="size-5" />}
-              title="Tareas"
-              count={client.tareas.length}
-            />
-
-            {client.tareas.length === 0 ? (
-              <EmptySection
-                icon={<Clock3 className="size-5" />}
-                title="Sin tareas"
-                description="No hay tareas registradas para este cliente."
-              />
+              </ul>
             ) : (
-              <div className="divide-y divide-border">
-                {client.tareas.map((task) => {
-                  const completed =
-                    task.estado.toLowerCase() === "completada" ||
-                    task.estado.toLowerCase() === "completado";
+              <Vacio>No está vinculado a ningún proceso activo. Vincúlalo desde el expediente, en Clientes y radicados.</Vacio>
+            )}
+          </Seccion>
 
-                  return (
-                    <div
-                      key={task.id}
-                      className="flex items-center justify-between gap-4 px-5 py-4"
-                    >
-                      <div className="flex min-w-0 items-center gap-3">
-                        <div
-                          className={`flex size-9 shrink-0 items-center justify-center rounded-lg ${
-                            completed
-                              ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400"
-                              : "bg-amber-500/10 text-amber-600 dark:text-amber-400"
-                          }`}
-                        >
-                          {completed ? (
-                            <Check className="size-4" />
-                          ) : (
-                            <Clock3 className="size-4" />
-                          )}
-                        </div>
-
-                        <div className="min-w-0">
-                          <p className="truncate text-sm font-medium text-foreground">
-                            {task.titulo}
-                          </p>
-
-                          {task.fecha_limite && (
-                            <p className="mt-0.5 text-xs text-foreground-muted">
-                              Fecha límite:{" "}
-                              {formatDate(task.fecha_limite)}
-                            </p>
-                          )}
-                        </div>
+          {ficha.expedientes.length > 0 && (
+            <Seccion titulo="Lo que le has contado" descripcion="Los últimos avisos de actuaciones que le enviaste.">
+              {ficha.avisos.length ? (
+                <ul className="divide-y divide-line">
+                  {ficha.avisos.map((a, i) => (
+                    <li key={i} className="flex items-start gap-3 px-4 py-3 sm:px-5">
+                      <div className="min-w-0 flex-1">
+                        <p className="text-[14px] text-pretty text-ink">{a.asunto}</p>
+                        <p className="mt-0.5 text-[13px] text-ink-3">{a.proceso.nombre}</p>
                       </div>
+                      <span className="shrink-0 text-[13px] tabular-nums text-ink-3">{fechaCorta(a.enviado_en)}</span>
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <Vacio>Aún no le has avisado de ninguna actuación. Desde los folios del expediente, «Avisar al cliente» le explica qué pasó.</Vacio>
+              )}
+            </Seccion>
+          )}
 
-                      <span
-                        className={`shrink-0 rounded-full px-2.5 py-1 text-xs font-medium ${
-                          completed
-                            ? "bg-emerald-500/10 text-emerald-700 dark:text-emerald-400"
-                            : "bg-amber-500/10 text-amber-700 dark:text-amber-400"
-                        }`}
-                      >
-                        {task.estado}
-                      </span>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-          </section>
-
-          {/* Document requests */}
-          <section className="overflow-hidden rounded-[var(--radius-lg)] border border-border bg-surface">
-            <SectionHeader
-              icon={<FileText className="size-5" />}
-              title="Solicitudes de documentos"
-              count={client.solicitudes_documento.length}
-            />
-
-            {client.solicitudes_documento.length === 0 ? (
-              <EmptySection
-                icon={<FileText className="size-5" />}
-                title="Sin solicitudes"
-                description="No hay solicitudes de documentos para este cliente."
-              />
-            ) : (
-              <div className="divide-y divide-border">
-                {client.solicitudes_documento.map((document) => {
-                  const delivered = Boolean(document.atendida_en);
-
-                  return (
-                    <div
-                      key={document.id}
-                      className="flex items-center justify-between gap-4 px-5 py-4"
-                    >
-                      <div className="flex min-w-0 items-center gap-3">
-                        <div className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-surface-secondary text-foreground-muted">
-                          <FileText className="size-4" />
+          {ficha.contratos && (ficha.contratos.length > 0 || ficha.expedientes.length > 0) && (
+            <Seccion titulo="Contratos" cuenta={ficha.contratos.length}>
+              {ficha.contratos.length ? (
+                <ul className="divide-y divide-line">
+                  {ficha.contratos.map((c) => (
+                    <li key={c.id}>
+                      <Link href={enlaceContratosDelProceso(c.proceso.id)} className="group flex items-center gap-3 px-4 py-3.5 transition-colors hover:bg-manila/60 sm:px-5">
+                        <FileSignature aria-hidden="true" size={16} className="shrink-0 text-ink-3" />
+                        <div className="min-w-0 flex-1">
+                          <p className="text-ink">{c.proceso.nombre}</p>
+                          {c.firmado_en && <p className="text-[13px] text-ink-3">Firmado el {fechaCorta(c.firmado_en)}</p>}
                         </div>
-
-                        <div className="min-w-0">
-                          <p className="truncate text-sm font-medium text-foreground">
-                            {document.titulo}
-                          </p>
-
-                          <p className="mt-0.5 truncate text-xs text-foreground-muted">
-                            {document.proceso}
-                          </p>
-                        </div>
-                      </div>
-
-                      <span
-                        className={`shrink-0 rounded-full px-2.5 py-1 text-xs font-medium ${
-                          delivered
-                            ? "bg-emerald-500/10 text-emerald-700 dark:text-emerald-400"
-                            : "bg-amber-500/10 text-amber-700 dark:text-amber-400"
-                        }`}
-                      >
-                        {delivered ? "Entregado" : "Pendiente"}
-                      </span>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-          </section>
-
-          <section className="overflow-hidden rounded-[var(--radius-lg)] border border-border bg-surface">
-            <SectionHeader icon={<Clock3 className="size-5" />} title="Actividad reciente" count={client.actividad.length} />
-            {client.actividad.length === 0 ? (
-              <EmptySection icon={<Clock3 className="size-5" />} title="Sin actividad registrada" description="Los cambios y comunicaciones asociados al cliente aparecerán aquí." />
-            ) : (
-              <div className="divide-y divide-border">
-                {client.actividad.map((item, index) => (
-                  <div key={`${item.tipo}-${item.proceso_id}-${item.fecha}-${index}`} className="flex gap-3 px-5 py-4">
-                    <span className="mt-1 size-2 shrink-0 rounded-full bg-brand-900" />
-                    <div className="min-w-0 flex-1">
-                      <div className="flex flex-wrap items-start justify-between gap-2">
-                        <p className="text-sm font-medium text-foreground">{item.titulo}</p>
-                        <span className="text-xs text-foreground-muted">{item.fecha ? formatDate(item.fecha) : "Fecha no disponible"}</span>
-                      </div>
-                      <p className="mt-1 text-sm text-[var(--foreground-secondary)]">{item.descripcion}</p>
-                      <p className="mt-1 text-xs text-foreground-muted">{item.proceso || "Cliente"}{item.actor ? ` · ${item.actor}` : ""} · {item.visibilidad === "CLIENTE" ? "Visible al cliente" : "Uso interno"}</p>
-                    </div>
-                    {item.proceso_id && <Link href={`/gestion-procesos/abogado/procesos/${item.proceso_id}/actividad`} className="shrink-0 text-xs font-medium text-brand-900 hover:underline">Abrir proceso</Link>}
-                  </div>
-                ))}
-              </div>
-            )}
-          </section>
-
-          <section className="overflow-hidden rounded-[var(--radius-lg)] border border-border bg-surface">
-            <SectionHeader icon={<MessageCircle className="size-5" />} title="Comunicaciones" count={client.comunicaciones.length} />
-            <div className="border-b px-5 py-3 text-xs text-foreground-muted" style={{ borderColor: "var(--border)" }}>
-              Último contacto registrado: {client.ultimo_contacto ? formatDate(client.ultimo_contacto) : "Sin contactos registrados"}
-            </div>
-            {client.comunicaciones.length === 0 ? (
-              <EmptySection icon={<MessageCircle className="size-5" />} title="Sin comunicaciones" description="Las notas y comunicaciones del expediente aparecerán aquí." />
-            ) : (
-              <div className="divide-y divide-border">
-                {client.comunicaciones.map((item) => (
-                  <div key={item.id} className="flex flex-wrap items-start justify-between gap-3 px-5 py-4">
-                    <div className="min-w-0"><p className="text-sm font-medium text-foreground">{item.asunto}</p><p className="mt-1 whitespace-pre-wrap text-sm text-[var(--foreground-secondary)]">{item.contenido}</p><p className="mt-1 text-xs text-foreground-muted">{item.proceso} · {item.actor} · {item.visibilidad === "CLIENTE" ? "Visible al cliente" : "Interna"} · {item.canal}</p></div>
-                    <span className="text-xs text-foreground-muted">{formatDate(item.created_at)}</span>
-                  </div>
-                ))}
-              </div>
-            )}
-          </section>
+                        <Tag tone={ESTADO_CONTRATO[c.estado as keyof typeof ESTADO_CONTRATO]?.tono ?? "neutral"}>
+                          {ESTADO_CONTRATO[c.estado as keyof typeof ESTADO_CONTRATO]?.nombre ?? c.estado}
+                        </Tag>
+                        <ChevronRight aria-hidden="true" size={16} className="shrink-0 text-ink-3 transition-transform group-hover:translate-x-0.5" />
+                      </Link>
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <Vacio>Sin contratos. Se redactan desde la pestaña Contratos del expediente.</Vacio>
+              )}
+            </Seccion>
+          )}
         </div>
 
-        {/* Sidebar */}
-        <aside className="space-y-5">
-          {/* Edit */}
-          <form
-            onSubmit={save}
-            className="overflow-hidden rounded-[var(--radius-lg)] border border-border bg-surface"
-          >
-            <div className="border-b border-border px-5 py-4">
-              <h2 className="font-semibold text-foreground">
-                Información del cliente
-              </h2>
-
-              <p className="mt-1 text-xs text-foreground-muted">
-                Actualiza los datos de contacto.
-              </p>
-            </div>
-
-            <div className="space-y-4 px-5 py-5">
-              <label className="block">
-                <span className="text-sm font-medium text-foreground">
-                  Nombre completo
-                </span>
-
-                <input
-                  value={name}
-                  onChange={(event) => setName(event.target.value)}
-                  required
-                  className="mt-1.5 h-10 w-full rounded-lg border border-border bg-[var(--background)] px-3 text-sm text-foreground outline-none transition focus:border-brand-900"
-                />
-              </label>
-
-              <label className="block">
-                <span className="text-sm font-medium text-foreground">
-                  Correo electrónico
-                </span>
-
-                <input
-                  value={client.email}
-                  disabled
-                  className="mt-1.5 h-10 w-full cursor-not-allowed rounded-lg border border-border bg-surface-secondary px-3 text-sm text-foreground-muted"
-                />
-
-                <p className="mt-1.5 text-xs text-foreground-muted">
-                  El correo no puede modificarse mediante el endpoint
-                  actual.
-                </p>
-              </label>
-
-              <label className="block">
-                <span className="text-sm font-medium text-foreground">
-                  WhatsApp
-                </span>
-
-                <input
-                  value={whatsapp}
-                  onChange={(event) =>
-                    setWhatsapp(event.target.value)
-                  }
-                  type="tel"
-                  placeholder="Opcional"
-                  className="mt-1.5 h-10 w-full rounded-lg border border-border bg-[var(--background)] px-3 text-sm text-foreground outline-none transition focus:border-brand-900"
-                />
-              </label>
-
-              <label className="block">
-                <span className="text-sm font-medium text-foreground">
-                  Género
-                </span>
-                <select
-                  value={gender}
-                  onChange={(event) => setGender(event.target.value as typeof gender)}
-                  className="mt-1.5 h-10 w-full rounded-lg border border-border bg-[var(--background)] px-3 text-sm text-foreground outline-none focus:border-brand-900"
-                >
-                  <option value="">Sin especificar</option>
-                  <option value="FEMENINO">Femenino</option>
-                  <option value="MASCULINO">Masculino</option>
-                </select>
-              </label>
-
-              <label className="block">
-                <span className="text-sm font-medium text-foreground">
-                  Número de documento
-                </span>
-                <input
-                  value={documentNumber}
-                  onChange={(event) => setDocumentNumber(event.target.value)}
-                  placeholder="Sin puntos"
-                  className="mt-1.5 h-10 w-full rounded-lg border border-border bg-[var(--background)] px-3 text-sm text-foreground outline-none focus:border-brand-900"
-                />
-              </label>
-
-              <label className="block">
-                <span className="text-sm font-medium text-foreground">
-                  Domicilio
-                </span>
-                <input
-                  value={domicile}
-                  onChange={(event) => setDomicile(event.target.value)}
-                  placeholder="Ciudad o municipio"
-                  className="mt-1.5 h-10 w-full rounded-lg border border-border bg-[var(--background)] px-3 text-sm text-foreground outline-none focus:border-brand-900"
-                />
-              </label>
-
-              <label className="block">
-                <span className="text-sm font-medium text-foreground">
-                  Dirección
-                </span>
-                <input
-                  value={address}
-                  onChange={(event) => setAddress(event.target.value)}
-                  className="mt-1.5 h-10 w-full rounded-lg border border-border bg-[var(--background)] px-3 text-sm text-foreground outline-none focus:border-brand-900"
-                />
-              </label>
-            </div>
-
-            <div className="border-t border-border px-5 py-4">
-              <button
-                type="submit"
-                disabled={saving}
-                className="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-brand-900 px-4 py-2.5 text-sm font-medium !text-white transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
-              >
-                {saving ? (
-                  <RefreshCw className="size-4 animate-spin" />
-                ) : (
-                  <Save className="size-4" />
-                )}
-
-                {saving ? "Guardando..." : "Guardar cambios"}
-              </button>
-            </div>
-          </form>
-
-          {/* Notifications */}
-          <section className="rounded-[var(--radius-lg)] border border-border bg-surface">
-            <div className="border-b border-border px-5 py-4">
-              <h2 className="font-semibold text-foreground">
-                Notificaciones
-              </h2>
-
-              <p className="mt-1 text-xs text-foreground-muted">
-                Preferencias actuales del cliente.
-              </p>
-            </div>
-
-            <div className="p-5">
-              <p className="text-sm text-foreground-muted">
-                Canales elegidos por el cliente
-              </p>
-              <p className="mt-2 font-medium text-foreground">
-                {[client.notificaciones_email && `Correo · ${client.email}`, client.notificaciones_whatsapp && `WhatsApp · ${client.whatsapp_numero || "sin número configurado"}`].filter(Boolean).join(" y ") || "Sin canal configurado"}
-              </p>
-            </div>
-          </section>
+        <aside className="rounded-[var(--radius-lg)] bg-sheet shadow-[0_0_0_1px_var(--line),0_1px_2px_rgb(24_32_58/0.05)] lg:sticky lg:top-24">
+          <div className="flex items-center justify-between gap-3 border-b border-line px-4 py-3 sm:px-5">
+            <h2 className="font-semibold text-ink">Datos</h2>
+            <Button size="sm" variant="ghost" className="-mr-2" icon={<Edit3 size={14} />} onClick={() => setEditando(true)}>Editar</Button>
+          </div>
+          <dl className="divide-y divide-line text-[14px]">
+            <Dato nombre="Correo"><a href={`mailto:${ficha.email}`} className="[overflow-wrap:anywhere] text-navy hover:underline">{ficha.email}</a></Dato>
+            <Dato nombre="WhatsApp">{ficha.whatsapp ? <span className="tabular-nums">{ficha.whatsapp}</span> : null}</Dato>
+            <Dato nombre="Documento">{ficha.documento ? <span className="tabular-nums">{ficha.documento}</span> : null}</Dato>
+            <Dato nombre="Domicilio">{[ficha.domicilio, ficha.direccion].filter(Boolean).join(" · ") || null}</Dato>
+            <Dato nombre="Avisos por">{ficha.canal ? CANAL[ficha.canal] : null}</Dato>
+            <Dato nombre="Cliente desde">{fechaCorta(ficha.creado_en)}</Dato>
+          </dl>
         </aside>
       </div>
+
+      <ClienteFormModal open={editando} clienteId={ficha.id} onClose={() => setEditando(false)} onGuardado={setFicha} />
+      <ReenviarAccesoDialog cliente={reenviando ? ficha : null} onClose={() => setReenviando(false)} onEnviado={() => void cargar()} />
+      <SolicitarDocumentosModal
+        open={pidiendo}
+        onClose={() => setPidiendo(false)}
+        procesoInicial={ficha.procesos[0]?.id}
+        onCreada={() => void cargar()}
+      />
+    </div>
+  );
+}
+
+function Volver() {
+  return (
+    <Link href={RUTA_CLIENTES} className="inline-flex min-h-10 items-center gap-1.5 text-[14px] text-ink-2 hover:text-ink">
+      <ArrowLeft aria-hidden="true" size={16} /> Clientes
+    </Link>
+  );
+}
+
+function Seccion({ titulo, descripcion, cuenta, children }: { titulo: string; descripcion?: string; cuenta?: number; children: ReactNode }) {
+  return (
+    <section className="overflow-hidden rounded-[var(--radius-lg)] bg-sheet shadow-[0_0_0_1px_var(--line),0_1px_2px_rgb(24_32_58/0.05)]">
+      <header className="border-b border-line px-4 py-3 sm:px-5">
+        <h2 className="font-semibold text-ink">
+          {titulo}
+          {cuenta !== undefined && cuenta > 0 && <span className="ml-2 text-[13px] font-normal tabular-nums text-ink-3">{cuenta}</span>}
+        </h2>
+        {descripcion && <p className="text-[13px] text-ink-3">{descripcion}</p>}
+      </header>
+      {children}
     </section>
   );
 }
 
-function SummaryCard({
-  icon,
-  label,
-  value,
-}: {
-  icon: React.ReactNode;
-  label: string;
-  value: number;
-}) {
+function Vacio({ children }: { children: ReactNode }) {
+  return <p className="px-4 py-6 text-[14px] text-pretty text-ink-3 sm:px-5">{children}</p>;
+}
+
+function Dato({ nombre, children }: { nombre: string; children: ReactNode }) {
   return (
-    <div className="rounded-[var(--radius-lg)] border border-border bg-surface p-4">
-      <div className="flex items-center justify-between gap-4">
-        <div>
-          <p className="text-sm text-foreground-muted">
-            {label}
-          </p>
-
-          <p className="mt-1 text-2xl font-semibold text-foreground">
-            {value}
-          </p>
-        </div>
-
-        <div className="flex size-10 items-center justify-center rounded-lg bg-brand-900/10 text-brand-900">
-          {icon}
-        </div>
-      </div>
+    <div className="grid grid-cols-[6.5rem_minmax(0,1fr)] gap-3 px-4 py-2.5 sm:px-5">
+      <dt className="text-ink-3">{nombre}</dt>
+      <dd className="min-w-0 text-ink">{children ?? <span className="text-ink-3">Sin registrar</span>}</dd>
     </div>
   );
-}
-
-function SectionHeader({
-  icon,
-  title,
-  count,
-}: {
-  icon: React.ReactNode;
-  title: string;
-  count: number;
-}) {
-  return (
-    <header className="flex items-center justify-between border-b border-border px-5 py-4">
-      <div className="flex items-center gap-2.5">
-        <div className="text-brand-900">{icon}</div>
-
-        <h2 className="font-semibold text-foreground">
-          {title}
-        </h2>
-      </div>
-
-      <span className="rounded-full bg-surface-secondary px-2.5 py-1 text-xs font-medium text-foreground-muted">
-        {count}
-      </span>
-    </header>
-  );
-}
-
-function EmptySection({
-  icon,
-  title,
-  description,
-}: {
-  icon: React.ReactNode;
-  title: string;
-  description: string;
-}) {
-  return (
-    <div className="px-5 py-10 text-center">
-      <div className="mx-auto flex size-10 items-center justify-center rounded-full bg-surface-secondary text-foreground-muted">
-        {icon}
-      </div>
-
-      <p className="mt-3 text-sm font-medium text-foreground">
-        {title}
-      </p>
-
-      <p className="mx-auto mt-1 max-w-sm text-xs text-foreground-muted">
-        {description}
-      </p>
-    </div>
-  );
-}
-
-function formatDate(value: string) {
-  const date = new Date(value);
-
-  if (Number.isNaN(date.getTime())) {
-    return value;
-  }
-
-  return new Intl.DateTimeFormat("es-CO", {
-    dateStyle: "medium",
-    timeZone: "America/Bogota",
-  }).format(date);
 }

@@ -677,10 +677,145 @@ export interface paths {
         patch: operations["revisar_documento"];
         trace?: never;
     };
+    "/api/v2/clientes": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Clientes de la firma
+         * @description Cada cliente con sus procesos activos, lo que le falta entregar y si ya entró al portal.
+         */
+        get: operations["listar_clientes"];
+        put?: never;
+        /**
+         * Crear un cliente
+         * @description Crea la cuenta con una contraseña temporal generada y se la envía al cliente por el canal elegido.
+         */
+        post: operations["crear_cliente"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v2/clientes/{cliente_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Ficha del cliente */
+        get: operations["obtener_cliente"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /**
+         * Editar los datos del cliente
+         * @description Cambia solo los campos enviados. El correo no se cambia: es el usuario de acceso.
+         */
+        patch: operations["actualizar_cliente"];
+        trace?: never;
+    };
+    "/api/v2/clientes/{cliente_id}/acceso": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Reenviar el acceso al portal
+         * @description Genera otra contraseña temporal y se la envía. Solo mientras el cliente no haya entrado (409 si ya entró).
+         */
+        post: operations["reenviar_acceso"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v2/contratos": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Contratos de servicios
+         * @description Los contratos de los procesos que el usuario ve, con el escaneado firmado si ya lo hay.
+         */
+        get: operations["listar_contratos"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v2/contratos/sin-contrato": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Procesos sin contrato
+         * @description Procesos activos con cliente que no tienen un contrato vigente.
+         */
+        get: operations["procesos_sin_contrato"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v2/contratos/{contrato_id}/firmado": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Ver o descargar el contrato firmado */
+        get: operations["contrato_firmado"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        /** AccesoEnviado */
+        AccesoEnviado: {
+            /**
+             * Canal
+             * @enum {string}
+             */
+            canal: "EMAIL" | "WHATSAPP";
+            /**
+             * Destino
+             * @description Correo o WhatsApp al que se envió.
+             */
+            destino: string;
+        };
         /** Agenda */
         Agenda: {
             /**
@@ -810,6 +945,17 @@ export interface components {
             /** Leido */
             leido: boolean;
         };
+        /** AvisoAlCliente */
+        AvisoAlCliente: {
+            /** Asunto */
+            asunto: string;
+            proceso: components["schemas"]["ProcesoBreve"];
+            /**
+             * Enviado En
+             * Format: date-time
+             */
+            enviado_en: string;
+        };
         /** Avisos */
         Avisos: {
             /** Items */
@@ -908,6 +1054,117 @@ export interface components {
              */
             fecha_limite: string | null;
         };
+        /** ClienteFicha */
+        ClienteFicha: {
+            /** Id */
+            id: number;
+            /** Nombre */
+            nombre: string;
+            /** Email */
+            email: string;
+            /** Whatsapp */
+            whatsapp: string | null;
+            /** Documento */
+            documento: string | null;
+            /**
+             * Acceso
+             * @description sin_ingreso: aún no entra al portal con su contraseña temporal.
+             * @enum {string}
+             */
+            acceso: "activo" | "sin_ingreso" | "suspendido";
+            /** Ultimo Acceso */
+            ultimo_acceso: string | null;
+            /**
+             * Procesos
+             * @description Procesos activos del cliente que el usuario ve.
+             */
+            procesos: components["schemas"]["ProcesoBreve"][];
+            /**
+             * Documentos Pendientes
+             * @description Documentos pedidos que el cliente no ha entregado o debe corregir.
+             */
+            documentos_pendientes: number;
+            /** Solicitudes Vencidas */
+            solicitudes_vencidas: number;
+            /**
+             * Proceso Chat Id
+             * @description Proceso con el que se abre la conversación con el cliente.
+             */
+            proceso_chat_id: number | null;
+            /**
+             * Creado En
+             * Format: date-time
+             */
+            creado_en: string;
+            /** Genero */
+            genero: ("FEMENINO" | "MASCULINO") | null;
+            /** Domicilio */
+            domicilio: string | null;
+            /** Direccion */
+            direccion: string | null;
+            /**
+             * Canal
+             * @description Canal que eligió para los avisos.
+             */
+            canal: ("EMAIL" | "WHATSAPP") | null;
+            /** Expedientes */
+            expedientes: components["schemas"]["ProcesoDelCliente"][];
+            /** Pendientes */
+            pendientes: components["schemas"]["PendienteDelCliente"][];
+            /**
+             * Contratos
+             * @description Contratos de servicios. Vacío (null) si el usuario no gestiona contratos.
+             */
+            contratos: components["schemas"]["ContratoDelCliente"][] | null;
+            /**
+             * Avisos
+             * @description Los últimos avisos de actuaciones que la firma le envió.
+             */
+            avisos: components["schemas"]["AvisoAlCliente"][];
+        };
+        /** ClienteResumen */
+        ClienteResumen: {
+            /** Id */
+            id: number;
+            /** Nombre */
+            nombre: string;
+            /** Email */
+            email: string;
+            /** Whatsapp */
+            whatsapp: string | null;
+            /** Documento */
+            documento: string | null;
+            /**
+             * Acceso
+             * @description sin_ingreso: aún no entra al portal con su contraseña temporal.
+             * @enum {string}
+             */
+            acceso: "activo" | "sin_ingreso" | "suspendido";
+            /** Ultimo Acceso */
+            ultimo_acceso: string | null;
+            /**
+             * Procesos
+             * @description Procesos activos del cliente que el usuario ve.
+             */
+            procesos: components["schemas"]["ProcesoBreve"][];
+            /**
+             * Documentos Pendientes
+             * @description Documentos pedidos que el cliente no ha entregado o debe corregir.
+             */
+            documentos_pendientes: number;
+            /** Solicitudes Vencidas */
+            solicitudes_vencidas: number;
+            /**
+             * Proceso Chat Id
+             * @description Proceso con el que se abre la conversación con el cliente.
+             */
+            proceso_chat_id: number | null;
+            /**
+             * Creado En
+             * Format: date-time
+             */
+            creado_en: string;
+        };
         /** ClientesAvisados */
         ClientesAvisados: {
             /**
@@ -915,6 +1172,68 @@ export interface components {
              * @description Clientes a los que se envió el aviso (id y nombre).
              */
             clientes: components["schemas"]["ProcesoDelFolio"][];
+        };
+        /** Contrato */
+        Contrato: {
+            /** Id */
+            id: number;
+            /**
+             * Estado
+             * @enum {string}
+             */
+            estado: "BORRADOR" | "LISTO_PARA_FIRMA" | "EN_FIRMA" | "FIRMADO" | "TERMINADO" | "ANULADO";
+            /** Version */
+            version: number;
+            proceso: components["schemas"]["ProcesoBreve"];
+            /** Expediente Archivado */
+            expediente_archivado: boolean;
+            /** @description Si el cliente ya no existe, el nombre con el que se firmó. */
+            cliente: components["schemas"]["PersonaBreve"] | null;
+            /**
+             * Creado En
+             * Format: date-time
+             */
+            creado_en: string;
+            /**
+             * Emitido En
+             * @description Cuando quedó listo para firmar.
+             */
+            emitido_en: string | null;
+            /** Firmado En */
+            firmado_en: string | null;
+            /**
+             * Cerrado En
+             * @description Cuando se terminó o se anuló.
+             */
+            cerrado_en: string | null;
+            /** Motivo Cierre */
+            motivo_cierre: string | null;
+            documento_firmado: components["schemas"]["DocumentoFirmado"] | null;
+        };
+        /** ContratoDelCliente */
+        ContratoDelCliente: {
+            /** Id */
+            id: number;
+            /** Estado */
+            estado: string;
+            proceso: components["schemas"]["ProcesoBreve"];
+            /** Firmado En */
+            firmado_en: string | null;
+        };
+        /** DatosCliente */
+        DatosCliente: {
+            /** Nombre */
+            nombre?: string | null;
+            /** Whatsapp */
+            whatsapp?: string | null;
+            /** Documento */
+            documento?: string | null;
+            /** Genero */
+            genero?: ("FEMENINO" | "MASCULINO") | null;
+            /** Domicilio */
+            domicilio?: string | null;
+            /** Direccion */
+            direccion?: string | null;
         };
         /** DatosPlantilla */
         DatosPlantilla: {
@@ -926,6 +1245,18 @@ export interface components {
             palabras_clave?: string[];
             /** Pasos */
             pasos: components["schemas"]["PasoPlantilla"][];
+        };
+        /** DocumentoFirmado */
+        DocumentoFirmado: {
+            /** Id */
+            id: number;
+            /** Nombre Archivo */
+            nombre_archivo: string;
+            /**
+             * Subido En
+             * Format: date-time
+             */
+            subido_en: string;
         };
         /** ElementoAgenda */
         ElementoAgenda: {
@@ -1157,10 +1488,27 @@ export interface components {
             total: number;
             resumen: components["schemas"]["ResumenDocumentos"];
         };
+        /** ListaClientes */
+        ListaClientes: {
+            /** Items */
+            items: components["schemas"]["ClienteResumen"][];
+            resumen: components["schemas"]["ResumenClientes"];
+        };
+        /** ListaContratos */
+        ListaContratos: {
+            /** Items */
+            items: components["schemas"]["Contrato"][];
+            resumen: components["schemas"]["ResumenContratos"];
+        };
         /** ListaPlantillas */
         ListaPlantillas: {
             /** Items */
             items: components["schemas"]["Plantilla"][];
+        };
+        /** ListaSinContrato */
+        ListaSinContrato: {
+            /** Items */
+            items: components["schemas"]["ProcesoSinContrato"][];
         };
         /** ListaSolicitudes */
         ListaSolicitudes: {
@@ -1207,6 +1555,33 @@ export interface components {
             instrucciones?: string | null;
             /** Fecha Limite */
             fecha_limite?: string | null;
+        };
+        /** NuevoCliente */
+        NuevoCliente: {
+            /** Nombre */
+            nombre: string;
+            /** Whatsapp */
+            whatsapp?: string | null;
+            /** Documento */
+            documento?: string | null;
+            /** Genero */
+            genero?: ("FEMENINO" | "MASCULINO") | null;
+            /** Domicilio */
+            domicilio?: string | null;
+            /** Direccion */
+            direccion?: string | null;
+            /**
+             * Email
+             * Format: email
+             */
+            email: string;
+            /**
+             * Canal
+             * @description Por dónde le llegan las credenciales y los avisos.
+             * @default EMAIL
+             * @enum {string}
+             */
+            canal: "EMAIL" | "WHATSAPP";
         };
         /** PaginaFolios */
         PaginaFolios: {
@@ -1317,6 +1692,25 @@ export interface components {
              */
             enlace: string;
         };
+        /** PendienteDelCliente */
+        PendienteDelCliente: {
+            /** Solicitud Id */
+            solicitud_id: number;
+            /** Titulo */
+            titulo: string;
+            proceso: components["schemas"]["ProcesoBreve"];
+            /**
+             * Faltan
+             * @description Nombres de lo que no ha entregado o debe corregir.
+             */
+            faltan: string[];
+            /** Total */
+            total: number;
+            /** Fecha Limite */
+            fecha_limite: string | null;
+            /** Vencida */
+            vencida: boolean;
+        };
         /** PeriodoInhabil */
         PeriodoInhabil: {
             /**
@@ -1369,6 +1763,19 @@ export interface components {
             id: number;
             /** Nombre */
             nombre: string;
+        };
+        /** ProcesoDelCliente */
+        ProcesoDelCliente: {
+            /** Id */
+            id: number;
+            /** Nombre */
+            nombre: string;
+            /** Etapa */
+            etapa: ("demanda" | "admision" | "pruebas" | "audiencia" | "sentencia") | null;
+            /** Radicados */
+            radicados: string[];
+            /** Responsable */
+            responsable: string;
         };
         /** ProcesoDelFolio */
         ProcesoDelFolio: {
@@ -1455,6 +1862,27 @@ export interface components {
              */
             puede_administrar: boolean;
         };
+        /** ProcesoSinContrato */
+        ProcesoSinContrato: {
+            /** Id */
+            id: number;
+            /** Nombre */
+            nombre: string;
+            /** Clientes */
+            clientes: components["schemas"]["PersonaBreve"][];
+            /** Responsable */
+            responsable: string;
+            /**
+             * Creado En
+             * Format: date-time
+             */
+            creado_en: string;
+            /**
+             * Ultimo Contrato
+             * @description TERMINADO o ANULADO si tuvo uno; vacío si nunca.
+             */
+            ultimo_contrato: ("BORRADOR" | "LISTO_PARA_FIRMA" | "EN_FIRMA" | "FIRMADO" | "TERMINADO" | "ANULADO") | null;
+        };
         /** Resultado */
         Resultado: {
             /**
@@ -1504,6 +1932,37 @@ export interface components {
             vencen_esta_semana: number;
             /** Documentos Por Revisar */
             documentos_por_revisar: number;
+        };
+        /** ResumenClientes */
+        ResumenClientes: {
+            /** Total */
+            total: number;
+            /** Con Pendientes */
+            con_pendientes: number;
+            /** Sin Ingreso */
+            sin_ingreso: number;
+            /** Sin Procesos */
+            sin_procesos: number;
+        };
+        /** ResumenContratos */
+        ResumenContratos: {
+            /**
+             * En Preparacion
+             * @description Borradores.
+             */
+            en_preparacion: number;
+            /**
+             * Por Firmar
+             * @description Listos para firmar o con la firma agendada.
+             */
+            por_firmar: number;
+            /** Firmados */
+            firmados: number;
+            /**
+             * Sin Contrato
+             * @description Procesos activos con cliente y sin contrato vigente.
+             */
+            sin_contrato: number;
         };
         /** ResumenDocumentos */
         ResumenDocumentos: {
@@ -5331,6 +5790,695 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["Archivo"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+        };
+    };
+    listar_clientes: {
+        parameters: {
+            query?: {
+                /** @description todos, con_pendientes, sin_ingreso (no han entrado al portal) o sin_procesos. */
+                grupo?: "todos" | "con_pendientes" | "sin_ingreso" | "sin_procesos";
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ListaClientes"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+        };
+    };
+    crear_cliente: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["NuevoCliente"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ClienteFicha"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+        };
+    };
+    obtener_cliente: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                cliente_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ClienteFicha"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+        };
+    };
+    actualizar_cliente: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                cliente_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DatosCliente"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ClienteFicha"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+        };
+    };
+    reenviar_acceso: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                cliente_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AccesoEnviado"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+        };
+    };
+    listar_contratos: {
+        parameters: {
+            query?: {
+                /** @description en_curso (borrador, listo o en firma), firmados, cerrados o todos. */
+                grupo?: "en_curso" | "firmados" | "cerrados" | "todos";
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ListaContratos"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+        };
+    };
+    procesos_sin_contrato: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ListaSinContrato"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+        };
+    };
+    contrato_firmado: {
+        parameters: {
+            query?: {
+                /** @description false lo muestra en el navegador. */
+                descargar?: boolean;
+            };
+            header?: never;
+            path: {
+                contrato_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description El escaneado firmado. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/pdf": unknown;
                 };
             };
             /** @description Bad Request */

@@ -4529,10 +4529,875 @@
           }
         }
       }
+    },
+    "/api/v2/clientes": {
+      "get": {
+        "tags": [
+          "Clientes"
+        ],
+        "summary": "Clientes de la firma",
+        "description": "Cada cliente con sus procesos activos, lo que le falta entregar y si ya entró al portal.",
+        "operationId": "listar_clientes",
+        "parameters": [
+          {
+            "name": "grupo",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "enum": [
+                "todos",
+                "con_pendientes",
+                "sin_ingreso",
+                "sin_procesos"
+              ],
+              "type": "string",
+              "description": "todos, con_pendientes, sin_ingreso (no han entrado al portal) o sin_procesos.",
+              "default": "todos",
+              "title": "Grupo"
+            },
+            "description": "todos, con_pendientes, sin_ingreso (no han entrado al portal) o sin_procesos."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ListaClientes"
+                }
+              }
+            }
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Too Many Requests"
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Clientes"
+        ],
+        "summary": "Crear un cliente",
+        "description": "Crea la cuenta con una contraseña temporal generada y se la envía al cliente por el canal elegido.",
+        "operationId": "crear_cliente",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NuevoCliente"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ClienteFicha"
+                }
+              }
+            }
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Too Many Requests"
+          }
+        }
+      }
+    },
+    "/api/v2/clientes/{cliente_id}": {
+      "get": {
+        "tags": [
+          "Clientes"
+        ],
+        "summary": "Ficha del cliente",
+        "operationId": "obtener_cliente",
+        "parameters": [
+          {
+            "name": "cliente_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Cliente Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ClienteFicha"
+                }
+              }
+            }
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Too Many Requests"
+          }
+        }
+      },
+      "patch": {
+        "tags": [
+          "Clientes"
+        ],
+        "summary": "Editar los datos del cliente",
+        "description": "Cambia solo los campos enviados. El correo no se cambia: es el usuario de acceso.",
+        "operationId": "actualizar_cliente",
+        "parameters": [
+          {
+            "name": "cliente_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Cliente Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DatosCliente"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ClienteFicha"
+                }
+              }
+            }
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Too Many Requests"
+          }
+        }
+      }
+    },
+    "/api/v2/clientes/{cliente_id}/acceso": {
+      "post": {
+        "tags": [
+          "Clientes"
+        ],
+        "summary": "Reenviar el acceso al portal",
+        "description": "Genera otra contraseña temporal y se la envía. Solo mientras el cliente no haya entrado (409 si ya entró).",
+        "operationId": "reenviar_acceso",
+        "parameters": [
+          {
+            "name": "cliente_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Cliente Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AccesoEnviado"
+                }
+              }
+            }
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Too Many Requests"
+          }
+        }
+      }
+    },
+    "/api/v2/contratos": {
+      "get": {
+        "tags": [
+          "Contratos"
+        ],
+        "summary": "Contratos de servicios",
+        "description": "Los contratos de los procesos que el usuario ve, con el escaneado firmado si ya lo hay.",
+        "operationId": "listar_contratos",
+        "parameters": [
+          {
+            "name": "grupo",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "enum": [
+                "en_curso",
+                "firmados",
+                "cerrados",
+                "todos"
+              ],
+              "type": "string",
+              "description": "en_curso (borrador, listo o en firma), firmados, cerrados o todos.",
+              "default": "en_curso",
+              "title": "Grupo"
+            },
+            "description": "en_curso (borrador, listo o en firma), firmados, cerrados o todos."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ListaContratos"
+                }
+              }
+            }
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Too Many Requests"
+          }
+        }
+      }
+    },
+    "/api/v2/contratos/sin-contrato": {
+      "get": {
+        "tags": [
+          "Contratos"
+        ],
+        "summary": "Procesos sin contrato",
+        "description": "Procesos activos con cliente que no tienen un contrato vigente.",
+        "operationId": "procesos_sin_contrato",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ListaSinContrato"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too Many Requests",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v2/contratos/{contrato_id}/firmado": {
+      "get": {
+        "tags": [
+          "Contratos"
+        ],
+        "summary": "Ver o descargar el contrato firmado",
+        "operationId": "contrato_firmado",
+        "parameters": [
+          {
+            "name": "contrato_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Contrato Id"
+            }
+          },
+          {
+            "name": "descargar",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "description": "false lo muestra en el navegador.",
+              "default": true,
+              "title": "Descargar"
+            },
+            "description": "false lo muestra en el navegador."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "El escaneado firmado.",
+            "content": {
+              "application/pdf": {}
+            }
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Too Many Requests"
+          }
+        }
+      }
     }
   },
   "components": {
     "schemas": {
+      "AccesoEnviado": {
+        "properties": {
+          "canal": {
+            "type": "string",
+            "enum": [
+              "EMAIL",
+              "WHATSAPP"
+            ],
+            "title": "Canal"
+          },
+          "destino": {
+            "type": "string",
+            "title": "Destino",
+            "description": "Correo o WhatsApp al que se envió."
+          }
+        },
+        "type": "object",
+        "required": [
+          "canal",
+          "destino"
+        ],
+        "title": "AccesoEnviado"
+      },
       "Agenda": {
         "properties": {
           "desde": {
@@ -4829,6 +5694,29 @@
         ],
         "title": "Aviso"
       },
+      "AvisoAlCliente": {
+        "properties": {
+          "asunto": {
+            "type": "string",
+            "title": "Asunto"
+          },
+          "proceso": {
+            "$ref": "#/components/schemas/ProcesoBreve"
+          },
+          "enviado_en": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Enviado En"
+          }
+        },
+        "type": "object",
+        "required": [
+          "asunto",
+          "proceso",
+          "enviado_en"
+        ],
+        "title": "AvisoAlCliente"
+      },
       "Avisos": {
         "properties": {
           "items": {
@@ -5078,6 +5966,324 @@
         ],
         "title": "CambioFecha"
       },
+      "ClienteFicha": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "nombre": {
+            "type": "string",
+            "title": "Nombre"
+          },
+          "email": {
+            "type": "string",
+            "title": "Email"
+          },
+          "whatsapp": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Whatsapp"
+          },
+          "documento": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Documento"
+          },
+          "acceso": {
+            "type": "string",
+            "enum": [
+              "activo",
+              "sin_ingreso",
+              "suspendido"
+            ],
+            "title": "Acceso",
+            "description": "sin_ingreso: aún no entra al portal con su contraseña temporal."
+          },
+          "ultimo_acceso": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ultimo Acceso"
+          },
+          "procesos": {
+            "items": {
+              "$ref": "#/components/schemas/ProcesoBreve"
+            },
+            "type": "array",
+            "title": "Procesos",
+            "description": "Procesos activos del cliente que el usuario ve."
+          },
+          "documentos_pendientes": {
+            "type": "integer",
+            "title": "Documentos Pendientes",
+            "description": "Documentos pedidos que el cliente no ha entregado o debe corregir."
+          },
+          "solicitudes_vencidas": {
+            "type": "integer",
+            "title": "Solicitudes Vencidas"
+          },
+          "proceso_chat_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Proceso Chat Id",
+            "description": "Proceso con el que se abre la conversación con el cliente."
+          },
+          "creado_en": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Creado En"
+          },
+          "genero": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "FEMENINO",
+                  "MASCULINO"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Genero"
+          },
+          "domicilio": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Domicilio"
+          },
+          "direccion": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Direccion"
+          },
+          "canal": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "EMAIL",
+                  "WHATSAPP"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Canal",
+            "description": "Canal que eligió para los avisos."
+          },
+          "expedientes": {
+            "items": {
+              "$ref": "#/components/schemas/ProcesoDelCliente"
+            },
+            "type": "array",
+            "title": "Expedientes"
+          },
+          "pendientes": {
+            "items": {
+              "$ref": "#/components/schemas/PendienteDelCliente"
+            },
+            "type": "array",
+            "title": "Pendientes"
+          },
+          "contratos": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/ContratoDelCliente"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Contratos",
+            "description": "Contratos de servicios. Vacío (null) si el usuario no gestiona contratos."
+          },
+          "avisos": {
+            "items": {
+              "$ref": "#/components/schemas/AvisoAlCliente"
+            },
+            "type": "array",
+            "title": "Avisos",
+            "description": "Los últimos avisos de actuaciones que la firma le envió."
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "nombre",
+          "email",
+          "whatsapp",
+          "documento",
+          "acceso",
+          "ultimo_acceso",
+          "procesos",
+          "documentos_pendientes",
+          "solicitudes_vencidas",
+          "proceso_chat_id",
+          "creado_en",
+          "genero",
+          "domicilio",
+          "direccion",
+          "canal",
+          "expedientes",
+          "pendientes",
+          "contratos",
+          "avisos"
+        ],
+        "title": "ClienteFicha"
+      },
+      "ClienteResumen": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "nombre": {
+            "type": "string",
+            "title": "Nombre"
+          },
+          "email": {
+            "type": "string",
+            "title": "Email"
+          },
+          "whatsapp": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Whatsapp"
+          },
+          "documento": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Documento"
+          },
+          "acceso": {
+            "type": "string",
+            "enum": [
+              "activo",
+              "sin_ingreso",
+              "suspendido"
+            ],
+            "title": "Acceso",
+            "description": "sin_ingreso: aún no entra al portal con su contraseña temporal."
+          },
+          "ultimo_acceso": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ultimo Acceso"
+          },
+          "procesos": {
+            "items": {
+              "$ref": "#/components/schemas/ProcesoBreve"
+            },
+            "type": "array",
+            "title": "Procesos",
+            "description": "Procesos activos del cliente que el usuario ve."
+          },
+          "documentos_pendientes": {
+            "type": "integer",
+            "title": "Documentos Pendientes",
+            "description": "Documentos pedidos que el cliente no ha entregado o debe corregir."
+          },
+          "solicitudes_vencidas": {
+            "type": "integer",
+            "title": "Solicitudes Vencidas"
+          },
+          "proceso_chat_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Proceso Chat Id",
+            "description": "Proceso con el que se abre la conversación con el cliente."
+          },
+          "creado_en": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Creado En"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "nombre",
+          "email",
+          "whatsapp",
+          "documento",
+          "acceso",
+          "ultimo_acceso",
+          "procesos",
+          "documentos_pendientes",
+          "solicitudes_vencidas",
+          "proceso_chat_id",
+          "creado_en"
+        ],
+        "title": "ClienteResumen"
+      },
       "ClientesAvisados": {
         "properties": {
           "clientes": {
@@ -5094,6 +6300,245 @@
           "clientes"
         ],
         "title": "ClientesAvisados"
+      },
+      "Contrato": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "estado": {
+            "type": "string",
+            "enum": [
+              "BORRADOR",
+              "LISTO_PARA_FIRMA",
+              "EN_FIRMA",
+              "FIRMADO",
+              "TERMINADO",
+              "ANULADO"
+            ],
+            "title": "Estado"
+          },
+          "version": {
+            "type": "integer",
+            "title": "Version"
+          },
+          "proceso": {
+            "$ref": "#/components/schemas/ProcesoBreve"
+          },
+          "expediente_archivado": {
+            "type": "boolean",
+            "title": "Expediente Archivado"
+          },
+          "cliente": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PersonaBreve"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Si el cliente ya no existe, el nombre con el que se firmó."
+          },
+          "creado_en": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Creado En"
+          },
+          "emitido_en": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Emitido En",
+            "description": "Cuando quedó listo para firmar."
+          },
+          "firmado_en": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Firmado En"
+          },
+          "cerrado_en": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cerrado En",
+            "description": "Cuando se terminó o se anuló."
+          },
+          "motivo_cierre": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Motivo Cierre"
+          },
+          "documento_firmado": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/DocumentoFirmado"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "estado",
+          "version",
+          "proceso",
+          "expediente_archivado",
+          "cliente",
+          "creado_en",
+          "emitido_en",
+          "firmado_en",
+          "cerrado_en",
+          "motivo_cierre",
+          "documento_firmado"
+        ],
+        "title": "Contrato"
+      },
+      "ContratoDelCliente": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "estado": {
+            "type": "string",
+            "title": "Estado"
+          },
+          "proceso": {
+            "$ref": "#/components/schemas/ProcesoBreve"
+          },
+          "firmado_en": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Firmado En"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "estado",
+          "proceso",
+          "firmado_en"
+        ],
+        "title": "ContratoDelCliente"
+      },
+      "DatosCliente": {
+        "properties": {
+          "nombre": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 150,
+                "minLength": 3
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Nombre"
+          },
+          "whatsapp": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 20
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Whatsapp"
+          },
+          "documento": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 40
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Documento"
+          },
+          "genero": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "FEMENINO",
+                  "MASCULINO"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Genero"
+          },
+          "domicilio": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 120
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Domicilio"
+          },
+          "direccion": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 300
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Direccion"
+          }
+        },
+        "type": "object",
+        "title": "DatosCliente"
       },
       "DatosPlantilla": {
         "properties": {
@@ -5139,6 +6584,30 @@
           "pasos"
         ],
         "title": "DatosPlantilla"
+      },
+      "DocumentoFirmado": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "nombre_archivo": {
+            "type": "string",
+            "title": "Nombre Archivo"
+          },
+          "subido_en": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Subido En"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "nombre_archivo",
+          "subido_en"
+        ],
+        "title": "DocumentoFirmado"
       },
       "ElementoAgenda": {
         "properties": {
@@ -5609,6 +7078,46 @@
         ],
         "title": "ListaArchivos"
       },
+      "ListaClientes": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/ClienteResumen"
+            },
+            "type": "array",
+            "title": "Items"
+          },
+          "resumen": {
+            "$ref": "#/components/schemas/ResumenClientes"
+          }
+        },
+        "type": "object",
+        "required": [
+          "items",
+          "resumen"
+        ],
+        "title": "ListaClientes"
+      },
+      "ListaContratos": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/Contrato"
+            },
+            "type": "array",
+            "title": "Items"
+          },
+          "resumen": {
+            "$ref": "#/components/schemas/ResumenContratos"
+          }
+        },
+        "type": "object",
+        "required": [
+          "items",
+          "resumen"
+        ],
+        "title": "ListaContratos"
+      },
       "ListaPlantillas": {
         "properties": {
           "items": {
@@ -5624,6 +7133,22 @@
           "items"
         ],
         "title": "ListaPlantillas"
+      },
+      "ListaSinContrato": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/ProcesoSinContrato"
+            },
+            "type": "array",
+            "title": "Items"
+          }
+        },
+        "type": "object",
+        "required": [
+          "items"
+        ],
+        "title": "ListaSinContrato"
       },
       "ListaSolicitudes": {
         "properties": {
@@ -5762,6 +7287,100 @@
           "documentos"
         ],
         "title": "NuevaSolicitud"
+      },
+      "NuevoCliente": {
+        "properties": {
+          "nombre": {
+            "type": "string",
+            "maxLength": 150,
+            "minLength": 3,
+            "title": "Nombre"
+          },
+          "whatsapp": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 20
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Whatsapp"
+          },
+          "documento": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 40
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Documento"
+          },
+          "genero": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "FEMENINO",
+                  "MASCULINO"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Genero"
+          },
+          "domicilio": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 120
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Domicilio"
+          },
+          "direccion": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 300
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Direccion"
+          },
+          "email": {
+            "type": "string",
+            "format": "email",
+            "title": "Email"
+          },
+          "canal": {
+            "type": "string",
+            "enum": [
+              "EMAIL",
+              "WHATSAPP"
+            ],
+            "title": "Canal",
+            "description": "Por dónde le llegan las credenciales y los avisos.",
+            "default": "EMAIL"
+          }
+        },
+        "type": "object",
+        "required": [
+          "nombre",
+          "email"
+        ],
+        "title": "NuevoCliente"
       },
       "PaginaFolios": {
         "properties": {
@@ -6014,6 +7633,60 @@
         ],
         "title": "Pendiente"
       },
+      "PendienteDelCliente": {
+        "properties": {
+          "solicitud_id": {
+            "type": "integer",
+            "title": "Solicitud Id"
+          },
+          "titulo": {
+            "type": "string",
+            "title": "Titulo"
+          },
+          "proceso": {
+            "$ref": "#/components/schemas/ProcesoBreve"
+          },
+          "faltan": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Faltan",
+            "description": "Nombres de lo que no ha entregado o debe corregir."
+          },
+          "total": {
+            "type": "integer",
+            "title": "Total"
+          },
+          "fecha_limite": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fecha Limite"
+          },
+          "vencida": {
+            "type": "boolean",
+            "title": "Vencida"
+          }
+        },
+        "type": "object",
+        "required": [
+          "solicitud_id",
+          "titulo",
+          "proceso",
+          "faltan",
+          "total",
+          "fecha_limite",
+          "vencida"
+        ],
+        "title": "PendienteDelCliente"
+      },
       "PeriodoInhabil": {
         "properties": {
           "desde": {
@@ -6136,6 +7809,56 @@
           "nombre"
         ],
         "title": "ProcesoBreve"
+      },
+      "ProcesoDelCliente": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "nombre": {
+            "type": "string",
+            "title": "Nombre"
+          },
+          "etapa": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "demanda",
+                  "admision",
+                  "pruebas",
+                  "audiencia",
+                  "sentencia"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Etapa"
+          },
+          "radicados": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Radicados"
+          },
+          "responsable": {
+            "type": "string",
+            "title": "Responsable"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "nombre",
+          "etapa",
+          "radicados",
+          "responsable"
+        ],
+        "title": "ProcesoDelCliente"
       },
       "ProcesoDelFolio": {
         "properties": {
@@ -6365,6 +8088,64 @@
         ],
         "title": "ProcesoResumen"
       },
+      "ProcesoSinContrato": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "nombre": {
+            "type": "string",
+            "title": "Nombre"
+          },
+          "clientes": {
+            "items": {
+              "$ref": "#/components/schemas/PersonaBreve"
+            },
+            "type": "array",
+            "title": "Clientes"
+          },
+          "responsable": {
+            "type": "string",
+            "title": "Responsable"
+          },
+          "creado_en": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Creado En"
+          },
+          "ultimo_contrato": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "BORRADOR",
+                  "LISTO_PARA_FIRMA",
+                  "EN_FIRMA",
+                  "FIRMADO",
+                  "TERMINADO",
+                  "ANULADO"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ultimo Contrato",
+            "description": "TERMINADO o ANULADO si tuvo uno; vacío si nunca."
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "nombre",
+          "clientes",
+          "responsable",
+          "creado_en",
+          "ultimo_contrato"
+        ],
+        "title": "ProcesoSinContrato"
+      },
       "Resultado": {
         "properties": {
           "tipo": {
@@ -6487,6 +8268,65 @@
           "documentos_por_revisar"
         ],
         "title": "ResumenBandeja"
+      },
+      "ResumenClientes": {
+        "properties": {
+          "total": {
+            "type": "integer",
+            "title": "Total"
+          },
+          "con_pendientes": {
+            "type": "integer",
+            "title": "Con Pendientes"
+          },
+          "sin_ingreso": {
+            "type": "integer",
+            "title": "Sin Ingreso"
+          },
+          "sin_procesos": {
+            "type": "integer",
+            "title": "Sin Procesos"
+          }
+        },
+        "type": "object",
+        "required": [
+          "total",
+          "con_pendientes",
+          "sin_ingreso",
+          "sin_procesos"
+        ],
+        "title": "ResumenClientes"
+      },
+      "ResumenContratos": {
+        "properties": {
+          "en_preparacion": {
+            "type": "integer",
+            "title": "En Preparacion",
+            "description": "Borradores."
+          },
+          "por_firmar": {
+            "type": "integer",
+            "title": "Por Firmar",
+            "description": "Listos para firmar o con la firma agendada."
+          },
+          "firmados": {
+            "type": "integer",
+            "title": "Firmados"
+          },
+          "sin_contrato": {
+            "type": "integer",
+            "title": "Sin Contrato",
+            "description": "Procesos activos con cliente y sin contrato vigente."
+          }
+        },
+        "type": "object",
+        "required": [
+          "en_preparacion",
+          "por_firmar",
+          "firmados",
+          "sin_contrato"
+        ],
+        "title": "ResumenContratos"
       },
       "ResumenDocumentos": {
         "properties": {
