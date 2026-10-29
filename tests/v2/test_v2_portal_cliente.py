@@ -1,7 +1,6 @@
 from datetime import date, timedelta
 
 from app import models
-from app.modulos.etapas.linea import plantilla_predeterminada
 from app.timezone import utc_ahora
 
 H = {"X-AM-Solicitud": "1"}
@@ -106,10 +105,9 @@ def _escenario_portal(crear_usuario, crear_proceso, sesion_bd):
     ajeno = crear_proceso(abogada, "Proceso de otra persona", clientes=[hernan])
     ahora = utc_ahora()
 
-    generales = {e.nombre: e for e in plantilla_predeterminada(sesion_bd).etapas}
-    proceso.etapa = generales["Pruebas"]
-    for i, etapa in enumerate(("Demanda", "Admisión", "Pruebas")):
-        sesion_bd.add(models.EtapaProceso(proceso_id=proceso.id, etapa_id=generales[etapa].id, nota="Nota interna",
+    proceso.etapa = "pruebas"
+    for i, etapa in enumerate(("demanda", "admision", "pruebas")):
+        sesion_bd.add(models.EtapaProceso(proceso_id=proceso.id, etapa=etapa, nota="Nota interna",
                                           usuario_id=abogada.id, fecha=ahora - timedelta(days=30 - i * 10)))
     _actuacion(sesion_bd, proceso, "Auto admite demanda", dias_atras=3)
     sesion_bd.add(models.TerminoGlosario(patron="Auto admite demanda", explicacion="El juez aceptó la demanda.",
@@ -190,9 +188,9 @@ def test_inicio_y_proceso_del_cliente(iniciar, crear_usuario, crear_proceso, cli
     assert inicio["pendientes"][2]["detalle"] == "Parte de: Radicar el inventario"
 
     resumen = inicio["procesos"][0]
-    assert resumen["etapa"]["nombre"] == "Pruebas" and resumen["etapa_explicacion"].startswith("Cada parte presenta sus pruebas")
-    assert [(x["nombre"], x["fecha"] is not None) for x in resumen["etapas"]] == [
-        ("Demanda", True), ("Admisión", True), ("Pruebas", True), ("Audiencia", False), ("Sentencia", False)]
+    assert resumen["etapa"] == "pruebas" and resumen["etapa_explicacion"].startswith("Cada parte presenta sus pruebas")
+    assert [(x["clave"], x["fecha"] is not None) for x in resumen["etapas"]] == [
+        ("demanda", True), ("admision", True), ("pruebas", True), ("audiencia", False), ("sentencia", False)]
     # La reunión de Hernán y la audiencia cancelada no son suyas.
     assert resumen["proxima_fecha"]["titulo"] == "Audiencia de inventarios"
     assert resumen["proxima_fecha"]["tipo_legible"] == "Audiencia"

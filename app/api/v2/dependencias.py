@@ -18,8 +18,6 @@ from app.modulos.contratos.repositorio import RepositorioContratos
 from app.modulos.contratos.servicio import ServicioContratos
 from app.modulos.documentos.repositorio import RepositorioDocumentos
 from app.modulos.documentos.servicio import ServicioDocumentos
-from app.modulos.etapas.repositorio import RepositorioEtapas
-from app.modulos.etapas.servicio import ServicioEtapas
 from app.modulos.expedientes.repositorio import RepositorioProcesos
 from app.modulos.expedientes.servicio import ServicioProcesos
 from app.modulos.finanzas.repositorio import RepositorioFinanzas
@@ -103,10 +101,6 @@ def servicio_mensajes(db: Session = Depends(obtener_bd)) -> ServicioMensajes:
 
 def servicio_glosario(db: Session = Depends(obtener_bd)) -> ServicioGlosario:
     return ServicioGlosario(db, RepositorioGlosario(db))
-
-
-def servicio_etapas(db: Session = Depends(obtener_bd)) -> ServicioEtapas:
-    return ServicioEtapas(db, RepositorioEtapas(db))
 
 
 def servicio_portal_cliente(db: Session = Depends(obtener_bd)) -> ServicioPortalCliente:

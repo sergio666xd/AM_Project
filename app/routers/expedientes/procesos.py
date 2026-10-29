@@ -17,7 +17,6 @@ from app.firm_access import (
     require_process_manager,
 )
 from app.message_templates import radicado_legible
-from app.modulos.etapas.linea import cargas_etapa, linea
 from app.radicados import (
     ambito_radicado_usuario,
     iniciar_consulta_nuevo_radicado,
@@ -77,17 +76,7 @@ _CARGA_LISTADO_PROCESOS = (
     selectinload(models.Proceso.radicados)
     .selectinload(models.ProcesoRadicado.radicado)
     .selectinload(models.Radicado.actuaciones),
-    *cargas_etapa(),
 )
-
-
-def _etapa_v1(proceso: models.Proceso) -> dict:
-    """La etapa como la leen las pantallas que aún usan esta API: nombre, posición y total."""
-    if proceso.etapa is None:
-        return {"etapa": None, "etapa_posicion": None, "etapas_total": None}
-    etapas = linea(proceso.plantilla_etapas or proceso.etapa.plantilla, proceso.etapa)
-    posicion = next((i for i, e in enumerate(etapas, start=1) if e.id == proceso.etapa.id), None)
-    return {"etapa": proceso.etapa.nombre, "etapa_posicion": posicion, "etapas_total": len(etapas)}
 
 
 def _resumen_actividad_procesos(db: Session, proceso_ids: list[int]) -> dict[int, dict[str, list]]:
@@ -133,7 +122,7 @@ def listar_procesos(db: Session = Depends(get_db), usuario: models.Usuario = Dep
             "id": proceso.id,
             "nombre": proceso.nombre,
             "descripcion": proceso.descripcion,
-            **_etapa_v1(proceso),
+            "etapa": proceso.etapa,
             **_equipo_proceso(proceso),
             "soy_responsable": usuario.rol == models.RolUsuario.ADMIN or usuario.id == proceso.abogado_id,
             "radicados": [
@@ -250,7 +239,7 @@ def listar_procesos_archivados(
             "id": proceso.id,
             "nombre": proceso.nombre,
             "descripcion": proceso.descripcion,
-            **_etapa_v1(proceso),
+            "etapa": proceso.etapa,
             "archivado_en": proceso.archivado_en,
             "radicados": [
                 {

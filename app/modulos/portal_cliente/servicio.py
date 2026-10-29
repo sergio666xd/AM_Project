@@ -20,9 +20,7 @@ from app.audit import registrar_evento_auditoria
 from app.document_validation import ALLOWED_DOCUMENT_TYPES, MAX_DOCUMENT_BYTES, document_content_matches_type
 from app.modulos.documentos.servicio import DEVUELTOS, EstadoDeSolicitud, estado_de, fecha_limite_de, notificar
 from app.modulos.expedientes import politicas
-from app.modulos.etapas.esquemas import EtapaBreve
-from app.modulos.etapas.linea import linea, plantilla_de, plantilla_predeterminada
-from app.modulos.expedientes.esquemas import PersonaBreve
+from app.modulos.expedientes.esquemas import ETAPAS, NOMBRES_ETAPA, PersonaBreve
 from app.modulos.folios.servicio import ServicioFolios
 from app.modulos.glosario.repositorio import RepositorioGlosario
 from app.modulos.glosario.servicio import ServicioGlosario, texto_juzgado
@@ -65,6 +63,13 @@ HECHOS = 10
 ESTADO_PEDIDO = {"FALTANTE": "falta", "REQUIERE_CORRECCION": "por_corregir", "RECHAZADO": "no_aceptado",
                  "RECIBIDO": "en_revision", "EN_REVISION": "en_revision", "APROBADO": "aprobado"}
 
+EXPLICACION_ETAPA = {
+    "demanda": "Se prepara y se presenta la demanda o la solicitud ante el juzgado.",
+    "admision": "El juzgado revisa la demanda y decide si la acepta; después se le avisa a la otra parte.",
+    "pruebas": "Cada parte presenta sus pruebas, como documentos, testigos o peritajes, para demostrar lo que dice.",
+    "audiencia": "El juez reúne a las partes para escucharlas, revisar las pruebas y, si se puede, buscar un acuerdo.",
+    "sentencia": "El juez decide el caso. Si una parte no está de acuerdo, puede apelar en un plazo corto.",
+}
 TIPOS_EVENTO = {"AUDIENCIA": "Audiencia", "REUNION": "Reunión", "FIRMA_CONTRATO": "Firma del contrato", "EVENTO": "Cita"}
 ESTADOS_REVISION = {"RECIBIDO": "recibido", "EN_REVISION": "en revisión", "APROBADO": "aprobado",
                     "REQUIERE_CORRECCION": "por corregir", "RECHAZADO": "no aceptado"}
@@ -283,7 +288,6 @@ class ServicioPortalCliente:
         entradas = dict(
             (folio.proceso_id, entrada) for folio, entrada in self._entradas(list(ultimos.values()), usuario.id, vistas)
         )
-        predeterminada = plantilla_predeterminada(self._db)
         salida = []
         for proceso in procesos:
             evento = proximas.get(proceso.id)
@@ -292,9 +296,9 @@ class ServicioPortalCliente:
                 nombre=proceso.nombre,
                 descripcion=(proceso.descripcion or "").strip() or None,
                 abogado=_persona(proceso.abogado),
-                etapa=EtapaBreve(id=proceso.etapa.id, nombre=proceso.etapa.nombre) if proceso.etapa else None,
-                etapa_explicacion=(proceso.etapa.explicacion or None) if proceso.etapa else None,
-                etapas=self._linea_etapas(proceso, predeterminada, etapas.get(proceso.id, [])),
+                etapa=proceso.etapa,
+                etapa_explicacion=EXPLICACION_ETAPA.get(proceso.etapa) if proceso.etapa else None,
+                etapas=self._linea_etapas(proceso.etapa, etapas.get(proceso.id, [])),
                 proxima_fecha=FechaProxima(
                     id=evento.id, titulo=evento.titulo, tipo=evento.tipo, tipo_legible=TIPOS_EVENTO.get(evento.tipo, "Cita"),
                     inicio=evento.fecha_inicio, fin=evento.fecha_fin, descripcion=(evento.descripcion or "").strip() or None,
@@ -305,14 +309,12 @@ class ServicioPortalCliente:
         return salida
 
     @staticmethod
-    def _linea_etapas(proceso: models.Proceso, predeterminada: models.PlantillaEtapas,
-                      cambios: list[models.EtapaProceso]) -> list[EtapaCliente]:
-        etapas = linea(plantilla_de(proceso, predeterminada), proceso.etapa)
-        indice = next((i for i, e in enumerate(etapas) if proceso.etapa and e.id == proceso.etapa.id), -1)
-        fechas = {cambio.etapa_id: cambio.fecha for cambio in cambios}
+    def _linea_etapas(actual: str | None, cambios: list[models.EtapaProceso]) -> list[EtapaCliente]:
+        indice = ETAPAS.index(actual) if actual in ETAPAS else -1
+        fechas = {cambio.etapa: cambio.fecha for cambio in cambios}
         return [
-            EtapaCliente(id=etapa.id, nombre=etapa.nombre, fecha=fechas.get(etapa.id) if i <= indice else None)
-            for i, etapa in enumerate(etapas)
+            EtapaCliente(clave=etapa, nombre=NOMBRES_ETAPA[etapa], fecha=fechas.get(etapa) if i <= indice else None)
+            for i, etapa in enumerate(ETAPAS)
         ]
 
     # ---- Historia en lenguaje claro -------------------------------------
@@ -366,7 +368,7 @@ class ServicioPortalCliente:
                 return {"texto": explicacion, "texto_juzgado": juzgado, "actuacion_id": registro.id}
             return {"texto": juzgado, "explicada": False, "actuacion_id": registro.id}
         if tipo == "etapa":
-            return {"texto": f"Su proceso pasó a la etapa de {registro.etapa.nombre.lower()}."}
+            return {"texto": f"Su proceso pasó a la etapa de {NOMBRES_ETAPA.get(registro.etapa, registro.etapa).lower()}."}
         if tipo == "documento":
             if registro.contrato_id is not None:
                 return {"texto": "Se firmó el contrato de prestación de servicios. Puede descargar su copia.",

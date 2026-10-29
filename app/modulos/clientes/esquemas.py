@@ -4,6 +4,7 @@ from typing import Literal
 from pydantic import BaseModel, EmailStr, Field, field_validator
 
 from app.modulos.bandeja.esquemas import ProcesoBreve
+from app.modulos.expedientes.esquemas import Etapa
 from app.nucleo.zona_horaria import FechaHora
 
 Acceso = Literal["activo", "sin_ingreso", "suspendido"]
@@ -42,7 +43,7 @@ class ListaClientes(BaseModel):
 class ProcesoDelCliente(BaseModel):
     id: int
     nombre: str
-    etapa: str | None = Field(description="Nombre de la etapa actual.")
+    etapa: Etapa | None
     radicados: list[str]
     responsable: str
 

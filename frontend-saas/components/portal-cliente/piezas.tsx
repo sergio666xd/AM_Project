@@ -8,7 +8,7 @@ import { Etapas } from "@/components/ui/Etapas";
 import { Folio } from "@/components/ui/Folio";
 import { Tag } from "@/components/ui/Tag";
 import { cx } from "@/lib/cx";
-import { indiceEtapa } from "@/lib/etapas";
+import { ETAPAS, indiceEtapa, nombreEtapa } from "@/lib/etapas";
 import { diaLargo, fechaLarga, horaDe } from "@/lib/fechas";
 import {
   cuantasCosas,
@@ -91,17 +91,17 @@ export function PendientesCliente({ pendientes, conProceso = false, titulo }: {
 }
 
 /** La línea de etapas con lo que se hace ahora, en lenguaje claro. */
-export function EnQueVa({ proceso }: { proceso: Pick<ResumenProcesoCliente, "etapa" | "etapa_explicacion" | "etapas"> }) {
-  const indice = indiceEtapa(proceso.etapas, proceso.etapa);
-  if (!proceso.etapa || indice < 0) {
+export function EnQueVa({ proceso }: { proceso: Pick<ResumenProcesoCliente, "etapa" | "etapa_explicacion"> }) {
+  const indice = indiceEtapa(proceso.etapa);
+  if (indice < 0) {
     return <p className="text-[16px] text-ink-2">La firma todavía no ha marcado en qué etapa va su proceso.</p>;
   }
   const explicacion = proceso.etapa_explicacion ?? "";
   return (
     <>
-      <Etapas etapas={proceso.etapas.map((e) => e.nombre)} actual={indice} grande />
+      <Etapas etapas={ETAPAS.map((e) => e.nombre)} actual={indice} grande />
       <p className="mt-4 text-[16px] text-ink-2">
-        Estamos en <b className="font-semibold text-ink">{proceso.etapa.nombre.toLowerCase()}</b>
+        Estamos en <b className="font-semibold text-ink">{nombreEtapa(proceso.etapa).toLowerCase()}</b>
         {explicacion && `: ${explicacion.charAt(0).toLowerCase()}${explicacion.slice(1)}`}
       </p>
     </>

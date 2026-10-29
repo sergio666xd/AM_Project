@@ -11,7 +11,6 @@ from app.modulos.expedientes.modelos import (
     ProcesoRadicado,
     Radicado,
 )
-from app.modulos.etapas.linea import cargas_etapa
 from app.modulos.identidad.modelos import Usuario
 
 
@@ -26,7 +25,6 @@ def _cargas():
         selectinload(Proceso.abogado),
         selectinload(Proceso.clientes).selectinload(ProcesoCliente.cliente),
         selectinload(Proceso.radicados).selectinload(ProcesoRadicado.radicado),
-        *cargas_etapa(),
     )
 
 
@@ -96,6 +94,5 @@ class RepositorioProcesos:
             select(EtapaProceso, Usuario.nombre_completo)
             .outerjoin(Usuario, Usuario.id == EtapaProceso.usuario_id)
             .where(EtapaProceso.proceso_id == proceso_id)
-            .options(selectinload(EtapaProceso.etapa))
             .order_by(EtapaProceso.fecha, EtapaProceso.id)
         )]

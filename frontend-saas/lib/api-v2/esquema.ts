@@ -975,51 +975,6 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/v2/plantillas-etapas": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Plantillas de etapas
-         * @description La predeterminada primero. Las etapas vienen en orden, incluidas las desactivadas.
-         */
-        get: operations["listar_plantillas_etapas"];
-        put?: never;
-        /** Crear una plantilla de etapas */
-        post: operations["crear_plantilla_etapas"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v2/plantillas-etapas/{plantilla_id}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        /**
-         * Editar una plantilla de etapas
-         * @description Se envían todas las etapas en orden. Las que falten se borran si ningún proceso las usó; si no, se desactivan.
-         */
-        put: operations["editar_plantilla_etapas"];
-        post?: never;
-        /**
-         * Borrar una plantilla de etapas
-         * @description Solo si ningún proceso la usa ni la usó y no es la predeterminada.
-         */
-        delete: operations["eliminar_plantilla_etapas"];
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
     "/api/v2/cliente/inicio": {
         parameters: {
             query?: never;
@@ -2738,10 +2693,10 @@ export interface components {
         /** CambiarEtapa */
         CambiarEtapa: {
             /**
-             * Etapa Id
-             * @description Una etapa activa de cualquier plantilla activa; el proceso pasa a seguir esa plantilla.
+             * Etapa
+             * @enum {string}
              */
-            etapa_id: number;
+            etapa: "demanda" | "admision" | "pruebas" | "audiencia" | "sentencia";
             /** Nota */
             nota?: string | null;
         };
@@ -2846,7 +2801,11 @@ export interface components {
         };
         /** CambioEtapa */
         CambioEtapa: {
-            etapa: components["schemas"]["EtapaBreve"];
+            /**
+             * Etapa
+             * @enum {string}
+             */
+            etapa: "demanda" | "admision" | "pruebas" | "audiencia" | "sentencia";
             /**
              * Fecha
              * Format: date-time
@@ -3468,23 +3427,6 @@ export interface components {
             /** Direccion */
             direccion?: string | null;
         };
-        /** DatosEtapa */
-        DatosEtapa: {
-            /**
-             * Id
-             * @description Vacío para una etapa nueva.
-             */
-            id?: number | null;
-            /** Nombre */
-            nombre: string;
-            /** Explicacion */
-            explicacion?: string | null;
-            /**
-             * Activa
-             * @default true
-             */
-            activa: boolean;
-        };
         /** DatosFirma */
         DatosFirma: {
             /** Nombre */
@@ -3554,28 +3496,6 @@ export interface components {
             palabras_clave?: string[];
             /** Pasos */
             pasos: components["schemas"]["PasoPlantilla"][];
-        };
-        /** DatosPlantillaEtapas */
-        DatosPlantillaEtapas: {
-            /** Nombre */
-            nombre: string;
-            /** Descripcion */
-            descripcion?: string | null;
-            /**
-             * Activa
-             * @default true
-             */
-            activa: boolean;
-            /**
-             * Predeterminada
-             * @default false
-             */
-            predeterminada: boolean;
-            /**
-             * Etapas
-             * @description Todas las etapas, en orden. Las que falten se borran si ningún proceso las usó; si no, se desactivan.
-             */
-            etapas: components["schemas"]["DatosEtapa"][];
         };
         /** DatosTermino */
         DatosTermino: {
@@ -4261,34 +4181,13 @@ export interface components {
             /** Enlace */
             enlace: string;
         };
-        /** EtapaActual */
-        EtapaActual: {
-            /** Id */
-            id: number;
-            /** Nombre */
-            nombre: string;
-            /**
-             * Posicion
-             * @description Lugar de la etapa en la línea del proceso, desde 1.
-             */
-            posicion: number;
-            /**
-             * Total
-             * @description Cuántas etapas tiene la línea del proceso.
-             */
-            total: number;
-        };
-        /** EtapaBreve */
-        EtapaBreve: {
-            /** Id */
-            id: number;
-            /** Nombre */
-            nombre: string;
-        };
         /** EtapaCliente */
         EtapaCliente: {
-            /** Id */
-            id: number;
+            /**
+             * Clave
+             * @enum {string}
+             */
+            clave: "demanda" | "admision" | "pruebas" | "audiencia" | "sentencia";
             /** Nombre */
             nombre: string;
             /**
@@ -4296,25 +4195,6 @@ export interface components {
              * @description Cuándo llegó el proceso a esta etapa, si ya pasó por ella.
              */
             fecha: string | null;
-        };
-        /** EtapaDePlantilla */
-        EtapaDePlantilla: {
-            /** Id */
-            id: number;
-            /** Nombre */
-            nombre: string;
-            /**
-             * Explicacion
-             * @description Qué pasa en la etapa, en palabras sencillas. Lo lee el cliente.
-             */
-            explicacion: string | null;
-            /** Activa */
-            activa: boolean;
-            /**
-             * Procesos
-             * @description Procesos que están hoy en esta etapa.
-             */
-            procesos: number;
         };
         /** EventoActividad */
         EventoActividad: {
@@ -4751,11 +4631,6 @@ export interface components {
         ListaPlantillas: {
             /** Items */
             items: components["schemas"]["Plantilla"][];
-        };
-        /** ListaPlantillasEtapas */
-        ListaPlantillasEtapas: {
-            /** Items */
-            items: components["schemas"]["PlantillaDeEtapas"][];
         };
         /** ListaSinContrato */
         ListaSinContrato: {
@@ -5578,44 +5453,6 @@ export interface components {
             /** Actualizada En */
             actualizada_en: string | null;
         };
-        /** PlantillaBreve */
-        PlantillaBreve: {
-            /** Id */
-            id: number;
-            /** Nombre */
-            nombre: string;
-        };
-        /** PlantillaDeEtapas */
-        PlantillaDeEtapas: {
-            /** Id */
-            id: number;
-            /** Nombre */
-            nombre: string;
-            /** Descripcion */
-            descripcion: string | null;
-            /** Activa */
-            activa: boolean;
-            /**
-             * Predeterminada
-             * @description La que toman los procesos que no eligen otra.
-             */
-            predeterminada: boolean;
-            /**
-             * Etapas
-             * @description En orden, incluidas las desactivadas.
-             */
-            etapas: components["schemas"]["EtapaDePlantilla"][];
-            /**
-             * Procesos
-             * @description Procesos que usan la plantilla.
-             */
-            procesos: number;
-            /**
-             * Actualizada En
-             * Format: date-time
-             */
-            actualizada_en: string;
-        };
         /** ProcesoBreve */
         ProcesoBreve: {
             /** Id */
@@ -5632,7 +5469,8 @@ export interface components {
             /** Descripcion */
             descripcion: string | null;
             abogado: components["schemas"]["PersonaBreve"];
-            etapa: components["schemas"]["EtapaBreve"] | null;
+            /** Etapa */
+            etapa: ("demanda" | "admision" | "pruebas" | "audiencia" | "sentencia") | null;
             /**
              * Etapa Explicacion
              * @description Qué se hace en la etapa actual, en lenguaje claro.
@@ -5640,7 +5478,7 @@ export interface components {
             etapa_explicacion: string | null;
             /**
              * Etapas
-             * @description Las etapas de su proceso en orden, con la fecha de las ya recorridas.
+             * @description Las cinco etapas en orden, con la fecha de las ya recorridas.
              */
             etapas: components["schemas"]["EtapaCliente"][];
             proxima_fecha: components["schemas"]["FechaProxima"] | null;
@@ -5667,11 +5505,8 @@ export interface components {
             id: number;
             /** Nombre */
             nombre: string;
-            /**
-             * Etapa
-             * @description Nombre de la etapa actual.
-             */
-            etapa: string | null;
+            /** Etapa */
+            etapa: ("demanda" | "admision" | "pruebas" | "audiencia" | "sentencia") | null;
             /** Radicados */
             radicados: string[];
             /** Responsable */
@@ -5716,8 +5551,11 @@ export interface components {
              * @description Números de radicado de 23 dígitos vinculados al proceso.
              */
             radicados: string[];
-            /** @description Etapa actual; vacía mientras la firma no la fije. */
-            etapa: components["schemas"]["EtapaActual"] | null;
+            /**
+             * Etapa
+             * @description Etapa actual; vacía mientras la firma no la fije.
+             */
+            etapa: ("demanda" | "admision" | "pruebas" | "audiencia" | "sentencia") | null;
             /** Archivado En */
             archivado_en: string | null;
             /**
@@ -5735,13 +5573,6 @@ export interface components {
              * @description Abogados que colaboran. Al cliente solo le llegan los marcados como visibles.
              */
             colaboradores: components["schemas"]["PersonaBreve"][];
-            /** @description Plantilla de etapas que sigue el proceso. */
-            plantilla: components["schemas"]["PlantillaBreve"];
-            /**
-             * Linea Etapas
-             * @description Las etapas de esa plantilla, en orden.
-             */
-            linea_etapas: components["schemas"]["EtapaBreve"][];
             /**
              * Etapas
              * @description Historial de cambios de etapa, del más antiguo al más reciente.
@@ -5764,8 +5595,11 @@ export interface components {
              * @description Números de radicado de 23 dígitos vinculados al proceso.
              */
             radicados: string[];
-            /** @description Etapa actual; vacía mientras la firma no la fije. */
-            etapa: components["schemas"]["EtapaActual"] | null;
+            /**
+             * Etapa
+             * @description Etapa actual; vacía mientras la firma no la fije.
+             */
+            etapa: ("demanda" | "admision" | "pruebas" | "audiencia" | "sentencia") | null;
             /** Archivado En */
             archivado_en: string | null;
             /**
@@ -6089,7 +5923,8 @@ export interface components {
             /** Descripcion */
             descripcion: string | null;
             abogado: components["schemas"]["PersonaBreve"];
-            etapa: components["schemas"]["EtapaBreve"] | null;
+            /** Etapa */
+            etapa: ("demanda" | "admision" | "pruebas" | "audiencia" | "sentencia") | null;
             /**
              * Etapa Explicacion
              * @description Qué se hace en la etapa actual, en lenguaje claro.
@@ -6097,7 +5932,7 @@ export interface components {
             etapa_explicacion: string | null;
             /**
              * Etapas
-             * @description Las etapas de su proceso en orden, con la fecha de las ya recorridas.
+             * @description Las cinco etapas en orden, con la fecha de las ya recorridas.
              */
             etapas: components["schemas"]["EtapaCliente"][];
             proxima_fecha: components["schemas"]["FechaProxima"] | null;
@@ -11785,351 +11620,6 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["Explicacion"];
                 };
-            };
-            /** @description Bad Request */
-            400: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorRespuesta"];
-                };
-            };
-            /** @description Unauthorized */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorRespuesta"];
-                };
-            };
-            /** @description Forbidden */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorRespuesta"];
-                };
-            };
-            /** @description Not Found */
-            404: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorRespuesta"];
-                };
-            };
-            /** @description Conflict */
-            409: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorRespuesta"];
-                };
-            };
-            /** @description Unprocessable Entity */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorRespuesta"];
-                };
-            };
-            /** @description Too Many Requests */
-            429: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorRespuesta"];
-                };
-            };
-        };
-    };
-    listar_plantillas_etapas: {
-        parameters: {
-            query?: {
-                /** @description Incluye las desactivadas. Solo para quien puede editarlas. */
-                todas?: boolean;
-            };
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ListaPlantillasEtapas"];
-                };
-            };
-            /** @description Bad Request */
-            400: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorRespuesta"];
-                };
-            };
-            /** @description Unauthorized */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorRespuesta"];
-                };
-            };
-            /** @description Forbidden */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorRespuesta"];
-                };
-            };
-            /** @description Not Found */
-            404: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorRespuesta"];
-                };
-            };
-            /** @description Conflict */
-            409: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorRespuesta"];
-                };
-            };
-            /** @description Unprocessable Entity */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorRespuesta"];
-                };
-            };
-            /** @description Too Many Requests */
-            429: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorRespuesta"];
-                };
-            };
-        };
-    };
-    crear_plantilla_etapas: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["DatosPlantillaEtapas"];
-            };
-        };
-        responses: {
-            /** @description Successful Response */
-            201: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["PlantillaDeEtapas"];
-                };
-            };
-            /** @description Bad Request */
-            400: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorRespuesta"];
-                };
-            };
-            /** @description Unauthorized */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorRespuesta"];
-                };
-            };
-            /** @description Forbidden */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorRespuesta"];
-                };
-            };
-            /** @description Not Found */
-            404: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorRespuesta"];
-                };
-            };
-            /** @description Conflict */
-            409: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorRespuesta"];
-                };
-            };
-            /** @description Unprocessable Entity */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorRespuesta"];
-                };
-            };
-            /** @description Too Many Requests */
-            429: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorRespuesta"];
-                };
-            };
-        };
-    };
-    editar_plantilla_etapas: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                plantilla_id: number;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["DatosPlantillaEtapas"];
-            };
-        };
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["PlantillaDeEtapas"];
-                };
-            };
-            /** @description Bad Request */
-            400: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorRespuesta"];
-                };
-            };
-            /** @description Unauthorized */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorRespuesta"];
-                };
-            };
-            /** @description Forbidden */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorRespuesta"];
-                };
-            };
-            /** @description Not Found */
-            404: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorRespuesta"];
-                };
-            };
-            /** @description Conflict */
-            409: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorRespuesta"];
-                };
-            };
-            /** @description Unprocessable Entity */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorRespuesta"];
-                };
-            };
-            /** @description Too Many Requests */
-            429: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorRespuesta"];
-                };
-            };
-        };
-    };
-    eliminar_plantilla_etapas: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                plantilla_id: number;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            204: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
             };
             /** @description Bad Request */
             400: {

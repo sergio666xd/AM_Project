@@ -6548,418 +6548,6 @@
         }
       }
     },
-    "/api/v2/plantillas-etapas": {
-      "get": {
-        "tags": [
-          "Etapas de los procesos"
-        ],
-        "summary": "Plantillas de etapas",
-        "description": "La predeterminada primero. Las etapas vienen en orden, incluidas las desactivadas.",
-        "operationId": "listar_plantillas_etapas",
-        "parameters": [
-          {
-            "name": "todas",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "type": "boolean",
-              "description": "Incluye las desactivadas. Solo para quien puede editarlas.",
-              "default": false,
-              "title": "Todas"
-            },
-            "description": "Incluye las desactivadas. Solo para quien puede editarlas."
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ListaPlantillasEtapas"
-                }
-              }
-            }
-          },
-          "400": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorRespuesta"
-                }
-              }
-            },
-            "description": "Bad Request"
-          },
-          "401": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorRespuesta"
-                }
-              }
-            },
-            "description": "Unauthorized"
-          },
-          "403": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorRespuesta"
-                }
-              }
-            },
-            "description": "Forbidden"
-          },
-          "404": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorRespuesta"
-                }
-              }
-            },
-            "description": "Not Found"
-          },
-          "409": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorRespuesta"
-                }
-              }
-            },
-            "description": "Conflict"
-          },
-          "422": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorRespuesta"
-                }
-              }
-            },
-            "description": "Unprocessable Entity"
-          },
-          "429": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorRespuesta"
-                }
-              }
-            },
-            "description": "Too Many Requests"
-          }
-        }
-      },
-      "post": {
-        "tags": [
-          "Etapas de los procesos"
-        ],
-        "summary": "Crear una plantilla de etapas",
-        "operationId": "crear_plantilla_etapas",
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/DatosPlantillaEtapas"
-              }
-            }
-          }
-        },
-        "responses": {
-          "201": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/PlantillaDeEtapas"
-                }
-              }
-            }
-          },
-          "400": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorRespuesta"
-                }
-              }
-            },
-            "description": "Bad Request"
-          },
-          "401": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorRespuesta"
-                }
-              }
-            },
-            "description": "Unauthorized"
-          },
-          "403": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorRespuesta"
-                }
-              }
-            },
-            "description": "Forbidden"
-          },
-          "404": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorRespuesta"
-                }
-              }
-            },
-            "description": "Not Found"
-          },
-          "409": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorRespuesta"
-                }
-              }
-            },
-            "description": "Conflict"
-          },
-          "422": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorRespuesta"
-                }
-              }
-            },
-            "description": "Unprocessable Entity"
-          },
-          "429": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorRespuesta"
-                }
-              }
-            },
-            "description": "Too Many Requests"
-          }
-        }
-      }
-    },
-    "/api/v2/plantillas-etapas/{plantilla_id}": {
-      "put": {
-        "tags": [
-          "Etapas de los procesos"
-        ],
-        "summary": "Editar una plantilla de etapas",
-        "description": "Se envían todas las etapas en orden. Las que falten se borran si ningún proceso las usó; si no, se desactivan.",
-        "operationId": "editar_plantilla_etapas",
-        "parameters": [
-          {
-            "name": "plantilla_id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "integer",
-              "title": "Plantilla Id"
-            }
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/DatosPlantillaEtapas"
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/PlantillaDeEtapas"
-                }
-              }
-            }
-          },
-          "400": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorRespuesta"
-                }
-              }
-            },
-            "description": "Bad Request"
-          },
-          "401": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorRespuesta"
-                }
-              }
-            },
-            "description": "Unauthorized"
-          },
-          "403": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorRespuesta"
-                }
-              }
-            },
-            "description": "Forbidden"
-          },
-          "404": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorRespuesta"
-                }
-              }
-            },
-            "description": "Not Found"
-          },
-          "409": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorRespuesta"
-                }
-              }
-            },
-            "description": "Conflict"
-          },
-          "422": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorRespuesta"
-                }
-              }
-            },
-            "description": "Unprocessable Entity"
-          },
-          "429": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorRespuesta"
-                }
-              }
-            },
-            "description": "Too Many Requests"
-          }
-        }
-      },
-      "delete": {
-        "tags": [
-          "Etapas de los procesos"
-        ],
-        "summary": "Borrar una plantilla de etapas",
-        "description": "Solo si ningún proceso la usa ni la usó y no es la predeterminada.",
-        "operationId": "eliminar_plantilla_etapas",
-        "parameters": [
-          {
-            "name": "plantilla_id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "integer",
-              "title": "Plantilla Id"
-            }
-          }
-        ],
-        "responses": {
-          "204": {
-            "description": "Successful Response"
-          },
-          "400": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorRespuesta"
-                }
-              }
-            },
-            "description": "Bad Request"
-          },
-          "401": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorRespuesta"
-                }
-              }
-            },
-            "description": "Unauthorized"
-          },
-          "403": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorRespuesta"
-                }
-              }
-            },
-            "description": "Forbidden"
-          },
-          "404": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorRespuesta"
-                }
-              }
-            },
-            "description": "Not Found"
-          },
-          "409": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorRespuesta"
-                }
-              }
-            },
-            "description": "Conflict"
-          },
-          "422": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorRespuesta"
-                }
-              }
-            },
-            "description": "Unprocessable Entity"
-          },
-          "429": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorRespuesta"
-                }
-              }
-            },
-            "description": "Too Many Requests"
-          }
-        }
-      }
-    },
     "/api/v2/cliente/inicio": {
       "get": {
         "tags": [
@@ -17044,10 +16632,16 @@
       },
       "CambiarEtapa": {
         "properties": {
-          "etapa_id": {
-            "type": "integer",
-            "title": "Etapa Id",
-            "description": "Una etapa activa de cualquier plantilla activa; el proceso pasa a seguir esa plantilla."
+          "etapa": {
+            "type": "string",
+            "enum": [
+              "demanda",
+              "admision",
+              "pruebas",
+              "audiencia",
+              "sentencia"
+            ],
+            "title": "Etapa"
           },
           "nota": {
             "anyOf": [
@@ -17064,7 +16658,7 @@
         },
         "type": "object",
         "required": [
-          "etapa_id"
+          "etapa"
         ],
         "title": "CambiarEtapa"
       },
@@ -17340,7 +16934,15 @@
       "CambioEtapa": {
         "properties": {
           "etapa": {
-            "$ref": "#/components/schemas/EtapaBreve"
+            "type": "string",
+            "enum": [
+              "demanda",
+              "admision",
+              "pruebas",
+              "audiencia",
+              "sentencia"
+            ],
+            "title": "Etapa"
           },
           "fecha": {
             "type": "string",
@@ -19107,50 +18709,6 @@
         "type": "object",
         "title": "DatosCliente"
       },
-      "DatosEtapa": {
-        "properties": {
-          "id": {
-            "anyOf": [
-              {
-                "type": "integer"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Id",
-            "description": "Vacío para una etapa nueva."
-          },
-          "nombre": {
-            "type": "string",
-            "maxLength": 80,
-            "minLength": 2,
-            "title": "Nombre"
-          },
-          "explicacion": {
-            "anyOf": [
-              {
-                "type": "string",
-                "maxLength": 600
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Explicacion"
-          },
-          "activa": {
-            "type": "boolean",
-            "title": "Activa",
-            "default": true
-          }
-        },
-        "type": "object",
-        "required": [
-          "nombre"
-        ],
-        "title": "DatosEtapa"
-      },
       "DatosFirma": {
         "properties": {
           "nombre": {
@@ -19313,54 +18871,6 @@
           "pasos"
         ],
         "title": "DatosPlantilla"
-      },
-      "DatosPlantillaEtapas": {
-        "properties": {
-          "nombre": {
-            "type": "string",
-            "maxLength": 120,
-            "minLength": 2,
-            "title": "Nombre"
-          },
-          "descripcion": {
-            "anyOf": [
-              {
-                "type": "string",
-                "maxLength": 300
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Descripcion"
-          },
-          "activa": {
-            "type": "boolean",
-            "title": "Activa",
-            "default": true
-          },
-          "predeterminada": {
-            "type": "boolean",
-            "title": "Predeterminada",
-            "default": false
-          },
-          "etapas": {
-            "items": {
-              "$ref": "#/components/schemas/DatosEtapa"
-            },
-            "type": "array",
-            "maxItems": 20,
-            "minItems": 1,
-            "title": "Etapas",
-            "description": "Todas las etapas, en orden. Las que falten se borran si ningún proceso las usó; si no, se desactivan."
-          }
-        },
-        "type": "object",
-        "required": [
-          "nombre",
-          "etapas"
-        ],
-        "title": "DatosPlantillaEtapas"
       },
       "DatosTermino": {
         "properties": {
@@ -20959,59 +20469,18 @@
         ],
         "title": "EstadoIntegracion"
       },
-      "EtapaActual": {
-        "properties": {
-          "id": {
-            "type": "integer",
-            "title": "Id"
-          },
-          "nombre": {
-            "type": "string",
-            "title": "Nombre"
-          },
-          "posicion": {
-            "type": "integer",
-            "title": "Posicion",
-            "description": "Lugar de la etapa en la línea del proceso, desde 1."
-          },
-          "total": {
-            "type": "integer",
-            "title": "Total",
-            "description": "Cuántas etapas tiene la línea del proceso."
-          }
-        },
-        "type": "object",
-        "required": [
-          "id",
-          "nombre",
-          "posicion",
-          "total"
-        ],
-        "title": "EtapaActual"
-      },
-      "EtapaBreve": {
-        "properties": {
-          "id": {
-            "type": "integer",
-            "title": "Id"
-          },
-          "nombre": {
-            "type": "string",
-            "title": "Nombre"
-          }
-        },
-        "type": "object",
-        "required": [
-          "id",
-          "nombre"
-        ],
-        "title": "EtapaBreve"
-      },
       "EtapaCliente": {
         "properties": {
-          "id": {
-            "type": "integer",
-            "title": "Id"
+          "clave": {
+            "type": "string",
+            "enum": [
+              "demanda",
+              "admision",
+              "pruebas",
+              "audiencia",
+              "sentencia"
+            ],
+            "title": "Clave"
           },
           "nombre": {
             "type": "string",
@@ -21033,53 +20502,11 @@
         },
         "type": "object",
         "required": [
-          "id",
+          "clave",
           "nombre",
           "fecha"
         ],
         "title": "EtapaCliente"
-      },
-      "EtapaDePlantilla": {
-        "properties": {
-          "id": {
-            "type": "integer",
-            "title": "Id"
-          },
-          "nombre": {
-            "type": "string",
-            "title": "Nombre"
-          },
-          "explicacion": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Explicacion",
-            "description": "Qué pasa en la etapa, en palabras sencillas. Lo lee el cliente."
-          },
-          "activa": {
-            "type": "boolean",
-            "title": "Activa"
-          },
-          "procesos": {
-            "type": "integer",
-            "title": "Procesos",
-            "description": "Procesos que están hoy en esta etapa."
-          }
-        },
-        "type": "object",
-        "required": [
-          "id",
-          "nombre",
-          "explicacion",
-          "activa",
-          "procesos"
-        ],
-        "title": "EtapaDePlantilla"
       },
       "EventoActividad": {
         "properties": {
@@ -22135,22 +21562,6 @@
           "items"
         ],
         "title": "ListaPlantillas"
-      },
-      "ListaPlantillasEtapas": {
-        "properties": {
-          "items": {
-            "items": {
-              "$ref": "#/components/schemas/PlantillaDeEtapas"
-            },
-            "type": "array",
-            "title": "Items"
-          }
-        },
-        "type": "object",
-        "required": [
-          "items"
-        ],
-        "title": "ListaPlantillasEtapas"
       },
       "ListaSinContrato": {
         "properties": {
@@ -24371,86 +23782,6 @@
         ],
         "title": "PlantillaAvisoFila"
       },
-      "PlantillaBreve": {
-        "properties": {
-          "id": {
-            "type": "integer",
-            "title": "Id"
-          },
-          "nombre": {
-            "type": "string",
-            "title": "Nombre"
-          }
-        },
-        "type": "object",
-        "required": [
-          "id",
-          "nombre"
-        ],
-        "title": "PlantillaBreve"
-      },
-      "PlantillaDeEtapas": {
-        "properties": {
-          "id": {
-            "type": "integer",
-            "title": "Id"
-          },
-          "nombre": {
-            "type": "string",
-            "title": "Nombre"
-          },
-          "descripcion": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Descripcion"
-          },
-          "activa": {
-            "type": "boolean",
-            "title": "Activa"
-          },
-          "predeterminada": {
-            "type": "boolean",
-            "title": "Predeterminada",
-            "description": "La que toman los procesos que no eligen otra."
-          },
-          "etapas": {
-            "items": {
-              "$ref": "#/components/schemas/EtapaDePlantilla"
-            },
-            "type": "array",
-            "title": "Etapas",
-            "description": "En orden, incluidas las desactivadas."
-          },
-          "procesos": {
-            "type": "integer",
-            "title": "Procesos",
-            "description": "Procesos que usan la plantilla."
-          },
-          "actualizada_en": {
-            "type": "string",
-            "format": "date-time",
-            "title": "Actualizada En"
-          }
-        },
-        "type": "object",
-        "required": [
-          "id",
-          "nombre",
-          "descripcion",
-          "activa",
-          "predeterminada",
-          "etapas",
-          "procesos",
-          "actualizada_en"
-        ],
-        "title": "PlantillaDeEtapas"
-      },
       "ProcesoBreve": {
         "properties": {
           "id": {
@@ -24496,12 +23827,20 @@
           "etapa": {
             "anyOf": [
               {
-                "$ref": "#/components/schemas/EtapaBreve"
+                "type": "string",
+                "enum": [
+                  "demanda",
+                  "admision",
+                  "pruebas",
+                  "audiencia",
+                  "sentencia"
+                ]
               },
               {
                 "type": "null"
               }
-            ]
+            ],
+            "title": "Etapa"
           },
           "etapa_explicacion": {
             "anyOf": [
@@ -24521,7 +23860,7 @@
             },
             "type": "array",
             "title": "Etapas",
-            "description": "Las etapas de su proceso en orden, con la fecha de las ya recorridas."
+            "description": "Las cinco etapas en orden, con la fecha de las ya recorridas."
           },
           "proxima_fecha": {
             "anyOf": [
@@ -24621,14 +23960,20 @@
           "etapa": {
             "anyOf": [
               {
-                "type": "string"
+                "type": "string",
+                "enum": [
+                  "demanda",
+                  "admision",
+                  "pruebas",
+                  "audiencia",
+                  "sentencia"
+                ]
               },
               {
                 "type": "null"
               }
             ],
-            "title": "Etapa",
-            "description": "Nombre de la etapa actual."
+            "title": "Etapa"
           },
           "radicados": {
             "items": {
@@ -24757,12 +24102,20 @@
           "etapa": {
             "anyOf": [
               {
-                "$ref": "#/components/schemas/EtapaActual"
+                "type": "string",
+                "enum": [
+                  "demanda",
+                  "admision",
+                  "pruebas",
+                  "audiencia",
+                  "sentencia"
+                ]
               },
               {
                 "type": "null"
               }
             ],
+            "title": "Etapa",
             "description": "Etapa actual; vacía mientras la firma no la fije."
           },
           "archivado_en": {
@@ -24795,18 +24148,6 @@
             "title": "Colaboradores",
             "description": "Abogados que colaboran. Al cliente solo le llegan los marcados como visibles."
           },
-          "plantilla": {
-            "$ref": "#/components/schemas/PlantillaBreve",
-            "description": "Plantilla de etapas que sigue el proceso."
-          },
-          "linea_etapas": {
-            "items": {
-              "$ref": "#/components/schemas/EtapaBreve"
-            },
-            "type": "array",
-            "title": "Linea Etapas",
-            "description": "Las etapas de esa plantilla, en orden."
-          },
           "etapas": {
             "items": {
               "$ref": "#/components/schemas/CambioEtapa"
@@ -24829,8 +24170,6 @@
           "creado_en",
           "puede_administrar",
           "colaboradores",
-          "plantilla",
-          "linea_etapas",
           "etapas"
         ],
         "title": "ProcesoDetalle"
@@ -24877,12 +24216,20 @@
           "etapa": {
             "anyOf": [
               {
-                "$ref": "#/components/schemas/EtapaActual"
+                "type": "string",
+                "enum": [
+                  "demanda",
+                  "admision",
+                  "pruebas",
+                  "audiencia",
+                  "sentencia"
+                ]
               },
               {
                 "type": "null"
               }
             ],
+            "title": "Etapa",
             "description": "Etapa actual; vacía mientras la firma no la fije."
           },
           "archivado_en": {
@@ -25676,12 +25023,20 @@
           "etapa": {
             "anyOf": [
               {
-                "$ref": "#/components/schemas/EtapaBreve"
+                "type": "string",
+                "enum": [
+                  "demanda",
+                  "admision",
+                  "pruebas",
+                  "audiencia",
+                  "sentencia"
+                ]
               },
               {
                 "type": "null"
               }
-            ]
+            ],
+            "title": "Etapa"
           },
           "etapa_explicacion": {
             "anyOf": [
@@ -25701,7 +25056,7 @@
             },
             "type": "array",
             "title": "Etapas",
-            "description": "Las etapas de su proceso en orden, con la fecha de las ya recorridas."
+            "description": "Las cinco etapas en orden, con la fecha de las ya recorridas."
           },
           "proxima_fecha": {
             "anyOf": [

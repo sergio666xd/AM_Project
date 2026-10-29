@@ -11,9 +11,10 @@ from dataclasses import dataclass
 from datetime import datetime, time, timezone
 
 from sqlalchemy import func, select, update
-from sqlalchemy.orm import Session, selectinload
+from sqlalchemy.orm import Session
 
 from app import models
+from app.modulos.expedientes.esquemas import NOMBRES_ETAPA
 from app.nucleo.zona_horaria import a_colombia
 from app.timezone import COLOMBIA
 
@@ -378,11 +379,11 @@ class RepositorioFolios:
 
     def _contenido_etapa(self, ids: list[int]) -> dict[int, Contenido]:
         P = models.EtapaProceso
-        cambios = list(self._db.scalars(select(P).where(P.id.in_(ids)).options(selectinload(P.etapa))))
+        cambios = list(self._db.scalars(select(P).where(P.id.in_(ids))))
         nombres = self._nombres({c.usuario_id for c in cambios})
         return {
             c.id: Contenido(
-                titulo=f"El proceso pasa a la etapa de {c.etapa.nombre.lower()}",
+                titulo=f"El proceso pasa a la etapa de {NOMBRES_ETAPA.get(c.etapa, c.etapa).lower()}",
                 detalle=c.nota,
                 autor=nombres.get(c.usuario_id),
             )

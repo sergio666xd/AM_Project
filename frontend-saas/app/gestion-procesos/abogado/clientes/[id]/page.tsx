@@ -16,6 +16,7 @@ import { api, mensajeDeError } from "@/lib/api-v2/cliente";
 import { ACCESO, CANAL, RUTA_CLIENTES, enlaceChat, iniciales, textoPendientes, whatsappDigitos, type FichaCliente } from "@/lib/clientes";
 import { ESTADO_CONTRATO, enlaceContratosDelProceso } from "@/lib/contratos";
 import { RUTA_DOCUMENTOS } from "@/lib/documentos";
+import { nombreEtapa } from "@/lib/etapas";
 import { diaCorto, fechaCorta, fechaRelativa } from "@/lib/fechas";
 import { useLoadEffect } from "@/lib/useLoadEffect";
 
@@ -154,7 +155,7 @@ export default function FichaClientePage() {
                       <div className="min-w-0 flex-1">
                         <p className="font-semibold text-ink">{p.nombre}</p>
                         <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-[13px] text-ink-3">
-                          <span>{p.etapa ?? "Sin etapa"}</span>
+                          <span>{nombreEtapa(p.etapa)}</span>
                           {p.radicados.map((numero) => <Radicado key={numero} numero={numero} copiable={false} />)}
                           <span>{p.responsable}</span>
                         </div>

@@ -60,9 +60,6 @@ FRASES = {
     "pago.abonar": "aplicó un saldo a favor",
     "plantilla_tarea.aplicar": "usó una plantilla de tareas",
     "proceso.etapa": "cambió la etapa de un proceso",
-    "etapas.plantilla.crear": "creó una plantilla de etapas",
-    "etapas.plantilla.editar": "editó una plantilla de etapas",
-    "etapas.plantilla.eliminar": "borró una plantilla de etapas",
     "proceso.cliente.asignar": "vinculó un cliente a un proceso",
     "proceso.cliente.retirar": "desvinculó un cliente de un proceso",
     "proceso.colaborador.asignar": "sumó un abogado a un proceso",
@@ -142,6 +139,6 @@ def enlace(tipo_recurso: str, recurso_id: str | None) -> str | None:
         "solicitud_documento": "documentos", "radicado": "radicados", "contrato_servicio": "contratos",
         "plantilla_mensaje": "operacion/mensajes", "solicitud_edicion_perfil": "solicitudes-perfil",
         "configuracion_integraciones": "operacion/integraciones", "configuracion_consultas": "operacion/consultas",
-        "configuracion_firma": "firma", "evento_agenda": "agenda", "plantilla_etapas": "operacion/etapas",
+        "configuracion_firma": "firma", "evento_agenda": "agenda",
     }
     return f"{ADMIN}/{destinos[tipo]}" if tipo in destinos else None
