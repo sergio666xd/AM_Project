@@ -6,6 +6,7 @@ export type Entrega = Esquemas["Entrega"];
 export type OpcionReferencia = Esquemas["OpcionReferencia"];
 
 export const RUTA_MENSAJES = "/gestion-procesos/abogado/chat";
+export const RUTA_MENSAJES_CLIENTE = "/gestion-procesos/cliente/chat";
 
 /** Lo que sigue a /chat en la ruta, sea la interna o la corta de los subdominios (/chat/12/34). */
 export function partesDeRuta(pathname: string): string[] {
@@ -34,10 +35,10 @@ export function procesoDeRuta(partes: string[]): number | null {
   return partes.length === 1 && /^\d+$/.test(partes[0]) ? Number(partes[0]) : null;
 }
 
-export function rutaDe(conversacion: Pick<Conversacion, "clave">): string {
+export function rutaDe(conversacion: Pick<Conversacion, "clave">, base = RUTA_MENSAJES): string {
   const [tipo, a, b] = conversacion.clave.split(":");
-  if (tipo === "direct") return `${RUTA_MENSAJES}/directo/${a}`;
-  return `${RUTA_MENSAJES}/${a}/${b === "collaborators" ? "colaboradores" : b}`;
+  if (tipo === "direct") return `${base}/directo/${a}`;
+  return `${base}/${a}/${b === "collaborators" ? "colaboradores" : b}`;
 }
 
 /** Una línea legible del mensaje, sin las marcas de formato. */

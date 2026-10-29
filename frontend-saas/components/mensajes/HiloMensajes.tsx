@@ -11,6 +11,7 @@ import { Folio } from "@/components/ui/Folio";
 import { Initials } from "@/components/ui/Initials";
 import { api, mensajeDeError } from "@/lib/api-v2/cliente";
 import { RUTA_CLIENTES } from "@/lib/clientes";
+import { primerNombre, rutaProceso } from "@/lib/portalCliente";
 import { cx } from "@/lib/cx";
 import { diaDe, fechaLarga, horaDe, hoyISO, sumarDias } from "@/lib/fechas";
 import { TIPO_REFERENCIA, textoEntrega, tituloReferencia, type Conversacion, type MensajeChat, type OpcionReferencia } from "@/lib/mensajes";
@@ -49,11 +50,13 @@ function fusionar(actuales: MensajeChat[], nuevos: MensajeChat[]): MensajeChat[]
 }
 
 /** Una conversación: mensajes por día, estado de entrega, folio de cada mensaje y el redactor. */
-export function HiloMensajes({ conversacion, onVolver, onActividad }: {
+export function HiloMensajes({ conversacion, onVolver, onActividad, variante = "firma" }: {
   conversacion: Conversacion;
   onVolver: () => void;
   /** Se envió o se leyó algo: la lista se refresca. */
   onActividad: (cambio: { leido?: boolean }) => void;
+  /** En el portal del cliente: trato de usted, letra más grande y sin enlazar del expediente. */
+  variante?: "firma" | "cliente";
 }) {
   const id = conversacion.id;
   const [mensajes, setMensajes] = useState<MensajeChat[]>([]);
@@ -248,8 +251,9 @@ export function HiloMensajes({ conversacion, onVolver, onActividad }: {
     }
   }
 
+  const cliente = variante === "cliente";
   const deGrupo = conversacion.tipo === "colaboradores";
-  const puedeEnlazar = Boolean(conversacion.proceso);
+  const puedeEnlazar = !cliente && Boolean(conversacion.proceso);
   const presencia = deGrupo
     ? (conversacion.en_linea ? `${conversacion.en_linea} en línea` : null)
     : (conversacion.en_linea ? "En línea" : null);
@@ -264,15 +268,15 @@ export function HiloMensajes({ conversacion, onVolver, onActividad }: {
           ? <span aria-hidden="true" className="grid size-9 shrink-0 place-items-center rounded-full bg-manila text-ink-2"><Users size={17} /></span>
           : <Initials name={conversacion.titulo} size={36} />}
         <div className="min-w-0 flex-1">
-          <h2 className="truncate text-[15px] font-semibold text-ink">{conversacion.titulo}</h2>
-          <p className="flex min-w-0 items-center gap-1.5 text-[12.5px] text-ink-3">
+          <h2 className={cx("truncate font-semibold text-ink", cliente ? "text-[17px]" : "text-[15px]")}>{conversacion.titulo}</h2>
+          <p className={cx("flex min-w-0 items-center gap-1.5 text-ink-3", cliente ? "text-[14px]" : "text-[12.5px]")}>
             {presencia && <><span aria-hidden="true" className="size-2 shrink-0 rounded-full bg-ok" /><span className="shrink-0">{presencia}</span>{conversacion.proceso && <span aria-hidden="true">·</span>}</>}
             {conversacion.proceso
-              ? <Link href={`/gestion-procesos/abogado/procesos/${conversacion.proceso.id}`} className="truncate font-semibold text-navy-ink hover:underline">{conversacion.proceso.nombre}</Link>
+              ? <Link href={cliente ? rutaProceso(conversacion.proceso.id) : `/gestion-procesos/abogado/procesos/${conversacion.proceso.id}`} className="truncate font-semibold text-navy-ink hover:underline">{conversacion.proceso.nombre}</Link>
               : !presencia && <span>{conversacion.tipo === "equipo" ? "Equipo de la firma" : ""}</span>}
           </p>
         </div>
-        {conversacion.tipo === "cliente" && conversacion.contacto && (
+        {!cliente && conversacion.tipo === "cliente" && conversacion.contacto && (
           <Link href={`${RUTA_CLIENTES}/${conversacion.contacto.id}`} className="inline-flex min-h-10 shrink-0 items-center gap-1.5 rounded-lg px-2.5 text-[13px] font-semibold text-ink-2 hover:bg-manila hover:text-ink">
             <UserRound aria-hidden="true" size={16} /><span className="hidden sm:inline">Ficha del cliente</span>
             <span className="sr-only sm:hidden">Ficha del cliente</span>
@@ -296,10 +300,19 @@ export function HiloMensajes({ conversacion, onVolver, onActividad }: {
           ) : mensajes.length === 0 ? (
             <div className="grid h-full place-items-center text-center">
               <div className="max-w-xs">
-                <p className="font-display text-[19px] text-ink">Escribe el primer mensaje</p>
-                <p className="mt-1.5 text-[13.5px] text-ink-3">
-                  {conversacion.proceso ? "Cada mensaje queda en el expediente como un folio." : "Solo lo ven ustedes dos."}
-                </p>
+                {cliente ? (
+                  <>
+                    <p className="font-display text-[22px] text-ink">Escríbale a {primerNombre(conversacion.titulo)}</p>
+                    <p className="mt-1.5 text-[16px] text-ink-2">Le responde en horario de oficina, de lunes a viernes. Su mensaje queda en el expediente del proceso.</p>
+                  </>
+                ) : (
+                  <>
+                    <p className="font-display text-[19px] text-ink">Escribe el primer mensaje</p>
+                    <p className="mt-1.5 text-[13.5px] text-ink-3">
+                      {conversacion.proceso ? "Cada mensaje queda en el expediente como un folio." : "Solo lo ven ustedes dos."}
+                    </p>
+                  </>
+                )}
               </div>
             </div>
           ) : (
@@ -330,7 +343,7 @@ export function HiloMensajes({ conversacion, onVolver, onActividad }: {
                         <span aria-hidden="true" className="h-px flex-1 bg-gold/60" />Mensajes nuevos<span aria-hidden="true" className="h-px flex-1 bg-gold/60" />
                       </li>
                     )}
-                    <Burbuja mensaje={m} conAnterior={conAnterior} conSiguiente={conSiguiente} mostrarAutor={deGrupo && !m.es_mio && !conAnterior} />
+                    <Burbuja mensaje={m} conAnterior={conAnterior} conSiguiente={conSiguiente} mostrarAutor={deGrupo && !m.es_mio && !conAnterior} grande={cliente} />
                   </Fragment>
                 );
               })}
@@ -374,15 +387,18 @@ export function HiloMensajes({ conversacion, onVolver, onActividad }: {
               onKeyDown={alTeclear}
               rows={1}
               maxLength={12000}
-              placeholder="Escribe un mensaje"
-              className="block min-h-11 w-full resize-none rounded-lg border border-line-strong bg-sheet px-3 py-2.5 text-[15px] leading-5 text-ink placeholder:text-ink-3 focus:border-navy focus:outline-none focus-visible:ring-2 focus-visible:ring-navy/25 sm:min-h-10 sm:py-2 sm:text-[14px]"
+              placeholder={cliente ? "Escriba su mensaje" : "Escribe un mensaje"}
+              className={cx(
+                "block w-full resize-none rounded-lg border border-line-strong bg-sheet px-3 text-ink placeholder:text-ink-3 focus:border-navy focus:outline-none focus-visible:ring-2 focus-visible:ring-navy/25",
+                cliente ? "min-h-12 py-3 text-[17px] leading-6" : "min-h-11 py-2.5 text-[15px] leading-5 sm:min-h-10 sm:py-2 sm:text-[14px]",
+              )}
             />
           </div>
-          <Button type="submit" loading={enviando} disabled={!borrador.trim()} icon={<Send size={16} />} aria-label="Enviar" className="min-h-11 shrink-0 sm:min-h-10">
+          <Button type="submit" size={cliente ? "lg" : "md"} loading={enviando} disabled={!borrador.trim()} icon={<Send size={16} />} aria-label="Enviar" className={cx("shrink-0", !cliente && "min-h-11 sm:min-h-10")}>
             <span className="hidden sm:inline">Enviar</span>
           </Button>
         </div>
-        <p className="mx-auto mt-1.5 hidden max-w-3xl px-1 text-[12px] text-ink-3 sm:block">Enter envía · Mayús + Enter, nueva línea</p>
+        <p className={cx("mx-auto mt-1.5 hidden max-w-3xl px-1 text-ink-3 sm:block", cliente ? "text-[13px]" : "text-[12px]")}>Enter envía · Mayús + Enter, nueva línea</p>
       </form>
 
       {puedeEnlazar && <SelectorReferencia conversacionId={id} open={selector} onClose={() => setSelector(false)} onElegir={setReferencia} />}
@@ -390,11 +406,12 @@ export function HiloMensajes({ conversacion, onVolver, onActividad }: {
   );
 }
 
-function Burbuja({ mensaje, conAnterior, conSiguiente, mostrarAutor }: {
+function Burbuja({ mensaje, conAnterior, conSiguiente, mostrarAutor, grande = false }: {
   mensaje: MensajeChat;
   conAnterior: boolean;
   conSiguiente: boolean;
   mostrarAutor: boolean;
+  grande?: boolean;
 }) {
   const mio = mensaje.es_mio;
   const Icono = mensaje.referencia ? ICONO_REFERENCIA[mensaje.referencia.tipo] : null;
@@ -404,7 +421,8 @@ function Burbuja({ mensaje, conAnterior, conSiguiente, mostrarAutor }: {
         {mostrarAutor && <p className="mb-1 px-1 text-[12px] font-semibold text-ink-2">{mensaje.autor?.nombre ?? "Usuario eliminado"}</p>}
         <div
           className={cx(
-            "motion-message-in rounded-2xl px-3.5 py-2 text-[14.5px] leading-[1.45] [overflow-wrap:anywhere]",
+            "motion-message-in rounded-2xl px-3.5 py-2 [overflow-wrap:anywhere]",
+            grande ? "text-[16.5px] leading-[1.5]" : "text-[14.5px] leading-[1.45]",
             mio ? "origin-bottom-right bg-navy text-on-navy" : "origin-bottom-left bg-sheet text-ink shadow-sheet",
             mio ? (conSiguiente ? "rounded-br-md" : "rounded-br-sm") : (conSiguiente ? "rounded-bl-md" : "rounded-bl-sm"),
             conAnterior && (mio ? "rounded-tr-md" : "rounded-tl-md"),
@@ -430,7 +448,7 @@ function Burbuja({ mensaje, conAnterior, conSiguiente, mostrarAutor }: {
           {renderMessageMarkdown(mensaje.texto)}
         </div>
         {!conSiguiente && (
-          <p className="mt-1 flex items-center gap-1 px-1 text-[11.5px] text-ink-3 tabular-nums">
+          <p className={cx("mt-1 flex items-center gap-1 px-1 text-ink-3 tabular-nums", grande ? "text-[13px]" : "text-[11.5px]")}>
             <time dateTime={mensaje.enviado_en}>{horaDe(mensaje.enviado_en)}</time>
             {mio && mensaje.entrega && (
               <span className={cx("inline-flex items-center gap-1", mensaje.entrega.estado === "leido" && "text-navy-ink")}>
