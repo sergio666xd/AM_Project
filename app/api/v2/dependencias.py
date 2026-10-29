@@ -46,6 +46,8 @@ from app.modulos.portal_cliente.repositorio import RepositorioPortal
 from app.modulos.portal_cliente.servicio import ServicioPortalCliente
 from app.modulos.tareas.repositorio import RepositorioTareas
 from app.modulos.tareas.servicio import ServicioTareas
+from app.modulos.sitio.repositorio import RepositorioSitio
+from app.modulos.sitio.servicio import ServicioSitio
 from app.nucleo.bd import obtener_bd
 
 
@@ -155,3 +157,7 @@ def servicio_almacenamiento(db: Session = Depends(obtener_bd)) -> ServicioAlmace
 
 def servicio_limpieza_chats(db: Session = Depends(obtener_bd)) -> ServicioLimpiezaChats:
     return ServicioLimpiezaChats(db, RepositorioSistema(db))
+
+
+def servicio_sitio(db: Session = Depends(obtener_bd)) -> ServicioSitio:
+    return ServicioSitio(db, RepositorioSitio(db))

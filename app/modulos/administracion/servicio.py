@@ -1,7 +1,7 @@
 """Resumen de la administración: lo que pide atención, el estado de las integraciones y la actividad.
 
 Las alertas no se guardan: se calculan de lo que ya está en la base (consultas
-y envíos fallidos, solicitudes, cuentas sin estrenar). Desaparecen solas cuando
+y envíos fallidos, solicitudes, mensajes del sitio, cuentas sin estrenar). Desaparecen solas cuando
 el problema se resuelve. Descartar una solo la oculta, con registro en la
 auditoría; si el problema cambia (otro envío falla), su `id` cambia y vuelve.
 """
@@ -19,6 +19,7 @@ from app.modulos.administracion.repositorio import RepositorioAdministracion
 from app.modulos.finanzas.repositorio import RepositorioFinanzas
 from app.modulos.finanzas.servicio import ServicioFinanzas
 from app.modulos.identidad.modelos import Usuario
+from app.modulos.sitio.repositorio import RepositorioSitio
 from app.nucleo.errores import NoEncontrado
 from app.timezone import utc_ahora
 
@@ -75,6 +76,14 @@ class ServicioAdministracion:
                 "id": f"perfil:{solicitud.id}", "tipo": "solicitud_perfil", "gravedad": "media",
                 "titulo": f"{nombre} pidió corregir sus datos", "detalle": None,
                 "enlace": f"{ADMIN}/solicitudes-perfil", "accion": "Revisar", "fecha": solicitud.solicitada_en,
+            })
+        nuevos, ultimo, ultimo_id = RepositorioSitio(self._db).sin_atender()
+        if nuevos:
+            alertas.append({
+                "id": f"mensajes_sitio:{ultimo_id}-{nuevos}", "tipo": "mensaje_sitio", "gravedad": "media",
+                "titulo": f"{_plural(nuevos, 'mensaje del sitio web sin atender', 'mensajes del sitio web sin atender')}",
+                "detalle": "Llegaron por el formulario de contacto. Márquelos como atendidos cuando la firma responda.",
+                "enlace": f"{ADMIN}/sitio/mensajes", "accion": "Ver mensajes", "fecha": ultimo,
             })
         sin_ingreso = self._repo.sin_ingreso(ahora - SIN_INGRESO_TRAS)
         if sin_ingreso:

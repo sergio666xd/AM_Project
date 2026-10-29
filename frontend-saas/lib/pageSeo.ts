@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { loadPublicPageContent } from "@/lib/publicPageContent";
+import { cargarPagina } from "@/lib/sitioPublico";
 import type { PublicPageSlug } from "@/lib/sitePageDefaults";
 
 type PageSeo = {
@@ -14,7 +14,7 @@ export async function generatePublicPageMetadata<T extends { seo?: PageSeo }>(
   defaults: T,
   pathname: string,
 ): Promise<Metadata> {
-  const content = await loadPublicPageContent(slug, defaults);
+  const content = await cargarPagina(slug, defaults);
   const seo = content.seo ?? defaults.seo ?? {};
   const title = seo.title?.trim() || "Alejandra Muñoz Abogada y Asociados";
   const description = seo.description?.trim()

@@ -33,7 +33,7 @@ AREAS: dict[AreaActividad, tuple[str, ...]] = {
     "tareas": ("tarea", "subtarea", "recordatorio_tarea", "plantilla_tarea", "evento_agenda"),
     "documentos": ("documento_proceso", "solicitud_documento", "contrato_servicio", "archivo_r2", "carpeta_r2"),
     "cobros": ("cuenta_cobro", "pago_financiero", "configuracion_correo_financiero"),
-    "mensajes": ("chat_conversacion", "entrega_notificacion", "plantilla_mensaje"),
+    "mensajes": ("chat_conversacion", "entrega_notificacion", "plantilla_mensaje", "solicitud_contacto"),
     "configuracion": (
         "configuracion_firma", "configuracion_consultas", "configuracion_integraciones", "configuracion_saas",
         "integracion", "pagina_publica", "alerta", "plan", "evento_auditoria",

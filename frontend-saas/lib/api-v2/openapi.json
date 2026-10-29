@@ -14749,6 +14749,1074 @@
           }
         }
       }
+    },
+    "/api/v2/sitio/contacto": {
+      "get": {
+        "tags": [
+          "Sitio público"
+        ],
+        "summary": "Datos de contacto del sitio",
+        "description": "Sin sesión. Si la administración oculta el contacto, solo trae el nombre de la firma.",
+        "operationId": "ver_contacto_publico",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ContactoPublico"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too Many Requests",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v2/sitio/paginas/{slug}": {
+      "get": {
+        "tags": [
+          "Sitio público"
+        ],
+        "summary": "Contenido de una página pública",
+        "description": "Sin sesión. `contenido` es null mientras la página use su texto base.",
+        "operationId": "ver_pagina_publica",
+        "parameters": [
+          {
+            "name": "slug",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Slug"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PaginaPublica"
+                }
+              }
+            }
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Too Many Requests"
+          }
+        }
+      }
+    },
+    "/api/v2/sitio/mensajes": {
+      "post": {
+        "tags": [
+          "Sitio público"
+        ],
+        "summary": "Enviar un mensaje desde el formulario de contacto",
+        "description": "Sin sesión. Guarda el mensaje; el aviso a la firma y la confirmación por correo salen después de responder.",
+        "operationId": "enviar_mensaje_sitio",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NuevoMensajeSitio"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MensajeSitioRecibido"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too Many Requests",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v2/admin/sitio/mensajes": {
+      "get": {
+        "tags": [
+          "Sitio público"
+        ],
+        "summary": "Mensajes del sitio",
+        "operationId": "listar_mensajes_sitio",
+        "parameters": [
+          {
+            "name": "estado",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "enum": [
+                    "nueva",
+                    "atendida",
+                    "descartada"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Sin filtro trae todos.",
+              "title": "Estado"
+            },
+            "description": "Sin filtro trae todos."
+          },
+          {
+            "name": "limite",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 100,
+              "minimum": 1,
+              "description": "Elementos por página.",
+              "default": 25,
+              "title": "Limite"
+            },
+            "description": "Elementos por página."
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "maxLength": 500
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Valor de `siguiente` de la página anterior.",
+              "title": "Cursor"
+            },
+            "description": "Valor de `siguiente` de la página anterior."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PaginaMensajesSitio"
+                }
+              }
+            }
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Too Many Requests"
+          }
+        }
+      }
+    },
+    "/api/v2/admin/sitio/mensajes/{mensaje_id}": {
+      "get": {
+        "tags": [
+          "Sitio público"
+        ],
+        "summary": "Ver un mensaje del sitio",
+        "operationId": "ver_mensaje_sitio",
+        "parameters": [
+          {
+            "name": "mensaje_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Mensaje Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MensajeSitio"
+                }
+              }
+            }
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Too Many Requests"
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "Sitio público"
+        ],
+        "summary": "Marcar o anotar un mensaje del sitio",
+        "description": "Atendido, descartado (por ejemplo, publicidad) o de vuelta a nuevo; la nota es interna.",
+        "operationId": "cambiar_mensaje_sitio",
+        "parameters": [
+          {
+            "name": "mensaje_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Mensaje Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CambioMensajeSitio"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MensajeSitio"
+                }
+              }
+            }
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Too Many Requests"
+          }
+        }
+      }
+    },
+    "/api/v2/admin/sitio/paginas": {
+      "get": {
+        "tags": [
+          "Sitio público"
+        ],
+        "summary": "Páginas del sitio y si tienen cambios",
+        "operationId": "listar_paginas_sitio",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/PaginaSitio"
+                  },
+                  "type": "array",
+                  "title": "Response Listar Paginas Sitio"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too Many Requests",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v2/admin/sitio/paginas/{slug}": {
+      "get": {
+        "tags": [
+          "Sitio público"
+        ],
+        "summary": "Ver el contenido editado de una página",
+        "description": "`contenido` es null mientras la página use su texto base.",
+        "operationId": "ver_pagina_sitio",
+        "parameters": [
+          {
+            "name": "slug",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Slug"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PaginaSitioDetalle"
+                }
+              }
+            }
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Too Many Requests"
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "Sitio público"
+        ],
+        "summary": "Guardar el contenido de una página",
+        "description": "La dirección de cada página es fija; `route` se ignora si llega.",
+        "operationId": "guardar_pagina_sitio",
+        "parameters": [
+          {
+            "name": "slug",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Slug"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CambioPaginaSitio"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PaginaSitioDetalle"
+                }
+              }
+            }
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Too Many Requests"
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Sitio público"
+        ],
+        "summary": "Volver al texto base de una página",
+        "operationId": "restaurar_pagina_sitio",
+        "parameters": [
+          {
+            "name": "slug",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Slug"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PaginaSitioDetalle"
+                }
+              }
+            }
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Too Many Requests"
+          }
+        }
+      }
     }
   },
   "components": {
@@ -14899,7 +15967,8 @@
               "consulta_fallida",
               "entrega_fallida",
               "solicitud_perfil",
-              "sin_ingreso"
+              "sin_ingreso",
+              "mensaje_sitio"
             ],
             "title": "Tipo"
           },
@@ -15933,6 +17002,55 @@
         ],
         "title": "CambioFecha"
       },
+      "CambioMensajeSitio": {
+        "properties": {
+          "estado": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "nueva",
+                  "atendida",
+                  "descartada"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Estado"
+          },
+          "nota": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 2000
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Nota"
+          }
+        },
+        "type": "object",
+        "title": "CambioMensajeSitio"
+      },
+      "CambioPaginaSitio": {
+        "properties": {
+          "contenido": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Contenido",
+            "description": "La página completa. La ruta no se cambia desde aquí."
+          }
+        },
+        "type": "object",
+        "required": [
+          "contenido"
+        ],
+        "title": "CambioPaginaSitio"
+      },
       "CambioUsuario": {
         "properties": {
           "nombre": {
@@ -16781,6 +17899,102 @@
         ],
         "title": "Contacto"
       },
+      "ContactoPublico": {
+        "properties": {
+          "nombre": {
+            "type": "string",
+            "title": "Nombre"
+          },
+          "mostrar_contacto": {
+            "type": "boolean",
+            "title": "Mostrar Contacto"
+          },
+          "correo_contacto": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Correo Contacto"
+          },
+          "correo_pqr": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Correo Pqr"
+          },
+          "telefono": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Telefono"
+          },
+          "whatsapp": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Whatsapp"
+          },
+          "direccion": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Direccion"
+          },
+          "ciudad": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ciudad"
+          },
+          "pais": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pais"
+          }
+        },
+        "type": "object",
+        "required": [
+          "nombre",
+          "mostrar_contacto"
+        ],
+        "title": "ContactoPublico",
+        "description": "Lo que el sitio muestra de la firma. Si la administración oculta el contacto, solo va el nombre."
+      },
       "ContenidoCarpeta": {
         "properties": {
           "ruta": {
@@ -16842,6 +18056,29 @@
           "pendientes"
         ],
         "title": "ConteoEnvios"
+      },
+      "ConteoMensajesSitio": {
+        "properties": {
+          "nueva": {
+            "type": "integer",
+            "title": "Nueva"
+          },
+          "atendida": {
+            "type": "integer",
+            "title": "Atendida"
+          },
+          "descartada": {
+            "type": "integer",
+            "title": "Descartada"
+          }
+        },
+        "type": "object",
+        "required": [
+          "nueva",
+          "atendida",
+          "descartada"
+        ],
+        "title": "ConteoMensajesSitio"
       },
       "ConteoUsuarios": {
         "properties": {
@@ -20497,6 +21734,168 @@
         ],
         "title": "Mensaje"
       },
+      "MensajeSitio": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "nombre": {
+            "type": "string",
+            "title": "Nombre"
+          },
+          "telefono": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Telefono"
+          },
+          "correo": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Correo"
+          },
+          "area": {
+            "type": "string",
+            "enum": [
+              "familia",
+              "empresas",
+              "propiedad_horizontal",
+              "publico",
+              "poliza",
+              "otro"
+            ],
+            "title": "Area"
+          },
+          "mensaje": {
+            "type": "string",
+            "title": "Mensaje"
+          },
+          "estado": {
+            "type": "string",
+            "enum": [
+              "nueva",
+              "atendida",
+              "descartada"
+            ],
+            "title": "Estado"
+          },
+          "nota": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Nota"
+          },
+          "aviso_firma": {
+            "type": "string",
+            "enum": [
+              "pendiente",
+              "enviado",
+              "fallido"
+            ],
+            "title": "Aviso Firma",
+            "description": "Si el correo de aviso a la firma salió."
+          },
+          "aviso_error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Aviso Error"
+          },
+          "whatsapp_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Whatsapp Url",
+            "description": "Enlace para escribirle por WhatsApp, si dejó un número."
+          },
+          "recibida_en": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Recibida En"
+          },
+          "atendida_en": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Atendida En"
+          },
+          "atendida_por": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Atendida Por"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "nombre",
+          "telefono",
+          "correo",
+          "area",
+          "mensaje",
+          "estado",
+          "nota",
+          "aviso_firma",
+          "aviso_error",
+          "whatsapp_url",
+          "recibida_en",
+          "atendida_en",
+          "atendida_por"
+        ],
+        "title": "MensajeSitio"
+      },
+      "MensajeSitioRecibido": {
+        "properties": {
+          "mensaje": {
+            "type": "string",
+            "title": "Mensaje"
+          }
+        },
+        "type": "object",
+        "required": [
+          "mensaje"
+        ],
+        "title": "MensajeSitioRecibido"
+      },
       "Motivo": {
         "properties": {
           "motivo": {
@@ -20689,6 +22088,77 @@
           "texto"
         ],
         "title": "NuevoMensaje"
+      },
+      "NuevoMensajeSitio": {
+        "properties": {
+          "nombre": {
+            "type": "string",
+            "maxLength": 150,
+            "title": "Nombre"
+          },
+          "telefono": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 40
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Telefono",
+            "description": "WhatsApp o teléfono."
+          },
+          "correo": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "email"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Correo"
+          },
+          "area": {
+            "type": "string",
+            "enum": [
+              "familia",
+              "empresas",
+              "propiedad_horizontal",
+              "publico",
+              "poliza",
+              "otro"
+            ],
+            "title": "Area"
+          },
+          "mensaje": {
+            "type": "string",
+            "maxLength": 3000,
+            "title": "Mensaje"
+          },
+          "autorizacion": {
+            "type": "boolean",
+            "title": "Autorizacion",
+            "description": "Autoriza el tratamiento de sus datos (Ley 1581 de 2012)."
+          },
+          "website": {
+            "type": "string",
+            "maxLength": 200,
+            "title": "Website",
+            "description": "Campo trampa: las personas lo dejan vacío.",
+            "default": ""
+          }
+        },
+        "type": "object",
+        "required": [
+          "nombre",
+          "area",
+          "mensaje",
+          "autorizacion"
+        ],
+        "title": "NuevoMensajeSitio"
       },
       "NuevoUsuario": {
         "properties": {
@@ -21017,6 +22487,45 @@
         ],
         "title": "PaginaHistoria"
       },
+      "PaginaMensajesSitio": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/MensajeSitio"
+            },
+            "type": "array",
+            "title": "Items"
+          },
+          "total": {
+            "type": "integer",
+            "title": "Total",
+            "description": "Cantidad total con los filtros aplicados, sin contar el cursor."
+          },
+          "siguiente": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Siguiente",
+            "description": "Cursor de la página siguiente, o null si no hay más."
+          },
+          "conteo": {
+            "$ref": "#/components/schemas/ConteoMensajesSitio"
+          }
+        },
+        "type": "object",
+        "required": [
+          "items",
+          "total",
+          "siguiente",
+          "conteo"
+        ],
+        "title": "PaginaMensajesSitio"
+      },
       "PaginaProcesos": {
         "properties": {
           "items": {
@@ -21052,6 +22561,46 @@
         ],
         "title": "PaginaProcesos"
       },
+      "PaginaPublica": {
+        "properties": {
+          "slug": {
+            "type": "string",
+            "title": "Slug"
+          },
+          "contenido": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Contenido",
+            "description": "Lo que la administración cambió; null si la página usa su texto base."
+          },
+          "actualizada_en": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Actualizada En"
+          }
+        },
+        "type": "object",
+        "required": [
+          "slug",
+          "contenido",
+          "actualizada_en"
+        ],
+        "title": "PaginaPublica"
+      },
       "PaginaRegistro": {
         "properties": {
           "items": {
@@ -21086,6 +22635,128 @@
           "siguiente"
         ],
         "title": "PaginaRegistro"
+      },
+      "PaginaSitio": {
+        "properties": {
+          "slug": {
+            "type": "string",
+            "title": "Slug"
+          },
+          "nombre": {
+            "type": "string",
+            "title": "Nombre"
+          },
+          "ruta": {
+            "type": "string",
+            "title": "Ruta"
+          },
+          "editada": {
+            "type": "boolean",
+            "title": "Editada",
+            "description": "False mientras la página use su texto base."
+          },
+          "actualizada_en": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Actualizada En"
+          },
+          "actualizada_por": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Actualizada Por"
+          }
+        },
+        "type": "object",
+        "required": [
+          "slug",
+          "nombre",
+          "ruta",
+          "editada",
+          "actualizada_en",
+          "actualizada_por"
+        ],
+        "title": "PaginaSitio"
+      },
+      "PaginaSitioDetalle": {
+        "properties": {
+          "slug": {
+            "type": "string",
+            "title": "Slug"
+          },
+          "nombre": {
+            "type": "string",
+            "title": "Nombre"
+          },
+          "ruta": {
+            "type": "string",
+            "title": "Ruta"
+          },
+          "editada": {
+            "type": "boolean",
+            "title": "Editada",
+            "description": "False mientras la página use su texto base."
+          },
+          "actualizada_en": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Actualizada En"
+          },
+          "actualizada_por": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Actualizada Por"
+          },
+          "contenido": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Contenido",
+            "description": "Lo guardado por la administración; null si usa el texto base."
+          }
+        },
+        "type": "object",
+        "required": [
+          "slug",
+          "nombre",
+          "ruta",
+          "editada",
+          "actualizada_en",
+          "actualizada_por",
+          "contenido"
+        ],
+        "title": "PaginaSitioDetalle"
       },
       "PaginaUsuarios": {
         "properties": {

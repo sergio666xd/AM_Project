@@ -1,8 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
-import { ADMIN_PORTAL_HOST, USER_PORTAL_HOST, isLocalPortalHost, isPreviewHost } from "@/lib/portalHosts";
+import { ADMIN_PORTAL_HOST, PUBLIC_SITE_HOST, USER_PORTAL_HOST, isLocalPortalHost, isPreviewHost } from "@/lib/portalHosts";
 
 const PUBLIC_HOSTS = new Set(["alejandramunozabogada.com", "www.alejandramunozabogada.com"]);
-const PUBLIC_SITE_HOST = "www.alejandramunozabogada.com";
 const ADMIN_LOGIN_PATH = "/gestion-procesos/auth/admin";
 const CLIENT_LOGIN_PATH = "/gestion-procesos/auth/login";
 const AUTH_ROUTES: Record<string, string> = {

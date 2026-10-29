@@ -1,6 +1,6 @@
 import type { MetadataRoute } from "next";
 import { SITE_URL } from "@/lib/siteUrl";
-import { loadPublicPageContent } from "@/lib/publicPageContent";
+import { cargarPagina } from "@/lib/sitioPublico";
 import { SITE_PAGE_DEFAULTS, type PublicPageSlug } from "@/lib/sitePageDefaults";
 
 // Solo rutas públicas: no incluir login, paneles administrativos ni dashboards.
@@ -10,7 +10,6 @@ const publicPages = [
   { path: "/quienes-somos", slug: "quienes-somos" as const, changeFrequency: "monthly" as const, priority: 0.8 },
   { path: "/filosofia", slug: "filosofia" as const, changeFrequency: "monthly" as const, priority: 0.7 },
   { path: "/contacto", slug: "contacto" as const, changeFrequency: "monthly" as const, priority: 0.8 },
-  { path: "/gestion-procesos", changeFrequency: "weekly" as const, priority: 0.9 },
   { path: "/poliza-juridica", slug: "poliza-juridica" as const, changeFrequency: "monthly" as const, priority: 0.9 },
   { path: "/politica-de-privacidad", slug: "politica-de-privacidad" as const, changeFrequency: "yearly" as const, priority: 0.3 },
   { path: "/tratamiento-de-datos", slug: "tratamiento-de-datos" as const, changeFrequency: "yearly" as const, priority: 0.3 },
@@ -18,8 +17,7 @@ const publicPages = [
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const visiblePages = await Promise.all(publicPages.map(async ({ slug, ...page }) => {
-    if (!slug) return page;
-    const content = await loadPublicPageContent(slug as PublicPageSlug, SITE_PAGE_DEFAULTS[slug]);
+    const content = await cargarPagina(slug as PublicPageSlug, SITE_PAGE_DEFAULTS[slug]);
     const typedContent = content as { seo?: { noIndex?: boolean }; route?: string };
     return typedContent.seo?.noIndex ? null : { ...page, path: typedContent.route || page.path };
   }));

@@ -1,65 +1,85 @@
 import Link from "next/link";
-import { renderRichText } from "@/components/marketing/RichText";
-import { MessageCircle } from "lucide-react";
-import { MarketingLayout } from "@/components/marketing/MarketingLayout";
-import { PracticeAreasExplorer } from "@/components/marketing/PracticeAreasExplorer";
-import { loadPublicPageContent } from "@/lib/publicPageContent";
-import { SITE_PAGE_DEFAULTS } from "@/lib/sitePageDefaults";
+import { ArrowRight } from "lucide-react";
+import { clasesBoton } from "@/components/ui/Button";
+import { areaDeIcono } from "@/components/sitio/areas";
+import { Carpeta, Entrada, RELLENO, TituloHoja, TituloPagina } from "@/components/sitio/Caratula";
+import { MarcoSitio } from "@/components/sitio/MarcoSitio";
+import { enLinea } from "@/components/sitio/Texto";
 import { generatePublicPageMetadata } from "@/lib/pageSeo";
+import { SITE_PAGE_DEFAULTS } from "@/lib/sitePageDefaults";
+import { cargarPagina } from "@/lib/sitioPublico";
 
 export function generateMetadata() {
   return generatePublicPageMetadata("areas-de-practica", SITE_PAGE_DEFAULTS["areas-de-practica"], "/areas-de-practica");
 }
 
 export default async function AreasDePractica() {
-  const content = await loadPublicPageContent("areas-de-practica", SITE_PAGE_DEFAULTS["areas-de-practica"]);
+  const contenido = await cargarPagina("areas-de-practica", SITE_PAGE_DEFAULTS["areas-de-practica"]);
+  const areas = contenido.areas.map((area, i) => ({ ...area, ...areaDeIcono(area.icon, i) }));
 
   return (
-    <MarketingLayout>
-      <main className="mx-auto max-w-7xl px-5 py-12 lg:py-16 lg:px-8 space-y-12">
-        {/* Header */}
-        <div className="max-w-3xl space-y-3">
-          <span className="inline-block text-xs font-bold uppercase tracking-widest text-gold-600">
-            {renderRichText(content.eyebrow)}
-          </span>
-          <h1 className="text-3xl sm:text-4xl lg:text-5xl font-display font-medium tracking-[-0.01em] text-foreground">
-            {renderRichText(content.title)}
-          </h1>
-          <p className="text-base sm:text-lg leading-relaxed text-foreground-muted">
-            {renderRichText(content.description)}
-          </p>
-        </div>
-
-        {/* Interactive Areas Explorer */}
-        <PracticeAreasExplorer areas={content.areas} />
-
-        {/* Closing Banner */}
-        <section className="rounded-3xl border border-gold-400/30 bg-gradient-to-r from-brand-950 via-brand-900 to-brand-950 p-8 sm:p-12 text-center text-white shadow-xl">
-          <h2 className="text-2xl sm:text-3xl font-display font-medium tracking-[-0.01em] text-white">
-            {renderRichText(content.closingTitle)}
-          </h2>
-          <p className="mx-auto mt-3 max-w-2xl text-sm sm:text-base text-neutral-300 leading-relaxed">
-            {renderRichText(content.closingDescription)}
-          </p>
-          <div className="mt-8 flex flex-col justify-center gap-3.5 sm:flex-row">
-            <a
-              href="https://wa.me/573508809878?text=Hola%2C%20quisiera%20asesor%C3%ADa%20en%20una%20de%20sus%20%C3%A1reas%20de%20pr%C3%A1ctica."
-              target="_blank"
-              rel="noreferrer"
-              className="inline-flex min-h-12 items-center justify-center gap-2 rounded-xl bg-gold-400 px-6 py-3 text-sm font-bold text-brand-950 hover:bg-gold-300 transition-colors shadow-sm"
-            >
-              <MessageCircle className="size-4" aria-hidden="true" />
-              {renderRichText(content.closingCta)}
-            </a>
-            <Link
-              href="/contacto"
-              className="inline-flex min-h-12 items-center justify-center rounded-xl border border-white/30 bg-white/5 px-6 py-3 text-sm font-semibold !text-white backdrop-blur-xs hover:bg-white/10 transition-colors"
-            >
-              Más formas de contacto y formulario
-            </Link>
+    <MarcoSitio>
+      <Carpeta
+        actual="areas"
+        caratula={
+          <div className="grid grid-cols-[minmax(0,1fr)] gap-9 lg:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)] lg:gap-14">
+            <div>
+              <TituloPagina>{enLinea(contenido.title)}</TituloPagina>
+              <Entrada>{enLinea(contenido.description)}</Entrada>
+            </div>
+            <nav aria-label="Áreas en esta página">
+              <h2 className="mb-3 text-[14px] font-semibold text-ink-2">En esta página</h2>
+              <ol className="divide-y divide-manila-line border-y border-manila-line">
+                {areas.map((area) => (
+                  <li key={area.ancla}>
+                    <a href={`#${area.ancla}`} className="group flex items-center justify-between gap-4 py-3 text-[16px] text-ink">
+                      <span className="group-hover:text-navy group-hover:underline group-hover:underline-offset-4">{area.title}</span>
+                      <ArrowRight aria-hidden="true" size={16} strokeWidth={1.75} className="rotate-90 text-ink-2 group-hover:text-navy" />
+                    </a>
+                  </li>
+                ))}
+              </ol>
+            </nav>
           </div>
+        }
+      >
+        <div className="divide-y divide-line">
+          {areas.map((area) => (
+            <section key={area.ancla} id={area.ancla} aria-labelledby={`${area.ancla}-titulo`} className={`${RELLENO} scroll-mt-6`}>
+              <div className="grid grid-cols-[minmax(0,1fr)] gap-8 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.9fr)] lg:gap-14">
+                <div className="space-y-4">
+                  <TituloHoja id={`${area.ancla}-titulo`}>{area.title}</TituloHoja>
+                  <p className="max-w-[46ch] text-[17px] leading-[1.6] text-ink-2">{enLinea(area.description)}</p>
+                  <Link href={`/contacto?area=${area.area}#consulta`} className={`${clasesBoton("secondary", "lg")} mt-2`}>
+                    Consultar sobre este tema
+                  </Link>
+                </div>
+                <div className="grid grid-cols-[minmax(0,1fr)] gap-x-10 gap-y-8 sm:grid-cols-2">
+                  {area.sections.map((seccion) => (
+                    <div key={seccion.title}>
+                      <h3 className="text-[17px] font-semibold text-ink">{seccion.title}</h3>
+                      <ul className="mt-3 space-y-2 pl-5 text-[16px] leading-[1.5] text-ink-2 marker:text-ink-3 list-disc">
+                        {seccion.items.map((item) => <li key={item} className="pl-1">{item}</li>)}
+                      </ul>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </section>
+          ))}
+        </div>
+        <section aria-label={contenido.closingTitle}>
+        <div className={`${RELLENO} flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between`}>
+          <div className="space-y-3">
+            <TituloHoja>{enLinea(contenido.closingTitle)}</TituloHoja>
+            <p className="max-w-[60ch] text-[17px] leading-[1.6] text-ink-2">{enLinea(contenido.closingDescription)}</p>
+          </div>
+          <Link href="/contacto#consulta" className={`${clasesBoton("primary", "lg")} shrink-0`}>
+            {contenido.closingCta}
+          </Link>
+        </div>
         </section>
-      </main>
-    </MarketingLayout>
+      </Carpeta>
+    </MarcoSitio>
   );
 }

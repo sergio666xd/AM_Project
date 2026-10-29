@@ -207,6 +207,7 @@ A warm paper ground with logo navy for structure and logo gold for attention.
 - **Label** (600, 13px): field labels and secondary meta.
 - **Folio numeral** (Georgia 600 with old-style figures, 13–15px): only inside folio stamps.
 - **Radicado** (Roboto Mono, tabular): the 23-digit radicado, shown in its seven segments.
+- **Public site title** (Georgia 400, 34px mobile / 50px tablet / 58px desktop on the home carátula, 32/42px on inner pages, 1.1–1.14): the page title on each public carátula; public body copy runs at 17–19px.
 
 ### Named Rules
 **The Two Voices Rule.** Serif speaks for the file (titles, dates, folio numbers); sans speaks for the interface. Never set buttons, labels or body copy in Georgia.
@@ -214,6 +215,8 @@ A warm paper ground with logo navy for structure and logo gold for attention.
 ## Layout
 
 The lawyer shell is a fixed navy rail (248px) plus a sticky top bar with global search (Ctrl/Cmd+K) and a content column capped at 1280px with 16/24/32px gutters by breakpoint. Below the `lg` breakpoint the rail becomes a four-item bottom bar plus a "Más" sheet. The client shell drops the rail for a white header with the full landscape logo and a 1080px column.
+
+The public site (alejandramunozabogada.com) is light-only and uses the same materials: a white header with the landscape logo and a single "Portal de clientes" link, a 1180px column, and a navy footer. Each page is one folder: a manila carátula holding the title, intro and a facts list, the site's section tabs on its bottom edge (the current one carries the gold edge), and one white sheet below divided into folios by hairlines. Forms and closing calls to action live inside that sheet, never in floating cards.
 
 Pages stack sheets with 16–24px gaps. Main/aside splits collapse to one column below `lg`; grid children use `minmax(0,1fr)` so long radicados and names truncate instead of overflowing at 390px. Tables become stacked lists on mobile. Side panels (Avisar, Crear tarea) are right-hand drawers on desktop and bottom sheets on mobile.
 
@@ -241,6 +244,8 @@ Gently rounded paper: 12px on sheets and carátulas, 8px on buttons and inputs, 
 - **Notice:** tinted full-width message with icon, title, text and an action that drops under the text on mobile.
 - **Radicado:** mono, grouped in its seven official segments, with a copy button whose icon cross-fades to a check.
 - **Término calculator:** inside Crear tarea, counts Colombian business days skipping weekends, festivos and the judicial vacancy, shows "Vence el …" in headline type on gold-soft, and names any skipped holiday and the legal basis.
+- **Consultation form (public):** area chips, name, "WhatsApp o correo" in one field, message, and a consent checkbox linking the data policy. Errors sit under each field and focus moves to the first one; on success the form is replaced by a confirmation addressed to the person by first name, with no promised response time.
+- **Site content editor (admin):** each public page edits by named sections in plain language (Portada, Servicios, Cómo aparece en Google), lists add, reorder and remove items in collapsible rows, and a sticky bar appears only while there are unpublished changes. "Volver al texto base" asks for confirmation.
 - **Drawer:** focus moves in on open, Escape closes, footer holds Cancelar + the primary action.
 
 ## Do's and Don'ts

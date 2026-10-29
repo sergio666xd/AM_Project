@@ -1,103 +1,66 @@
-import { renderRichText } from "@/components/marketing/RichText";
-import { MarketingContactCta } from "@/components/marketing/MarketingContactCta";
-import { Compass, FileCheck2, Search, UserCheck, type LucideIcon } from "lucide-react";
-import { MarketingLayout } from "@/components/marketing/MarketingLayout";
-import { loadPublicPageContent } from "@/lib/publicPageContent";
-import { SITE_PAGE_DEFAULTS } from "@/lib/sitePageDefaults";
+import Link from "next/link";
+import { ArrowLeft } from "lucide-react";
+import { Carpeta, Entrada, RELLENO, TituloHoja, TituloPagina } from "@/components/sitio/Caratula";
+import { MarcoSitio } from "@/components/sitio/MarcoSitio";
+import { enLinea } from "@/components/sitio/Texto";
 import { generatePublicPageMetadata } from "@/lib/pageSeo";
+import { SITE_PAGE_DEFAULTS } from "@/lib/sitePageDefaults";
+import { cargarPagina } from "@/lib/sitioPublico";
 
 export function generateMetadata() {
   return generatePublicPageMetadata("filosofia", SITE_PAGE_DEFAULTS.filosofia, "/filosofia");
 }
 
-const stepIcons: LucideIcon[] = [Search, Compass, FileCheck2, UserCheck];
-
 export default async function Filosofia() {
-  const content = await loadPublicPageContent("filosofia", SITE_PAGE_DEFAULTS.filosofia);
+  const contenido = await cargarPagina("filosofia", SITE_PAGE_DEFAULTS.filosofia);
 
   return (
-    <MarketingLayout>
-      <main>
-        {/* Hero Section */}
-        <section className="relative overflow-hidden bg-gradient-to-b from-brand-950 via-brand-900 to-brand-950 px-5 py-20 text-white lg:px-8 lg:py-28 border-b border-gold-400/20">
-          <div className="mx-auto max-w-7xl">
-            <div className="max-w-3xl space-y-4">
-              <span className="inline-block text-xs font-bold uppercase tracking-widest text-gold-400">
-                {renderRichText(content.eyebrow)}
-              </span>
-              <h1 className="text-3xl sm:text-4xl lg:text-5xl font-display font-medium tracking-[-0.01em] text-white leading-tight">
-                {renderRichText(content.title)}
-              </h1>
-              <p className="text-lg sm:text-xl leading-relaxed text-neutral-300">
-                {renderRichText(content.intro)}
-              </p>
-            </div>
+    <MarcoSitio>
+      <Carpeta
+        actual="firma"
+        caratula={
+          <div>
+            <Link href="/quienes-somos" className="mb-5 inline-flex items-center gap-1.5 text-[15px] font-semibold text-ink-2 hover:text-navy">
+              <ArrowLeft aria-hidden="true" size={16} strokeWidth={2} />
+              Quiénes somos
+            </Link>
+            <TituloPagina>{enLinea(contenido.title)}</TituloPagina>
+            <Entrada>{enLinea(contenido.intro)}</Entrada>
+          </div>
+        }
+      >
+        <div className="divide-y divide-line">
+          <div className={`${RELLENO} grid grid-cols-[minmax(0,1fr)] gap-8 md:grid-cols-3 md:gap-10`}>
+            {contenido.values.map((valor) => (
+              <div key={valor.title}>
+                <h2 className="font-display text-[26px] leading-[1.2] text-ink">{valor.title}</h2>
+                <p className="mt-2 text-[17px] leading-[1.6] text-ink-2">{enLinea(valor.description)}</p>
+              </div>
+            ))}
+          </div>
 
-            <div className="mt-16 grid gap-8 sm:grid-cols-3">
-              {content.values.map((value) => (
-                <div key={value.number} className="border-t border-gold-400/40 pt-6 space-y-2">
-                  <span className="text-xs font-bold uppercase tracking-widest text-gold-400">
-                    {renderRichText(value.number)}
+          <section aria-labelledby="metodo" className={`${RELLENO} grid grid-cols-[minmax(0,1fr)] gap-8 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.9fr)] lg:gap-14`}>
+            <div className="space-y-3">
+              <TituloHoja id="metodo">{enLinea(contenido.methodologyTitle)}</TituloHoja>
+              <p className="max-w-[44ch] text-[17px] leading-[1.6] text-ink-2">{enLinea(contenido.methodologyDescription)}</p>
+            </div>
+            {/* Las etapas del acompañamiento, como la línea de etapas de un expediente. */}
+            <ol className="space-y-7">
+              {contenido.steps.map((paso, i) => (
+                <li key={paso.title} className="relative grid grid-cols-[40px_minmax(0,1fr)] gap-5 after:absolute after:top-10 after:-bottom-7 after:left-[19.5px] after:w-px after:bg-line-strong last:after:hidden">
+                  <span className="folio-num relative z-[1] flex size-10 items-center justify-center rounded-full bg-sheet text-[18px] text-navy shadow-[0_0_0_1.5px_var(--navy)]">
+                    {i + 1}
                   </span>
-                  <h2 className="text-xl sm:text-2xl font-display font-medium text-white">
-                    {renderRichText(value.title)}
-                  </h2>
-                  <p className="text-sm leading-relaxed text-neutral-300">
-                    {renderRichText(value.description)}
-                  </p>
-                </div>
-              ))}
-            </div>
-          </div>
-        </section>
-
-        {/* Methodology / Steps */}
-        <section className="mx-auto max-w-7xl px-5 py-20 lg:px-8 space-y-12">
-          <div className="mx-auto max-w-2xl text-center space-y-3">
-            <span className="inline-block text-xs font-bold uppercase tracking-widest text-gold-600">
-              {renderRichText(content.methodologyEyebrow)}
-            </span>
-            <h2 className="text-3xl sm:text-4xl font-display font-medium tracking-[-0.01em] text-foreground">
-              {renderRichText(content.methodologyTitle)}
-            </h2>
-            <p className="text-base text-foreground-muted">
-              {renderRichText(content.methodologyDescription)}
-            </p>
-          </div>
-
-          <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
-            {content.steps.map((step, index) => {
-              const Icon = stepIcons[index % stepIcons.length];
-              return (
-                <article
-                  key={step.step}
-                  className="marketing-card rounded-2xl border border-border bg-surface p-6 shadow-xs hover:border-gold-400 hover:shadow-md transition-all space-y-4"
-                >
-                  <div className="flex items-center justify-between">
-                    <span className="grid size-11 place-items-center rounded-xl bg-brand-50 text-brand-900 font-bold text-xs">
-                      <Icon className="size-5 text-brand-900" aria-hidden="true" />
-                    </span>
-                    <span className="rounded-full bg-gold-400/15 px-2.5 py-0.5 text-xs font-bold text-gold-700">
-                      {renderRichText(step.step)}
-                    </span>
+                  <div className="pt-1.5">
+                    <h3 className="text-[18px] font-semibold text-ink">{paso.title}</h3>
+                    <p className="mt-1.5 max-w-[56ch] text-[17px] leading-[1.6] text-ink-2">{enLinea(paso.description)}</p>
                   </div>
-                  <h3 className="text-base font-bold text-foreground">
-                    {renderRichText(step.title)}
-                  </h3>
-                  <p className="text-xs leading-relaxed text-foreground-muted">
-                    {renderRichText(step.description)}
-                  </p>
-                </article>
-              );
-            })}
-          </div>
-        </section>
-
-        {/* Contact CTA */}
-        <div className="mx-auto max-w-7xl px-5 pb-20 lg:px-8">
-          <MarketingContactCta />
+                </li>
+              ))}
+            </ol>
+          </section>
         </div>
-      </main>
-    </MarketingLayout>
+      </Carpeta>
+    </MarcoSitio>
   );
 }

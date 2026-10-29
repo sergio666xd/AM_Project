@@ -1386,3 +1386,28 @@ class IntentoLimitado(Base):
     id = Column(Integer, primary_key=True)
     clave = Column(String(80), nullable=False)
     creado_en = Column(DateTime, nullable=False, default=utc_ahora, index=True)
+
+
+class SolicitudContacto(Base):
+    """Mensaje que alguien deja en el formulario de contacto del sitio público."""
+    __tablename__ = "solicitudes_contacto"
+    __table_args__ = (
+        CheckConstraint("estado IN ('NUEVA', 'ATENDIDA', 'DESCARTADA')", name="ck_solicitud_contacto_estado"),
+        Index("ix_solicitud_contacto_estado_fecha", "estado", "created_at"),
+    )
+
+    id = Column(Integer, primary_key=True)
+    nombre = Column(String(150), nullable=False)
+    telefono = Column(String(40), nullable=True)
+    correo = Column(String(320), nullable=True)
+    area = Column(String(32), nullable=False)
+    mensaje = Column(Text, nullable=False)
+    autorizo_datos_en = Column(DateTime, nullable=False)
+    estado = Column(String(16), nullable=False, default="NUEVA")
+    nota = Column(Text, nullable=True)
+    aviso_firma = Column(String(16), nullable=False, default="PENDIENTE")
+    aviso_error = Column(Text, nullable=True)
+    atendida_por_id = Column(Integer, ForeignKey("usuarios.id", ondelete="SET NULL"), nullable=True)
+    atendida_en = Column(DateTime, nullable=True)
+    created_at = Column(DateTime, nullable=False, default=utc_ahora)
+    updated_at = Column(DateTime, nullable=False, default=utc_ahora, onupdate=utc_ahora)

@@ -27,7 +27,7 @@ const labels: Record<string, string> = {
   notificaciones: "Notificaciones",
   auditoria: "Auditoría",
   operacion: "Operación",
-  contenido: "Contenido público",
+  contenido: "Contenido",
   usuarios: "Usuarios",
   solicitudes: "Solicitudes",
   "solicitudes-perfil": "Solicitudes de perfil",
@@ -61,6 +61,8 @@ const labelsEnSeccion: Record<string, string> = {
   "chat/limpiar": "Limpieza de chats",
   "admin/chat": "Chats",
   "admin/auditoria": "Auditoría técnica",
+  "admin/sitio": "Sitio público",
+  "sitio/mensajes": "Mensajes del sitio",
 };
 
 function labelFor(segment: string, anterior?: string) {

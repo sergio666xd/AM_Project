@@ -9,6 +9,12 @@ ADMIN = "/gestion-procesos/admin"
 
 # Acciones con una frase propia.
 FRASES = {
+    "sitio.mensaje.atendida": "marcó como atendido un mensaje del sitio web",
+    "sitio.mensaje.descartada": "descartó un mensaje del sitio web",
+    "sitio.mensaje.nueva": "volvió a marcar como nuevo un mensaje del sitio web",
+    "sitio.mensaje.nota": "anotó un mensaje del sitio web",
+    "sitio.pagina.guardada": "editó una página del sitio web",
+    "sitio.pagina.restaurada": "devolvió una página del sitio web a su texto base",
     "abogado.crear": "creó la cuenta de un abogado",
     "admin.usuario.crear": "creó una cuenta",
     "admin.usuario.actualizar": "editó una cuenta",
@@ -123,11 +129,15 @@ def enlace(tipo_recurso: str, recurso_id: str | None) -> str | None:
         return f"{ADMIN}/usuarios/{con_id}"
     if tipo == "proceso" and con_id:
         return f"{ADMIN}/procesos/{con_id}"
+    if tipo == "solicitud_contacto" and con_id:
+        return f"{ADMIN}/sitio/mensajes?mensaje={con_id}"
+    if tipo == "pagina_publica" and recurso_id:
+        return f"{ADMIN}/sitio/contenido?pagina={recurso_id}"
     destinos = {
         "cuenta_cobro": "cobros", "pago_financiero": "cobros", "configuracion_correo_financiero": "finanzas",
         "tarea": "tareas", "subtarea": "tareas", "recordatorio_tarea": "tareas", "documento_proceso": "documentos",
         "solicitud_documento": "documentos", "radicado": "radicados", "contrato_servicio": "contratos",
-        "pagina_publica": "contenido", "plantilla_mensaje": "operacion/mensajes", "solicitud_edicion_perfil": "solicitudes-perfil",
+        "plantilla_mensaje": "operacion/mensajes", "solicitud_edicion_perfil": "solicitudes-perfil",
         "configuracion_integraciones": "operacion/integraciones", "configuracion_consultas": "operacion/consultas",
         "configuracion_firma": "firma", "evento_agenda": "agenda",
     }

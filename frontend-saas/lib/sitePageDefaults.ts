@@ -9,119 +9,334 @@ export const SITE_PAGE_LABELS: Record<string, string> = {
   "tratamiento-de-datos": "Tratamiento de datos",
 };
 
+// Texto base de cada página pública. Inicio, quiénes somos, contacto y las dos
+// políticas copian lo que la firma tenía publicado el 29/10/2026; lo que la
+// administración guarde en contenido_paginas se mezcla encima.
 export const SITE_PAGE_DEFAULTS = {
   inicio: {
     route: "/",
-    seo: { title: "Abogada en Sabaneta y asesoría jurídica", description: "Asesoría jurídica preventiva, estratégica y cercana para personas, familias y empresas en Sabaneta y toda Colombia.", keywords: "abogada en Sabaneta, asesoría jurídica, abogados en Colombia", noIndex: false },
+    seo: {
+      title: "Alejandra Muñoz | Abogada y Asociados",
+      description: "Asesoría jurídica preventiva, estratégica y cercana para personas, familias y empresas en Sabaneta y toda Colombia.",
+      keywords: "abogada en Sabaneta, asesoría jurídica, abogados en Colombia",
+      noIndex: false
+    },
     heroEyebrow: "Prevención · estrategia · representación",
     heroTitle: "Decisiones jurídicas bien informadas.",
     heroDescription: "Asesoría integral para personas, empresas y organizaciones, desde Sabaneta para toda Colombia.",
     heroCta: "Hablemos por WhatsApp",
-    heroAside: "Una consulta a tiempo protege su patrimonio, relaciones y tranquilidad.",
+    heroAside: "Una consulta a tiempo protege su patrimonio, sus relaciones y su tranquilidad.",
     servicesEyebrow: "Sectores de atención",
     servicesTitle: "Soluciones a la medida de su perfil",
     services: [
-      { icon: "family", title: "Personas y familias", description: "Protección de acuerdos familiares, herencias, patrimonio e inmuebles." },
-      { icon: "business", title: "Empresas y PyMEs", description: "Contratos sólidos, prevención de litigios y asesoría societaria." },
-      { icon: "building", title: "Propiedad horizontal", description: "Acompañamiento a administradores, consejos y cobro de cartera morosa." },
-      { icon: "government", title: "Entidades públicas", description: "Conceptos normativos, vía administrativa y contratación estatal." },
+      {
+        icon: "family",
+        title: "Personas y familias",
+        description: "Protección de acuerdos familiares, herencias, patrimonio e inmuebles."
+      },
+      {
+        icon: "business",
+        title: "Empresas y PyMEs",
+        description: "Contratos sólidos, prevención de litigios y asesoría societaria."
+      },
+      {
+        icon: "building",
+        title: "Propiedad horizontal",
+        description: "Acompañamiento a administradores, consejos y cobro de cartera morosa."
+      },
+      {
+        icon: "government",
+        title: "Entidades públicas",
+        description: "Conceptos normativos, vía administrativa y contratación estatal."
+      }
     ],
     servicesLink: "Ver todas las áreas de práctica",
     preventionEyebrow: "Enfoque preventivo",
     preventionTitle: "Un buen asesoramiento puede evitar un largo proceso judicial.",
     preventionDescription: "El costo emocional, financiero y de tiempo de un pleito suele superar la inversión de redactar un contrato bien estructurado o recibir asesoría a tiempo.",
-    preventionItems: ["Antes de firmar un contrato", "Antes de negociar un acuerdo", "Antes de comprar o vender", "Antes de emprender un negocio", "Antes de asumir una obligación", "Antes de iniciar un proceso"],
+    preventionItems: [
+      "Antes de firmar un contrato",
+      "Antes de negociar un acuerdo",
+      "Antes de comprar o vender",
+      "Antes de emprender un negocio",
+      "Antes de asumir una obligación",
+      "Antes de iniciar un proceso"
+    ],
     aboutTitle: "Conozca nuestro enfoque",
     aboutDescription: "Convertimos la complejidad jurídica en decisiones claras, con un acompañamiento humano y responsable.",
-    aboutLink: "Quiénes somos",
+    aboutLink: "Quiénes somos"
   },
   "quienes-somos": {
     route: "/quienes-somos",
-    seo: { title: "Quiénes somos | Asesoría jurídica", description: "Conozca el equipo y la forma de trabajo de Alejandra Muñoz Abogada y Asociados: derecho claro, preventivo y cercano.", keywords: "asesoría jurídica, abogada, asesoría legal Colombia", noIndex: false },
-    eyebrow: "Quiénes somos",
+    seo: {
+      title: "Quiénes somos | Alejandra Muñoz | Abogada y Asociados",
+      description: "Conozca el equipo y la forma de trabajo de Alejandra Muñoz Abogada y Asociados: derecho claro, preventivo y cercano.",
+      keywords: "firma jurídica, abogada, asesoría legal Colombia",
+      noIndex: false
+    },
+    eyebrow: "Nuestra firma",
     title: "Quiénes somos",
-    intro: "Somos un equipo jurídico comprometido con hacer el derecho más claro, preventivo y cercano.",
+    intro: "> El derecho también es una herramienta para prevenir.\n\nAlejandra Muñoz Abogada y Asociados es una firma jurídica colombiana con más de cinco años de trayectoria profesional, dedicada a la prevención de riesgos jurídicos, __asesoría__, __consultoría__, __representación judicial y extrajudicial__, y acompañamiento estratégico de **personas, familias, empresas y organizaciones**.\n\nEntendemos el ejercicio del derecho desde una perspectiva que combina conocimiento jurídico, análisis estratégico y comprensión de las circunstancias particulares de cada cliente.\n\n- Creemos que la mejor asesoría jurídica comienza con una pregunta: *¿__Qué consecuencias puede tener la decisión que está por tomar__?*\n\nUna firma jurídica verdaderamente cercana debe estar disponible no solamente cuando surge un conflicto, sino también antes de firmar, decidir, negociar, disponer de un patrimonio, asumir una obligación, iniciar un proyecto o adoptar una determinada actuación.\n\nPor eso, nuestro trabajo está orientado tanto a prevenir y anticipar riesgos como a actuar cuando el conflicto ya existe. Porque cuando una persona comprende sus derechos, sus obligaciones, sus alternativas y las consecuencias de cada camino, puede tomar decisiones jurídicas mejor informadas.",
     sections: [
-      { title: "Nuestro propósito", body: "Acompañar a personas y organizaciones en decisiones relevantes, anticipando riesgos y construyendo soluciones jurídicas sostenibles." },
-      { title: "Nuestra forma de trabajar", body: "Escuchamos primero, explicamos con claridad y proponemos una ruta de acción comprensible. Cada caso recibe un análisis responsable y una comunicación oportuna." },
-      { title: "Nuestros valores", body: "Rigor técnico, confidencialidad, cercanía y compromiso con los intereses legítimos de nuestros clientes." },
-    ],
+      {
+        title: "Nuestro propósito",
+        body: "> Convertir el conocimiento jurídico en decisiones que protejan lo que más importa.\n\nEstamos para brindar a nuestros clientes las herramientas jurídicas necesarias para comprender sus situaciones, evaluar alternativas y tomar decisiones informadas, oportunas y sostenibles.\n\nCreemos que el derecho no debe ser únicamente una respuesta frente al conflicto. También debe ser una herramienta para: prevenir, anticipar, proteger, negociar, decidir y actuar.\n\nPor eso, en cada caso logramos que nuestros clientes conozcan no solamente qué pueden hacer, sino también:\n\n- ¿Qué riesgos existen?\n- ¿Qué consecuencias puede tener cada decisión?\n- ¿Qué alternativas tienen?\n- ¿Qué oportunidades pueden aprovechar?\n- ¿Qué derechos pueden ejercer?\n- ¿Qué obligaciones deben cumplir?\n- ¿Cuándo es el momento adecuado para actuar?\n\nPorque decidir con información jurídica oportuna y profesional puede cambiar el resultado a su favor."
+      },
+      {
+        title: "Cómo lo hacemos",
+        body: "Escuchamos primero, explicamos con claridad y proponemos una ruta de acción comprensible. Cada caso recibe un análisis responsable y una comunicación oportuna.\n\n> Porque prevenir también es ejercer el derecho.\n\nNo todos los problemas jurídicos necesitan convertirse en procesos.\nAlgunos pueden evitarse con una conversación a tiempo, una revisión cuidadosa, una negociación adecuada, una decisión informada o un documento correctamente estructurado.\n\nPor eso creemos que el abogado no debe ser solamente quien aparece cuando el conflicto ya existe.\nTambién debe ser quien ayuda a evitar que ocurra y para eso estamos nosotros dispuestos a acompañarlo en cada paso y decisión."
+      },
+      {
+        title: "Nuestros principios y valores",
+        body: "Nos caracterizamos por ser profesionales con Rigor técnico, confidencialidad, oportunidad, prevención, cercanía y compromiso con los intereses legítimos de nuestros clientes, Integridad, independencia  transparencia, la pasión por nuestra profesión y la importancia de servir con calidad humana."
+      }
+    ]
   },
   "areas-de-practica": {
     route: "/areas-de-practica",
-    seo: { title: "Áreas de práctica jurídica", description: "Asesoría en derecho de familia, empresarial, contractual, inmobiliario, propiedad horizontal y derecho público en Colombia.", keywords: "derecho de familia, derecho empresarial, contratos, propiedad horizontal, derecho administrativo", noIndex: false },
+    seo: {
+      title: "Áreas de práctica jurídica | Alejandra Muñoz | Abogada y Asociados",
+      description: "Asesoría en derecho de familia, empresarial, contractual, inmobiliario, propiedad horizontal y derecho público en Colombia.",
+      keywords: "derecho de familia, derecho empresarial, contratos, propiedad horizontal, derecho administrativo",
+      noIndex: false
+    },
     eyebrow: "Áreas de práctica especializadas",
     title: "Asesoría integral que entiende el contexto de su decisión.",
     description: "Explore nuestros servicios jurídicos clasificados por rama de práctica profesional.",
     areas: [
-      { icon: "family", title: "Personas, familia y patrimonio", description: "Acompañamiento legal cercano y humano para proteger relaciones familiares, patrimonio y sucesión generacional.", sections: [
-        { title: "Derecho de familia y pareja", items: ["Divorcios y cesación de efectos civiles de matrimonio", "Unión marital de hecho y liquidación de sociedad patrimonial", "Capitulaciones matrimoniales y patrimoniales", "Fijación, aumento y exoneración de cuota alimentaria", "Custodia, reglamentación de visitas y patria potestad"] },
-        { title: "Sucesiones y planificación patrimonial", items: ["Procesos de sucesión notariales y judiciales", "Elaboración de testamentos e insinuaciones de donación", "Planificación de herencias en vida", "Protección de bienes: afectación a vivienda familiar y patrimonio de familia"] },
-        { title: "Contratos civiles y bienes", items: ["Compraventa y arrendamiento", "Estudios de títulos inmobiliarios", "Procesos de pertenencia y saneamiento de propiedad", "Controversias de responsabilidad civil"] },
-      ] },
-      { icon: "business", title: "Empresas, contratos y negocios", description: "Blindaje legal estratégico para PyMEs, emprendedores y corporaciones.", sections: [
-        { title: "Derecho corporativo y societario", items: ["Constitución, transformación y disolución de sociedades", "Acuerdos de accionistas y pactos de socios", "Reorganización empresarial y gobierno corporativo", "Actas de asamblea y juntas directivas"] },
-        { title: "Derecho comercial y contratación", items: ["Contratos mercantiles: distribución, franquicia y suministro", "Términos y condiciones para plataformas digitales y e-commerce", "Registro de marca e intangibles corporativos", "Protección de datos personales y SGPD"] },
-        { title: "Gestión de riesgos y cartera", items: ["Cobro prejurídico y ejecutivo de cartera", "Auditoría preventiva de contratos vigentes", "Resolución alternativa de conflictos comerciales"] },
-      ] },
-      { icon: "building", title: "Propiedad horizontal e inmobiliario", description: "Soporte jurídico integral para administradores, consejos, comités y copropietarios.", sections: [
-        { title: "Asesoría institucional y gobierno de PH", items: ["Revisión y reforma de reglamentos de propiedad horizontal", "Acompañamiento en asambleas ordinarias y extraordinarias", "Conceptos jurídicos para consejos de administración", "Manuales de convivencia y régimen sancionatorio"] },
-        { title: "Cobranza y litigios en PH", items: ["Recuperación de cartera de expensas comunes", "Procesos ejecutivos contra copropietarios morosos", "Querellas policivas y conflictos de convivencia", "Impugnación de actas de asamblea"] },
-      ] },
-      { icon: "government", title: "Derecho público y administrativo", description: "Representación y asesoría ante entidades del Estado y organismos de control.", sections: [
-        { title: "Actuaciones ante la administración", items: ["Derechos de petición y recursos en vía administrativa", "Acompañamiento en procesos sancionatorios", "Defensa en investigaciones disciplinarias y fiscales"] },
-        { title: "Contratación estatal y análisis normativo", items: ["Asesoría en licitaciones y contratación directa", "Estructuración de propuestas para licitadores del Estado", "Conceptos jurídicos y análisis de viabilidad normativa"] },
-      ] },
+      {
+        icon: "family",
+        title: "Personas, familia y patrimonio",
+        description: "Acompañamiento legal cercano y humano para proteger relaciones familiares, patrimonio y sucesión generacional.",
+        sections: [
+          {
+            title: "Derecho de familia y pareja",
+            items: [
+              "Divorcios y cesación de efectos civiles de matrimonio",
+              "Unión marital de hecho y liquidación de sociedad patrimonial",
+              "Capitulaciones matrimoniales y patrimoniales",
+              "Fijación, aumento y exoneración de cuota alimentaria",
+              "Custodia, reglamentación de visitas y patria potestad"
+            ]
+          },
+          {
+            title: "Sucesiones y planificación patrimonial",
+            items: [
+              "Procesos de sucesión notariales y judiciales",
+              "Elaboración de testamentos e insinuaciones de donación",
+              "Planificación de herencias en vida",
+              "Protección de bienes: afectación a vivienda familiar y patrimonio de familia"
+            ]
+          },
+          {
+            title: "Contratos civiles y bienes",
+            items: [
+              "Compraventa y arrendamiento",
+              "Estudios de títulos inmobiliarios",
+              "Procesos de pertenencia y saneamiento de propiedad",
+              "Controversias de responsabilidad civil"
+            ]
+          }
+        ]
+      },
+      {
+        icon: "business",
+        title: "Empresas, contratos y negocios",
+        description: "Blindaje legal estratégico para PyMEs, emprendedores y corporaciones.",
+        sections: [
+          {
+            title: "Derecho corporativo y societario",
+            items: [
+              "Constitución, transformación y disolución de sociedades",
+              "Acuerdos de accionistas y pactos de socios",
+              "Reorganización empresarial y gobierno corporativo",
+              "Actas de asamblea y juntas directivas"
+            ]
+          },
+          {
+            title: "Derecho comercial y contratación",
+            items: [
+              "Contratos mercantiles: distribución, franquicia y suministro",
+              "Términos y condiciones para plataformas digitales y e-commerce",
+              "Registro de marca e intangibles corporativos",
+              "Protección de datos personales y SGPD"
+            ]
+          },
+          {
+            title: "Gestión de riesgos y cartera",
+            items: [
+              "Cobro prejurídico y ejecutivo de cartera",
+              "Auditoría preventiva de contratos vigentes",
+              "Resolución alternativa de conflictos comerciales"
+            ]
+          }
+        ]
+      },
+      {
+        icon: "building",
+        title: "Propiedad horizontal e inmobiliario",
+        description: "Soporte jurídico integral para administradores, consejos, comités y copropietarios.",
+        sections: [
+          {
+            title: "Asesoría institucional y gobierno de PH",
+            items: [
+              "Revisión y reforma de reglamentos de propiedad horizontal",
+              "Acompañamiento en asambleas ordinarias y extraordinarias",
+              "Conceptos jurídicos para consejos de administración",
+              "Manuales de convivencia y régimen sancionatorio"
+            ]
+          },
+          {
+            title: "Cobranza y litigios en PH",
+            items: [
+              "Recuperación de cartera de expensas comunes",
+              "Procesos ejecutivos contra copropietarios morosos",
+              "Querellas policivas y conflictos de convivencia",
+              "Impugnación de actas de asamblea"
+            ]
+          }
+        ]
+      },
+      {
+        icon: "government",
+        title: "Derecho público y administrativo",
+        description: "Representación y asesoría ante entidades del Estado y organismos de control.",
+        sections: [
+          {
+            title: "Actuaciones ante la administración",
+            items: [
+              "Derechos de petición y recursos en vía administrativa",
+              "Acompañamiento en procesos sancionatorios",
+              "Defensa en investigaciones disciplinarias y fiscales"
+            ]
+          },
+          {
+            title: "Contratación estatal y análisis normativo",
+            items: [
+              "Asesoría en licitaciones y contratación directa",
+              "Estructuración de propuestas para licitadores del Estado",
+              "Conceptos jurídicos y análisis de viabilidad normativa"
+            ]
+          }
+        ]
+      }
     ],
     closingTitle: "¿Su requerimiento no encaja exactamente en estas categorías?",
     closingDescription: "Analizamos su caso particular para ofrecerle la mejor orientación jurídica.",
-    closingCta: "Consulta preliminar",
+    closingCta: "Consulta preliminar"
   },
   filosofia: {
     route: "/filosofia",
-    seo: { title: "Nuestra filosofía de trabajo", description: "Conozca nuestro enfoque jurídico basado en la prevención, la estrategia y la representación responsable.", keywords: "prevención jurídica, estrategia legal, representación jurídica", noIndex: false },
+    seo: {
+      title: "Nuestra filosofía de trabajo | Alejandra Muñoz | Abogada y Asociados",
+      description: "Conozca nuestro enfoque jurídico basado en la prevención, la estrategia y la representación responsable.",
+      keywords: "prevención jurídica, estrategia legal, representación jurídica",
+      noIndex: false
+    },
     eyebrow: "Nuestra filosofía de trabajo",
     title: "Prevenir. Estructurar. Defender.",
     intro: "Antes de que exista un pleito judicial, existió una decisión no asesorada. Aportamos claridad para elegir una ruta sólida desde el primer día.",
     values: [
-      { number: "01", title: "Prevención", description: "Identificamos riesgos anticipadamente en contratos, acuerdos y actuaciones formales." },
-      { number: "02", title: "Estrategia", description: "Diseñamos rutas claras alineadas con sus objetivos, optimizando tiempo y recursos." },
-      { number: "03", title: "Representación", description: "Acompañamos decisiones con rigor técnico, objetividad y firmeza ética." },
+      {
+        number: "01",
+        title: "Prevención",
+        description: "Identificamos riesgos anticipadamente en contratos, acuerdos y actuaciones formales."
+      },
+      {
+        number: "02",
+        title: "Estrategia",
+        description: "Diseñamos rutas claras alineadas con sus objetivos, optimizando tiempo y recursos."
+      },
+      {
+        number: "03",
+        title: "Representación",
+        description: "Acompañamos decisiones con rigor técnico, objetividad y firmeza ética."
+      }
     ],
     methodologyEyebrow: "Metodología de trabajo",
     methodologyTitle: "Cómo acompañamos su caso",
     methodologyDescription: "Un proceso estructurado en cuatro etapas para su tranquilidad.",
     steps: [
-      { step: "01", title: "Diagnóstico preventivo", description: "Escuchamos su situación, analizamos antecedentes y evaluamos riesgos jurídicos inmediatos y futuros." },
-      { step: "02", title: "Diseño estratégico", description: "Estructuramos un plan claro con alternativas viables, tiempos proyectados y presupuestos transparentes." },
-      { step: "03", title: "Ejecución y blindaje", description: "Redactamos instrumentos, negociamos acuerdos o representamos sus intereses con rigor técnico." },
-      { step: "04", title: "Seguimiento continuo", description: "Mantenemos información oportuna de cada avance y evaluamos resultados." },
-    ],
+      {
+        step: "01",
+        title: "Diagnóstico preventivo",
+        description: "Escuchamos su situación, analizamos antecedentes y evaluamos riesgos jurídicos inmediatos y futuros."
+      },
+      {
+        step: "02",
+        title: "Diseño estratégico",
+        description: "Estructuramos un plan claro con alternativas viables, tiempos proyectados y presupuestos transparentes."
+      },
+      {
+        step: "03",
+        title: "Ejecución y blindaje",
+        description: "Redactamos instrumentos, negociamos acuerdos o representamos sus intereses con rigor técnico."
+      },
+      {
+        step: "04",
+        title: "Seguimiento continuo",
+        description: "Mantenemos información oportuna de cada avance y evaluamos resultados."
+      }
+    ]
   },
   contacto: {
     route: "/contacto",
-    seo: { title: "Contacto y consulta jurídica", description: "Solicite orientación jurídica presencial en Sabaneta o virtual desde cualquier lugar de Colombia.", keywords: "consulta jurídica, abogada Sabaneta, contacto abogado Colombia", noIndex: false },
+    seo: {
+      title: "Contacto | Alejandra Muñoz | Abogada y Asociados",
+      description: "Solicite orientación jurídica presencial en Sabaneta o virtual desde cualquier lugar de Colombia.",
+      keywords: "consulta jurídica, abogada Sabaneta, contacto abogado Colombia",
+      noIndex: false
+    },
     eyebrow: "¿Tiene una decisión jurídica por tomar?",
     title: "Consulte antes de firmar, negociar o comprar.",
     intro: "Una decisión informada puede prevenir conflictos y costos innecesarios.",
     whatsappCta: "Escribir por WhatsApp",
     emailCta: "Enviar correo",
     contactOptions: [
-      { icon: "location", title: "Atención presencial", description: "Sabaneta, Antioquia. Sede principal con cita previa." },
-      { icon: "clock", title: "Atención virtual nacional", description: "Asesorías por Teams o Zoom para clientes en Colombia y el exterior." },
-      { icon: "email", title: "Correo directo", description: "alejandramunozabg@outlook.com" },
+      {
+        icon: "location",
+        title: "Atención presencial",
+        description: "Sabaneta, Antioquia. Sede principal con cita previa."
+      },
+      {
+        icon: "clock",
+        title: "Atención virtual nacional",
+        description: "Asesorías por Teams o Zoom para clientes en Colombia y el exterior."
+      },
+      {
+        icon: "email",
+        title: "Correo directo",
+        description: "alejandramunozabg@outlook.com"
+      }
     ],
     faqEyebrow: "Resolvemos sus dudas",
     faqs: [
-      { question: "¿Por qué consultar antes de firmar un contrato o tomar una decisión?", answer: "Una consulta preventiva permite identificar cláusulas abusivas, riesgos financieros ocultos o vacíos legales antes de obligarse jurídicamente." },
-      { question: "¿Cómo se programan y realizan las consultas?", answer: "Ofrecemos atención presencial en Sabaneta (Antioquia) y atención virtual por Teams o Zoom para clientes en cualquier parte del país." },
-      { question: "¿Cómo es el esquema de honorarios profesionales?", answer: "Trabajamos bajo esquemas claros previamente pactados: tarifas por trámite, igualas mensuales o porcentaje de éxito en gestión de cobranzas, según el caso." },
-      { question: "¿Ofrecen cobertura a nivel nacional?", answer: "Sí. Para trámites notariales, asesoría corporativa, contratos y procesos que permiten virtualidad, atendemos clientes de toda Colombia." },
-    ],
+      {
+        question: "¿Por qué consultar antes de firmar un contrato o tomar una decisión?",
+        answer: "Una consulta preventiva permite identificar cláusulas abusivas, riesgos financieros ocultos o vacíos legales antes de obligarse jurídicamente."
+      },
+      {
+        question: "¿Cómo se programan y realizan las consultas?",
+        answer: "Ofrecemos atención presencial en Sabaneta (Antioquia) y atención virtual por Teams o Zoom para clientes en cualquier parte del país."
+      },
+      {
+        question: "¿Cómo es el esquema de honorarios profesionales?",
+        answer: "Trabajamos bajo esquemas claros previamente pactados: tarifas por trámite, igualas mensuales o porcentaje de éxito en gestión de cobranzas, según el caso."
+      },
+      {
+        question: "¿Ofrecen cobertura a nivel nacional?",
+        answer: "Sí. Para trámites notariales, asesoría corporativa, contratos y procesos que permiten virtualidad, atendemos clientes de toda Colombia."
+      }
+    ]
   },
   "poliza-juridica": {
     route: "/poliza-juridica",
-    seo: { title: "Póliza jurídica para personas y empresas", description: "Acompañamiento jurídico continuo y ajustado a las necesidades de su organización o familia.", keywords: "póliza jurídica, asesoría jurídica mensual, acompañamiento legal empresas", noIndex: false },
+    seo: {
+      title: "Póliza jurídica para personas y empresas | Alejandra Muñoz | Abogada y Asociados",
+      description: "Acompañamiento jurídico continuo y ajustado a las necesidades de su organización o familia.",
+      keywords: "póliza jurídica, asesoría jurídica mensual, acompañamiento legal empresas",
+      noIndex: false
+    },
     eyebrow: "Acompañamiento jurídico continuo",
     title: "Póliza Jurídica: prevención y respaldo cuando lo necesita.",
     intro: "Una solución diseñada para contar con orientación jurídica de forma periódica, anticipar riesgos y atender las necesidades legales cotidianas sin empezar de cero cada vez.",
@@ -131,42 +346,118 @@ export const SITE_PAGE_DEFAULTS = {
     coverageTitle: "Servicios que pueden hacer parte de su póliza",
     coverageDescription: "El alcance, número de consultas y entregables se definen después de conocer su caso.",
     benefits: [
-      { icon: "message", title: "Consultas jurídicas recurrentes", description: "Un número de consultas mensuales definido según las necesidades de su organización o familia." },
-      { icon: "document", title: "Contratos y documentos", description: "Acompañamiento en revisión, elaboración y ajustes de documentos jurídicos prioritarios." },
-      { icon: "shield", title: "Prevención de riesgos", description: "Identificación temprana de contingencias para tomar decisiones con mayor seguridad." },
-      { icon: "followup", title: "Seguimiento y orientación", description: "Una ruta de acompañamiento clara para los asuntos jurídicos que requieran atención continua." },
+      {
+        icon: "message",
+        title: "Consultas jurídicas recurrentes",
+        description: "Un número de consultas mensuales definido según las necesidades de su organización o familia."
+      },
+      {
+        icon: "document",
+        title: "Contratos y documentos",
+        description: "Acompañamiento en revisión, elaboración y ajustes de documentos jurídicos prioritarios."
+      },
+      {
+        icon: "shield",
+        title: "Prevención de riesgos",
+        description: "Identificación temprana de contingencias para tomar decisiones con mayor seguridad."
+      },
+      {
+        icon: "followup",
+        title: "Seguimiento y orientación",
+        description: "Una ruta de acompañamiento clara para los asuntos jurídicos que requieran atención continua."
+      }
     ],
     closingEyebrow: "Primer paso",
     closingTitle: "Conozcamos sus necesidades antes de definir la cobertura.",
     closingDescription: "Escríbanos por WhatsApp. Realizaremos un estudio preliminar para proponer una póliza jurídica pertinente y transparente para usted.",
-    closingCta: "Consultar información adicional",
+    closingCta: "Consultar información adicional"
   },
   "politica-de-privacidad": {
     route: "/politica-de-privacidad",
-    seo: { title: "Política de privacidad", description: "Consulte cómo Alejandra Muñoz Abogada y Asociados protege y trata los datos personales de quienes usan este sitio.", keywords: "política de privacidad, protección de datos personales", noIndex: false },
+    seo: {
+      title: "Política de privacidad | Alejandra Muñoz | Abogada y Asociados",
+      description: "Consulte cómo Alejandra Muñoz Abogada y Asociados protege y trata los datos personales de quienes usan este sitio.",
+      keywords: "política de privacidad, protección de datos personales",
+      noIndex: false
+    },
     title: "Política de privacidad",
     updatedAt: "27 de septiembre de 2026",
     sections: [
-      { title: "Responsable", body: ["Alejandra Muñoz Abogada y Asociados [razón social/NIT pendiente de confirmar] es responsable del tratamiento de los datos personales recolectados en este sitio. Para ejercer sus derechos, escriba a [correo de protección de datos] o a [dirección física]."] },
-      { title: "Información que recopilamos", body: ["Podemos tratar datos de contacto, como nombre, correo electrónico y teléfono, además de la información que usted entregue voluntariamente al contactarnos o usar nuestros servicios. El formulario de Gestión de Procesos solicita únicamente correo electrónico."] },
-      { title: "Finalidades", body: ["Usamos los datos para responder solicitudes, prestar o preparar servicios jurídicos, gestionar la relación con clientes y proveedores, enviar novedades de Gestión de Procesos cuando exista autorización, y cumplir obligaciones legales."] },
-      { title: "Cookies y seguridad", body: ["El sitio puede usar tecnologías necesarias para su funcionamiento y medición. Aplicamos medidas técnicas, humanas y administrativas razonables para proteger la información; sin embargo, ninguna transmisión por internet es completamente segura."] },
-      { title: "Cambios", body: ["Esta política puede actualizarse. La versión vigente se publicará en esta página con su fecha de actualización."] },
-    ],
+      {
+        title: "Responsable",
+        body: [
+          "Alejandra Muñoz Abogada y Asociados [razón social/NIT pendiente de confirmar] es responsable del tratamiento de los datos personales recolectados en este sitio. Para ejercer sus derechos, escriba a [correo de protección de datos] o a [dirección física]."
+        ]
+      },
+      {
+        title: "Información que recopilamos",
+        body: [
+          "Podemos tratar datos de contacto, como nombre, correo electrónico y teléfono, además de la información que usted entregue voluntariamente al contactarnos o usar nuestros servicios. El formulario de Gestión de Procesos solicita únicamente correo electrónico."
+        ]
+      },
+      {
+        title: "Finalidades",
+        body: [
+          "Usamos los datos para responder solicitudes, prestar o preparar servicios jurídicos, gestionar la relación con clientes y proveedores, enviar novedades de Gestión de Procesos cuando exista autorización, y cumplir obligaciones legales."
+        ]
+      },
+      {
+        title: "Cookies y seguridad",
+        body: [
+          "El sitio puede usar tecnologías necesarias para su funcionamiento y medición. Aplicamos medidas técnicas, humanas y administrativas razonables para proteger la información; sin embargo, ninguna transmisión por internet es completamente segura."
+        ]
+      },
+      {
+        title: "Cambios",
+        body: [
+          "Esta política puede actualizarse. La versión vigente se publicará en esta página con su fecha de actualización."
+        ]
+      }
+    ]
   },
   "tratamiento-de-datos": {
     route: "/tratamiento-de-datos",
-    seo: { title: "Política de tratamiento de datos personales", description: "Conozca sus derechos y las finalidades, procedimientos y canales para ejercerlos respecto de sus datos personales.", keywords: "tratamiento de datos personales, Ley 1581 de 2012, derechos del titular", noIndex: false },
+    seo: {
+      title: "Política de tratamiento de datos personales | Alejandra Muñoz | Abogada y Asociados",
+      description: "Conozca sus derechos y las finalidades, procedimientos y canales para ejercerlos respecto de sus datos personales.",
+      keywords: "tratamiento de datos personales, Ley 1581 de 2012, derechos del titular",
+      noIndex: false
+    },
     title: "Política de tratamiento de datos personales",
     updatedAt: "27 de septiembre de 2026",
     sections: [
-      { title: "Marco y alcance", body: ["Esta política regula el tratamiento de datos personales realizado por Alejandra Muñoz Abogada y Asociados [razón social/NIT pendiente de confirmar], en cumplimiento de la Constitución Política, la Ley 1581 de 2012 y el Decreto 1074 de 2015, así como las normas que los modifiquen o sustituyan."] },
-      { title: "Derechos del titular", body: ["El titular puede conocer, actualizar y rectificar sus datos; solicitar prueba de la autorización; ser informado sobre el uso dado a sus datos; presentar quejas ante la Superintendencia de Industria y Comercio; revocar la autorización o solicitar la supresión cuando sea procedente; y acceder gratuitamente a sus datos."] },
-      { title: "Autorización y finalidades", body: ["Salvo excepciones legales, se solicitará autorización previa, expresa e informada. Los datos se tratarán para las finalidades informadas al recolectarlos: atención de solicitudes, relación contractual o profesional, obligaciones legales, comunicaciones autorizadas y mejora de servicios."] },
-      { title: "Consultas y reclamos", body: ["Para consultas, reclamos, actualización, rectificación, supresión o revocatoria, el titular debe escribir a [correo de protección de datos] indicando nombre, identificación, datos de contacto, descripción de la solicitud y soportes cuando correspondan. Las consultas se atenderán en hasta diez (10) días hábiles; los reclamos, en hasta quince (15) días hábiles, con las prórrogas legalmente permitidas."] },
-      { title: "Vigencia", body: ["Los datos se conservarán durante el tiempo necesario para cumplir las finalidades y obligaciones legales o contractuales. Esta política rige desde su publicación y estará disponible de forma permanente en el sitio web."] },
-    ],
-  },
+      {
+        title: "Marco y alcance",
+        body: [
+          "Esta política regula el tratamiento de datos personales realizado por Alejandra Muñoz Abogada y Asociados [razón social/NIT pendiente de confirmar], en cumplimiento de la Constitución Política, la Ley 1581 de 2012 y el Decreto 1074 de 2015, así como las normas que los modifiquen o sustituyan."
+        ]
+      },
+      {
+        title: "Derechos del titular",
+        body: [
+          "El titular puede conocer, actualizar y rectificar sus datos; solicitar prueba de la autorización; ser informado sobre el uso dado a sus datos; presentar quejas ante la Superintendencia de Industria y Comercio; revocar la autorización o solicitar la supresión cuando sea procedente; y acceder gratuitamente a sus datos."
+        ]
+      },
+      {
+        title: "Autorización y finalidades",
+        body: [
+          "Salvo excepciones legales, se solicitará autorización previa, expresa e informada. Los datos se tratarán para las finalidades informadas al recolectarlos: atención de solicitudes, relación contractual o profesional, obligaciones legales, comunicaciones autorizadas y mejora de servicios."
+        ]
+      },
+      {
+        title: "Consultas y reclamos",
+        body: [
+          "Para consultas, reclamos, actualización, rectificación, supresión o revocatoria, el titular debe escribir a [correo de protección de datos] indicando nombre, identificación, datos de contacto, descripción de la solicitud y soportes cuando correspondan. Las consultas se atenderán en hasta diez (10) días hábiles; los reclamos, en hasta quince (15) días hábiles, con las prórrogas legalmente permitidas."
+        ]
+      },
+      {
+        title: "Vigencia",
+        body: [
+          "Los datos se conservarán durante el tiempo necesario para cumplir las finalidades y obligaciones legales o contractuales. Esta política rige desde su publicación y estará disponible de forma permanente en el sitio web."
+        ]
+      }
+    ]
+  }
 } as const;
 
 export type PublicPageSlug = keyof typeof SITE_PAGE_DEFAULTS;
