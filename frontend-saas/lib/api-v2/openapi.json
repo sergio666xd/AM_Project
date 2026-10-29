@@ -4980,7 +4980,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/AccesoEnviado"
+                  "$ref": "#/components/schemas/app__modulos__clientes__esquemas__AccesoEnviado"
                 }
               }
             }
@@ -9842,33 +9842,1545 @@
           }
         }
       }
+    },
+    "/api/v2/admin/resumen": {
+      "get": {
+        "tags": [
+          "Administración"
+        ],
+        "summary": "Resumen de la administración",
+        "description": "Alertas vigentes, estado de las integraciones, cifras de la firma y actividad reciente.",
+        "operationId": "resumen_admin",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResumenAdmin"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too Many Requests",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v2/admin/alertas": {
+      "get": {
+        "tags": [
+          "Administración"
+        ],
+        "summary": "Alertas de la administración",
+        "operationId": "listar_alertas_admin",
+        "parameters": [
+          {
+            "name": "descartadas",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "description": "true: las que la administración ocultó.",
+              "default": false,
+              "title": "Descartadas"
+            },
+            "description": "true: las que la administración ocultó."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ListaAlertas"
+                }
+              }
+            }
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Too Many Requests"
+          }
+        }
+      }
+    },
+    "/api/v2/admin/alertas/{alerta_id}/descartar": {
+      "post": {
+        "tags": [
+          "Administración"
+        ],
+        "summary": "Descartar una alerta",
+        "description": "La oculta del resumen. Devuelve las alertas que siguen a la vista.",
+        "operationId": "descartar_alerta",
+        "parameters": [
+          {
+            "name": "alerta_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Alerta Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ListaAlertas"
+                }
+              }
+            }
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Too Many Requests"
+          }
+        }
+      }
+    },
+    "/api/v2/admin/alertas/{alerta_id}/restaurar": {
+      "post": {
+        "tags": [
+          "Administración"
+        ],
+        "summary": "Volver a mostrar una alerta",
+        "description": "Devuelve las alertas que siguen descartadas.",
+        "operationId": "restaurar_alerta",
+        "parameters": [
+          {
+            "name": "alerta_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Alerta Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ListaAlertas"
+                }
+              }
+            }
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Too Many Requests"
+          }
+        }
+      }
+    },
+    "/api/v2/admin/usuarios": {
+      "get": {
+        "tags": [
+          "Administración"
+        ],
+        "summary": "Cuentas de la plataforma",
+        "operationId": "listar_usuarios_admin",
+        "parameters": [
+          {
+            "name": "grupo",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "enum": [
+                "equipo",
+                "clientes",
+                "administradores"
+              ],
+              "type": "string",
+              "default": "equipo",
+              "title": "Grupo"
+            }
+          },
+          {
+            "name": "estado",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "enum": [
+                    "activo",
+                    "suspendido",
+                    "pendiente",
+                    "rechazado"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Estado"
+            }
+          },
+          {
+            "name": "acceso",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "enum": [
+                    "activo",
+                    "sin_ingreso"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Acceso"
+            }
+          },
+          {
+            "name": "q",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "maxLength": 120
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Nombre, correo o WhatsApp.",
+              "title": "Q"
+            },
+            "description": "Nombre, correo o WhatsApp."
+          },
+          {
+            "name": "limite",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 100,
+              "minimum": 1,
+              "description": "Elementos por página.",
+              "default": 25,
+              "title": "Limite"
+            },
+            "description": "Elementos por página."
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "maxLength": 500
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Valor de `siguiente` de la página anterior.",
+              "title": "Cursor"
+            },
+            "description": "Valor de `siguiente` de la página anterior."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PaginaUsuarios"
+                }
+              }
+            }
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Too Many Requests"
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Administración"
+        ],
+        "summary": "Crear una cuenta",
+        "description": "La contraseña temporal se genera y llega por correo; la persona la cambia al entrar.",
+        "operationId": "crear_usuario_admin",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NuevoUsuario"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FichaUsuario"
+                }
+              }
+            }
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Too Many Requests"
+          }
+        }
+      }
+    },
+    "/api/v2/admin/usuarios/estado": {
+      "post": {
+        "tags": [
+          "Administración"
+        ],
+        "summary": "Suspender o reactivar varias cuentas",
+        "operationId": "cambiar_estado_usuarios",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CambioEstadoVarios"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EstadoActualizado"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too Many Requests",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v2/admin/usuarios/{usuario_id}": {
+      "get": {
+        "tags": [
+          "Administración"
+        ],
+        "summary": "Ficha de una cuenta",
+        "operationId": "ficha_usuario_admin",
+        "parameters": [
+          {
+            "name": "usuario_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Usuario Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FichaUsuario"
+                }
+              }
+            }
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Too Many Requests"
+          }
+        }
+      },
+      "patch": {
+        "tags": [
+          "Administración"
+        ],
+        "summary": "Editar una cuenta",
+        "description": "El rol solo cambia en cuentas activas que aún no tienen información de la firma.",
+        "operationId": "editar_usuario_admin",
+        "parameters": [
+          {
+            "name": "usuario_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Usuario Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CambioUsuario"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FichaUsuario"
+                }
+              }
+            }
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Too Many Requests"
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Administración"
+        ],
+        "summary": "Eliminar una cuenta sin información",
+        "description": "Solo cuentas creadas por error, sin procesos, tareas, documentos, cobros ni mensajes.",
+        "operationId": "eliminar_usuario_admin",
+        "parameters": [
+          {
+            "name": "usuario_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Usuario Id"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Too Many Requests"
+          }
+        }
+      }
+    },
+    "/api/v2/admin/usuarios/{usuario_id}/estado": {
+      "post": {
+        "tags": [
+          "Administración"
+        ],
+        "summary": "Suspender o reactivar una cuenta",
+        "description": "Suspender cierra sus sesiones abiertas.",
+        "operationId": "cambiar_estado_usuario",
+        "parameters": [
+          {
+            "name": "usuario_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Usuario Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CambioEstado"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FichaUsuario"
+                }
+              }
+            }
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Too Many Requests"
+          }
+        }
+      }
+    },
+    "/api/v2/admin/usuarios/{usuario_id}/acceso": {
+      "post": {
+        "tags": [
+          "Administración"
+        ],
+        "summary": "Reenviar el acceso",
+        "description": "Nueva contraseña temporal por correo, para quien aún no ha entrado.",
+        "operationId": "reenviar_acceso_usuario",
+        "parameters": [
+          {
+            "name": "usuario_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Usuario Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/app__modulos__administracion__esquemas__AccesoEnviado"
+                }
+              }
+            }
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Too Many Requests"
+          }
+        }
+      }
+    },
+    "/api/v2/admin/usuarios/{usuario_id}/enlace-contrasena": {
+      "post": {
+        "tags": [
+          "Administración"
+        ],
+        "summary": "Enviar enlace para cambiar la contraseña",
+        "description": "Para quien ya entró y olvidó su contraseña.",
+        "operationId": "enviar_enlace_contrasena",
+        "parameters": [
+          {
+            "name": "usuario_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Usuario Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/app__modulos__administracion__esquemas__AccesoEnviado"
+                }
+              }
+            }
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Too Many Requests"
+          }
+        }
+      }
+    },
+    "/api/v2/admin/usuarios/{usuario_id}/cerrar-sesiones": {
+      "post": {
+        "tags": [
+          "Administración"
+        ],
+        "summary": "Cerrar sus sesiones",
+        "description": "Tendrá que iniciar sesión de nuevo en todos sus dispositivos.",
+        "operationId": "cerrar_sesiones_usuario",
+        "parameters": [
+          {
+            "name": "usuario_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Usuario Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FichaUsuario"
+                }
+              }
+            }
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Too Many Requests"
+          }
+        }
+      }
     }
   },
   "components": {
     "schemas": {
-      "AccesoEnviado": {
-        "properties": {
-          "canal": {
-            "type": "string",
-            "enum": [
-              "EMAIL",
-              "WHATSAPP"
-            ],
-            "title": "Canal"
-          },
-          "destino": {
-            "type": "string",
-            "title": "Destino",
-            "description": "Correo o WhatsApp al que se envió."
-          }
-        },
-        "type": "object",
-        "required": [
-          "canal",
-          "destino"
-        ],
-        "title": "AccesoEnviado"
-      },
       "Agenda": {
         "properties": {
           "desde": {
@@ -9978,6 +11490,87 @@
           "por"
         ],
         "title": "AjusteVista"
+      },
+      "Alerta": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id",
+            "description": "Estable mientras dure el problema, por ejemplo `consulta:812`."
+          },
+          "tipo": {
+            "type": "string",
+            "enum": [
+              "consulta_fallida",
+              "entrega_fallida",
+              "solicitud_perfil",
+              "sin_ingreso"
+            ],
+            "title": "Tipo"
+          },
+          "gravedad": {
+            "type": "string",
+            "enum": [
+              "alta",
+              "media"
+            ],
+            "title": "Gravedad"
+          },
+          "titulo": {
+            "type": "string",
+            "title": "Titulo"
+          },
+          "detalle": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Detalle"
+          },
+          "enlace": {
+            "type": "string",
+            "title": "Enlace",
+            "description": "Ruta del panel donde se resuelve."
+          },
+          "accion": {
+            "type": "string",
+            "title": "Accion",
+            "description": "Texto del enlace, por ejemplo «Ver la consulta»."
+          },
+          "fecha": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fecha"
+          },
+          "descartada": {
+            "type": "boolean",
+            "title": "Descartada"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "tipo",
+          "gravedad",
+          "titulo",
+          "detalle",
+          "enlace",
+          "accion",
+          "fecha",
+          "descartada"
+        ],
+        "title": "Alerta"
       },
       "AplicacionDePago": {
         "properties": {
@@ -10687,6 +12280,50 @@
         "title": "CambioEnLote",
         "description": "Lo que se cambia a todas las tareas elegidas. Solo se aplican los campos enviados."
       },
+      "CambioEstado": {
+        "properties": {
+          "estado": {
+            "type": "string",
+            "enum": [
+              "activo",
+              "suspendido"
+            ],
+            "title": "Estado"
+          }
+        },
+        "type": "object",
+        "required": [
+          "estado"
+        ],
+        "title": "CambioEstado"
+      },
+      "CambioEstadoVarios": {
+        "properties": {
+          "estado": {
+            "type": "string",
+            "enum": [
+              "activo",
+              "suspendido"
+            ],
+            "title": "Estado"
+          },
+          "ids": {
+            "items": {
+              "type": "integer"
+            },
+            "type": "array",
+            "maxItems": 200,
+            "minItems": 1,
+            "title": "Ids"
+          }
+        },
+        "type": "object",
+        "required": [
+          "estado",
+          "ids"
+        ],
+        "title": "CambioEstadoVarios"
+      },
       "CambioEtapa": {
         "properties": {
           "etapa": {
@@ -10757,6 +12394,104 @@
           "fecha_limite"
         ],
         "title": "CambioFecha"
+      },
+      "CambioUsuario": {
+        "properties": {
+          "nombre": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 150,
+                "minLength": 2
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Nombre"
+          },
+          "whatsapp": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 20
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Whatsapp"
+          },
+          "rol": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "ABOGADO_ADMIN",
+                  "CLIENTE"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rol"
+          },
+          "responsable_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Responsable Id"
+          }
+        },
+        "type": "object",
+        "title": "CambioUsuario"
+      },
+      "CifraFirma": {
+        "properties": {
+          "clave": {
+            "type": "string",
+            "enum": [
+              "procesos_activos",
+              "tareas_vencidas",
+              "documentos_por_revisar",
+              "cuentas_vencidas"
+            ],
+            "title": "Clave"
+          },
+          "cantidad": {
+            "type": "integer",
+            "title": "Cantidad"
+          },
+          "texto": {
+            "type": "string",
+            "title": "Texto",
+            "description": "La cifra en una frase: «3 tareas vencidas»."
+          },
+          "enlace": {
+            "type": "string",
+            "title": "Enlace"
+          },
+          "atencion": {
+            "type": "boolean",
+            "title": "Atencion",
+            "description": "Verdadero cuando la cifra pide revisar algo."
+          }
+        },
+        "type": "object",
+        "required": [
+          "clave",
+          "cantidad",
+          "texto",
+          "enlace",
+          "atencion"
+        ],
+        "title": "CifraFirma"
       },
       "ClienteFicha": {
         "properties": {
@@ -11186,6 +12921,39 @@
           "rol"
         ],
         "title": "Contacto"
+      },
+      "ConteoUsuarios": {
+        "properties": {
+          "equipo": {
+            "type": "integer",
+            "title": "Equipo"
+          },
+          "clientes": {
+            "type": "integer",
+            "title": "Clientes"
+          },
+          "administradores": {
+            "type": "integer",
+            "title": "Administradores"
+          },
+          "sin_ingreso": {
+            "type": "integer",
+            "title": "Sin Ingreso"
+          },
+          "suspendidos": {
+            "type": "integer",
+            "title": "Suspendidos"
+          }
+        },
+        "type": "object",
+        "required": [
+          "equipo",
+          "clientes",
+          "administradores",
+          "sin_ingreso",
+          "suspendidos"
+        ],
+        "title": "ConteoUsuarios"
       },
       "Contrato": {
         "properties": {
@@ -12708,6 +14476,19 @@
         ],
         "title": "ErrorRespuesta"
       },
+      "EstadoActualizado": {
+        "properties": {
+          "actualizados": {
+            "type": "integer",
+            "title": "Actualizados"
+          }
+        },
+        "type": "object",
+        "required": [
+          "actualizados"
+        ],
+        "title": "EstadoActualizado"
+      },
       "EstadoDeCuenta": {
         "properties": {
           "cliente": {
@@ -12752,6 +14533,78 @@
         ],
         "title": "EstadoDeCuenta"
       },
+      "EstadoIntegracion": {
+        "properties": {
+          "clave": {
+            "type": "string",
+            "enum": [
+              "rama_judicial",
+              "correo",
+              "whatsapp",
+              "push",
+              "almacenamiento"
+            ],
+            "title": "Clave"
+          },
+          "nombre": {
+            "type": "string",
+            "title": "Nombre"
+          },
+          "estado": {
+            "type": "string",
+            "enum": [
+              "ok",
+              "aviso",
+              "falla",
+              "sin_configurar"
+            ],
+            "title": "Estado"
+          },
+          "resumen": {
+            "type": "string",
+            "title": "Resumen",
+            "description": "Una frase: «Última consulta hoy a las 12:00», «Faltan los datos del servidor»."
+          },
+          "detalle": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Detalle"
+          },
+          "ultima_vez": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ultima Vez"
+          },
+          "enlace": {
+            "type": "string",
+            "title": "Enlace"
+          }
+        },
+        "type": "object",
+        "required": [
+          "clave",
+          "nombre",
+          "estado",
+          "resumen",
+          "detalle",
+          "ultima_vez",
+          "enlace"
+        ],
+        "title": "EstadoIntegracion"
+      },
       "EtapaCliente": {
         "properties": {
           "clave": {
@@ -12790,6 +14643,67 @@
           "fecha"
         ],
         "title": "EtapaCliente"
+      },
+      "EventoActividad": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "actor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Actor"
+          },
+          "actor_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Actor Id"
+          },
+          "frase": {
+            "type": "string",
+            "title": "Frase",
+            "description": "Lo que hizo, en pasado: «emitió una cuenta de cobro»."
+          },
+          "enlace": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Enlace"
+          },
+          "fecha": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Fecha"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "actor",
+          "actor_id",
+          "frase",
+          "enlace",
+          "fecha"
+        ],
+        "title": "EventoActividad"
       },
       "Explicacion": {
         "properties": {
@@ -12935,6 +14849,154 @@
           "descripcion"
         ],
         "title": "FechaProxima"
+      },
+      "FichaUsuario": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "nombre": {
+            "type": "string",
+            "title": "Nombre"
+          },
+          "email": {
+            "type": "string",
+            "title": "Email"
+          },
+          "whatsapp": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Whatsapp"
+          },
+          "rol": {
+            "type": "string",
+            "enum": [
+              "ABOGADO_ADMIN",
+              "ABOGADO",
+              "CLIENTE",
+              "ADMIN"
+            ],
+            "title": "Rol"
+          },
+          "estado": {
+            "type": "string",
+            "enum": [
+              "activo",
+              "suspendido",
+              "pendiente",
+              "rechazado"
+            ],
+            "title": "Estado"
+          },
+          "acceso": {
+            "type": "string",
+            "enum": [
+              "activo",
+              "sin_ingreso",
+              "suspendido"
+            ],
+            "title": "Acceso",
+            "description": "sin_ingreso: aún no entra con su contraseña temporal."
+          },
+          "ultimo_acceso": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ultimo Acceso"
+          },
+          "creado_en": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Creado En"
+          },
+          "procesos": {
+            "type": "integer",
+            "title": "Procesos",
+            "description": "Procesos activos en los que participa."
+          },
+          "responsable": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PersonaBreve"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Abogado de la firma a cargo del cliente."
+          },
+          "debe_cambiar_password": {
+            "type": "boolean",
+            "title": "Debe Cambiar Password"
+          },
+          "totales": {
+            "$ref": "#/components/schemas/TotalesUsuario"
+          },
+          "procesos_detalle": {
+            "items": {
+              "$ref": "#/components/schemas/ProcesoDelUsuario"
+            },
+            "type": "array",
+            "title": "Procesos Detalle"
+          },
+          "actividad": {
+            "items": {
+              "$ref": "#/components/schemas/EventoActividad"
+            },
+            "type": "array",
+            "title": "Actividad"
+          },
+          "puede_eliminarse": {
+            "type": "boolean",
+            "title": "Puede Eliminarse",
+            "description": "Solo las cuentas sin información asociada se pueden eliminar."
+          },
+          "puede_cambiar_rol": {
+            "type": "boolean",
+            "title": "Puede Cambiar Rol"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "nombre",
+          "email",
+          "whatsapp",
+          "rol",
+          "estado",
+          "acceso",
+          "ultimo_acceso",
+          "creado_en",
+          "procesos",
+          "responsable",
+          "debe_cambiar_password",
+          "totales",
+          "procesos_detalle",
+          "actividad",
+          "puede_eliminarse",
+          "puede_cambiar_rol"
+        ],
+        "title": "FichaUsuario"
       },
       "Folio": {
         "properties": {
@@ -13456,6 +15518,28 @@
           "valor_unitario"
         ],
         "title": "LineaNueva"
+      },
+      "ListaAlertas": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/Alerta"
+            },
+            "type": "array",
+            "title": "Items"
+          },
+          "descartadas": {
+            "type": "integer",
+            "title": "Descartadas",
+            "description": "Alertas vigentes que la administración ocultó."
+          }
+        },
+        "type": "object",
+        "required": [
+          "items",
+          "descartadas"
+        ],
+        "title": "ListaAlertas"
       },
       "ListaArchivos": {
         "properties": {
@@ -13979,6 +16063,60 @@
         ],
         "title": "NuevoMensaje"
       },
+      "NuevoUsuario": {
+        "properties": {
+          "nombre": {
+            "type": "string",
+            "maxLength": 150,
+            "minLength": 2,
+            "title": "Nombre"
+          },
+          "email": {
+            "type": "string",
+            "format": "email",
+            "title": "Email"
+          },
+          "whatsapp": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 20
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Whatsapp"
+          },
+          "rol": {
+            "type": "string",
+            "enum": [
+              "ABOGADO_ADMIN",
+              "CLIENTE"
+            ],
+            "title": "Rol"
+          },
+          "responsable_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Responsable Id",
+            "description": "Obligatorio para clientes: abogado de la firma a cargo."
+          }
+        },
+        "type": "object",
+        "required": [
+          "nombre",
+          "email",
+          "rol"
+        ],
+        "title": "NuevoUsuario"
+      },
       "OpcionReferencia": {
         "properties": {
           "tipo": {
@@ -14177,6 +16315,45 @@
           "siguiente"
         ],
         "title": "PaginaProcesos"
+      },
+      "PaginaUsuarios": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/UsuarioFila"
+            },
+            "type": "array",
+            "title": "Items"
+          },
+          "total": {
+            "type": "integer",
+            "title": "Total",
+            "description": "Cantidad total con los filtros aplicados, sin contar el cursor."
+          },
+          "siguiente": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Siguiente",
+            "description": "Cursor de la página siguiente, o null si no hay más."
+          },
+          "conteo": {
+            "$ref": "#/components/schemas/ConteoUsuarios"
+          }
+        },
+        "type": "object",
+        "required": [
+          "items",
+          "total",
+          "siguiente",
+          "conteo"
+        ],
+        "title": "PaginaUsuarios"
       },
       "PagoNuevo": {
         "properties": {
@@ -15185,6 +17362,51 @@
         ],
         "title": "ProcesoDelFolio"
       },
+      "ProcesoDelUsuario": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "nombre": {
+            "type": "string",
+            "title": "Nombre"
+          },
+          "papel": {
+            "type": "string",
+            "enum": [
+              "responsable",
+              "colaborador",
+              "cliente"
+            ],
+            "title": "Papel"
+          },
+          "archivado": {
+            "type": "boolean",
+            "title": "Archivado"
+          },
+          "responsable": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Responsable"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "nombre",
+          "papel",
+          "archivado",
+          "responsable"
+        ],
+        "title": "ProcesoDelUsuario"
+      },
       "ProcesoDetalle": {
         "properties": {
           "id": {
@@ -15615,6 +17837,52 @@
           "items"
         ],
         "title": "Resultados"
+      },
+      "ResumenAdmin": {
+        "properties": {
+          "alertas": {
+            "items": {
+              "$ref": "#/components/schemas/Alerta"
+            },
+            "type": "array",
+            "title": "Alertas",
+            "description": "Alertas vigentes sin descartar, las graves primero."
+          },
+          "alertas_descartadas": {
+            "type": "integer",
+            "title": "Alertas Descartadas"
+          },
+          "integraciones": {
+            "items": {
+              "$ref": "#/components/schemas/EstadoIntegracion"
+            },
+            "type": "array",
+            "title": "Integraciones"
+          },
+          "firma": {
+            "items": {
+              "$ref": "#/components/schemas/CifraFirma"
+            },
+            "type": "array",
+            "title": "Firma"
+          },
+          "actividad": {
+            "items": {
+              "$ref": "#/components/schemas/EventoActividad"
+            },
+            "type": "array",
+            "title": "Actividad"
+          }
+        },
+        "type": "object",
+        "required": [
+          "alertas",
+          "alertas_descartadas",
+          "integraciones",
+          "firma",
+          "actividad"
+        ],
+        "title": "ResumenAdmin"
       },
       "ResumenBandeja": {
         "properties": {
@@ -16529,6 +18797,34 @@
         ],
         "title": "TotalesEstado"
       },
+      "TotalesUsuario": {
+        "properties": {
+          "procesos": {
+            "type": "integer",
+            "title": "Procesos"
+          },
+          "tareas_abiertas": {
+            "type": "integer",
+            "title": "Tareas Abiertas"
+          },
+          "documentos": {
+            "type": "integer",
+            "title": "Documentos"
+          },
+          "cuentas_cobro": {
+            "type": "integer",
+            "title": "Cuentas Cobro"
+          }
+        },
+        "type": "object",
+        "required": [
+          "procesos",
+          "tareas_abiertas",
+          "documentos",
+          "cuentas_cobro"
+        ],
+        "title": "TotalesUsuario"
+      },
       "UltimoMensaje": {
         "properties": {
           "texto": {
@@ -16564,6 +18860,118 @@
           "enviado_en"
         ],
         "title": "UltimoMensaje"
+      },
+      "UsuarioFila": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "nombre": {
+            "type": "string",
+            "title": "Nombre"
+          },
+          "email": {
+            "type": "string",
+            "title": "Email"
+          },
+          "whatsapp": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Whatsapp"
+          },
+          "rol": {
+            "type": "string",
+            "enum": [
+              "ABOGADO_ADMIN",
+              "ABOGADO",
+              "CLIENTE",
+              "ADMIN"
+            ],
+            "title": "Rol"
+          },
+          "estado": {
+            "type": "string",
+            "enum": [
+              "activo",
+              "suspendido",
+              "pendiente",
+              "rechazado"
+            ],
+            "title": "Estado"
+          },
+          "acceso": {
+            "type": "string",
+            "enum": [
+              "activo",
+              "sin_ingreso",
+              "suspendido"
+            ],
+            "title": "Acceso",
+            "description": "sin_ingreso: aún no entra con su contraseña temporal."
+          },
+          "ultimo_acceso": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ultimo Acceso"
+          },
+          "creado_en": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Creado En"
+          },
+          "procesos": {
+            "type": "integer",
+            "title": "Procesos",
+            "description": "Procesos activos en los que participa."
+          },
+          "responsable": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PersonaBreve"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Abogado de la firma a cargo del cliente."
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "nombre",
+          "email",
+          "whatsapp",
+          "rol",
+          "estado",
+          "acceso",
+          "ultimo_acceso",
+          "creado_en",
+          "procesos",
+          "responsable"
+        ],
+        "title": "UsuarioFila"
       },
       "UsuarioSesion": {
         "properties": {
@@ -16703,6 +19111,43 @@
           "recibido_en"
         ],
         "title": "Version"
+      },
+      "app__modulos__administracion__esquemas__AccesoEnviado": {
+        "properties": {
+          "destino": {
+            "type": "string",
+            "title": "Destino",
+            "description": "Correo al que se envió."
+          }
+        },
+        "type": "object",
+        "required": [
+          "destino"
+        ],
+        "title": "AccesoEnviado"
+      },
+      "app__modulos__clientes__esquemas__AccesoEnviado": {
+        "properties": {
+          "canal": {
+            "type": "string",
+            "enum": [
+              "EMAIL",
+              "WHATSAPP"
+            ],
+            "title": "Canal"
+          },
+          "destino": {
+            "type": "string",
+            "title": "Destino",
+            "description": "Correo o WhatsApp al que se envió."
+          }
+        },
+        "type": "object",
+        "required": [
+          "canal",
+          "destino"
+        ],
+        "title": "AccesoEnviado"
       }
     }
   }

@@ -1,25 +1,17 @@
 "use client";
 
 import type { CSSProperties, ReactNode } from "react";
+import Link from "next/link";
 import {
   Activity,
-  BarChart3,
-  Bell,
   BookOpenText,
-  CalendarDays,
   CreditCard,
-  Eraser,
-  FileSignature,
   FileText,
   FolderOpen,
-  HardDrive,
-  Inbox,
-  Landmark,
+  Globe,
   LayoutDashboard,
   ListChecks,
-  MessageSquare,
   Scale,
-  ScrollText,
   ServerCog,
   Settings,
   UserCheck,
@@ -34,68 +26,50 @@ import { BarraSuperior } from "@/components/layout/BarraSuperior";
 import { BusquedaGlobal } from "@/components/layout/BusquedaGlobal";
 import { MobileTabBar } from "@/components/layout/MobileTabBar";
 import Sidebar from "@/components/layout/Sidebar";
-import type { GrupoNav, ItemNav } from "@/components/layout/navegacion";
+import { estaActiva, itemActivo, type GrupoNav } from "@/components/layout/navegacion";
 import { cx } from "@/lib/cx";
 import { usePortalPathname } from "@/lib/usePortalPathname";
 
 const ADMIN = "/gestion-procesos/admin";
 
-const operacion: ItemNav[] = [
-  { id: "operacion-resumen", label: "Resumen", href: `${ADMIN}/operacion`, icon: Activity },
-  { id: "operacion-consultas", label: "Consultas judiciales", href: `${ADMIN}/operacion/consultas`, icon: CalendarDays },
-  { id: "operacion-integraciones", label: "Integraciones", href: `${ADMIN}/operacion/integraciones`, icon: ServerCog },
-  { id: "operacion-notificaciones", label: "Notificaciones", href: `${ADMIN}/operacion/notificaciones`, icon: Bell },
-  { id: "operacion-mensajes", label: "Mensajes del sistema", href: `${ADMIN}/operacion/mensajes`, icon: FileText },
-];
+const EXPEDIENTES = ["procesos", "radicados", "tareas", "agenda", "documentos", "contratos"].map((r) => `${ADMIN}/${r}`);
 
 const grupos: GrupoNav[] = [
   {
-    titulo: "Inicio",
-    items: [
-      { id: "resumen", label: "Resumen", href: ADMIN, icon: LayoutDashboard },
-      { id: "alertas", label: "Alertas", href: `${ADMIN}/alertas`, icon: Bell },
-      { id: "notificaciones", label: "Notificaciones", href: `${ADMIN}/notificaciones`, icon: Inbox },
-    ],
+    titulo: null,
+    items: [{ id: "resumen", label: "Resumen", href: ADMIN, icon: LayoutDashboard }],
   },
   {
-    titulo: "Expedientes",
+    titulo: "La firma",
     items: [
-      { id: "procesos", label: "Procesos", href: `${ADMIN}/procesos`, icon: FolderOpen },
-      { id: "radicados", label: "Radicados", href: `${ADMIN}/radicados`, icon: Scale },
-      { id: "tareas", label: "Tareas", href: `${ADMIN}/tareas`, icon: ListChecks },
-      { id: "agenda", label: "Agenda", href: `${ADMIN}/agenda`, icon: CalendarDays },
-      { id: "documentos", label: "Documentos", href: `${ADMIN}/documentos`, icon: BookOpenText },
-      { id: "contratos", label: "Contratos", href: `${ADMIN}/contratos`, icon: FileSignature },
+      { id: "expedientes", label: "Expedientes", href: `${ADMIN}/procesos`, icon: FolderOpen, rutas: EXPEDIENTES },
       { id: "cobros", label: "Cobros", href: `${ADMIN}/cobros`, icon: Wallet },
+      { id: "usuarios", label: "Usuarios", href: `${ADMIN}/usuarios`, icon: Users, rutas: [`${ADMIN}/solicitudes-perfil`] },
     ],
   },
   {
-    titulo: "Personas",
+    titulo: "Operación",
     items: [
-      { id: "usuarios", label: "Usuarios", href: `${ADMIN}/usuarios`, icon: Users },
-      { id: "solicitudes-perfil", label: "Solicitudes de perfil", href: `${ADMIN}/solicitudes-perfil`, icon: UserRound },
-      { id: "chat", label: "Chat del equipo", href: `${ADMIN}/chat`, icon: MessageSquare },
-    ],
-  },
-  {
-    titulo: "Supervisión",
-    plegable: true,
-    items: [
-      { id: "metricas", label: "Métricas", href: `${ADMIN}/metricas`, icon: BarChart3 },
-      { id: "actividad", label: "Actividad", href: `${ADMIN}/actividad`, icon: Activity },
-      { id: "auditoria", label: "Auditoría técnica", href: `${ADMIN}/auditoria`, icon: ScrollText },
+      {
+        id: "consultas", label: "Consultas y envíos", corto: "Consultas", href: `${ADMIN}/operacion/consultas`, icon: Scale,
+        rutas: [`${ADMIN}/operacion/notificaciones`],
+      },
+      { id: "integraciones", label: "Integraciones", href: `${ADMIN}/operacion/integraciones`, icon: ServerCog },
+      { id: "plantillas", label: "Plantillas y glosario", corto: "Plantillas", href: `${ADMIN}/operacion/mensajes`, icon: FileText },
     ],
   },
   {
     titulo: "Sistema",
-    plegable: true,
     items: [
-      { id: "operacion", label: "Operación", href: `${ADMIN}/operacion`, icon: ServerCog, hijos: operacion },
-      { id: "firma", label: "Datos de la firma", href: `${ADMIN}/firma`, icon: Settings },
-      { id: "finanzas", label: "Cobros y pagos", href: `${ADMIN}/finanzas`, icon: Landmark },
-      { id: "contenido", label: "Contenido público", href: `${ADMIN}/contenido`, icon: FileText, recargar: true },
-      { id: "almacenamiento", label: "Almacenamiento", href: `${ADMIN}/almacenamiento`, icon: HardDrive },
-      { id: "chat-limpiar", label: "Limpieza de chats", href: `${ADMIN}/chat/limpiar`, icon: Eraser },
+      {
+        id: "actividad", label: "Actividad y auditoría", corto: "Actividad", href: `${ADMIN}/actividad`, icon: Activity,
+        rutas: [`${ADMIN}/auditoria`, `${ADMIN}/metricas`],
+      },
+      {
+        id: "configuracion", label: "Configuración", href: `${ADMIN}/firma`, icon: Settings,
+        rutas: [`${ADMIN}/finanzas`, `${ADMIN}/almacenamiento`, `${ADMIN}/chat/limpiar`],
+      },
+      { id: "contenido", label: "Contenido del sitio", corto: "Sitio", href: `${ADMIN}/contenido`, icon: Globe, recargar: true },
     ],
   },
   {
@@ -113,8 +87,84 @@ const grupos: GrupoNav[] = [
   },
 ];
 
+/** Páginas de cada sección, como pestañas sobre el contenido. */
+const SECCIONES: { titulo: string; pestanas: { label: string; href: string }[] }[] = [
+  {
+    titulo: "Expedientes",
+    pestanas: [
+      { label: "Procesos", href: `${ADMIN}/procesos` },
+      { label: "Radicados", href: `${ADMIN}/radicados` },
+      { label: "Tareas", href: `${ADMIN}/tareas` },
+      { label: "Agenda", href: `${ADMIN}/agenda` },
+      { label: "Documentos", href: `${ADMIN}/documentos` },
+      { label: "Contratos", href: `${ADMIN}/contratos` },
+    ],
+  },
+  {
+    titulo: "Usuarios",
+    pestanas: [
+      { label: "Cuentas", href: `${ADMIN}/usuarios` },
+      { label: "Solicitudes de perfil", href: `${ADMIN}/solicitudes-perfil` },
+    ],
+  },
+  {
+    titulo: "Consultas y envíos",
+    pestanas: [
+      { label: "Consultas judiciales", href: `${ADMIN}/operacion/consultas` },
+      { label: "Envíos de avisos", href: `${ADMIN}/operacion/notificaciones` },
+    ],
+  },
+  {
+    titulo: "Actividad y auditoría",
+    pestanas: [
+      { label: "Actividad", href: `${ADMIN}/actividad` },
+      { label: "Auditoría técnica", href: `${ADMIN}/auditoria` },
+      { label: "Carga de trabajo", href: `${ADMIN}/metricas` },
+    ],
+  },
+  {
+    titulo: "Configuración",
+    pestanas: [
+      { label: "Datos de la firma", href: `${ADMIN}/firma` },
+      { label: "Cobros y pagos", href: `${ADMIN}/finanzas` },
+      { label: "Almacenamiento", href: `${ADMIN}/almacenamiento` },
+      { label: "Limpieza de chats", href: `${ADMIN}/chat/limpiar` },
+    ],
+  },
+];
+
+function PestanasSeccion({ ruta }: { ruta: string }) {
+  const seccion = SECCIONES.find((s) => s.pestanas.some((p) => estaActiva(ruta, p.href, ADMIN)));
+  if (!seccion) return null;
+  const activa = itemActivo(ruta, seccion.pestanas.map((p) => ({ id: p.href, label: p.label, href: p.href, icon: Activity })), ADMIN);
+  return (
+    <nav aria-label={seccion.titulo} className="-mx-4 mb-5 overflow-x-auto px-4 [scrollbar-width:none] sm:-mx-6 sm:px-6 lg:mx-0 lg:px-0">
+      <ul className="flex min-w-max gap-1 border-b border-line">
+        {seccion.pestanas.map((p) => {
+          const actual = activa?.href === p.href;
+          return (
+            <li key={p.href}>
+              <Link
+                href={p.href}
+                aria-current={actual ? "page" : undefined}
+                className={cx(
+                  "relative flex h-11 items-center whitespace-nowrap rounded-t-md px-3 text-[14px] font-semibold transition-colors duration-150",
+                  actual ? "text-ink" : "text-ink-2 hover:bg-manila hover:text-ink",
+                )}
+              >
+                {p.label}
+                {actual && <span aria-hidden="true" className="absolute inset-x-2 -bottom-px h-[2px] rounded-full bg-gold" />}
+              </Link>
+            </li>
+          );
+        })}
+      </ul>
+    </nav>
+  );
+}
+
 const todos = grupos.flatMap((grupo) => grupo.items);
-const PESTANAS = ["resumen", "procesos", "tareas", "usuarios"];
+const PESTANAS = ["resumen", "expedientes", "cobros", "usuarios"];
 const pestanas = PESTANAS.map((id) => todos.find((item) => item.id === id)!);
 const restoAgrupado = grupos
   .map((grupo) => ({ ...grupo, items: grupo.items.filter((item) => !PESTANAS.includes(item.id)) }))
@@ -138,6 +188,7 @@ export default function AdminConsoleShell({ children }: { children: ReactNode })
       <Sidebar grupos={grupos} inicio={ADMIN} areaHref={ADMIN} enlacesCuenta={enlacesCuenta} />
       <BarraSuperior inicio={ADMIN} areaHref={ADMIN} fija={!enChat} avisosHref={`${ADMIN}/notificaciones`} enlacesCuenta={enlacesCuenta} />
       <main className={cx("mx-auto w-full max-w-[1280px]", enChat ? "min-h-0 flex-1" : "px-4 pb-28 pt-5 sm:px-6 lg:px-8 lg:pb-12 lg:pt-7")}>
+        {!enChat && <PestanasSeccion ruta={ruta} />}
         {children}
       </main>
       {!enChat && <MobileTabBar pestanas={pestanas} resto={resto} gruposResto={restoAgrupado} inicio={ADMIN} />}

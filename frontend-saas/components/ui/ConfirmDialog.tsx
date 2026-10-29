@@ -25,9 +25,9 @@ export function ConfirmDialog({
   destructive?: boolean;
 }) {
   const [pending, setPending] = useState(false);
-  const [failed, setFailed] = useState(false);
+  const [failed, setFailed] = useState<string | null>(null);
   function close() {
-    setFailed(false);
+    setFailed(null);
     onClose();
   }
   async function confirm() {
@@ -35,15 +35,16 @@ export function ConfirmDialog({
     try {
       await onConfirm();
       close();
-    } catch {
-      setFailed(true);
+    } catch (error) {
+      // Quien llama puede lanzar un Error con el mensaje para la persona.
+      setFailed(error instanceof Error && error.message ? error.message : "No se pudo completar la acción. Inténtelo de nuevo.");
     } finally {
       setPending(false);
     }
   }
   return (
     <Modal open={open} onClose={close} title={title} description={description} size="sm">
-      {failed && <Alert kind="error" className="mb-4">No se pudo completar la acción. Inténtalo de nuevo.</Alert>}
+      {failed && <Alert kind="error" className="mb-4">{failed}</Alert>}
       <div className="flex flex-wrap justify-end gap-2">
         <Button variant="outline" onClick={close} disabled={pending}>{cancelLabel}</Button>
         <Button variant={destructive ? "danger" : "primary"} onClick={() => void confirm()} disabled={pending}>{pending ? "Procesando…" : confirmLabel}</Button>

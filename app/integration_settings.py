@@ -5,6 +5,7 @@ import hashlib
 import os
 
 from cryptography.fernet import Fernet, InvalidToken
+from sqlalchemy.orm import Session
 
 from app import models
 from app.database import SessionLocal
@@ -31,8 +32,12 @@ def _decrypt_secret(value: str | None) -> str | None:
         raise RuntimeError("Could not decrypt integration credentials; verify the encryption key") from exc
 
 
-def get_integration_settings() -> dict[str, str | int | bool | None]:
-    db = SessionLocal()
+def get_integration_settings(db_actual: Session | None = None) -> dict[str, str | int | bool | None]:
+    """Valores guardados por ADMIN, con las variables de entorno como respaldo.
+
+    Con `db_actual` usa esa sesión (la de la petición) en lugar de abrir otra.
+    """
+    db = db_actual or SessionLocal()
     try:
         config = db.query(models.ConfiguracionIntegraciones).filter_by(id=1).first()
         return {
@@ -46,7 +51,8 @@ def get_integration_settings() -> dict[str, str | int | bool | None]:
             "whatsapp_token": _decrypt_secret(config.whatsapp_token_encrypted) if config and config.whatsapp_token_encrypted is not None else os.getenv("WHATSAPP_TOKEN", ""),
         }
     finally:
-        db.close()
+        if db_actual is None:
+            db.close()
 
 
 def get_firm_settings() -> dict[str, str | bool]:
