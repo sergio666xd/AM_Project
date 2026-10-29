@@ -5371,6 +5371,683 @@
           }
         }
       }
+    },
+    "/api/v2/conversaciones": {
+      "get": {
+        "tags": [
+          "Mensajes"
+        ],
+        "summary": "Conversaciones del usuario",
+        "description": "Todas, con el último mensaje, cuántos sin leer y si un cliente espera respuesta. Las más recientes primero.",
+        "operationId": "listar_conversaciones",
+        "parameters": [
+          {
+            "name": "sincronizar",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "description": "Crea antes las conversaciones que le corresponden. Los sondeos periódicos envían false.",
+              "default": true,
+              "title": "Sincronizar"
+            },
+            "description": "Crea antes las conversaciones que le corresponden. Los sondeos periódicos envían false."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ListaConversaciones"
+                }
+              }
+            }
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Too Many Requests"
+          }
+        }
+      }
+    },
+    "/api/v2/conversaciones/resolver": {
+      "get": {
+        "tags": [
+          "Mensajes"
+        ],
+        "summary": "Abrir una conversación por su ruta",
+        "description": "La crea si aún no existe y el usuario puede participar en ella.",
+        "operationId": "resolver_conversacion",
+        "parameters": [
+          {
+            "name": "clave",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "process:{proceso}:{persona}, process:{proceso}:collaborators o direct:{persona}.",
+              "title": "Clave"
+            },
+            "description": "process:{proceso}:{persona}, process:{proceso}:collaborators o direct:{persona}."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Conversacion"
+                }
+              }
+            }
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Too Many Requests"
+          }
+        }
+      }
+    },
+    "/api/v2/conversaciones/{conversacion_id}": {
+      "get": {
+        "tags": [
+          "Mensajes"
+        ],
+        "summary": "Mensajes de una conversación",
+        "description": "Sin parámetros, los últimos mensajes. Marca como entregados los que recibe el usuario.",
+        "operationId": "ver_hilo",
+        "parameters": [
+          {
+            "name": "conversacion_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Conversacion Id"
+            }
+          },
+          {
+            "name": "despues_de",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "description": "Solo los mensajes posteriores a este id (para refrescar).",
+              "default": 0,
+              "title": "Despues De"
+            },
+            "description": "Solo los mensajes posteriores a este id (para refrescar)."
+          },
+          {
+            "name": "antes_de",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "description": "La página anterior a este id (para subir en el historial).",
+              "default": 0,
+              "title": "Antes De"
+            },
+            "description": "La página anterior a este id (para subir en el historial)."
+          },
+          {
+            "name": "limite",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 200,
+              "minimum": 1,
+              "default": 30,
+              "title": "Limite"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Hilo"
+                }
+              }
+            }
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Too Many Requests"
+          }
+        }
+      }
+    },
+    "/api/v2/conversaciones/{conversacion_id}/mensajes": {
+      "post": {
+        "tags": [
+          "Mensajes"
+        ],
+        "summary": "Enviar un mensaje",
+        "description": "Avisa a los demás (push y, si no están en el panel, correo o WhatsApp). En un proceso, queda como folio.",
+        "operationId": "enviar_mensaje",
+        "parameters": [
+          {
+            "name": "conversacion_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Conversacion Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NuevoMensaje"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Mensaje"
+                }
+              }
+            }
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Too Many Requests"
+          }
+        }
+      }
+    },
+    "/api/v2/conversaciones/{conversacion_id}/leido": {
+      "post": {
+        "tags": [
+          "Mensajes"
+        ],
+        "summary": "Marcar como leído",
+        "operationId": "marcar_leido",
+        "parameters": [
+          {
+            "name": "conversacion_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Conversacion Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Leido"
+              }
+            }
+          }
+        },
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Too Many Requests"
+          }
+        }
+      }
+    },
+    "/api/v2/conversaciones/{conversacion_id}/referencias": {
+      "get": {
+        "tags": [
+          "Mensajes"
+        ],
+        "summary": "Qué se puede adjuntar",
+        "description": "Radicados, actuaciones, tareas, eventos y documentos del proceso que todos los participantes pueden ver.",
+        "operationId": "listar_referencias",
+        "parameters": [
+          {
+            "name": "conversacion_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Conversacion Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/OpcionReferencia"
+                  },
+                  "title": "Response Listar Referencias"
+                }
+              }
+            }
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Too Many Requests"
+          }
+        }
+      }
     }
   },
   "components": {
@@ -5579,6 +6256,24 @@
           "url"
         ],
         "title": "ArchivoFolio"
+      },
+      "Autor": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "nombre": {
+            "type": "string",
+            "title": "Nombre"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "nombre"
+        ],
+        "title": "Autor"
       },
       "AvanceSubtareas": {
         "properties": {
@@ -6301,6 +6996,34 @@
         ],
         "title": "ClientesAvisados"
       },
+      "Contacto": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "nombre": {
+            "type": "string",
+            "title": "Nombre"
+          },
+          "rol": {
+            "type": "string",
+            "enum": [
+              "cliente",
+              "abogado",
+              "administrador"
+            ],
+            "title": "Rol"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "nombre",
+          "rol"
+        ],
+        "title": "Contacto"
+      },
       "Contrato": {
         "properties": {
           "id": {
@@ -6457,6 +7180,116 @@
           "firmado_en"
         ],
         "title": "ContratoDelCliente"
+      },
+      "Conversacion": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "clave": {
+            "type": "string",
+            "title": "Clave",
+            "description": "Ruta estable de la conversación, como «process:12:34» o «direct:5»."
+          },
+          "tipo": {
+            "type": "string",
+            "enum": [
+              "cliente",
+              "colaboradores",
+              "equipo_proceso",
+              "equipo"
+            ],
+            "title": "Tipo",
+            "description": "cliente: con un cliente sobre un proceso; colaboradores: el equipo del proceso; equipo_proceso: dos abogados sobre un proceso; equipo: dos integrantes de la firma."
+          },
+          "titulo": {
+            "type": "string",
+            "title": "Titulo"
+          },
+          "proceso": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ProcesoBreve"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "contacto": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Contacto"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "La otra persona, si la conversación es entre dos."
+          },
+          "participantes": {
+            "type": "integer",
+            "title": "Participantes"
+          },
+          "en_linea": {
+            "type": "integer",
+            "title": "En Linea",
+            "description": "Cuántos de los demás participantes tienen el panel abierto ahora."
+          },
+          "sin_leer": {
+            "type": "integer",
+            "title": "Sin Leer"
+          },
+          "primer_sin_leer_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Primer Sin Leer Id"
+          },
+          "por_responder": {
+            "type": "boolean",
+            "title": "Por Responder",
+            "description": "El último mensaje es de un cliente y nadie de la firma ha respondido."
+          },
+          "ultimo": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/UltimoMensaje"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "actualizada_en": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Actualizada En"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "clave",
+          "tipo",
+          "titulo",
+          "proceso",
+          "contacto",
+          "participantes",
+          "en_linea",
+          "sin_leer",
+          "primer_sin_leer_id",
+          "por_responder",
+          "ultimo",
+          "actualizada_en"
+        ],
+        "title": "Conversacion"
       },
       "DatosCliente": {
         "properties": {
@@ -6735,6 +7568,57 @@
           "creada_en"
         ],
         "title": "EnlaceSuscripcion"
+      },
+      "Entrega": {
+        "properties": {
+          "estado": {
+            "type": "string",
+            "enum": [
+              "enviado",
+              "entregado",
+              "entregado_parcial",
+              "leido"
+            ],
+            "title": "Estado"
+          },
+          "entregados": {
+            "type": "integer",
+            "title": "Entregados"
+          },
+          "leidos": {
+            "type": "integer",
+            "title": "Leidos"
+          },
+          "destinatarios": {
+            "type": "integer",
+            "title": "Destinatarios"
+          }
+        },
+        "type": "object",
+        "required": [
+          "estado",
+          "entregados",
+          "leidos",
+          "destinatarios"
+        ],
+        "title": "Entrega"
+      },
+      "EntregaDeMensaje": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "entrega": {
+            "$ref": "#/components/schemas/Entrega"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "entrega"
+        ],
+        "title": "EntregaDeMensaje"
       },
       "ErrorRespuesta": {
         "properties": {
@@ -7025,6 +7909,42 @@
         ],
         "title": "FoliosRevisados"
       },
+      "Hilo": {
+        "properties": {
+          "conversacion": {
+            "$ref": "#/components/schemas/Conversacion"
+          },
+          "mensajes": {
+            "items": {
+              "$ref": "#/components/schemas/Mensaje"
+            },
+            "type": "array",
+            "title": "Mensajes",
+            "description": "En orden cronológico."
+          },
+          "hay_mas": {
+            "type": "boolean",
+            "title": "Hay Mas",
+            "description": "Hay mensajes anteriores al primero de la página."
+          },
+          "entregas": {
+            "items": {
+              "$ref": "#/components/schemas/EntregaDeMensaje"
+            },
+            "type": "array",
+            "title": "Entregas",
+            "description": "Estado actual de los mensajes propios recientes, para refrescarlos."
+          }
+        },
+        "type": "object",
+        "required": [
+          "conversacion",
+          "mensajes",
+          "hay_mas",
+          "entregas"
+        ],
+        "title": "Hilo"
+      },
       "IniciarSesion": {
         "properties": {
           "email": {
@@ -7052,6 +7972,20 @@
           "password"
         ],
         "title": "IniciarSesion"
+      },
+      "Leido": {
+        "properties": {
+          "hasta": {
+            "type": "integer",
+            "title": "Hasta",
+            "description": "Id del último mensaje leído."
+          }
+        },
+        "type": "object",
+        "required": [
+          "hasta"
+        ],
+        "title": "Leido"
       },
       "ListaArchivos": {
         "properties": {
@@ -7117,6 +8051,26 @@
           "resumen"
         ],
         "title": "ListaContratos"
+      },
+      "ListaConversaciones": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/Conversacion"
+            },
+            "type": "array",
+            "title": "Items"
+          },
+          "resumen": {
+            "$ref": "#/components/schemas/ResumenMensajes"
+          }
+        },
+        "type": "object",
+        "required": [
+          "items",
+          "resumen"
+        ],
+        "title": "ListaConversaciones"
       },
       "ListaPlantillas": {
         "properties": {
@@ -7227,6 +8181,83 @@
           "ids"
         ],
         "title": "MarcarLeidos"
+      },
+      "Mensaje": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "texto": {
+            "type": "string",
+            "title": "Texto"
+          },
+          "autor": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Autor"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Vacío si la cuenta del autor ya no existe."
+          },
+          "es_mio": {
+            "type": "boolean",
+            "title": "Es Mio"
+          },
+          "enviado_en": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Enviado En"
+          },
+          "entrega": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Entrega"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Solo en los mensajes propios."
+          },
+          "referencia": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Referencia"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "folio": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Folio",
+            "description": "Número de folio en el expediente, en las conversaciones de un proceso."
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "texto",
+          "autor",
+          "es_mio",
+          "enviado_en",
+          "entrega",
+          "referencia",
+          "folio"
+        ],
+        "title": "Mensaje"
       },
       "NuevaSolicitud": {
         "properties": {
@@ -7381,6 +8412,106 @@
           "email"
         ],
         "title": "NuevoCliente"
+      },
+      "NuevoMensaje": {
+        "properties": {
+          "texto": {
+            "type": "string",
+            "maxLength": 12000,
+            "title": "Texto"
+          },
+          "referencia": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ReferenciaElegida"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "texto"
+        ],
+        "title": "NuevoMensaje"
+      },
+      "OpcionReferencia": {
+        "properties": {
+          "tipo": {
+            "type": "string",
+            "enum": [
+              "RADICADO",
+              "ACTUACION",
+              "TAREA",
+              "SUBTAREA",
+              "EVENTO",
+              "DOCUMENTO"
+            ],
+            "title": "Tipo"
+          },
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "titulo": {
+            "type": "string",
+            "title": "Titulo"
+          },
+          "grupo": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Grupo",
+            "description": "Radicado de la actuación, tarea de la subtarea o solicitud del documento."
+          },
+          "radicado": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Radicado"
+          },
+          "padre_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Padre Id"
+          },
+          "solicitud_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Solicitud Id"
+          }
+        },
+        "type": "object",
+        "required": [
+          "tipo",
+          "id",
+          "titulo"
+        ],
+        "title": "OpcionReferencia"
       },
       "PaginaFolios": {
         "properties": {
@@ -8146,6 +9277,75 @@
         ],
         "title": "ProcesoSinContrato"
       },
+      "Referencia": {
+        "properties": {
+          "tipo": {
+            "type": "string",
+            "enum": [
+              "RADICADO",
+              "ACTUACION",
+              "TAREA",
+              "SUBTAREA",
+              "EVENTO",
+              "DOCUMENTO"
+            ],
+            "title": "Tipo"
+          },
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "titulo": {
+            "type": "string",
+            "title": "Titulo"
+          },
+          "enlace": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Enlace"
+          }
+        },
+        "type": "object",
+        "required": [
+          "tipo",
+          "id",
+          "titulo",
+          "enlace"
+        ],
+        "title": "Referencia"
+      },
+      "ReferenciaElegida": {
+        "properties": {
+          "tipo": {
+            "type": "string",
+            "enum": [
+              "RADICADO",
+              "ACTUACION",
+              "TAREA",
+              "SUBTAREA",
+              "EVENTO",
+              "DOCUMENTO"
+            ],
+            "title": "Tipo"
+          },
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          }
+        },
+        "type": "object",
+        "required": [
+          "tipo",
+          "id"
+        ],
+        "title": "ReferenciaElegida"
+      },
       "Resultado": {
         "properties": {
           "tipo": {
@@ -8357,6 +9557,26 @@
           "solicitudes_vencidas"
         ],
         "title": "ResumenDocumentos"
+      },
+      "ResumenMensajes": {
+        "properties": {
+          "sin_leer": {
+            "type": "integer",
+            "title": "Sin Leer",
+            "description": "Conversaciones con mensajes sin leer."
+          },
+          "por_responder": {
+            "type": "integer",
+            "title": "Por Responder",
+            "description": "Conversaciones con clientes cuyo último mensaje espera respuesta."
+          }
+        },
+        "type": "object",
+        "required": [
+          "sin_leer",
+          "por_responder"
+        ],
+        "title": "ResumenMensajes"
       },
       "ResumenTareas": {
         "properties": {
@@ -8858,6 +10078,42 @@
           "inhabiles"
         ],
         "title": "Termino"
+      },
+      "UltimoMensaje": {
+        "properties": {
+          "texto": {
+            "type": "string",
+            "title": "Texto"
+          },
+          "autor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Autor"
+          },
+          "es_mio": {
+            "type": "boolean",
+            "title": "Es Mio"
+          },
+          "enviado_en": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Enviado En"
+          }
+        },
+        "type": "object",
+        "required": [
+          "texto",
+          "autor",
+          "es_mio",
+          "enviado_en"
+        ],
+        "title": "UltimoMensaje"
       },
       "UsuarioSesion": {
         "properties": {

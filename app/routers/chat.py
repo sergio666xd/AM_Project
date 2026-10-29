@@ -1013,21 +1013,19 @@ def listar_referencias(process_id: int, conversation_id: int | None = None, clav
     return _listar_referencias(process, conversation, db, user)
 
 
-@router.post("/conversaciones/{conversation_id}/mensajes", status_code=201)
-def enviar_mensaje(conversation_id: int, data: schemas.ChatMensajeCreate, db: Session = Depends(get_db), user: models.Usuario = Depends(security.obtener_usuario_actual)):
-    conversation = _conversation_for_actor(db, conversation_id, user)
-    content = data.contenido.strip()
-    if not content:
-        raise HTTPException(status_code=400, detail="Escribe un mensaje antes de enviarlo.")
-    reference = None
-    if data.referencia_tipo:
-        if _role(user) == "CLIENTE" or conversation.proceso_id is None:
-            raise HTTPException(status_code=403, detail="No puedes adjuntar referencias en esta conversación.")
-        process = _process(db, conversation.proceso_id, user)
-        options = _listar_referencias(process, conversation, db, user)
-        reference = next((item for item in options if item["tipo"] == data.referencia_tipo and item["id"] == data.referencia_id), None)
-        if not reference:
-            raise HTTPException(status_code=404, detail="La referencia no pertenece a este proceso.")
+def buscar_referencia(db: Session, conversation: models.ChatConversacion, user: models.Usuario, tipo: str, referencia_id: int | None) -> dict:
+    """La referencia elegida, validada contra lo que el usuario puede adjuntar en esta conversación."""
+    if _role(user) == "CLIENTE" or conversation.proceso_id is None:
+        raise HTTPException(status_code=403, detail="No puedes adjuntar referencias en esta conversación.")
+    process = _process(db, conversation.proceso_id, user)
+    options = _listar_referencias(process, conversation, db, user)
+    reference = next((item for item in options if item["tipo"] == tipo and item["id"] == referencia_id), None)
+    if not reference:
+        raise HTTPException(status_code=404, detail="La referencia no pertenece a este proceso.")
+    return reference
+
+
+def crear_mensaje(db: Session, conversation: models.ChatConversacion, user: models.Usuario, content: str, reference: dict | None) -> models.ChatMensaje:
     message = models.ChatMensaje(
         conversacion_id=conversation.id, remitente_id=user.id, contenido=content,
         referencia_tipo=reference["tipo"] if reference else None,
@@ -1044,6 +1042,24 @@ def enviar_mensaje(conversation_id: int, data: schemas.ChatMensajeCreate, db: Se
     registrar_evento_auditoria(db, user, "chat.mensaje.enviar", "chat_conversacion", conversation.id)
     db.commit()
     db.refresh(message)
+    return message
+
+
+@router.post("/conversaciones/{conversation_id}/mensajes", status_code=201)
+def enviar_mensaje(conversation_id: int, data: schemas.ChatMensajeCreate, db: Session = Depends(get_db), user: models.Usuario = Depends(security.obtener_usuario_actual)):
+    conversation = _conversation_for_actor(db, conversation_id, user)
+    content = data.contenido.strip()
+    if not content:
+        raise HTTPException(status_code=400, detail="Escribe un mensaje antes de enviarlo.")
+    reference = buscar_referencia(db, conversation, user, data.referencia_tipo, data.referencia_id) if data.referencia_tipo else None
+    message = crear_mensaje(db, conversation, user, content, reference)
+    avisar_mensaje(db, conversation, message, user)
+    return {"id": message.id, "mensaje": "Mensaje enviado."}
+
+
+def avisar_mensaje(db: Session, conversation: models.ChatConversacion, message: models.ChatMensaje, user: models.Usuario) -> None:
+    """Push a cada destinatario y, si no está en el panel, el aviso agrupado por correo o WhatsApp."""
+    content = message.contenido
     process = conversation.proceso
     recipients = [item.usuario for item in conversation.participantes if item.usuario and item.usuario_id != user.id and item.usuario.estado == models.EstadoUsuario.ACTIVO]
     now = utc_ahora()
@@ -1144,4 +1160,3 @@ def enviar_mensaje(conversation_id: int, data: schemas.ChatMensajeCreate, db: Se
                 else:
                     current_notice.ultima_notificacion_en = previous_notice_at
                 db.commit()
-    return {"id": message.id, "mensaje": "Mensaje enviado."}
