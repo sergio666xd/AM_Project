@@ -12,7 +12,7 @@ import { Radicado } from "@/components/ui/Radicado";
 import { useToast } from "@/components/ui/ToastProvider";
 import { api, mensajeDeError, type Esquemas } from "@/lib/api-v2/cliente";
 import { cx } from "@/lib/cx";
-import { ETAPAS, indiceEtapa, nombreEtapa, type Etapa } from "@/lib/etapas";
+import { indiceEtapa, type PlantillaEtapas } from "@/lib/etapas";
 import { fechaCorta, fechaRelativa } from "@/lib/fechas";
 import { useLoadEffect } from "@/lib/useLoadEffect";
 
@@ -86,7 +86,7 @@ export function CabeceraExpediente({ procesoId, nombre, onCambio }: { procesoId:
             <div>
               <p className="text-[12.5px] font-semibold text-ink-3">Etapa actual</p>
               <p className="text-[16px] font-semibold text-ink">
-                {proceso.etapa ? nombreEtapa(proceso.etapa) : "Sin etapa definida"}
+                {proceso.etapa ? proceso.etapa.nombre : "Sin etapa definida"}
                 {actual && <span className="ml-2 text-[13px] font-normal text-ink-3">desde {fechaRelativa(actual.fecha)}</span>}
               </p>
             </div>
@@ -96,7 +96,8 @@ export function CabeceraExpediente({ procesoId, nombre, onCambio }: { procesoId:
               </Button>
             )}
           </div>
-          <Etapas etapas={ETAPAS.map((e) => e.nombre)} actual={indiceEtapa(proceso.etapa)} />
+          <Etapas etapas={proceso.linea_etapas.map((e) => e.nombre)} actual={indiceEtapa(proceso.linea_etapas, proceso.etapa)} />
+          <p className="mt-3 text-[12.5px] text-ink-3">Plantilla: {proceso.plantilla.nombre}</p>
         </section>
       )}
 
@@ -137,15 +138,36 @@ function CambiarEtapaModal({
 }) {
   const id = useId();
   const { toast } = useToast();
-  const siguiente = ETAPAS[indiceEtapa(proceso.etapa) + 1]?.id ?? null;
-  const [etapa, setEtapa] = useState<Etapa | null>(null);
+  const [plantillas, setPlantillas] = useState<PlantillaEtapas[] | null>(null);
+  const [plantillaId, setPlantillaId] = useState<number | null>(null);
+  const [etapa, setEtapa] = useState<number | null>(null);
   const [nota, setNota] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [guardando, setGuardando] = useState(false);
-  const elegida = etapa ?? siguiente;
+
+  const cargar = useCallback(async () => {
+    if (!abierto) return;
+    const { data } = await api.GET("/api/v2/plantillas-etapas");
+    if (data) setPlantillas(data.items);
+  }, [abierto]);
+  useLoadEffect(cargar);
+
+  const elegidaPlantilla = plantillaId ?? proceso.plantilla.id;
+  const misma = elegidaPlantilla === proceso.plantilla.id;
+  const otra = plantillas?.find((p) => p.id === elegidaPlantilla);
+  // En la plantilla del proceso se muestra su línea (incluye la etapa actual aunque ya no se use).
+  const opciones = misma ? proceso.linea_etapas : (otra?.etapas.filter((e) => e.activa) ?? []);
+  // Se pueden elegir las etapas activas; mientras cargan las plantillas, todas las de la línea.
+  const activasDe = plantillas?.find((p) => p.id === elegidaPlantilla)?.etapas.filter((e) => e.activa).map((e) => e.id);
+  const disponibles = new Set(activasDe ?? opciones.map((e) => e.id));
+  const indiceActual = misma ? indiceEtapa(opciones, proceso.etapa) : -1;
+  const sugerida = opciones.slice(indiceActual + 1).find((e) => disponibles.has(e.id))?.id ?? null;
+  const elegida = etapa ?? sugerida;
+  const nombreElegida = opciones.find((e) => e.id === elegida)?.nombre;
 
   function cerrar() {
     setEtapa(null);
+    setPlantillaId(null);
     setNota("");
     setError(null);
     onClose();
@@ -158,43 +180,65 @@ function CambiarEtapaModal({
     setError(null);
     const { data, error: fallo } = await api.PATCH("/api/v2/procesos/{proceso_id}/etapa", {
       params: { path: { proceso_id: proceso.id } },
-      body: { etapa: elegida, nota: nota.trim() || null },
+      body: { etapa_id: elegida, nota: nota.trim() || null },
     });
     setGuardando(false);
     if (fallo || !data) {
       setError(mensajeDeError(fallo));
       return;
     }
-    toast({ title: `Etapa: ${nombreEtapa(elegida)}`, description: "Quedó en el historial y en los folios del expediente.", tone: "success" });
+    toast({ title: `Etapa: ${data.etapa?.nombre ?? nombreElegida}`, description: "Quedó en el historial y en los folios del expediente.", tone: "success" });
     onHecho(data);
     cerrar();
   }
 
+  const activas = plantillas?.filter((p) => p.activa) ?? [];
+
   return (
     <Modal open={abierto} onClose={cerrar} title="Etapa del proceso" description="El cliente ve la etapa en su portal; la nota es solo para la firma.">
       <form onSubmit={guardar} noValidate>
+        {activas.length > 1 && (
+          <div className="mb-4">
+            <label htmlFor={`${id}-plantilla`} className={ETIQUETA}>Plantilla de etapas</label>
+            <select
+              id={`${id}-plantilla`}
+              value={elegidaPlantilla}
+              onChange={(e) => { setPlantillaId(Number(e.target.value)); setEtapa(null); }}
+              className={CAMPO}
+            >
+              {!activas.some((p) => p.id === proceso.plantilla.id) && <option value={proceso.plantilla.id}>{proceso.plantilla.nombre}</option>}
+              {activas.map((p) => <option key={p.id} value={p.id}>{p.nombre}</option>)}
+            </select>
+            {!misma && <p className="mt-1.5 text-[13px] text-ink-2">Al guardar, el proceso pasa a seguir esta plantilla y su línea de etapas cambia también en el portal del cliente.</p>}
+          </div>
+        )}
         <fieldset>
           <legend className={ETIQUETA}>Nueva etapa</legend>
-          <div className="grid gap-1.5">
-            {ETAPAS.map((e, i) => {
-              const esActual = proceso.etapa === e.id;
-              return (
-                <label
-                  key={e.id}
-                  className={cx(
-                    "flex min-h-11 items-center gap-3 rounded-lg px-3 text-[14.5px] shadow-[0_0_0_1px_var(--line)] has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-navy/30",
-                    esActual ? "cursor-default text-ink-3" : "cursor-pointer text-ink hover:bg-manila",
-                    elegida === e.id && !esActual && "bg-navy-soft shadow-[0_0_0_1.5px_var(--navy)]",
-                  )}
-                >
-                  <input type="radio" name={`${id}-etapa`} value={e.id} disabled={esActual} checked={elegida === e.id} onChange={() => setEtapa(e.id)} className="size-4 accent-[var(--navy)]" />
-                  <span className="w-5 text-[12px] tabular-nums text-ink-3">{i + 1}.</span>
-                  <span className="font-semibold">{e.nombre}</span>
-                  {esActual && <span className="ml-auto text-[12.5px]">Etapa actual</span>}
-                </label>
-              );
-            })}
-          </div>
+          {plantillas === null && !misma ? (
+            <p className="text-[14px] text-ink-3">Cargando las etapas…</p>
+          ) : (
+            <div className="grid gap-1.5">
+              {opciones.map((e, i) => {
+                const esActual = proceso.etapa?.id === e.id;
+                const bloqueada = esActual || !disponibles.has(e.id);
+                return (
+                  <label
+                    key={e.id}
+                    className={cx(
+                      "flex min-h-11 items-center gap-3 rounded-lg px-3 text-[14.5px] shadow-[0_0_0_1px_var(--line)] has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-navy/30",
+                      bloqueada ? "cursor-default text-ink-3" : "cursor-pointer text-ink hover:bg-manila",
+                      elegida === e.id && !bloqueada && "bg-navy-soft shadow-[0_0_0_1.5px_var(--navy)]",
+                    )}
+                  >
+                    <input type="radio" name={`${id}-etapa`} value={e.id} disabled={bloqueada} checked={elegida === e.id} onChange={() => setEtapa(e.id)} className="size-4 accent-[var(--navy)]" />
+                    <span className="w-5 text-[12px] tabular-nums text-ink-3">{i + 1}.</span>
+                    <span className="font-semibold">{e.nombre}</span>
+                    {esActual ? <span className="ml-auto text-[12.5px]">Etapa actual</span> : bloqueada && <span className="ml-auto text-[12.5px]">Ya no se usa</span>}
+                  </label>
+                );
+              })}
+            </div>
+          )}
         </fieldset>
         <label htmlFor={`${id}-nota`} className={cx(ETIQUETA, "mt-4")}>Nota interna <span className="font-normal text-ink-3">(opcional)</span></label>
         <textarea id={`${id}-nota`} rows={2} maxLength={500} value={nota} onChange={(e) => setNota(e.target.value)} placeholder="Ej.: Auto admisorio del 27 de octubre." className={cx(CAMPO, "resize-y py-2.5")} />
@@ -204,8 +248,8 @@ function CambiarEtapaModal({
             <summary className="cursor-pointer font-semibold text-ink-2">Historial ({proceso.etapas.length})</summary>
             <ol className="mt-2 space-y-1.5 border-l-2 border-line pl-3">
               {[...proceso.etapas].reverse().map((c) => (
-                <li key={`${c.etapa}-${c.fecha}`} className="text-ink-2">
-                  <span className="font-semibold text-ink">{nombreEtapa(c.etapa)}</span> · {fechaRelativa(c.fecha)}
+                <li key={`${c.etapa.id}-${c.fecha}`} className="text-ink-2">
+                  <span className="font-semibold text-ink">{c.etapa.nombre}</span> · {fechaRelativa(c.fecha)}
                   {c.autor && ` · ${c.autor}`}
                   {c.nota && <span className="block text-ink-3">{c.nota}</span>}
                 </li>

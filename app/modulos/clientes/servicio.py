@@ -188,7 +188,7 @@ class ServicioClientes:
             canal=cliente.canal_notificacion_cliente if cliente.canal_notificacion_cliente in ("EMAIL", "WHATSAPP") else None,
             expedientes=[
                 ProcesoDelCliente(
-                    id=p.id, nombre=p.nombre, etapa=p.etapa,
+                    id=p.id, nombre=p.nombre, etapa=p.etapa.nombre if p.etapa else None,
                     radicados=sorted(v.radicado.numero for v in p.radicados if v.radicado),
                     responsable=p.abogado.nombre_completo if p.abogado else "Sin responsable",
                 )
