@@ -4,6 +4,7 @@ import { useCallback, useState, type FormEvent, type ReactNode } from "react";
 import { BellRing, Clock3, Mail, MessageCircle, Monitor, PencilLine, Smartphone, Trash2, XCircle } from "lucide-react";
 
 import { Button } from "@/components/ui/Button";
+import { Interruptor } from "@/components/ui/Interruptor";
 import { useToast } from "@/components/ui/ToastProvider";
 import { useSession } from "@/context/SessionContext";
 import { apiRequest, fetchApi } from "@/lib/api";
@@ -15,41 +16,6 @@ import { useLoadEffect } from "@/lib/useLoadEffect";
 
 export const CAMPO_CLIENTE =
   "block min-h-12 w-full rounded-lg border border-line-strong bg-sheet px-3.5 text-[17px] text-ink placeholder:text-ink-3 focus:border-navy focus:outline-none focus-visible:ring-2 focus-visible:ring-navy/25";
-
-/** Un interruptor de 44 px de alto, con su nombre para lectores de pantalla. */
-function Interruptor({ activo, onCambio, etiqueta, deshabilitado }: {
-  activo: boolean;
-  onCambio: (valor: boolean) => void;
-  etiqueta: string;
-  deshabilitado?: boolean;
-}) {
-  return (
-    <button
-      type="button"
-      role="switch"
-      aria-checked={activo}
-      aria-label={etiqueta}
-      disabled={deshabilitado}
-      onClick={() => onCambio(!activo)}
-      className="group grid min-h-11 min-w-14 place-items-center rounded-full disabled:cursor-not-allowed disabled:opacity-45"
-    >
-      <span
-        aria-hidden="true"
-        className={cx(
-          "relative h-7 w-12 rounded-full transition-colors duration-150 group-focus-visible:outline-2 group-focus-visible:outline-offset-2 group-focus-visible:outline-navy",
-          activo ? "bg-navy" : "bg-line-strong",
-        )}
-      >
-        <span
-          className={cx(
-            "absolute left-0.5 top-0.5 size-6 rounded-full bg-sheet shadow-[0_1px_2px_rgb(0_0_0/0.25)] transition-transform duration-150 ease-out",
-            activo && "translate-x-5",
-          )}
-        />
-      </span>
-    </button>
-  );
-}
 
 /** Correo y WhatsApp por grupo de avisos. Cada cambio se guarda al momento. */
 export function AvisosCliente({ perfil, onCambio }: { perfil: PerfilCliente; onCambio: (avisos: GrupoAvisos[]) => void }) {

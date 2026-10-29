@@ -148,8 +148,8 @@ class ServicioGlosario:
     def _validar_patron(self, patron: str, excepto: int | None = None) -> None:
         buscada = clave(patron)
         if not buscada:
-            raise DatosInvalidos("Escribe palabras del texto del juzgado, no solo artículos.", codigo="patron_vacio",
-                            campos={"patron": "Escribe palabras del texto del juzgado."})
+            raise DatosInvalidos("Escriba palabras del texto del juzgado, no solo artículos.", codigo="patron_vacio",
+                            campos={"patron": "Escriba palabras del texto del juzgado."})
         if any(clave(t.patron) == buscada and t.id != excepto for t in self._repo.terminos()):
             raise Conflicto("Ese texto del juzgado ya está en el glosario.", codigo="patron_repetido",
                             campos={"patron": "Ya está en el glosario."})

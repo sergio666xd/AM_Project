@@ -1,5 +1,5 @@
-import AdminMessageTemplatesPage from "@/components/admin/console/AdminMessageTemplatesPage";
+import { PanelPlantillas } from "@/components/admin/operacion/PanelPlantillas";
 
-export default function AdminMessageTemplatesRoute() {
-  return <AdminMessageTemplatesPage />;
+export default function PlantillasPage() {
+  return <PanelPlantillas />;
 }

@@ -55,7 +55,10 @@ const grupos: GrupoNav[] = [
         rutas: [`${ADMIN}/operacion/notificaciones`],
       },
       { id: "integraciones", label: "Integraciones", href: `${ADMIN}/operacion/integraciones`, icon: ServerCog },
-      { id: "plantillas", label: "Plantillas y glosario", corto: "Plantillas", href: `${ADMIN}/operacion/mensajes`, icon: FileText },
+      {
+        id: "plantillas", label: "Plantillas y glosario", corto: "Plantillas", href: `${ADMIN}/operacion/mensajes`, icon: FileText,
+        rutas: [`${ADMIN}/operacion/glosario`],
+      },
     ],
   },
   {
@@ -112,6 +115,13 @@ const SECCIONES: { titulo: string; pestanas: { label: string; href: string }[] }
     pestanas: [
       { label: "Consultas judiciales", href: `${ADMIN}/operacion/consultas` },
       { label: "Envíos de avisos", href: `${ADMIN}/operacion/notificaciones` },
+    ],
+  },
+  {
+    titulo: "Plantillas y glosario",
+    pestanas: [
+      { label: "Plantillas de avisos", href: `${ADMIN}/operacion/mensajes` },
+      { label: "Glosario", href: `${ADMIN}/operacion/glosario` },
     ],
   },
   {

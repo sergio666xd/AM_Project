@@ -215,3 +215,15 @@ def render_push_message(
         raise HTTPException(status_code=503, detail=f"La plantilla Push '{key}' no está configurada.")
     valores = preparar_valores(values, "PUSH")
     return _render(template.titulo_push, valores), _render(template.cuerpo_push, valores)
+
+
+def render_borrador(
+    source: str | None,
+    values: dict[str, Any],
+    *,
+    canal: str,
+    link_label: str | None = None,
+    link_url: str | None = None,
+) -> str:
+    """Un texto aún sin guardar, como saldría con estos valores (vista previa del editor de plantillas)."""
+    return _cuerpo_con_enlace(source or "", preparar_valores(values, canal), link_label, link_url)

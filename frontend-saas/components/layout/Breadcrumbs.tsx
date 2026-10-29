@@ -51,7 +51,18 @@ const labels: Record<string, string> = {
   plantillas: "Plantillas",
 };
 
-function labelFor(segment: string) {
+// Segmentos que se llaman distinto según la sección donde aparecen.
+const labelsEnSeccion: Record<string, string> = {
+  "operacion/consultas": "Consultas judiciales",
+  "operacion/notificaciones": "Envíos de avisos",
+  "operacion/integraciones": "Integraciones",
+  "operacion/mensajes": "Plantillas de avisos",
+  "operacion/glosario": "Glosario",
+};
+
+function labelFor(segment: string, anterior?: string) {
+  const enSeccion = anterior ? labelsEnSeccion[`${anterior}/${segment}`] : undefined;
+  if (enSeccion) return enSeccion;
   if (/^\d+$/.test(segment) || /^[0-9a-f-]{16,}$/i.test(segment)) return "Detalle";
   return labels[segment] ?? decodeURIComponent(segment).replace(/-/g, " ");
 }
@@ -151,7 +162,7 @@ export default function Breadcrumbs() {
           if (index === 0 && segment === "gestion-procesos" && segments.length > 1) return null;
           const href = `/${segments.slice(0, index + 1).join("/")}`;
           const current = index === segments.length - 1;
-          const label = labelFor(segment);
+          const label = labelFor(segment, segments[index - 1]);
           return (
             <li key={href} className="flex min-w-0 items-center gap-1.5">
               {index > (segments[0] === "gestion-procesos" ? 1 : 0) && <span aria-hidden="true" className="text-line-strong">/</span>}

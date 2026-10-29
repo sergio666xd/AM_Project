@@ -1,5 +1,5 @@
-import AdminOperationsPage from "@/components/admin/console/AdminOperationsPage";
+import { PanelEnvios } from "@/components/admin/operacion/PanelEnvios";
 
-export default function AdminOperationsNotificationsPage() {
-  return <AdminOperationsPage section="notificaciones" />;
+export default function EnviosPage() {
+  return <PanelEnvios />;
 }

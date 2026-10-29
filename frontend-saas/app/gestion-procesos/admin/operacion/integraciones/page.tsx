@@ -1,5 +1,5 @@
-import AdminOperationsPage from "@/components/admin/console/AdminOperationsPage";
+import { PanelIntegraciones } from "@/components/admin/operacion/PanelIntegraciones";
 
-export default function AdminOperationsIntegrationsPage() {
-  return <AdminOperationsPage section="integraciones" />;
+export default function IntegracionesPage() {
+  return <PanelIntegraciones />;
 }

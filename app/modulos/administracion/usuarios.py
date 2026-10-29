@@ -17,7 +17,7 @@ from sqlalchemy.orm import Session
 from app import models, security
 from app.audit import registrar_evento_auditoria
 from app.modulos.administracion.esquemas import (
-    AccesoEnviado,
+    EnlaceEnviado,
     CambioEstado,
     CambioEstadoVarios,
     CambioUsuario,
@@ -304,7 +304,7 @@ class ServicioUsuariosAdmin:
             self._ponerse_al_dia(admin, cuenta)
         return EstadoActualizado(actualizados=actualizados)
 
-    def reenviar_acceso(self, admin: Usuario, usuario_id: int) -> AccesoEnviado:
+    def reenviar_acceso(self, admin: Usuario, usuario_id: int) -> EnlaceEnviado:
         exigir_admin(admin)
         cuenta = self._editable(usuario_id, bloquear=True)
         acceso = acceso_de(cuenta)
@@ -317,9 +317,9 @@ class ServicioUsuariosAdmin:
         registrar_evento_auditoria(self._db, admin, "admin.usuario.acceso_reenviado", "usuario", cuenta.id)
         self._db.commit()
         self._enviar_credenciales(admin, cuenta, clave)
-        return AccesoEnviado(destino=cuenta.email)
+        return EnlaceEnviado(destino=cuenta.email)
 
-    def enviar_enlace(self, admin: Usuario, usuario_id: int) -> AccesoEnviado:
+    def enviar_enlace(self, admin: Usuario, usuario_id: int) -> EnlaceEnviado:
         exigir_admin(admin)
         cuenta = self._editable(usuario_id)
         acceso = acceso_de(cuenta)
@@ -331,7 +331,7 @@ class ServicioUsuariosAdmin:
         registrar_evento_auditoria(self._db, admin, "admin.usuario.password.restablecimiento_enviado", "usuario", cuenta.id)
         self._db.commit()
         enviar_enlace_contrasena(cuenta.email, password_reset_url(token, cuenta.rol))
-        return AccesoEnviado(destino=cuenta.email)
+        return EnlaceEnviado(destino=cuenta.email)
 
     def cerrar_sesiones(self, admin: Usuario, usuario_id: int) -> FichaUsuario:
         exigir_admin(admin)

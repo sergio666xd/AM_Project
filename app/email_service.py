@@ -334,3 +334,8 @@ def enviar_correo(
             servidor.login(usuario, password)
         servidor.send_message(mensaje)
     return True
+
+
+def vista_previa_html(cuerpo: str, firma: dict[str, str | bool], preferencias_url: str | None = None) -> str:
+    """El correo completo, con el diseño y el pie de la firma, para mostrarlo en el editor."""
+    return _html_correo(cuerpo, firma, preferencias_url)

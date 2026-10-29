@@ -55,9 +55,9 @@ def get_integration_settings(db_actual: Session | None = None) -> dict[str, str 
             db.close()
 
 
-def get_firm_settings() -> dict[str, str | bool]:
+def get_firm_settings(db_actual: Session | None = None) -> dict[str, str | bool]:
     """Return the public brand/contact values configured by ADMIN."""
-    db = SessionLocal()
+    db = db_actual or SessionLocal()
     try:
         config = db.query(models.ConfiguracionFirma).filter_by(id=1).first()
         return {
@@ -73,4 +73,5 @@ def get_firm_settings() -> dict[str, str | bool]:
             "mostrar_contacto_publico": config.mostrar_contacto_publico if config else True,
         }
     finally:
-        db.close()
+        if db_actual is None:
+            db.close()
