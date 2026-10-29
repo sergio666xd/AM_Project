@@ -1,5 +1,5 @@
-import AdminUsersPage from "@/components/admin/console/AdminUsersPage";
+import { PanelUsuarios } from "@/components/admin/usuarios/PanelUsuarios";
 
-export default function AdminUsersRoute() {
-  return <AdminUsersPage />;
+export default function AdminUsuariosRoute() {
+  return <PanelUsuarios />;
 }

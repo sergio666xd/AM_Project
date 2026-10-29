@@ -3,6 +3,9 @@
 from fastapi import Depends
 from sqlalchemy.orm import Session
 
+from app.modulos.administracion.repositorio import RepositorioAdministracion
+from app.modulos.administracion.servicio import ServicioAdministracion
+from app.modulos.administracion.usuarios import ServicioUsuariosAdmin
 from app.modulos.agenda.repositorio import RepositorioAgenda
 from app.modulos.agenda.servicio import ServicioAgenda
 from app.modulos.avisos.servicio import ServicioAvisos
@@ -97,3 +100,11 @@ def servicio_perfil_cliente(db: Session = Depends(obtener_bd)) -> ServicioPerfil
 
 def servicio_finanzas(db: Session = Depends(obtener_bd)) -> ServicioFinanzas:
     return ServicioFinanzas(db, RepositorioFinanzas(db))
+
+
+def servicio_administracion(db: Session = Depends(obtener_bd)) -> ServicioAdministracion:
+    return ServicioAdministracion(db, RepositorioAdministracion(db))
+
+
+def servicio_usuarios_admin(db: Session = Depends(obtener_bd)) -> ServicioUsuariosAdmin:
+    return ServicioUsuariosAdmin(db, RepositorioAdministracion(db))

@@ -199,7 +199,7 @@ export function ClienteFormModal({ open, clienteId, onClose, onGuardado }: {
   );
 }
 
-function Campo({ id, etiqueta, opcional, ayuda, error, className, children }: {
+export function Campo({ id, etiqueta, opcional, ayuda, error, className, children }: {
   id: string;
   etiqueta: string;
   opcional?: boolean;

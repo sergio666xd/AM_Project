@@ -30,6 +30,8 @@ export type ItemNav = {
   hijos?: ItemNav[];
   /** Abrir con recarga completa (p. ej. el editor de contenido). */
   recargar?: boolean;
+  /** Otras rutas de la sección: Expedientes también abarca tareas, agenda, documentos… */
+  rutas?: string[];
 };
 export type GrupoNav = {
   titulo: string | null;
@@ -143,7 +145,10 @@ export function estaActiva(ruta: string, href: string, inicio: string) {
  * /admin/chat/limpiar marque "Limpieza de chats" y no "Chat del equipo".
  */
 export function itemActivo(ruta: string, items: ItemNav[], inicio: string): ItemNav | undefined {
+  const largo = (item: ItemNav) =>
+    Math.max(-1, ...[item.href, ...(item.rutas ?? [])].filter((href) => estaActiva(ruta, href, inicio)).map((href) => normalizar(href).length));
   return items
-    .filter((item) => estaActiva(ruta, item.href, inicio))
-    .sort((a, b) => normalizar(b.href).length - normalizar(a.href).length)[0];
+    .map((item) => ({ item, largo: largo(item) }))
+    .filter(({ largo }) => largo >= 0)
+    .sort((a, b) => b.largo - a.largo)[0]?.item;
 }
