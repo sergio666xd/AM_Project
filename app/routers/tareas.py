@@ -16,6 +16,7 @@ from app.firm_access import (
     require_roles,
 )
 from app.security import obtener_usuario_actual
+from app.message_templates import fecha_texto, texto_legible
 from app.notification_service import emitir_notificacion_workflow
 from app.notification_policy import plan_whatsapp_habilitado, preferencia_de_cliente
 from app.reminder_workflow import iniciar_workflow_recordatorio, normalizar_utc_naive
@@ -644,7 +645,7 @@ def actualizar_tarea(
         db.commit()
         _lanzar_recordatorios_pendientes(db, tarea, recordatorio_ids)
         db.refresh(tarea)
-        _notificar_cambio_tarea(db, tarea, usuario_actual, "cambió la fecha límite", f"Fecha anterior: {format_colombia_datetime(anterior) if anterior else 'Sin fecha'}. Nueva fecha: {format_colombia_datetime(nueva_fecha)}.")
+        _notificar_cambio_tarea(db, tarea, usuario_actual, "cambió la fecha límite", (f"Antes vencía el {fecha_texto(format_colombia_datetime(anterior))}. " if anterior else "") + f"Ahora vence el {fecha_texto(format_colombia_datetime(nueva_fecha))}.")
         return serializar_tarea_para_usuario(tarea, usuario_actual)
 
     estado_anterior = tarea.estado
@@ -809,7 +810,7 @@ def completar_tarea(
     db.commit()
     _lanzar_recordatorios_pendientes(db, tarea, recordatorio_ids)
     db.refresh(tarea)
-    _notificar_cambio_tarea(db, tarea, usuario_actual, "actualizó el estado de la tarea", f"Estado actualizado a {tarea.estado.value}.")
+    _notificar_cambio_tarea(db, tarea, usuario_actual, "actualizó el estado de la tarea", f"El estado ahora es «{texto_legible(tarea.estado.value)}».")
 
     return serializar_tarea_para_usuario(tarea, usuario_actual)
 
