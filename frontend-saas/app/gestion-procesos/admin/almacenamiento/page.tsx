@@ -1,5 +1,5 @@
-import AdminStoragePage from "@/components/admin/console/AdminStoragePage";
+import { PanelAlmacenamiento } from "@/components/admin/sistema/PanelAlmacenamiento";
 
-export default function AdminStorageRoute() {
-  return <AdminStoragePage />;
+export default function AlmacenamientoPage() {
+  return <PanelAlmacenamiento />;
 }

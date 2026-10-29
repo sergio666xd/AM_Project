@@ -144,7 +144,12 @@ export function FichaUsuarioAdmin({ usuarioId }: { usuarioId: number }) {
           </Sheet>
 
           <Sheet aria-labelledby="ficha-actividad" className="order-4 lg:order-none">
-            <SheetHeader title={<span id="ficha-actividad">Lo que ha hecho</span>} />
+            <SheetHeader
+              title={<span id="ficha-actividad">Lo que ha hecho</span>}
+              action={ficha.actividad.length ? (
+                <Link href={`/gestion-procesos/admin/actividad?actor=${ficha.id}`} className="text-[13px] font-semibold text-navy hover:underline dark:text-navy-ink">Ver todo</Link>
+              ) : undefined}
+            />
             {ficha.actividad.length ? (
               <ol className="divide-y divide-line">
                 {ficha.actividad.map((evento) => {

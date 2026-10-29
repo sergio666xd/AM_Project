@@ -1,5 +1,5 @@
-import AdminAuditPage from "@/components/admin/console/AdminAuditPage";
+import { PanelActividad } from "@/components/admin/sistema/PanelActividad";
 
-export default function AdminAuditRoute() {
-  return <AdminAuditPage initialView="auditoria" />;
+export default function AuditoriaPage() {
+  return <PanelActividad vista="auditoria" />;
 }

@@ -25,7 +25,7 @@ from app.timezone import utc_ahora
 EDITORES = {RolUsuario.ADMIN.value, RolUsuario.ABOGADO_ADMIN.value}
 # Palabras que no cuentan al comparar: «Auto fija fecha de audiencia» es «auto fija fecha audiencia».
 VACIAS = frozenset({"a", "al", "con", "de", "del", "el", "en", "la", "las", "lo", "los", "o", "para", "por", "que", "se", "u", "y"})
-NO_ENCONTRADA = "No encontramos esa actuación, o no tienes acceso a ella."
+NO_ENCONTRADA = "No encontramos esa actuación, o no tiene acceso a ella."
 
 
 def normalizar(texto: str) -> str:

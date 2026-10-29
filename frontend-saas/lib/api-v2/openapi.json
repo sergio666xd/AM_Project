@@ -13226,6 +13226,1529 @@
           }
         }
       }
+    },
+    "/api/v2/admin/actividad": {
+      "get": {
+        "tags": [
+          "Sistema"
+        ],
+        "summary": "Actividad y auditoría",
+        "description": "Lo que se hizo en la plataforma, lo más reciente primero. Los registros no se pueden borrar.",
+        "operationId": "listar_actividad",
+        "parameters": [
+          {
+            "name": "q",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "maxLength": 120
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Nombre de quien lo hizo.",
+              "title": "Q"
+            },
+            "description": "Nombre de quien lo hizo."
+          },
+          {
+            "name": "actor_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Solo lo que hizo esta persona.",
+              "title": "Actor Id"
+            },
+            "description": "Solo lo que hizo esta persona."
+          },
+          {
+            "name": "area",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "enum": [
+                    "cuentas",
+                    "procesos",
+                    "tareas",
+                    "documentos",
+                    "cobros",
+                    "mensajes",
+                    "configuracion",
+                    "otros"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Area"
+            }
+          },
+          {
+            "name": "desde",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Día inicial, en hora de Colombia.",
+              "title": "Desde"
+            },
+            "description": "Día inicial, en hora de Colombia."
+          },
+          {
+            "name": "hasta",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Día final, incluido.",
+              "title": "Hasta"
+            },
+            "description": "Día final, incluido."
+          },
+          {
+            "name": "solo_errores",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "description": "Solo los registros con error técnico.",
+              "default": false,
+              "title": "Solo Errores"
+            },
+            "description": "Solo los registros con error técnico."
+          },
+          {
+            "name": "todo",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "description": "Incluir las acciones de rutina (descargas, alertas descartadas).",
+              "default": false,
+              "title": "Todo"
+            },
+            "description": "Incluir las acciones de rutina (descargas, alertas descartadas)."
+          },
+          {
+            "name": "limite",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 100,
+              "minimum": 1,
+              "description": "Elementos por página.",
+              "default": 25,
+              "title": "Limite"
+            },
+            "description": "Elementos por página."
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "maxLength": 500
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Valor de `siguiente` de la página anterior.",
+              "title": "Cursor"
+            },
+            "description": "Valor de `siguiente` de la página anterior."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PaginaRegistro"
+                }
+              }
+            }
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Too Many Requests"
+          }
+        }
+      }
+    },
+    "/api/v2/admin/actividad/csv": {
+      "get": {
+        "tags": [
+          "Sistema"
+        ],
+        "summary": "Descargar la actividad en CSV",
+        "operationId": "descargar_actividad",
+        "parameters": [
+          {
+            "name": "q",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "maxLength": 120
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Nombre de quien lo hizo.",
+              "title": "Q"
+            },
+            "description": "Nombre de quien lo hizo."
+          },
+          {
+            "name": "actor_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Solo lo que hizo esta persona.",
+              "title": "Actor Id"
+            },
+            "description": "Solo lo que hizo esta persona."
+          },
+          {
+            "name": "area",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "enum": [
+                    "cuentas",
+                    "procesos",
+                    "tareas",
+                    "documentos",
+                    "cobros",
+                    "mensajes",
+                    "configuracion",
+                    "otros"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Area"
+            }
+          },
+          {
+            "name": "desde",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Día inicial, en hora de Colombia.",
+              "title": "Desde"
+            },
+            "description": "Día inicial, en hora de Colombia."
+          },
+          {
+            "name": "hasta",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Día final, incluido.",
+              "title": "Hasta"
+            },
+            "description": "Día final, incluido."
+          },
+          {
+            "name": "solo_errores",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "description": "Solo los registros con error técnico.",
+              "default": false,
+              "title": "Solo Errores"
+            },
+            "description": "Solo los registros con error técnico."
+          },
+          {
+            "name": "todo",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "description": "Incluir las acciones de rutina (descargas, alertas descartadas).",
+              "default": false,
+              "title": "Todo"
+            },
+            "description": "Incluir las acciones de rutina (descargas, alertas descartadas)."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Hasta 5.000 registros.",
+            "content": {
+              "text/csv": {}
+            }
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Too Many Requests"
+          }
+        }
+      }
+    },
+    "/api/v2/admin/actividad/{registro_id}": {
+      "get": {
+        "tags": [
+          "Sistema"
+        ],
+        "summary": "Detalle técnico de un registro",
+        "operationId": "detalle_actividad",
+        "parameters": [
+          {
+            "name": "registro_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Registro Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DetalleRegistro"
+                }
+              }
+            }
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Too Many Requests"
+          }
+        }
+      }
+    },
+    "/api/v2/admin/carga": {
+      "get": {
+        "tags": [
+          "Sistema"
+        ],
+        "summary": "Carga de trabajo del equipo",
+        "description": "Procesos activos y tareas abiertas por persona. También la ve la abogada directora.",
+        "operationId": "carga_de_trabajo",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PanelCarga"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too Many Requests",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v2/admin/firma": {
+      "get": {
+        "tags": [
+          "Sistema"
+        ],
+        "summary": "Datos de la firma",
+        "operationId": "ver_datos_firma",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DatosFirma"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too Many Requests",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "Sistema"
+        ],
+        "summary": "Guardar los datos de la firma",
+        "description": "Los usan el sitio público, el pie de los correos y los PDF de cobro.",
+        "operationId": "guardar_datos_firma",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TextosFirma"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DatosFirma"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too Many Requests",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v2/admin/almacenamiento": {
+      "get": {
+        "tags": [
+          "Sistema"
+        ],
+        "summary": "Archivos guardados",
+        "operationId": "contenido_almacenamiento",
+        "parameters": [
+          {
+            "name": "ruta",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "maxLength": 1024,
+              "description": "Carpeta a listar; vacío es la raíz.",
+              "default": "",
+              "title": "Ruta"
+            },
+            "description": "Carpeta a listar; vacío es la raíz."
+          },
+          {
+            "name": "siguiente",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "maxLength": 2048
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Para pedir más archivos de la misma carpeta.",
+              "title": "Siguiente"
+            },
+            "description": "Para pedir más archivos de la misma carpeta."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ContenidoCarpeta"
+                }
+              }
+            }
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Too Many Requests"
+          }
+        }
+      }
+    },
+    "/api/v2/admin/almacenamiento/enlace": {
+      "get": {
+        "tags": [
+          "Sistema"
+        ],
+        "summary": "Abrir un archivo guardado",
+        "description": "Un enlace que sirve 15 minutos.",
+        "operationId": "enlace_almacenamiento",
+        "parameters": [
+          {
+            "name": "clave",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 1024,
+              "title": "Clave"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EnlaceTemporal"
+                }
+              }
+            }
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Too Many Requests"
+          }
+        }
+      }
+    },
+    "/api/v2/admin/almacenamiento/eliminar-archivo": {
+      "post": {
+        "tags": [
+          "Sistema"
+        ],
+        "summary": "Borrar un archivo huérfano",
+        "description": "Solo archivos que ningún documento usa; los demás se retiran desde su expediente.",
+        "operationId": "eliminar_archivo_guardado",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ArchivoAEliminar"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Eliminados"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too Many Requests",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v2/admin/almacenamiento/eliminar-carpeta": {
+      "post": {
+        "tags": [
+          "Sistema"
+        ],
+        "summary": "Borrar una carpeta sin documentos",
+        "operationId": "eliminar_carpeta_guardada",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CarpetaAEliminar"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Eliminados"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too Many Requests",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v2/admin/chats": {
+      "get": {
+        "tags": [
+          "Sistema"
+        ],
+        "summary": "Conversaciones del chat",
+        "description": "Quiénes participan, cuántos mensajes hay y cuándo fue el último. Nunca el contenido.",
+        "operationId": "listar_chats_para_limpiar",
+        "parameters": [
+          {
+            "name": "limite",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 100,
+              "minimum": 1,
+              "description": "Elementos por página.",
+              "default": 25,
+              "title": "Limite"
+            },
+            "description": "Elementos por página."
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "maxLength": 500
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Valor de `siguiente` de la página anterior.",
+              "title": "Cursor"
+            },
+            "description": "Valor de `siguiente` de la página anterior."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PaginaChats"
+                }
+              }
+            }
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Too Many Requests"
+          }
+        }
+      }
+    },
+    "/api/v2/admin/chats/{chat_id}/vaciar": {
+      "post": {
+        "tags": [
+          "Sistema"
+        ],
+        "summary": "Vaciar una conversación",
+        "operationId": "vaciar_chat",
+        "parameters": [
+          {
+            "name": "chat_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Chat Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ConfirmacionVaciado"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ChatVaciado"
+                }
+              }
+            }
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Too Many Requests"
+          }
+        }
+      }
     }
   },
   "components": {
@@ -13690,6 +15213,21 @@
         "title": "Archivo",
         "description": "Un documento del proceso. Si responde a una solicitud, es la versión vigente\nde lo pedido y `versiones` trae todas las entregas, de la más reciente a la primera."
       },
+      "ArchivoAEliminar": {
+        "properties": {
+          "clave": {
+            "type": "string",
+            "maxLength": 1024,
+            "minLength": 1,
+            "title": "Clave"
+          }
+        },
+        "type": "object",
+        "required": [
+          "clave"
+        ],
+        "title": "ArchivoAEliminar"
+      },
       "ArchivoEntrada": {
         "properties": {
           "nombre": {
@@ -13727,6 +15265,56 @@
           "url"
         ],
         "title": "ArchivoFolio"
+      },
+      "ArchivoGuardado": {
+        "properties": {
+          "clave": {
+            "type": "string",
+            "title": "Clave",
+            "description": "Ruta completa del archivo en el almacenamiento."
+          },
+          "nombre": {
+            "type": "string",
+            "title": "Nombre"
+          },
+          "tamano": {
+            "type": "integer",
+            "title": "Tamano",
+            "description": "En bytes."
+          },
+          "modificado": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Modificado"
+          },
+          "vinculo": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/VinculoArchivo"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "null si ningún registro de la plataforma lo usa (huérfano)."
+          }
+        },
+        "type": "object",
+        "required": [
+          "clave",
+          "nombre",
+          "tamano",
+          "modificado",
+          "vinculo"
+        ],
+        "title": "ArchivoGuardado"
       },
       "Autor": {
         "properties": {
@@ -14434,6 +16022,161 @@
         ],
         "title": "CambioWhatsapp"
       },
+      "CargaPersona": {
+        "properties": {
+          "persona": {
+            "$ref": "#/components/schemas/PersonaBreve"
+          },
+          "activa": {
+            "type": "boolean",
+            "title": "Activa",
+            "description": "False si la cuenta está suspendida o cerrada y aún tiene trabajo a su nombre."
+          },
+          "procesos": {
+            "type": "integer",
+            "title": "Procesos",
+            "description": "Procesos activos de los que es responsable."
+          },
+          "tareas_abiertas": {
+            "type": "integer",
+            "title": "Tareas Abiertas"
+          },
+          "vencidas": {
+            "type": "integer",
+            "title": "Vencidas"
+          },
+          "proximas": {
+            "type": "integer",
+            "title": "Proximas",
+            "description": "Tareas que vencen en los próximos 7 días."
+          }
+        },
+        "type": "object",
+        "required": [
+          "persona",
+          "activa",
+          "procesos",
+          "tareas_abiertas",
+          "vencidas",
+          "proximas"
+        ],
+        "title": "CargaPersona"
+      },
+      "CarpetaAEliminar": {
+        "properties": {
+          "ruta": {
+            "type": "string",
+            "maxLength": 1024,
+            "minLength": 1,
+            "title": "Ruta"
+          },
+          "confirmacion": {
+            "type": "string",
+            "title": "Confirmacion",
+            "description": "El nombre de la carpeta, escrito por la persona para confirmar."
+          }
+        },
+        "type": "object",
+        "required": [
+          "ruta",
+          "confirmacion"
+        ],
+        "title": "CarpetaAEliminar"
+      },
+      "CarpetaGuardada": {
+        "properties": {
+          "ruta": {
+            "type": "string",
+            "title": "Ruta",
+            "description": "Sin barra final: `procesos/12`."
+          },
+          "nombre": {
+            "type": "string",
+            "title": "Nombre"
+          }
+        },
+        "type": "object",
+        "required": [
+          "ruta",
+          "nombre"
+        ],
+        "title": "CarpetaGuardada"
+      },
+      "ChatParaLimpiar": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "tipo": {
+            "type": "string",
+            "enum": [
+              "cliente",
+              "equipo_proceso",
+              "colaboradores",
+              "equipo"
+            ],
+            "title": "Tipo"
+          },
+          "proceso": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Proceso"
+          },
+          "participantes": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Participantes"
+          },
+          "mensajes": {
+            "type": "integer",
+            "title": "Mensajes"
+          },
+          "ultimo_mensaje": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ultimo Mensaje"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "tipo",
+          "proceso",
+          "participantes",
+          "mensajes",
+          "ultimo_mensaje"
+        ],
+        "title": "ChatParaLimpiar"
+      },
+      "ChatVaciado": {
+        "properties": {
+          "mensajes_eliminados": {
+            "type": "integer",
+            "title": "Mensajes Eliminados"
+          }
+        },
+        "type": "object",
+        "required": [
+          "mensajes_eliminados"
+        ],
+        "title": "ChatVaciado"
+      },
       "CifraFirma": {
         "properties": {
           "clave": {
@@ -14995,6 +16738,21 @@
         ],
         "title": "ConfiguracionWhatsapp"
       },
+      "ConfirmacionVaciado": {
+        "properties": {
+          "confirmacion": {
+            "type": "string",
+            "const": "VACIAR",
+            "title": "Confirmacion",
+            "description": "La palabra VACIAR, escrita por la persona."
+          }
+        },
+        "type": "object",
+        "required": [
+          "confirmacion"
+        ],
+        "title": "ConfirmacionVaciado"
+      },
       "Contacto": {
         "properties": {
           "id": {
@@ -15022,6 +16780,49 @@
           "rol"
         ],
         "title": "Contacto"
+      },
+      "ContenidoCarpeta": {
+        "properties": {
+          "ruta": {
+            "type": "string",
+            "title": "Ruta",
+            "description": "La carpeta listada; vacío es la raíz."
+          },
+          "carpetas": {
+            "items": {
+              "$ref": "#/components/schemas/CarpetaGuardada"
+            },
+            "type": "array",
+            "title": "Carpetas"
+          },
+          "archivos": {
+            "items": {
+              "$ref": "#/components/schemas/ArchivoGuardado"
+            },
+            "type": "array",
+            "title": "Archivos"
+          },
+          "siguiente": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Siguiente",
+            "description": "Para pedir más archivos de esta carpeta, o null."
+          }
+        },
+        "type": "object",
+        "required": [
+          "ruta",
+          "carpetas",
+          "archivos",
+          "siguiente"
+        ],
+        "title": "ContenidoCarpeta"
       },
       "ConteoEnvios": {
         "properties": {
@@ -15671,6 +17472,124 @@
         "type": "object",
         "title": "DatosCliente"
       },
+      "DatosFirma": {
+        "properties": {
+          "nombre": {
+            "type": "string",
+            "maxLength": 180,
+            "minLength": 2,
+            "title": "Nombre"
+          },
+          "correo_contacto": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "email"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Correo Contacto"
+          },
+          "correo_pqr": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "email"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Correo Pqr"
+          },
+          "telefono": {
+            "type": "string",
+            "maxLength": 40,
+            "title": "Telefono",
+            "default": ""
+          },
+          "whatsapp": {
+            "type": "string",
+            "maxLength": 40,
+            "title": "Whatsapp",
+            "default": ""
+          },
+          "direccion": {
+            "type": "string",
+            "maxLength": 300,
+            "title": "Direccion",
+            "default": ""
+          },
+          "ciudad": {
+            "type": "string",
+            "maxLength": 120,
+            "title": "Ciudad",
+            "default": ""
+          },
+          "pais": {
+            "type": "string",
+            "maxLength": 120,
+            "title": "Pais",
+            "default": "Colombia"
+          },
+          "sitio_web": {
+            "type": "string",
+            "maxLength": 1000,
+            "title": "Sitio Web",
+            "default": ""
+          },
+          "logo_url": {
+            "type": "string",
+            "maxLength": 1000,
+            "title": "Logo Url",
+            "default": ""
+          },
+          "logo_correo_url": {
+            "type": "string",
+            "maxLength": 1000,
+            "title": "Logo Correo Url",
+            "description": "Logo del encabezado de los correos; vacío usa el logo general.",
+            "default": ""
+          },
+          "mostrar_contacto_publico": {
+            "type": "boolean",
+            "title": "Mostrar Contacto Publico",
+            "default": true
+          },
+          "actualizado_en": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Actualizado En"
+          },
+          "actualizado_por": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Actualizado Por"
+          }
+        },
+        "type": "object",
+        "required": [
+          "nombre",
+          "actualizado_en",
+          "actualizado_por"
+        ],
+        "title": "DatosFirma"
+      },
       "DatosPlantilla": {
         "properties": {
           "nombre": {
@@ -16216,6 +18135,154 @@
         "title": "DetallePendiente",
         "description": "Un pendiente con lo necesario para resolverlo desde la misma tarjeta."
       },
+      "DetalleRegistro": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "actor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Actor",
+            "description": "Quién lo hizo; null cuando fue la plataforma sola."
+          },
+          "actor_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Actor Id"
+          },
+          "frase": {
+            "type": "string",
+            "title": "Frase",
+            "description": "Lo que hizo, en pasado: «emitió una cuenta de cobro»."
+          },
+          "enlace": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Enlace",
+            "description": "Dónde ver lo que cambió, si tiene pantalla propia."
+          },
+          "fecha": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Fecha"
+          },
+          "area": {
+            "type": "string",
+            "enum": [
+              "cuentas",
+              "procesos",
+              "tareas",
+              "documentos",
+              "cobros",
+              "mensajes",
+              "configuracion",
+              "otros"
+            ],
+            "title": "Area"
+          },
+          "accion": {
+            "type": "string",
+            "title": "Accion",
+            "description": "Código de la acción, por ejemplo `cuenta_cobro.emitir`."
+          },
+          "con_error": {
+            "type": "boolean",
+            "title": "Con Error",
+            "description": "La operación quedó registrada con un error técnico."
+          },
+          "recurso": {
+            "type": "string",
+            "title": "Recurso",
+            "description": "Tipo de registro afectado, por ejemplo `cuenta_cobro`."
+          },
+          "recurso_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Recurso Id"
+          },
+          "endpoint": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Endpoint"
+          },
+          "metodo": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Metodo"
+          },
+          "datos": {
+            "title": "Datos",
+            "description": "Los datos que la operación guardó con el registro."
+          },
+          "error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "actor",
+          "actor_id",
+          "frase",
+          "enlace",
+          "fecha",
+          "area",
+          "accion",
+          "con_error",
+          "recurso",
+          "recurso_id",
+          "endpoint",
+          "metodo",
+          "error"
+        ],
+        "title": "DetalleRegistro"
+      },
       "DocumentoCliente": {
         "properties": {
           "id": {
@@ -16478,6 +18545,19 @@
         ],
         "title": "ElementoAgenda"
       },
+      "Eliminados": {
+        "properties": {
+          "archivos": {
+            "type": "integer",
+            "title": "Archivos"
+          }
+        },
+        "type": "object",
+        "required": [
+          "archivos"
+        ],
+        "title": "Eliminados"
+      },
       "EnlaceEnviado": {
         "properties": {
           "destino": {
@@ -16511,6 +18591,25 @@
           "creada_en"
         ],
         "title": "EnlaceSuscripcion"
+      },
+      "EnlaceTemporal": {
+        "properties": {
+          "url": {
+            "type": "string",
+            "title": "Url"
+          },
+          "expira_en": {
+            "type": "integer",
+            "title": "Expira En",
+            "description": "Segundos que sirve el enlace."
+          }
+        },
+        "type": "object",
+        "required": [
+          "url",
+          "expira_en"
+        ],
+        "title": "EnlaceTemporal"
       },
       "EntradaHistoria": {
         "properties": {
@@ -18721,6 +20820,41 @@
         ],
         "title": "OpcionReferencia"
       },
+      "PaginaChats": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/ChatParaLimpiar"
+            },
+            "type": "array",
+            "title": "Items"
+          },
+          "total": {
+            "type": "integer",
+            "title": "Total",
+            "description": "Cantidad total con los filtros aplicados, sin contar el cursor."
+          },
+          "siguiente": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Siguiente",
+            "description": "Cursor de la página siguiente, o null si no hay más."
+          }
+        },
+        "type": "object",
+        "required": [
+          "items",
+          "total",
+          "siguiente"
+        ],
+        "title": "PaginaChats"
+      },
       "PaginaEjecuciones": {
         "properties": {
           "items": {
@@ -18917,6 +21051,41 @@
           "siguiente"
         ],
         "title": "PaginaProcesos"
+      },
+      "PaginaRegistro": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/RegistroActividad"
+            },
+            "type": "array",
+            "title": "Items"
+          },
+          "total": {
+            "type": "integer",
+            "title": "Total",
+            "description": "Cantidad total con los filtros aplicados, sin contar el cursor."
+          },
+          "siguiente": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Siguiente",
+            "description": "Cursor de la página siguiente, o null si no hay más."
+          }
+        },
+        "type": "object",
+        "required": [
+          "items",
+          "total",
+          "siguiente"
+        ],
+        "title": "PaginaRegistro"
       },
       "PaginaUsuarios": {
         "properties": {
@@ -19152,6 +21321,43 @@
           "aplicaciones"
         ],
         "title": "PagoVista"
+      },
+      "PanelCarga": {
+        "properties": {
+          "personas": {
+            "items": {
+              "$ref": "#/components/schemas/CargaPersona"
+            },
+            "type": "array",
+            "title": "Personas",
+            "description": "Primero quien tiene más tareas vencidas."
+          },
+          "procesos": {
+            "type": "integer",
+            "title": "Procesos"
+          },
+          "tareas_abiertas": {
+            "type": "integer",
+            "title": "Tareas Abiertas"
+          },
+          "vencidas": {
+            "type": "integer",
+            "title": "Vencidas"
+          },
+          "proximas": {
+            "type": "integer",
+            "title": "Proximas"
+          }
+        },
+        "type": "object",
+        "required": [
+          "personas",
+          "procesos",
+          "tareas_abiertas",
+          "vencidas",
+          "proximas"
+        ],
+        "title": "PanelCarga"
       },
       "PanelConsultas": {
         "properties": {
@@ -20617,6 +22823,96 @@
         ],
         "title": "ReferenciaElegida"
       },
+      "RegistroActividad": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "actor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Actor",
+            "description": "Quién lo hizo; null cuando fue la plataforma sola."
+          },
+          "actor_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Actor Id"
+          },
+          "frase": {
+            "type": "string",
+            "title": "Frase",
+            "description": "Lo que hizo, en pasado: «emitió una cuenta de cobro»."
+          },
+          "enlace": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Enlace",
+            "description": "Dónde ver lo que cambió, si tiene pantalla propia."
+          },
+          "fecha": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Fecha"
+          },
+          "area": {
+            "type": "string",
+            "enum": [
+              "cuentas",
+              "procesos",
+              "tareas",
+              "documentos",
+              "cobros",
+              "mensajes",
+              "configuracion",
+              "otros"
+            ],
+            "title": "Area"
+          },
+          "accion": {
+            "type": "string",
+            "title": "Accion",
+            "description": "Código de la acción, por ejemplo `cuenta_cobro.emitir`."
+          },
+          "con_error": {
+            "type": "boolean",
+            "title": "Con Error",
+            "description": "La operación quedó registrada con un error técnico."
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "actor",
+          "actor_id",
+          "frase",
+          "enlace",
+          "fecha",
+          "area",
+          "accion",
+          "con_error"
+        ],
+        "title": "RegistroActividad"
+      },
       "Reintentados": {
         "properties": {
           "reintentados": {
@@ -21734,6 +24030,99 @@
         ],
         "title": "TerminoDelGlosario"
       },
+      "TextosFirma": {
+        "properties": {
+          "nombre": {
+            "type": "string",
+            "maxLength": 180,
+            "minLength": 2,
+            "title": "Nombre"
+          },
+          "correo_contacto": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "email"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Correo Contacto"
+          },
+          "correo_pqr": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "email"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Correo Pqr"
+          },
+          "telefono": {
+            "type": "string",
+            "maxLength": 40,
+            "title": "Telefono",
+            "default": ""
+          },
+          "whatsapp": {
+            "type": "string",
+            "maxLength": 40,
+            "title": "Whatsapp",
+            "default": ""
+          },
+          "direccion": {
+            "type": "string",
+            "maxLength": 300,
+            "title": "Direccion",
+            "default": ""
+          },
+          "ciudad": {
+            "type": "string",
+            "maxLength": 120,
+            "title": "Ciudad",
+            "default": ""
+          },
+          "pais": {
+            "type": "string",
+            "maxLength": 120,
+            "title": "Pais",
+            "default": "Colombia"
+          },
+          "sitio_web": {
+            "type": "string",
+            "maxLength": 1000,
+            "title": "Sitio Web",
+            "default": ""
+          },
+          "logo_url": {
+            "type": "string",
+            "maxLength": 1000,
+            "title": "Logo Url",
+            "default": ""
+          },
+          "logo_correo_url": {
+            "type": "string",
+            "maxLength": 1000,
+            "title": "Logo Correo Url",
+            "description": "Logo del encabezado de los correos; vacío usa el logo general.",
+            "default": ""
+          },
+          "mostrar_contacto_publico": {
+            "type": "boolean",
+            "title": "Mostrar Contacto Publico",
+            "default": true
+          }
+        },
+        "type": "object",
+        "required": [
+          "nombre"
+        ],
+        "title": "TextosFirma"
+      },
       "TextosPlantillaAviso": {
         "properties": {
           "asunto": {
@@ -22136,6 +24525,41 @@
           "recibido_en"
         ],
         "title": "Version"
+      },
+      "VinculoArchivo": {
+        "properties": {
+          "tipo": {
+            "type": "string",
+            "enum": [
+              "documento",
+              "contrato"
+            ],
+            "title": "Tipo"
+          },
+          "descripcion": {
+            "type": "string",
+            "title": "Descripcion",
+            "description": "«Cédula.pdf, del proceso Sucesión de Jorge Pérez»."
+          },
+          "enlace": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Enlace"
+          }
+        },
+        "type": "object",
+        "required": [
+          "tipo",
+          "descripcion",
+          "enlace"
+        ],
+        "title": "VinculoArchivo"
       },
       "VistaPrevia": {
         "properties": {

@@ -208,10 +208,14 @@ class ServicioClientes:
             cliente,
             asunto="Acceso a sus procesos",
             cuerpo=(
-                f"Hola {cliente.nombre_completo},\n\n{actor.nombre_completo} creó tu acceso al portal de gestión de procesos.\n\n"
-                f"Tus credenciales temporales son:\nUsuario: {cliente.email}\nContraseña temporal: {clave}\n\n"
-                "Al iniciar sesión tendrás que cambiar esta contraseña. No compartas estas credenciales.\n\n"
-                f"Canal elegido para futuras notificaciones: {canal}.\n\nAbrir enlace: Ingresar al portal | {enlace}"
+                "# Su acceso al portal\n"
+                f"Hola, {cliente.nombre_completo.split()[0]}:\n"
+                f"{actor.nombre_completo} creó su acceso al portal de la firma. Allí puede ver sus procesos y sus documentos, y escribirnos.\n"
+                "! Entre con estos datos. Al iniciar sesión, el portal le pedirá crear una contraseña nueva. No comparta estos datos con nadie.\n"
+                f"Usuario: {cliente.email}\nContraseña temporal: {clave}\n"
+                f"Avisos por: {'WhatsApp' if canal == 'WHATSAPP' else 'correo'}\n"
+                f"Abrir enlace: Entrar al portal | {enlace}\n"
+                "? Si tiene dudas, escríbanos por el chat del portal."
             ),
             tipo="ACCESO",
             origen=f"USUARIO:{cliente.id}:ACCESO",
