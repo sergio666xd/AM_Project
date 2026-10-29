@@ -16,6 +16,7 @@ from app.firm_access import (
     lawyer_scope_id,
     require_process_manager,
 )
+from app.message_templates import radicado_legible
 from app.radicados import (
     ambito_radicado_usuario,
     iniciar_consulta_nuevo_radicado,
@@ -63,7 +64,7 @@ def actualizar_proceso(proceso_id: int, datos: schemas.ProcesoUpdate, db: Sessio
     registrar_evento_auditoria(db, usuario, "proceso.actualizar", "proceso", proceso.id)
     db.commit(); db.refresh(proceso)
     _notificar_clientes_proceso(db, proceso, usuario, f"Actualización del proceso {proceso.nombre}",
-                                "actualizó la información general", datos.nombre or datos.descripcion or "Se actualizaron los datos generales del expediente.",
+                                "actualizó la información general del proceso", datos.nombre or datos.descripcion or "Se actualizaron los datos generales del expediente.",
                                 "#resumen")
     return {"id": proceso.id, "nombre": proceso.nombre, "descripcion": proceso.descripcion}
 
@@ -554,7 +555,7 @@ def asignar_radicado(proceso_id: int, radicado_id: int, db: Session = Depends(ge
         db.commit()
         _notificar_clientes_proceso(
             db, proceso, usuario, f"Radicado asociado: {radicado.numero}",
-            "asoció un radicado judicial", f"Radicado: {radicado.numero}\nProceso: {proceso.nombre}\nEstado de consulta: {radicado.estado_consulta}",
+            "asoció un radicado judicial al proceso", f"Radicado: {radicado_legible(radicado.numero)}",
             "radicados", tipo="ACTUACIONES",
         )
         if not vinculado_previamente:
@@ -601,7 +602,7 @@ def crear_y_asignar_radicado(
     db.commit(); db.refresh(radicado)
     _notificar_clientes_proceso(
         db, proceso, usuario, f"Radicado asociado: {radicado.numero}",
-        "asoció un radicado judicial", f"Radicado: {radicado.numero}\nProceso: {proceso.nombre}\nEstado de consulta: {radicado.estado_consulta}",
+        "asoció un radicado judicial al proceso", f"Radicado: {radicado_legible(radicado.numero)}",
         "radicados", tipo="ACTUACIONES",
     )
     mensaje = "Radicado creado y asociado al proceso."
@@ -651,7 +652,7 @@ def asignar_cliente(proceso_id: int, cliente_id: int, db: Session = Depends(get_
         db.commit()
         _notificar_clientes_proceso(
             db, proceso, usuario, f"Proceso asignado: {proceso.nombre}",
-            "te dio acceso al siguiente proceso", f"Proceso: {proceso.nombre}\nResponsable: {proceso.abogado.nombre_completo}\nDescripción: {proceso.descripcion or 'Sin descripción'}",
+            "le dio acceso a este proceso en el portal", f"Responsable: {proceso.abogado.nombre_completo}" + (f"\nDescripción: {proceso.descripcion}" if proceso.descripcion else ""),
             "resumen", tipo="RESUMENES", cliente=cliente,
         )
     return {"mensaje": "Cliente asignado al proceso."}

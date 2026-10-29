@@ -22,7 +22,7 @@ from app.notification_policy import (
     clientes_notificables_para_radicado,
 )
 from app.notification_service import emitir_notificacion_workflow
-from app.message_templates import render_message, render_push_message
+from app.message_templates import fecha_texto, radicado_legible, render_message, render_push_message
 from app.timezone import format_colombia_datetime
 from app.rama_judicial_api import ejecutar_consulta_api_radicado
 from app.reminder_workflow import (
@@ -300,25 +300,40 @@ def _agregar_actuaciones_a_grupo(
 
 
 def _cuerpo_novedades(secciones: list[dict]) -> str:
+    """Una ficha por proceso, con la actuación más reciente y su enlace directo."""
     bloques = []
     for seccion in secciones:
         actuaciones = list(seccion["actuaciones"].values())
         actuaciones.sort(key=lambda item: (item.get("orden", 0), item.get("id", 0)))
         # Orden 1 corresponde a la actuación más reciente en la Rama Judicial.
         reciente = actuaciones[0]
-        encabezado = f"Proceso: {seccion['proceso']}\n" if seccion["proceso"] else ""
-        bloque = (
-            f"{encabezado}Radicado: {seccion['radicado']}\n"
-            f"Novedades: {len(actuaciones)}\n"
-            f"Actuación más reciente ({reciente.get('fecha_actuacion') or 'sin fecha'}): "
-            f"{reciente.get('actuacion') or 'Sin descripción'}"
-        )
+        lineas = []
+        if seccion["proceso"]:
+            lineas.append(f"Proceso: {seccion['proceso']}")
+        lineas.append(f"Radicado: {radicado_legible(seccion['radicado'])}")
+        actuacion = reciente.get("actuacion") or "Actuación sin descripción"
+        if len(actuaciones) > 1:
+            otras = len(actuaciones) - 1
+            actuacion += f" (y {otras} {'actuación más' if otras == 1 else 'actuaciones más'})"
+        lineas.append(f"Actuación: {actuacion}")
+        if reciente.get("fecha_actuacion"):
+            lineas.append(f"Fecha: {fecha_texto(reciente['fecha_actuacion'])}")
         if reciente.get("anotacion"):
-            bloque += f"\nAnotación: {reciente['anotacion']}"
+            lineas.append(f"Nota del juzgado: {reciente['anotacion']}")
         if seccion.get("detalle_url"):
-            bloque += f"\nAbrir radicado: {seccion['detalle_url']}"
-        bloques.append(bloque)
+            nombre = seccion["proceso"] or radicado_legible(seccion["radicado"])
+            lineas.append(f"Abrir enlace: Ver las novedades de {nombre[:50]} | {seccion['detalle_url']}")
+        bloques.append("\n".join(lineas))
     return "\n\n".join(bloques)
+
+
+def _url_preferencias(usuario: models.Usuario) -> str | None:
+    """Página donde cada rol elige qué avisos recibe; se enlaza al pie de los correos."""
+    if usuario.rol == models.RolUsuario.CLIENTE:
+        return user_portal_url(usuario, "/gestion-procesos/cliente/configuracion")
+    if usuario.rol in (models.RolUsuario.ABOGADO, models.RolUsuario.ABOGADO_ADMIN):
+        return user_portal_url(usuario, "/gestion-procesos/abogado/configuracion")
+    return None
 
 
 def _url_radicado(usuario: models.Usuario, radicado_id: int, proceso_id: int | None = None) -> str:
@@ -928,7 +943,7 @@ def enviar_entrega_notificacion_workflow(
     db.commit()
     try:
         if entrega.canal == "EMAIL":
-            enviado = enviar_correo(usuario.email, entrega.asunto, entrega.cuerpo)
+            enviado = enviar_correo(usuario.email, entrega.asunto, entrega.cuerpo, preferencias_url=_url_preferencias(usuario))
         else:
             enviado = enviar_mensaje_whatsapp(usuario.whatsapp_numero, entrega.cuerpo, raise_on_error=True)
         if not enviado:
