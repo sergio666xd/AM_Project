@@ -6,7 +6,6 @@ apagado los avisos ordinarios, y cada intento queda en
 """
 
 import logging
-import re
 from datetime import date
 
 from sqlalchemy.orm import Session
@@ -32,11 +31,6 @@ def _firma(db: Session) -> pdf.Firma:
                          whatsapp="350 880 9878", direccion="Sabaneta, Antioquia")
     return pdf.Firma(nombre=config.nombre, correo=config.correo_contacto or "", whatsapp=config.whatsapp or "",
                      direccion=config.direccion or "", sitio=config.sitio_web or "")
-
-
-def _primer_nombre(nombre: str) -> str:
-    partes = (nombre or "").split()
-    return partes[0].capitalize() if partes else "cliente"
 
 
 def _documento(valor: str | None, prefijo: str = "C.C.") -> str:
@@ -166,8 +160,6 @@ def _enviar(db: Session, *, destinatario: str, plantilla: str, valores: dict, en
         if not destinatario:
             raise ValueError("El cliente no tiene correo registrado.")
         asunto, cuerpo = render_direct_message(db, plantilla, valores, link_label=enlace[0], link_url=enlace[1])
-        # Un dato opcional vacío (plazo, datos para pagar) no deja huecos en el correo.
-        cuerpo = re.sub(r"\n[ \t]*(\n[ \t]*){2,}", "\n\n", cuerpo)
         enviado = enviar_correo(
             destinatario, asunto, cuerpo, adjunto=adjunto,
             remitente_nombre=config.remitente_nombre if config else None,
@@ -196,12 +188,15 @@ def enviar_cuenta(db: Session, cuenta: CuentaCobro, detalle: DetalleCuenta, conf
     usuario_cliente = db.get(models.Usuario, cuenta.cliente_id) if cuenta.cliente_id else None
     if usuario_cliente is not None:
         destinatario = usuario_cliente.email
+    valor = pesos(detalle.saldo or detalle.total)
+    vence = dia_largo(detalle.vence_el) if detalle.vence_el else ""
     valores = {
-        "nombre": _primer_nombre(cliente.get("nombre", "")),
+        "nombre": cliente.get("nombre", ""),
         "numero": detalle.numero,
         "concepto": detalle.concepto,
-        "valor": pesos(detalle.saldo or detalle.total),
-        "plazo": f"Por favor, págela antes del {dia_largo(detalle.vence_el)}." if detalle.vence_el else "",
+        "valor": valor,
+        "accion": f"Pague {valor} a más tardar el {vence}." if vence else f"Pague {valor}. Esta cuenta no tiene fecha límite.",
+        "vence": vence,
         "proceso": detalle.proceso.nombre if detalle.proceso else "",
         "datos_pago": _datos_pago(config),
         "abogado": detalle.abogado.nombre,
@@ -227,13 +222,13 @@ def enviar_recibo(db: Session, pago: PagoFinanciero, vista: PagoVista, config: C
     if vista.disponible:
         abonos = f"{abonos} Le quedan {pesos(vista.disponible)} a su favor para próximas cuentas.".strip()
     valores = {
-        "nombre": _primer_nombre(cliente.get("nombre", "")),
+        "nombre": cliente.get("nombre", ""),
         "numero_recibo": vista.numero_recibo,
         "valor": pesos(vista.importe),
         "fecha": dia_largo(vista.pagado_el),
-        "metodo": METODOS[vista.metodo.upper()],
+        "metodo": METODOS[vista.metodo.upper()].capitalize(),
         "abonos": abonos,
-        "saldo": f"Su saldo pendiente con nosotros es de {pesos(saldo)}." if saldo else "Con este pago queda al día con sus cuentas.",
+        "saldo": f"Le queda un saldo pendiente de {pesos(saldo)}." if saldo else "Con este pago queda al día: no tiene saldo pendiente.",
     }
     return _enviar(
         db, destinatario=destinatario, plantilla="RECIBO_PAGO", valores=valores,

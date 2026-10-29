@@ -216,7 +216,8 @@ class ServicioClientes:
             tipo="ACCESO",
             origen=f"USUARIO:{cliente.id}:ACCESO",
             emisor=actor,
-            incluir_email=False,
+            # La contraseña temporal solo viaja por correo; WhatsApp avisa que la busque allí.
+            incluir_email=True,
             plantilla_clave="CLIENTE_CREDENCIALES",
             variables={"nombre": cliente.nombre_completo, "actor": actor.nombre_completo,
                        "correo": cliente.email, "password": clave, "canal": canal},

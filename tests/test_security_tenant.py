@@ -1197,7 +1197,7 @@ def test_notification_delivery_retry_is_idempotent(monkeypatch):
     sends = []
     monkeypatch.setattr(
         "app.routers.workflows.enviar_correo",
-        lambda email, subject, body: sends.append(email) or len(sends) > 1,
+        lambda email, subject, body, **_: sends.append(email) or len(sends) > 1,
     )
     with Session(engine) as db:
         with pytest.raises(HTTPException) as failed:
@@ -1245,7 +1245,7 @@ def test_deleted_reminder_delivery_is_omitted_after_foreign_key_is_cleared(monke
 
     monkeypatch.setattr(
         "app.routers.workflows.enviar_correo",
-        lambda *args: pytest.fail("A deleted reminder must not be delivered."),
+        lambda *args, **_: pytest.fail("A deleted reminder must not be delivered."),
     )
     with Session(engine) as db:
         result = enviar_entrega_notificacion_workflow(delivery_id, _=None, db=db)
