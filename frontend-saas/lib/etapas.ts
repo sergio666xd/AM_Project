@@ -1,20 +1,9 @@
 import type { Esquemas } from "@/lib/api-v2/cliente";
 
-export type Etapa = NonNullable<Esquemas["ProcesoResumen"]["etapa"]>;
+export type PlantillaEtapas = Esquemas["PlantillaDeEtapas"];
+export type EtapaDePlantilla = Esquemas["EtapaDePlantilla"];
 
-export const ETAPAS: { id: Etapa; nombre: string }[] = [
-  { id: "demanda", nombre: "Demanda" },
-  { id: "admision", nombre: "Admisión" },
-  { id: "pruebas", nombre: "Pruebas" },
-  { id: "audiencia", nombre: "Audiencia" },
-  { id: "sentencia", nombre: "Sentencia" },
-];
-
-export function nombreEtapa(etapa: string | null | undefined): string {
-  return ETAPAS.find((e) => e.id === etapa)?.nombre ?? "Sin etapa";
-}
-
-/** Posición de la etapa en la línea; -1 si el proceso aún no tiene etapa. */
-export function indiceEtapa(etapa: string | null | undefined): number {
-  return ETAPAS.findIndex((e) => e.id === etapa);
+/** Posición de la etapa actual en la línea del proceso; -1 si aún no tiene etapa. */
+export function indiceEtapa(linea: readonly { id: number }[], actual: { id: number } | null | undefined): number {
+  return actual ? linea.findIndex((e) => e.id === actual.id) : -1;
 }

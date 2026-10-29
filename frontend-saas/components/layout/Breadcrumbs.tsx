@@ -58,6 +58,7 @@ const labelsEnSeccion: Record<string, string> = {
   "operacion/integraciones": "Integraciones",
   "operacion/mensajes": "Plantillas de avisos",
   "operacion/glosario": "Glosario",
+  "operacion/etapas": "Etapas de los procesos",
   "chat/limpiar": "Limpieza de chats",
   "admin/chat": "Chats",
   "admin/auditoria": "Auditoría técnica",

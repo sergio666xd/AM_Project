@@ -13,7 +13,6 @@ import { formatDate, formatDateTime, formatRelative, toDate } from "@/lib/labels
 import { useNow } from "@/lib/useNow";
 import { Button } from "@/components/ui/Button";
 import { Badge } from "@/components/ui/Badge";
-import { ETAPAS, indiceEtapa, nombreEtapa } from "@/lib/etapas";
 import {
   Archive,
   ArchiveRestore,
@@ -31,6 +30,8 @@ type Process = {
   nombre: string;
   descripcion?: string | null;
   etapa?: string | null;
+  etapa_posicion?: number | null;
+  etapas_total?: number | null;
   responsable?: { id: number; nombre_completo: string };
   colaboradores?: { id: number; nombre_completo: string }[];
   soy_responsable?: boolean;
@@ -164,17 +165,18 @@ export default function ProcesosPage() {
       key: "etapa",
       header: "Etapa",
       mobile: "meta",
-      sortValue: (item) => indiceEtapa(item.etapa),
-      exportValue: (item) => nombreEtapa(item.etapa),
+      sortValue: (item) => (item.etapa_posicion && item.etapas_total ? item.etapa_posicion / item.etapas_total : -1),
+      exportValue: (item) => item.etapa ?? "Sin etapa",
       render: (item) =>
         item.etapa ? (
           <span className="inline-flex items-center gap-2 whitespace-nowrap">
             <span aria-hidden="true" className="flex gap-0.5">
-              {ETAPAS.map((e, i) => (
-                <span key={e.id} className={`h-1.5 w-2.5 rounded-full ${i < indiceEtapa(item.etapa) ? "bg-navy" : i === indiceEtapa(item.etapa) ? "bg-gold" : "bg-line-strong"}`} />
-              ))}
+              {Array.from({ length: item.etapas_total ?? 0 }, (_, i) => {
+                const actual = (item.etapa_posicion ?? 0) - 1;
+                return <span key={i} className={`h-1.5 w-2.5 rounded-full ${i < actual ? "bg-navy" : i === actual ? "bg-gold" : "bg-line-strong"}`} />;
+              })}
             </span>
-            {nombreEtapa(item.etapa)}
+            {item.etapa}
           </span>
         ) : (
           <span className="text-foreground-muted">Sin etapa</span>

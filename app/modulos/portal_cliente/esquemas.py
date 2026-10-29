@@ -3,7 +3,8 @@ from typing import Literal
 
 from pydantic import BaseModel, Field
 
-from app.modulos.expedientes.esquemas import Etapa, PersonaBreve
+from app.modulos.etapas.esquemas import EtapaBreve
+from app.modulos.expedientes.esquemas import PersonaBreve
 from app.nucleo.paginacion import Pagina
 from app.nucleo.zona_horaria import FechaHora
 
@@ -71,7 +72,7 @@ class PendienteCliente(BaseModel):
 
 
 class EtapaCliente(BaseModel):
-    clave: Etapa
+    id: int
     nombre: str
     fecha: FechaHora | None = Field(description="Cuándo llegó el proceso a esta etapa, si ya pasó por ella.")
 
@@ -81,9 +82,9 @@ class ResumenProcesoCliente(BaseModel):
     nombre: str
     descripcion: str | None
     abogado: PersonaBreve
-    etapa: Etapa | None
+    etapa: EtapaBreve | None
     etapa_explicacion: str | None = Field(description="Qué se hace en la etapa actual, en lenguaje claro.")
-    etapas: list[EtapaCliente] = Field(description="Las cinco etapas en orden, con la fecha de las ya recorridas.")
+    etapas: list[EtapaCliente] = Field(description="Las etapas de su proceso en orden, con la fecha de las ya recorridas.")
     proxima_fecha: FechaProxima | None
     nuevos: int
     ultima: EntradaHistoria | None

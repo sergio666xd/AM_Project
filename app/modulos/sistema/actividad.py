@@ -29,7 +29,7 @@ LIMITE_CSV = 5000
 
 AREAS: dict[AreaActividad, tuple[str, ...]] = {
     "cuentas": ("usuario", "solicitud_edicion_perfil", "solicitud_registro"),
-    "procesos": ("proceso", "proceso_cliente", "proceso_radicado", "radicado", "glosario"),
+    "procesos": ("proceso", "proceso_cliente", "proceso_radicado", "radicado", "glosario", "plantilla_etapas"),
     "tareas": ("tarea", "subtarea", "recordatorio_tarea", "plantilla_tarea", "evento_agenda"),
     "documentos": ("documento_proceso", "solicitud_documento", "contrato_servicio", "archivo_r2", "carpeta_r2"),
     "cobros": ("cuenta_cobro", "pago_financiero", "configuracion_correo_financiero"),
