@@ -88,6 +88,7 @@ export const gruposCliente: GrupoNav[] = [
       { id: "pendientes", label: "Pendientes", href: `${C}/pendientes`, icon: ListChecks },
       { id: "mensajes", label: "Mensajes", href: `${C}/chat`, icon: MessageSquare },
       { id: "documentos", label: "Documentos", href: `${C}/documentos`, icon: FileText },
+      { id: "pagos", label: "Pagos", href: `${C}/pagos`, icon: Wallet },
       { id: "calendario", label: "Calendario", href: `${C}/calendario`, icon: CalendarDays },
       { id: "perfil", label: "Mi perfil y avisos", href: `${C}/perfil`, icon: UserRound },
       { id: "ayuda", label: "Ayuda", href: `${C}/ayuda`, icon: CircleHelp },

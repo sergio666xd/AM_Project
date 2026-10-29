@@ -2615,6 +2615,11 @@ export interface components {
             /** Pagos */
             pagos: components["schemas"]["PagoVista"][];
             totales: components["schemas"]["TotalesEstado"];
+            /**
+             * Datos Pago
+             * @description Cómo pagar (cuentas bancarias), tal como lo configuró la firma.
+             */
+            datos_pago?: string | null;
         };
         /** EtapaCliente */
         EtapaCliente: {

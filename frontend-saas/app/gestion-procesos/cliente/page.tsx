@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useCallback, useState } from "react";
 import { ArrowRight, FolderOpen, MessageCircle, RefreshCw } from "lucide-react";
 
+import { AvisoPagos } from "@/components/portal-cliente/AvisoPagos";
 import {
   AlDia,
   EnQueVa,
@@ -16,7 +17,7 @@ import {
 import { Button, EnlaceBoton } from "@/components/ui/Button";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { Sheet } from "@/components/ui/Sheet";
-import { api, mensajeDeError } from "@/lib/api-v2/cliente";
+import { api, mensajeDeError, type Esquemas } from "@/lib/api-v2/cliente";
 import { fechaLarga } from "@/lib/fechas";
 import {
   primerNombre,
@@ -31,13 +32,16 @@ import { useNow } from "@/lib/useNow";
 
 export default function InicioClientePage() {
   const [inicio, setInicio] = useState<InicioCliente | null>(null);
+  const [cuentas, setCuentas] = useState<Esquemas["EstadoDeCuenta"] | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const cargar = useCallback(async () => {
     setError(null);
-    const { data, error: fallo } = await api.GET("/api/v2/cliente/inicio");
+    // El estado de cuenta es opcional en el inicio: si falla, solo no se muestra el aviso de pagos.
+    const [{ data, error: fallo }, pagos] = await Promise.all([api.GET("/api/v2/cliente/inicio"), api.GET("/api/v2/estado-cuenta")]);
     if (data) setInicio(data);
     else setError(mensajeDeError(fallo));
+    setCuentas(pagos.data ?? null);
   }, []);
   useLoadEffect(cargar);
 
@@ -65,9 +69,11 @@ export default function InicioClientePage() {
         <div className="space-y-8">
           {inicio.pendientes.length > 0 ? (
             <PendientesCliente pendientes={inicio.pendientes} conProceso={variosProcesos} />
-          ) : inicio.procesos.length > 0 ? (
+          ) : inicio.procesos.length > 0 && !(cuentas && cuentas.totales.saldo > 0) ? (
             <AlDia />
           ) : null}
+
+          <AvisoPagos estado={cuentas} />
 
           {inicio.procesos.length === 0 ? (
             <Sheet>
