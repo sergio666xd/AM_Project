@@ -35,7 +35,7 @@ export default function AppShell({ children, variant = "saas" }: AppShellProps) 
   const areaHref = rutaAreaCuenta(variant);
   const segmentos = usePathname().split("/");
   const enChat = segmentos.includes("chat");
-  // En la lista de Mensajes del abogado sigue la barra inferior; dentro de una conversación, no.
+  // En la lista de Mensajes sigue la barra inferior; dentro de una conversación, no.
   const tramoChat = segmentos.slice(segmentos.indexOf("chat") + 1).filter(Boolean);
   const conversacionAbierta = enChat && !(tramoChat.length === 0 || (tramoChat.length === 1 && /^\d+$/.test(tramoChat[0])));
   const chatViewport = useChatViewport();
@@ -60,8 +60,7 @@ export default function AppShell({ children, variant = "saas" }: AppShellProps) 
         <main className={cx("mx-auto w-full max-w-[1080px]", enChat ? "min-h-0 flex-1" : "px-4 pb-32 pt-6 sm:px-6 lg:pb-16 lg:pt-10")}>
           {children}
         </main>
-        {!enChat && <MobileTabBar pestanas={nav.pestanas} resto={nav.resto} inicio={nav.inicio} grande />}
-        {!enChat && <ChatFloatingButton />}
+        {!conversacionAbierta && <MobileTabBar pestanas={nav.pestanas} resto={nav.resto} inicio={nav.inicio} grande />}
       </div>
     );
   }
