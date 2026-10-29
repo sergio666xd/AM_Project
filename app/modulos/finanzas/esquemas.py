@@ -3,7 +3,8 @@
 from datetime import date
 from typing import Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
+from pydantic.networks import validate_email
 
 from app.modulos.bandeja.esquemas import ProcesoBreve
 from app.modulos.tareas.esquemas import PersonaBreve
@@ -191,3 +192,14 @@ class ConfiguracionFinanzas(BaseModel):
     reply_to: str | None = Field(None, max_length=320)
     datos_pago: str | None = Field(None, max_length=2000, description="Cuentas bancarias y medios de pago que salen en la cuenta de cobro.")
     nota_documentos: str | None = Field(None, max_length=1000, description="Nota de alcance al pie de los PDF.")
+
+    @field_validator("remitente_email", "reply_to")
+    @classmethod
+    def _correo(cls, valor: str | None) -> str | None:
+        valor = (valor or "").strip()
+        if not valor:
+            return None
+        try:
+            return validate_email(valor)[1]
+        except Exception as exc:  # noqa: BLE001 - pydantic lanza PydanticCustomError
+            raise ValueError("Escriba un correo válido, como cobros@firma.com.") from exc

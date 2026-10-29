@@ -14,6 +14,7 @@ import {
   FolderOpen,
   HardDrive,
   Inbox,
+  Landmark,
   LayoutDashboard,
   ListChecks,
   MessageSquare,
@@ -24,6 +25,7 @@ import {
   UserCheck,
   UserRound,
   Users,
+  Wallet,
 } from "lucide-react";
 import ChatFloatingButton from "@/components/chat/ChatFloatingButton";
 import ChatPresenceHeartbeat from "@/components/chat/ChatPresenceHeartbeat";
@@ -64,6 +66,7 @@ const grupos: GrupoNav[] = [
       { id: "agenda", label: "Agenda", href: `${ADMIN}/agenda`, icon: CalendarDays },
       { id: "documentos", label: "Documentos", href: `${ADMIN}/documentos`, icon: BookOpenText },
       { id: "contratos", label: "Contratos", href: `${ADMIN}/contratos`, icon: FileSignature },
+      { id: "cobros", label: "Cobros", href: `${ADMIN}/cobros`, icon: Wallet },
     ],
   },
   {
@@ -89,6 +92,7 @@ const grupos: GrupoNav[] = [
     items: [
       { id: "operacion", label: "Operación", href: `${ADMIN}/operacion`, icon: ServerCog, hijos: operacion },
       { id: "firma", label: "Datos de la firma", href: `${ADMIN}/firma`, icon: Settings },
+      { id: "finanzas", label: "Cobros y pagos", href: `${ADMIN}/finanzas`, icon: Landmark },
       { id: "contenido", label: "Contenido público", href: `${ADMIN}/contenido`, icon: FileText, recargar: true },
       { id: "almacenamiento", label: "Almacenamiento", href: `${ADMIN}/almacenamiento`, icon: HardDrive },
       { id: "chat-limpiar", label: "Limpieza de chats", href: `${ADMIN}/chat/limpiar`, icon: Eraser },

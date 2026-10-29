@@ -20,6 +20,7 @@ const labels: Record<string, string> = {
   documentos: "Documentos",
   contratos: "Contratos",
   cobros: "Cobros",
+  finanzas: "Cobros y pagos",
   pagos: "Pagos",
   clientes: "Clientes",
   agenda: "Agenda",
