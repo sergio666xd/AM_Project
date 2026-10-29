@@ -74,7 +74,8 @@ def crear_cliente(datos: schemas.ClienteCreate, db: Session = Depends(get_db), u
         "ACCESO",
         f"USUARIO:{cliente.id}:ACCESO",
         emisor=usuario,
-        incluir_email=False,
+        # La contraseña temporal solo viaja por correo; WhatsApp avisa que la busque allí.
+        incluir_email=True,
         plantilla_clave="CLIENTE_CREDENCIALES",
         variables={"nombre": cliente.nombre_completo, "actor": usuario.nombre_completo,
                    "correo": cliente.email, "password": datos.password_temporal,

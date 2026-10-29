@@ -3,10 +3,12 @@
 `configuracion_correo_financiero` gana `datos_pago` (cuentas bancarias que
 salen en la cuenta de cobro) y `nota_documentos` (nota de alcance al pie de
 los PDF). Las plantillas `CUENTA_COBRO_EMITIDA` y `RECIBO_PAGO` dan el texto de
-los correos que recibe el cliente; se editan en administración.
+los correos que recibe el cliente, con las marcas de línea de
+`app/email_service.py` (skill `correos-despacho-am`); se editan en
+administración.
 
-Revision ID: 0011
-Revises: 0010
+Revision ID: 0012
+Revises: 0011
 Create Date: 2026-10-29
 """
 from datetime import datetime, timezone
@@ -15,10 +17,12 @@ from typing import Sequence, Union
 from alembic import op
 import sqlalchemy as sa
 
-revision: str = "0011"
-down_revision: Union[str, Sequence[str], None] = "0010"
+revision: str = "0012"
+down_revision: Union[str, Sequence[str], None] = "0011"
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
+
+PANEL = "https://panel.alejandramunozabogada.com"
 
 PLANTILLAS = [
     {
@@ -26,44 +30,68 @@ PLANTILLAS = [
         "nombre": "Cuenta de cobro emitida",
         "asunto_email": "Su cuenta de cobro por {{valor}}",
         "cuerpo_email": (
-            "Hola, {{nombre}}:\n\nLe enviamos la cuenta de cobro {{numero}} por {{concepto}}.\n\n"
-            "Valor a pagar: {{valor}}\n{{plazo}}\n\n{{datos_pago}}\n\n"
-            "Adjuntamos el PDF. Cuando pague, envíenos el comprobante por Mensajes en el portal o por WhatsApp."
+            "# Le enviamos una cuenta de cobro\n"
+            "Hola, {{primer_nombre}}:\n"
+            "Le enviamos la cuenta de cobro por {{concepto}}. La encuentra adjunta en PDF y también en el portal.\n"
+            "! {{accion}}\n"
+            "Abrir enlace: Ver la cuenta de cobro | {{enlace}}\n"
+            "Cuenta de cobro: {{numero}}\n"
+            "Concepto: {{concepto}}\n"
+            "Proceso: {{proceso}}\n"
+            "Valor a pagar: {{valor}}\n"
+            "Pagar a más tardar: {{vence}}\n"
+            "{{datos_pago}}\n"
+            "? Cuando pague, envíenos el comprobante por el chat del portal o por WhatsApp."
         ),
         "cuerpo_whatsapp": (
-            "Hola, {{nombre}}. Le enviamos la cuenta de cobro {{numero}} por {{concepto}}.\n\n"
-            "Valor a pagar: *{{valor}}*\n{{plazo}}\n\nLa encuentra en su correo y en el portal, en Pagos."
+            "Hola, {{primer_nombre}}.\n"
+            "Le enviamos la cuenta de cobro {{numero}} por {{concepto}}.\n"
+            "Valor a pagar: *{{valor}}*\n"
+            "Pagar a más tardar: {{vence}}\n"
+            "Abrir enlace: Ver la cuenta de cobro | {{enlace}}"
         ),
         "titulo_push": "Nueva cuenta de cobro",
-        "cuerpo_push": "{{concepto}}: {{valor}}. {{plazo}}",
+        "cuerpo_push": "{{concepto}}: {{valor}}.",
         "variables_ejemplo": {
-            "nombre": "María", "numero": "CC-2026-00012", "concepto": "Honorarios de la sucesión", "valor": "$1.250.000",
-            "plazo": "Por favor, págela antes del viernes 20 de noviembre de 2026.", "proceso": "Sucesión de Jorge Pérez",
+            "nombre": "María Pérez", "numero": "CC-2026-00012", "concepto": "Honorarios de la sucesión", "valor": "$1.250.000",
+            "accion": "Pague $1.250.000 a más tardar el viernes 20 de noviembre de 2026.",
+            "vence": "viernes 20 de noviembre de 2026", "proceso": "Sucesión de Jorge Pérez",
             "datos_pago": "Puede pagar así:\nBancolombia, cuenta de ahorros 000-000000-00 a nombre de Alejandra Muñoz.",
             "abogado": "Alejandra Muñoz",
         },
-        "enlace_ejemplo": "https://panel.alejandramunozabogada.com/pagos#cuenta-12",
+        "enlace_ejemplo": f"{PANEL}/pagos#cuenta-12",
     },
     {
         "clave": "RECIBO_PAGO",
         "nombre": "Recibo de pago",
         "asunto_email": "Recibimos su pago de {{valor}}",
         "cuerpo_email": (
-            "Hola, {{nombre}}:\n\nRecibimos su pago de {{valor}} del {{fecha}}, por {{metodo}}. Gracias.\n\n"
-            "{{abonos}}\n{{saldo}}\n\nAdjuntamos el recibo {{numero_recibo}} en PDF. No tiene que hacer nada más."
+            "# Recibimos su pago\n"
+            "Hola, {{primer_nombre}}:\n"
+            "Recibimos su pago de {{valor}}. Gracias. Le adjuntamos el recibo en PDF.\n"
+            "{{abonos}}\n"
+            "> {{saldo}}\n"
+            "Abrir enlace: Ver mis pagos | {{enlace}}\n"
+            "Recibo: {{numero_recibo}}\n"
+            "Valor recibido: {{valor}}\n"
+            "Fecha del pago: {{fecha}}\n"
+            "Forma de pago: {{metodo}}\n"
+            "? No tiene que hacer nada más. Si algún dato no coincide, escríbanos por el chat del portal."
         ),
         "cuerpo_whatsapp": (
-            "Hola, {{nombre}}. Recibimos su pago de *{{valor}}* del {{fecha}}. Gracias.\n\n{{saldo}}\n\n"
-            "El recibo está en su correo y en el portal, en Pagos."
+            "Hola, {{primer_nombre}}.\n"
+            "Recibimos su pago de *{{valor}}* del {{fecha}}. Gracias.\n"
+            "{{saldo}}\n"
+            "Abrir enlace: Ver mis pagos | {{enlace}}"
         ),
         "titulo_push": "Recibimos su pago",
         "cuerpo_push": "{{valor}} del {{fecha}}. {{saldo}}",
         "variables_ejemplo": {
-            "nombre": "María", "numero_recibo": "RP-2026-00008", "valor": "$500.000", "fecha": "martes 3 de noviembre de 2026",
-            "metodo": "transferencia", "abonos": "Lo abonamos a la cuenta de cobro CC-2026-00012 (Honorarios de la sucesión).",
-            "saldo": "Su saldo pendiente con nosotros es de $750.000.",
+            "nombre": "María Pérez", "numero_recibo": "RP-2026-00008", "valor": "$500.000", "fecha": "martes 3 de noviembre de 2026",
+            "metodo": "Transferencia", "abonos": "Lo abonamos a la cuenta de cobro CC-2026-00012 (Honorarios de la sucesión).",
+            "saldo": "Le queda un saldo pendiente de $750.000.",
         },
-        "enlace_ejemplo": "https://panel.alejandramunozabogada.com/pagos#pago-8",
+        "enlace_ejemplo": f"{PANEL}/pagos#pago-8",
     },
 ]
 

@@ -4,6 +4,7 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import Session
 
 from app import models, schemas
+from app.message_templates import radicado_legible
 from app.notification_policy import abogados_notificables_para_radicado
 from app.radicados import obtener_o_vincular_radicado
 from app.routers.dashboard import obtener_dashboard
@@ -103,8 +104,9 @@ def test_lawyer_without_channels_gets_an_omitted_delivery_for_a_radicado_without
         assert entrega.tipo == "ACTUACIONES"
         assert entrega.estado == "OMITIDA"
         assert "Push" in entrega.error
-        assert radicado.numero in entrega.cuerpo
-        assert entrega.cuerpo.endswith(f"/radicados/{radicado.id}")
+        # El radicado se muestra en sus siete segmentos y el enlace lleva directo a él.
+        assert radicado_legible(radicado.numero) in entrega.cuerpo
+        assert f"/radicados/{radicado.id}\n" in entrega.cuerpo
         assert db.query(models.EntregaNotificacionActuacion).filter_by(usuario_id=abogado.id).count() == 1
 
 

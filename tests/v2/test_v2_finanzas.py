@@ -9,7 +9,7 @@ from app.modulos.finanzas import correo
 from app.timezone import utc_ahora
 
 H = {"X-AM-Solicitud": "1"}
-MIGRACION = Path(__file__).resolve().parents[2] / "alembic_migrations" / "versions" / "2026_10_29_0011_finanzas.py"
+MIGRACION = Path(__file__).resolve().parents[2] / "alembic_migrations" / "versions" / "2026_10_29_0012_finanzas.py"
 
 
 @pytest.fixture
@@ -161,7 +161,7 @@ def test_pagos_abonos_reversion_y_estado_de_cuenta(iniciar, crear_usuario, crear
 
     recibo = correos[-1]
     assert recibo["asunto"] == "Recibimos su pago de $1.500.000"
-    assert "Le quedan $200.000 a su favor" in recibo["cuerpo"] and "Su saldo pendiente con nosotros es de $100.000." in recibo["cuerpo"]
+    assert "Le quedan $200.000 a su favor" in recibo["cuerpo"] and "> Le queda un saldo pendiente de $100.000." in recibo["cuerpo"]
 
     assert cliente_http.get(f"/api/v2/cuentas-cobro/{primera['id']}").json()["estado"] == "pagada"
     assert cliente_http.get(f"/api/v2/cuentas-cobro/{segunda['id']}").json()["estado"] == "parcial"

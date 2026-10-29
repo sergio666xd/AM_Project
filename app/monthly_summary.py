@@ -6,6 +6,7 @@ import logging
 
 from app.database import SessionLocal
 from app import models
+from app.message_templates import MESES, fecha_texto, radicado_legible
 from app.notification_service import emitir_notificacion_workflow
 
 logger = logging.getLogger(__name__)
@@ -40,43 +41,33 @@ def enviar_resumen_mensual():
             if not radicados:
                 continue
 
-            mes_actual = datetime.now().strftime("%B %Y").capitalize()
-            mensaje = (
-                f"📊 *INFORME MENSUAL DE PROCESOS ({mes_actual})*\n"
-                f"Estimado(a) *{usuario.nombre_completo}*,\n\n"
-                f"A continuación, presentamos el estado consolidado de sus "
-                f"*{len(radicados)}* radicados activos:\n"
-                f"{'─' * 30}\n\n"
-            )
-            for idx, rad in enumerate(radicados, 1):
+            mes_actual = f"{MESES[hoy.month - 1]} de {hoy.year}"
+            fichas = []
+            for rad in radicados:
                 ultima_act = (
                     db.query(models.Actuacion)
                     .filter(models.Actuacion.radicado_id == rad.id)
                     .order_by(models.Actuacion.orden.asc())
                     .first()
                 )
-                mensaje += f"*{idx}. Radicado:* `{rad.numero}`\n"
-                mensaje += (
-                    f"   🏢 *Despacho:* {rad.despacho_departamento or 'Sin asignar'}\n"
-                )
+                lineas = [f"Radicado: {radicado_legible(rad.numero)}"]
+                if rad.despacho_departamento:
+                    lineas.append(f"Juzgado: {rad.despacho_departamento}")
                 if ultima_act:
-                    mensaje += (
-                        f"   📅 *Última Actuación ({ultima_act.fecha_actuacion}):* "
-                        f"{ultima_act.actuacion}\n"
-                    )
+                    lineas.append(f"Última actuación: {ultima_act.actuacion}")
+                    if ultima_act.fecha_actuacion:
+                        lineas.append(f"Fecha: {fecha_texto(ultima_act.fecha_actuacion)}")
                 else:
-                    mensaje += "   ℹ️ *Sin actuaciones registradas a la fecha.*\n"
-                mensaje += "\n"
-
-            mensaje += f"{'─' * 30}\n"
-            mensaje += "🤖 *Mensaje automático generado por tu plataforma SaaS Judicial.*"
+                    lineas.append("Última actuación: todavía no hay actuaciones registradas")
+                fichas.append("\n".join(lineas))
+            mensaje = "\n\n".join(fichas)
 
             entrega_ids = emitir_notificacion_workflow(
                 db,
                 usuario,
                 "RESUMENES",
                 f"RESUMEN:{usuario.id}:{hoy.year:04d}-{hoy.month:02d}",
-                f"Resumen mensual de procesos ({mes_actual})",
+                f"Resumen de sus procesos de {mes_actual}",
                 mensaje,
                 emisor=usuario,
                 plantilla_clave="RESUMEN_MENSUAL",
