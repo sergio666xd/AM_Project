@@ -182,6 +182,7 @@ class EstadoDeCuenta(BaseModel):
     cuentas: list[CuentaBreve]
     pagos: list[PagoVista]
     totales: TotalesEstado
+    datos_pago: str | None = Field(None, description="Cómo pagar (cuentas bancarias), tal como lo configuró la firma.")
 
 
 class ConfiguracionFinanzas(BaseModel):

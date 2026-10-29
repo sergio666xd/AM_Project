@@ -596,8 +596,10 @@ class ServicioFinanzas:
             vencido=sum(c.saldo for c in vigentes if c.vencida),
             a_favor=sum(p.disponible for p in pagos),
         )
+        config = self._repo.configuracion()
         return EstadoDeCuenta(cliente=PersonaBreve(id=cliente.id, nombre=cliente.nombre_completo),
-                              cuentas=cuentas, pagos=pagos, totales=totales)
+                              cuentas=cuentas, pagos=pagos, totales=totales,
+                              datos_pago=(config.datos_pago or None) if config else None)
 
     def pdf_estado(self, usuario: Usuario, cliente_id: int | None) -> tuple[bytes, str]:
         estado = self.estado_de_cuenta(usuario, cliente_id)

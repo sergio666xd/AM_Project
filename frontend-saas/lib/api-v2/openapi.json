@@ -12729,6 +12729,18 @@
           },
           "totales": {
             "$ref": "#/components/schemas/TotalesEstado"
+          },
+          "datos_pago": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Datos Pago",
+            "description": "Cómo pagar (cuentas bancarias), tal como lo configuró la firma."
           }
         },
         "type": "object",

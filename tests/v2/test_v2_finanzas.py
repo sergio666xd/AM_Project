@@ -138,6 +138,8 @@ def test_quien_puede_cobrar(iniciar, crear_usuario, crear_proceso, cliente_http,
     _cuenta(cliente_http, e["gloria"], e["sucesion"])
     assert (correos[-1]["remitente_nombre"], correos[-1]["remitente_email"]) == ("Cobros AM", "cobros@am.test")
     assert "Bancolombia 123" in correos[-1]["cuerpo"]
+    iniciar(e["gloria"])
+    assert cliente_http.get("/api/v2/estado-cuenta").json()["datos_pago"] == "Bancolombia 123"
 
 
 def test_pagos_abonos_reversion_y_estado_de_cuenta(iniciar, crear_usuario, crear_proceso, cliente_http, correos, sesion_bd):
@@ -200,6 +202,7 @@ def test_pagos_abonos_reversion_y_estado_de_cuenta(iniciar, crear_usuario, crear
     iniciar(e["gloria"])
     propio = cliente_http.get("/api/v2/estado-cuenta").json()
     assert propio["cliente"]["id"] == e["gloria"].id and propio["totales"]["saldo"] == 450_000
+    assert propio["datos_pago"] is None
     assert [p["id"] for p in cliente_http.get("/api/v2/pagos").json()["items"]] == [registrado["id"]]
     assert cliente_http.get(f"/api/v2/pagos/{registrado['id']}/recibo").content.startswith(b"%PDF")
     assert cliente_http.post(f"/api/v2/pagos/{registrado['id']}/revertir", headers=H, json={"motivo": "Yo no"}).status_code == 403
