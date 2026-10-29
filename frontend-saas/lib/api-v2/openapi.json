@@ -3540,6 +3540,995 @@
           }
         }
       }
+    },
+    "/api/v2/documentos": {
+      "get": {
+        "tags": [
+          "Documentos"
+        ],
+        "summary": "Documentos de los procesos",
+        "description": "Lo que entregan los clientes (la versión vigente de cada documento pedido, con sus\nversiones anteriores) y los demás documentos del proceso, sin los de contratos.",
+        "operationId": "listar_documentos",
+        "parameters": [
+          {
+            "name": "grupo",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "enum": [
+                "por_revisar",
+                "por_corregir",
+                "aprobados",
+                "todos"
+              ],
+              "type": "string",
+              "description": "por_revisar, por_corregir (devueltos al cliente), aprobados o todos.",
+              "default": "por_revisar",
+              "title": "Grupo"
+            },
+            "description": "por_revisar, por_corregir (devueltos al cliente), aprobados o todos."
+          },
+          {
+            "name": "proceso_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Proceso Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ListaArchivos"
+                }
+              }
+            }
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Too Many Requests"
+          }
+        }
+      }
+    },
+    "/api/v2/documentos/solicitudes": {
+      "get": {
+        "tags": [
+          "Documentos"
+        ],
+        "summary": "Solicitudes de documentos",
+        "operationId": "listar_solicitudes",
+        "parameters": [
+          {
+            "name": "grupo",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "enum": [
+                "abiertas",
+                "vencidas",
+                "completas",
+                "todas"
+              ],
+              "type": "string",
+              "description": "abiertas, vencidas, completas o todas.",
+              "default": "abiertas",
+              "title": "Grupo"
+            },
+            "description": "abiertas, vencidas, completas o todas."
+          },
+          {
+            "name": "proceso_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Proceso Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ListaSolicitudes"
+                }
+              }
+            }
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Too Many Requests"
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Documentos"
+        ],
+        "summary": "Pedir documentos al cliente",
+        "description": "Le pide al cliente uno o varios documentos, con fecha límite opcional, y le avisa.",
+        "operationId": "crear_solicitud",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NuevaSolicitud"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Solicitud"
+                }
+              }
+            }
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Too Many Requests"
+          }
+        }
+      }
+    },
+    "/api/v2/documentos/solicitudes/{solicitud_id}": {
+      "patch": {
+        "tags": [
+          "Documentos"
+        ],
+        "summary": "Cambiar la fecha límite",
+        "operationId": "cambiar_fecha_solicitud",
+        "parameters": [
+          {
+            "name": "solicitud_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Solicitud Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CambioFecha"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Solicitud"
+                }
+              }
+            }
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Too Many Requests"
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Documentos"
+        ],
+        "summary": "Eliminar una solicitud",
+        "description": "El cliente deja de verla; los archivos que ya entregó se quedan en el proceso.",
+        "operationId": "eliminar_solicitud",
+        "parameters": [
+          {
+            "name": "solicitud_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Solicitud Id"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Too Many Requests"
+          }
+        }
+      }
+    },
+    "/api/v2/documentos/solicitudes/{solicitud_id}/recordar": {
+      "post": {
+        "tags": [
+          "Documentos"
+        ],
+        "summary": "Recordarle al cliente",
+        "description": "Le recuerda al cliente lo que le falta por entregar. Una vez cada 12 horas (409 si no).",
+        "operationId": "recordar_solicitud",
+        "parameters": [
+          {
+            "name": "solicitud_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Solicitud Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Solicitud"
+                }
+              }
+            }
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Too Many Requests"
+          }
+        }
+      }
+    },
+    "/api/v2/documentos/{documento_id}": {
+      "get": {
+        "tags": [
+          "Documentos"
+        ],
+        "summary": "Un documento con sus versiones",
+        "operationId": "ver_documento",
+        "parameters": [
+          {
+            "name": "documento_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Documento Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Archivo"
+                }
+              }
+            }
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Too Many Requests"
+          }
+        }
+      }
+    },
+    "/api/v2/documentos/{documento_id}/archivo": {
+      "get": {
+        "tags": [
+          "Documentos"
+        ],
+        "summary": "Ver o descargar el archivo",
+        "operationId": "archivo_documento",
+        "parameters": [
+          {
+            "name": "documento_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Documento Id"
+            }
+          },
+          {
+            "name": "descargar",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "description": "false lo muestra en el navegador si es PDF o imagen.",
+              "default": true,
+              "title": "Descargar"
+            },
+            "description": "false lo muestra en el navegador si es PDF o imagen."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "El archivo.",
+            "content": {
+              "application/octet-stream": {}
+            }
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Too Many Requests"
+          }
+        }
+      }
+    },
+    "/api/v2/documentos/{documento_id}/revision": {
+      "patch": {
+        "tags": [
+          "Documentos"
+        ],
+        "summary": "Aprobar o devolver una entrega",
+        "description": "Aprueba la versión vigente o la devuelve al cliente con lo que debe corregir, y le avisa.",
+        "operationId": "revisar_documento",
+        "parameters": [
+          {
+            "name": "documento_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Documento Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Revision"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Archivo"
+                }
+              }
+            }
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Too Many Requests"
+          }
+        }
+      }
     }
   },
   "components": {
@@ -3605,6 +4594,107 @@
           "notificacion"
         ],
         "title": "AplicarPlantilla"
+      },
+      "Archivo": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "nombre": {
+            "type": "string",
+            "title": "Nombre",
+            "description": "Lo que se pidió, o el nombre del archivo si no responde a una solicitud."
+          },
+          "nombre_archivo": {
+            "type": "string",
+            "title": "Nombre Archivo"
+          },
+          "tipo_archivo": {
+            "type": "string",
+            "title": "Tipo Archivo"
+          },
+          "vista_previa": {
+            "type": "boolean",
+            "title": "Vista Previa"
+          },
+          "estado_revision": {
+            "type": "string",
+            "enum": [
+              "RECIBIDO",
+              "EN_REVISION",
+              "APROBADO",
+              "REQUIERE_CORRECCION",
+              "RECHAZADO"
+            ],
+            "title": "Estado Revision"
+          },
+          "comentario": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Comentario"
+          },
+          "entregado_por_cliente": {
+            "type": "boolean",
+            "title": "Entregado Por Cliente"
+          },
+          "proceso": {
+            "$ref": "#/components/schemas/ProcesoBreve"
+          },
+          "cliente": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PersonaBreve"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "solicitud": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SolicitudBreve"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "versiones": {
+            "items": {
+              "$ref": "#/components/schemas/Version"
+            },
+            "type": "array",
+            "title": "Versiones"
+          },
+          "recibido_en": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Recibido En"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "nombre",
+          "nombre_archivo",
+          "tipo_archivo",
+          "vista_previa",
+          "estado_revision",
+          "entregado_por_cliente",
+          "proceso",
+          "versiones",
+          "recibido_en"
+        ],
+        "title": "Archivo",
+        "description": "Un documento del proceso. Si responde a una solicitud, es la versión vigente\nde lo pedido y `versiones` trae todas las entregas, de la más reciente a la primera."
       },
       "ArchivoFolio": {
         "properties": {
@@ -3965,6 +5055,28 @@
           "fecha"
         ],
         "title": "CambioEtapa"
+      },
+      "CambioFecha": {
+        "properties": {
+          "fecha_limite": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fecha Limite",
+            "description": "null quita la fecha límite."
+          }
+        },
+        "type": "object",
+        "required": [
+          "fecha_limite"
+        ],
+        "title": "CambioFecha"
       },
       "ClientesAvisados": {
         "properties": {
@@ -4472,6 +5584,31 @@
         ],
         "title": "IniciarSesion"
       },
+      "ListaArchivos": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/Archivo"
+            },
+            "type": "array",
+            "title": "Items"
+          },
+          "total": {
+            "type": "integer",
+            "title": "Total"
+          },
+          "resumen": {
+            "$ref": "#/components/schemas/ResumenDocumentos"
+          }
+        },
+        "type": "object",
+        "required": [
+          "items",
+          "total",
+          "resumen"
+        ],
+        "title": "ListaArchivos"
+      },
       "ListaPlantillas": {
         "properties": {
           "items": {
@@ -4487,6 +5624,27 @@
           "items"
         ],
         "title": "ListaPlantillas"
+      },
+      "ListaSolicitudes": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/Solicitud"
+            },
+            "type": "array",
+            "title": "Items"
+          },
+          "total": {
+            "type": "integer",
+            "title": "Total"
+          }
+        },
+        "type": "object",
+        "required": [
+          "items",
+          "total"
+        ],
+        "title": "ListaSolicitudes"
       },
       "ListaTareas": {
         "properties": {
@@ -4544,6 +5702,66 @@
           "ids"
         ],
         "title": "MarcarLeidos"
+      },
+      "NuevaSolicitud": {
+        "properties": {
+          "proceso_id": {
+            "type": "integer",
+            "title": "Proceso Id"
+          },
+          "cliente_id": {
+            "type": "integer",
+            "title": "Cliente Id"
+          },
+          "titulo": {
+            "type": "string",
+            "maxLength": 255,
+            "minLength": 1,
+            "title": "Titulo"
+          },
+          "documentos": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "maxItems": 30,
+            "minItems": 1,
+            "title": "Documentos",
+            "description": "Un nombre por documento pedido."
+          },
+          "instrucciones": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 4000
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Instrucciones"
+          },
+          "fecha_limite": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fecha Limite"
+          }
+        },
+        "type": "object",
+        "required": [
+          "proceso_id",
+          "cliente_id",
+          "titulo",
+          "documentos"
+        ],
+        "title": "NuevaSolicitud"
       },
       "PaginaFolios": {
         "properties": {
@@ -4666,6 +5884,55 @@
           "titulo"
         ],
         "title": "PasoPlantilla"
+      },
+      "Pedido": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "nombre": {
+            "type": "string",
+            "title": "Nombre"
+          },
+          "estado": {
+            "type": "string",
+            "enum": [
+              "FALTANTE",
+              "RECIBIDO",
+              "EN_REVISION",
+              "APROBADO",
+              "REQUIERE_CORRECCION",
+              "RECHAZADO"
+            ],
+            "title": "Estado"
+          },
+          "archivo_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Archivo Id",
+            "description": "Versión vigente, si ya entregó algo."
+          },
+          "versiones": {
+            "type": "integer",
+            "title": "Versiones"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "nombre",
+          "estado",
+          "versiones"
+        ],
+        "title": "Pedido",
+        "description": "Un documento de los que pide la solicitud."
       },
       "Pendiente": {
         "properties": {
@@ -5221,6 +6488,36 @@
         ],
         "title": "ResumenBandeja"
       },
+      "ResumenDocumentos": {
+        "properties": {
+          "por_revisar": {
+            "type": "integer",
+            "title": "Por Revisar",
+            "description": "Entregas del cliente sin revisar."
+          },
+          "por_corregir": {
+            "type": "integer",
+            "title": "Por Corregir",
+            "description": "Entregas devueltas al cliente para que las corrija."
+          },
+          "solicitudes_abiertas": {
+            "type": "integer",
+            "title": "Solicitudes Abiertas"
+          },
+          "solicitudes_vencidas": {
+            "type": "integer",
+            "title": "Solicitudes Vencidas"
+          }
+        },
+        "type": "object",
+        "required": [
+          "por_revisar",
+          "por_corregir",
+          "solicitudes_abiertas",
+          "solicitudes_vencidas"
+        ],
+        "title": "ResumenDocumentos"
+      },
       "ResumenTareas": {
         "properties": {
           "abiertas": {
@@ -5272,6 +6569,156 @@
         },
         "type": "object",
         "title": "RevisarFolios"
+      },
+      "Revision": {
+        "properties": {
+          "estado": {
+            "type": "string",
+            "enum": [
+              "APROBADO",
+              "REQUIERE_CORRECCION"
+            ],
+            "title": "Estado"
+          },
+          "comentario": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 4000
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Comentario"
+          }
+        },
+        "type": "object",
+        "required": [
+          "estado"
+        ],
+        "title": "Revision"
+      },
+      "Solicitud": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "titulo": {
+            "type": "string",
+            "title": "Titulo"
+          },
+          "instrucciones": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Instrucciones"
+          },
+          "proceso": {
+            "$ref": "#/components/schemas/ProcesoBreve"
+          },
+          "cliente": {
+            "$ref": "#/components/schemas/PersonaBreve"
+          },
+          "estado": {
+            "type": "string",
+            "enum": [
+              "esperando_cliente",
+              "por_revisar",
+              "completa"
+            ],
+            "title": "Estado"
+          },
+          "pedidos": {
+            "items": {
+              "$ref": "#/components/schemas/Pedido"
+            },
+            "type": "array",
+            "title": "Pedidos"
+          },
+          "entregados": {
+            "type": "integer",
+            "title": "Entregados",
+            "description": "Pedidos con una entrega que no está devuelta para corregir."
+          },
+          "fecha_limite": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fecha Limite"
+          },
+          "vencida": {
+            "type": "boolean",
+            "title": "Vencida",
+            "description": "Abierta y con la fecha límite ya pasada."
+          },
+          "ultimo_recordatorio_en": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ultimo Recordatorio En"
+          },
+          "puede_recordar": {
+            "type": "boolean",
+            "title": "Puede Recordar",
+            "description": "Está abierta y no se le recordó al cliente en las últimas 12 horas."
+          },
+          "creada_en": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Creada En"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "titulo",
+          "proceso",
+          "cliente",
+          "estado",
+          "pedidos",
+          "entregados",
+          "vencida",
+          "puede_recordar",
+          "creada_en"
+        ],
+        "title": "Solicitud"
+      },
+      "SolicitudBreve": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "titulo": {
+            "type": "string",
+            "title": "Titulo"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "titulo"
+        ],
+        "title": "SolicitudBreve"
       },
       "Suscripcion": {
         "properties": {
@@ -5622,6 +7069,94 @@
           "debe_cambiar_password"
         ],
         "title": "UsuarioSesion"
+      },
+      "Version": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "numero": {
+            "type": "integer",
+            "title": "Numero",
+            "description": "1 es la primera entrega; la más alta es la vigente."
+          },
+          "nombre_archivo": {
+            "type": "string",
+            "title": "Nombre Archivo"
+          },
+          "tipo_archivo": {
+            "type": "string",
+            "title": "Tipo Archivo",
+            "description": "MIME del archivo."
+          },
+          "vista_previa": {
+            "type": "boolean",
+            "title": "Vista Previa",
+            "description": "PDF o imagen: el navegador lo puede mostrar."
+          },
+          "estado_revision": {
+            "type": "string",
+            "enum": [
+              "RECIBIDO",
+              "EN_REVISION",
+              "APROBADO",
+              "REQUIERE_CORRECCION",
+              "RECHAZADO"
+            ],
+            "title": "Estado Revision"
+          },
+          "comentario": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Comentario"
+          },
+          "revisado_por": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Revisado Por"
+          },
+          "revisado_en": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Revisado En"
+          },
+          "recibido_en": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Recibido En"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "numero",
+          "nombre_archivo",
+          "tipo_archivo",
+          "vista_previa",
+          "estado_revision",
+          "recibido_en"
+        ],
+        "title": "Version"
       }
     }
   }

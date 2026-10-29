@@ -724,6 +724,19 @@ def ejecutar_resumen_mensual_workflow(
     return enviar_resumen_mensual()
 
 
+@router.post("/recordatorios-documentos")
+def recordar_documentos_pendientes(
+    _: None = Depends(verificar_token_workflow),
+    db: Session = Depends(get_db),
+):
+    """Cron diario: recuerda a los clientes las solicitudes de documentos que vencen
+    en dos días o que vencieron ayer."""
+    from app.modulos.documentos.repositorio import RepositorioDocumentos
+    from app.modulos.documentos.servicio import ServicioDocumentos
+
+    return ServicioDocumentos(db, RepositorioDocumentos(db)).enviar_recordatorios().model_dump()
+
+
 @router.post("/recordatorios/{recordatorio_id}/preparar")
 def preparar_recordatorio_workflow(
     recordatorio_id: int,

@@ -74,7 +74,7 @@ class ServicioBandeja:
                 clave=f"documento:{documento.id}", tipo="documento", urgencia="por_revisar", titulo=documento.nombre_archivo,
                 detalle=f"Lo entregó {cliente}" if cliente else "Entregado por el cliente",
                 fecha=documento.created_at, proceso=proceso(documento.proceso_id),
-                enlace=f"{BASE}/procesos/{documento.proceso_id}/documentos",
+                enlace=f"{BASE}/documentos?documento={documento.id}",
             ))
 
         pendientes.sort(key=lambda p: (ORDEN_URGENCIA[p.urgencia], p.fecha or ahora))

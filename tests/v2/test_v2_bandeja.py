@@ -51,7 +51,7 @@ def test_bandeja_ordena_lo_urgente(iniciar, crear_usuario, crear_proceso, client
     documento = bandeja["pendientes"][1]
     assert documento["detalle"] == "Lo entregó Gloria Restrepo"
     assert documento["proceso"] == {"id": proceso.id, "nombre": "Sucesión Restrepo"}
-    assert documento["enlace"] == f"/gestion-procesos/abogado/procesos/{proceso.id}/documentos"
+    assert documento["enlace"].startswith("/gestion-procesos/abogado/documentos?documento=")
     assert bandeja["pendientes"][2]["proceso"] is None
     assert [(e["titulo"], e["detalle"], e["urgencia"]) for e in bandeja["agenda"]] == [("Audiencia inicial", "Audiencia", "pronto")]
 

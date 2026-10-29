@@ -9,6 +9,8 @@ from app.modulos.avisos.servicio import ServicioAvisos
 from app.modulos.bandeja.repositorio import RepositorioBandeja
 from app.modulos.bandeja.servicio import ServicioBandeja
 from app.modulos.busqueda.servicio import ServicioBusqueda
+from app.modulos.documentos.repositorio import RepositorioDocumentos
+from app.modulos.documentos.servicio import ServicioDocumentos
 from app.modulos.expedientes.repositorio import RepositorioProcesos
 from app.modulos.expedientes.servicio import ServicioProcesos
 from app.modulos.folios.repositorio import RepositorioFolios
@@ -50,3 +52,7 @@ def servicio_tareas(db: Session = Depends(obtener_bd)) -> ServicioTareas:
 
 def servicio_agenda(db: Session = Depends(obtener_bd)) -> ServicioAgenda:
     return ServicioAgenda(db, RepositorioAgenda(db))
+
+
+def servicio_documentos(db: Session = Depends(obtener_bd)) -> ServicioDocumentos:
+    return ServicioDocumentos(db, RepositorioDocumentos(db))
