@@ -1990,6 +1990,212 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v2/admin/actividad": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Actividad y auditoría
+         * @description Lo que se hizo en la plataforma, lo más reciente primero. Los registros no se pueden borrar.
+         */
+        get: operations["listar_actividad"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v2/admin/actividad/csv": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Descargar la actividad en CSV */
+        get: operations["descargar_actividad"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v2/admin/actividad/{registro_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Detalle técnico de un registro */
+        get: operations["detalle_actividad"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v2/admin/carga": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Carga de trabajo del equipo
+         * @description Procesos activos y tareas abiertas por persona. También la ve la abogada directora.
+         */
+        get: operations["carga_de_trabajo"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v2/admin/firma": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Datos de la firma */
+        get: operations["ver_datos_firma"];
+        /**
+         * Guardar los datos de la firma
+         * @description Los usan el sitio público, el pie de los correos y los PDF de cobro.
+         */
+        put: operations["guardar_datos_firma"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v2/admin/almacenamiento": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Archivos guardados */
+        get: operations["contenido_almacenamiento"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v2/admin/almacenamiento/enlace": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Abrir un archivo guardado
+         * @description Un enlace que sirve 15 minutos.
+         */
+        get: operations["enlace_almacenamiento"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v2/admin/almacenamiento/eliminar-archivo": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Borrar un archivo huérfano
+         * @description Solo archivos que ningún documento usa; los demás se retiran desde su expediente.
+         */
+        post: operations["eliminar_archivo_guardado"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v2/admin/almacenamiento/eliminar-carpeta": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Borrar una carpeta sin documentos */
+        post: operations["eliminar_carpeta_guardada"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v2/admin/chats": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Conversaciones del chat
+         * @description Quiénes participan, cuántos mensajes hay y cuándo fue el último. Nunca el contenido.
+         */
+        get: operations["listar_chats_para_limpiar"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v2/admin/chats/{chat_id}/vaciar": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Vaciar una conversación */
+        post: operations["vaciar_chat"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -2190,6 +2396,11 @@ export interface components {
              */
             recibido_en: string;
         };
+        /** ArchivoAEliminar */
+        ArchivoAEliminar: {
+            /** Clave */
+            clave: string;
+        };
         /** ArchivoEntrada */
         ArchivoEntrada: {
             /** Nombre */
@@ -2209,6 +2420,25 @@ export interface components {
              * @description Ruta de descarga del archivo, con la sesión del usuario.
              */
             url: string;
+        };
+        /** ArchivoGuardado */
+        ArchivoGuardado: {
+            /**
+             * Clave
+             * @description Ruta completa del archivo en el almacenamiento.
+             */
+            clave: string;
+            /** Nombre */
+            nombre: string;
+            /**
+             * Tamano
+             * @description En bytes.
+             */
+            tamano: number;
+            /** Modificado */
+            modificado: string | null;
+            /** @description null si ningún registro de la plataforma lo usa (huérfano). */
+            vinculo: components["schemas"]["VinculoArchivo"] | null;
         };
         /** Autor */
         Autor: {
@@ -2483,6 +2713,72 @@ export interface components {
              */
             borrar_token: boolean;
         };
+        /** CargaPersona */
+        CargaPersona: {
+            persona: components["schemas"]["PersonaBreve"];
+            /**
+             * Activa
+             * @description False si la cuenta está suspendida o cerrada y aún tiene trabajo a su nombre.
+             */
+            activa: boolean;
+            /**
+             * Procesos
+             * @description Procesos activos de los que es responsable.
+             */
+            procesos: number;
+            /** Tareas Abiertas */
+            tareas_abiertas: number;
+            /** Vencidas */
+            vencidas: number;
+            /**
+             * Proximas
+             * @description Tareas que vencen en los próximos 7 días.
+             */
+            proximas: number;
+        };
+        /** CarpetaAEliminar */
+        CarpetaAEliminar: {
+            /** Ruta */
+            ruta: string;
+            /**
+             * Confirmacion
+             * @description El nombre de la carpeta, escrito por la persona para confirmar.
+             */
+            confirmacion: string;
+        };
+        /** CarpetaGuardada */
+        CarpetaGuardada: {
+            /**
+             * Ruta
+             * @description Sin barra final: `procesos/12`.
+             */
+            ruta: string;
+            /** Nombre */
+            nombre: string;
+        };
+        /** ChatParaLimpiar */
+        ChatParaLimpiar: {
+            /** Id */
+            id: number;
+            /**
+             * Tipo
+             * @enum {string}
+             */
+            tipo: "cliente" | "equipo_proceso" | "colaboradores" | "equipo";
+            /** Proceso */
+            proceso: string | null;
+            /** Participantes */
+            participantes: string[];
+            /** Mensajes */
+            mensajes: number;
+            /** Ultimo Mensaje */
+            ultimo_mensaje: string | null;
+        };
+        /** ChatVaciado */
+        ChatVaciado: {
+            /** Mensajes Eliminados */
+            mensajes_eliminados: number;
+        };
         /** CifraFirma */
         CifraFirma: {
             /**
@@ -2695,6 +2991,15 @@ export interface components {
             /** Configurado */
             configurado: boolean;
         };
+        /** ConfirmacionVaciado */
+        ConfirmacionVaciado: {
+            /**
+             * Confirmacion
+             * @description La palabra VACIAR, escrita por la persona.
+             * @constant
+             */
+            confirmacion: "VACIAR";
+        };
         /** Contacto */
         Contacto: {
             /** Id */
@@ -2706,6 +3011,23 @@ export interface components {
              * @enum {string}
              */
             rol: "cliente" | "abogado" | "administrador";
+        };
+        /** ContenidoCarpeta */
+        ContenidoCarpeta: {
+            /**
+             * Ruta
+             * @description La carpeta listada; vacío es la raíz.
+             */
+            ruta: string;
+            /** Carpetas */
+            carpetas: components["schemas"]["CarpetaGuardada"][];
+            /** Archivos */
+            archivos: components["schemas"]["ArchivoGuardado"][];
+            /**
+             * Siguiente
+             * @description Para pedir más archivos de esta carpeta, o null.
+             */
+            siguiente: string | null;
         };
         /** ConteoEnvios */
         ConteoEnvios: {
@@ -2914,6 +3236,65 @@ export interface components {
             domicilio?: string | null;
             /** Direccion */
             direccion?: string | null;
+        };
+        /** DatosFirma */
+        DatosFirma: {
+            /** Nombre */
+            nombre: string;
+            /** Correo Contacto */
+            correo_contacto?: string | null;
+            /** Correo Pqr */
+            correo_pqr?: string | null;
+            /**
+             * Telefono
+             * @default
+             */
+            telefono: string;
+            /**
+             * Whatsapp
+             * @default
+             */
+            whatsapp: string;
+            /**
+             * Direccion
+             * @default
+             */
+            direccion: string;
+            /**
+             * Ciudad
+             * @default
+             */
+            ciudad: string;
+            /**
+             * Pais
+             * @default Colombia
+             */
+            pais: string;
+            /**
+             * Sitio Web
+             * @default
+             */
+            sitio_web: string;
+            /**
+             * Logo Url
+             * @default
+             */
+            logo_url: string;
+            /**
+             * Logo Correo Url
+             * @description Logo del encabezado de los correos; vacío usa el logo general.
+             * @default
+             */
+            logo_correo_url: string;
+            /**
+             * Mostrar Contacto Publico
+             * @default true
+             */
+            mostrar_contacto_publico: boolean;
+            /** Actualizado En */
+            actualizado_en: string | null;
+            /** Actualizado Por */
+            actualizado_por: string | null;
         };
         /** DatosPlantilla */
         DatosPlantilla: {
@@ -3125,6 +3506,66 @@ export interface components {
              */
             tarea?: string | null;
         };
+        /** DetalleRegistro */
+        DetalleRegistro: {
+            /** Id */
+            id: number;
+            /**
+             * Actor
+             * @description Quién lo hizo; null cuando fue la plataforma sola.
+             */
+            actor: string | null;
+            /** Actor Id */
+            actor_id: number | null;
+            /**
+             * Frase
+             * @description Lo que hizo, en pasado: «emitió una cuenta de cobro».
+             */
+            frase: string;
+            /**
+             * Enlace
+             * @description Dónde ver lo que cambió, si tiene pantalla propia.
+             */
+            enlace: string | null;
+            /**
+             * Fecha
+             * Format: date-time
+             */
+            fecha: string;
+            /**
+             * Area
+             * @enum {string}
+             */
+            area: "cuentas" | "procesos" | "tareas" | "documentos" | "cobros" | "mensajes" | "configuracion" | "otros";
+            /**
+             * Accion
+             * @description Código de la acción, por ejemplo `cuenta_cobro.emitir`.
+             */
+            accion: string;
+            /**
+             * Con Error
+             * @description La operación quedó registrada con un error técnico.
+             */
+            con_error: boolean;
+            /**
+             * Recurso
+             * @description Tipo de registro afectado, por ejemplo `cuenta_cobro`.
+             */
+            recurso: string;
+            /** Recurso Id */
+            recurso_id: string | null;
+            /** Endpoint */
+            endpoint: string | null;
+            /** Metodo */
+            metodo: string | null;
+            /**
+             * Datos
+             * @description Los datos que la operación guardó con el registro.
+             */
+            datos?: unknown;
+            /** Error */
+            error: string | null;
+        };
         /** DocumentoCliente */
         DocumentoCliente: {
             /** Id */
@@ -3242,6 +3683,11 @@ export interface components {
              */
             enlace: string;
         };
+        /** Eliminados */
+        Eliminados: {
+            /** Archivos */
+            archivos: number;
+        };
         /** EnlaceEnviado */
         EnlaceEnviado: {
             /**
@@ -3262,6 +3708,16 @@ export interface components {
              * Format: date-time
              */
             creada_en: string;
+        };
+        /** EnlaceTemporal */
+        EnlaceTemporal: {
+            /** Url */
+            url: string;
+            /**
+             * Expira En
+             * @description Segundos que sirve el enlace.
+             */
+            expira_en: number;
         };
         /**
          * EntradaHistoria
@@ -4144,6 +4600,21 @@ export interface components {
             /** Solicitud Id */
             solicitud_id?: number | null;
         };
+        /** PaginaChats */
+        PaginaChats: {
+            /** Items */
+            items: components["schemas"]["ChatParaLimpiar"][];
+            /**
+             * Total
+             * @description Cantidad total con los filtros aplicados, sin contar el cursor.
+             */
+            total: number;
+            /**
+             * Siguiente
+             * @description Cursor de la página siguiente, o null si no hay más.
+             */
+            siguiente: string | null;
+        };
         /** PaginaEjecuciones */
         PaginaEjecuciones: {
             /** Items */
@@ -4224,6 +4695,21 @@ export interface components {
         PaginaProcesos: {
             /** Items */
             items: components["schemas"]["ProcesoResumen"][];
+            /**
+             * Total
+             * @description Cantidad total con los filtros aplicados, sin contar el cursor.
+             */
+            total: number;
+            /**
+             * Siguiente
+             * @description Cursor de la página siguiente, o null si no hay más.
+             */
+            siguiente: string | null;
+        };
+        /** PaginaRegistro */
+        PaginaRegistro: {
+            /** Items */
+            items: components["schemas"]["RegistroActividad"][];
             /**
              * Total
              * @description Cantidad total con los filtros aplicados, sin contar el cursor.
@@ -4323,6 +4809,22 @@ export interface components {
             registrado_en: string;
             /** Aplicaciones */
             aplicaciones: components["schemas"]["AplicacionDePago"][];
+        };
+        /** PanelCarga */
+        PanelCarga: {
+            /**
+             * Personas
+             * @description Primero quien tiene más tareas vencidas.
+             */
+            personas: components["schemas"]["CargaPersona"][];
+            /** Procesos */
+            procesos: number;
+            /** Tareas Abiertas */
+            tareas_abiertas: number;
+            /** Vencidas */
+            vencidas: number;
+            /** Proximas */
+            proximas: number;
         };
         /** PanelConsultas */
         PanelConsultas: {
@@ -4843,6 +5345,48 @@ export interface components {
             /** Id */
             id: number;
         };
+        /** RegistroActividad */
+        RegistroActividad: {
+            /** Id */
+            id: number;
+            /**
+             * Actor
+             * @description Quién lo hizo; null cuando fue la plataforma sola.
+             */
+            actor: string | null;
+            /** Actor Id */
+            actor_id: number | null;
+            /**
+             * Frase
+             * @description Lo que hizo, en pasado: «emitió una cuenta de cobro».
+             */
+            frase: string;
+            /**
+             * Enlace
+             * @description Dónde ver lo que cambió, si tiene pantalla propia.
+             */
+            enlace: string | null;
+            /**
+             * Fecha
+             * Format: date-time
+             */
+            fecha: string;
+            /**
+             * Area
+             * @enum {string}
+             */
+            area: "cuentas" | "procesos" | "tareas" | "documentos" | "cobros" | "mensajes" | "configuracion" | "otros";
+            /**
+             * Accion
+             * @description Código de la acción, por ejemplo `cuenta_cobro.emitir`.
+             */
+            accion: string;
+            /**
+             * Con Error
+             * @description La operación quedó registrada con un error técnico.
+             */
+            con_error: boolean;
+        };
         /** Reintentados */
         Reintentados: {
             /** Reintentados */
@@ -5290,6 +5834,61 @@ export interface components {
             /** Actualizado Por */
             actualizado_por?: string | null;
         };
+        /** TextosFirma */
+        TextosFirma: {
+            /** Nombre */
+            nombre: string;
+            /** Correo Contacto */
+            correo_contacto?: string | null;
+            /** Correo Pqr */
+            correo_pqr?: string | null;
+            /**
+             * Telefono
+             * @default
+             */
+            telefono: string;
+            /**
+             * Whatsapp
+             * @default
+             */
+            whatsapp: string;
+            /**
+             * Direccion
+             * @default
+             */
+            direccion: string;
+            /**
+             * Ciudad
+             * @default
+             */
+            ciudad: string;
+            /**
+             * Pais
+             * @default Colombia
+             */
+            pais: string;
+            /**
+             * Sitio Web
+             * @default
+             */
+            sitio_web: string;
+            /**
+             * Logo Url
+             * @default
+             */
+            logo_url: string;
+            /**
+             * Logo Correo Url
+             * @description Logo del encabezado de los correos; vacío usa el logo general.
+             * @default
+             */
+            logo_correo_url: string;
+            /**
+             * Mostrar Contacto Publico
+             * @default true
+             */
+            mostrar_contacto_publico: boolean;
+        };
         /** TextosPlantillaAviso */
         TextosPlantillaAviso: {
             /** Asunto */
@@ -5440,6 +6039,21 @@ export interface components {
              * Format: date-time
              */
             recibido_en: string;
+        };
+        /** VinculoArchivo */
+        VinculoArchivo: {
+            /**
+             * Tipo
+             * @enum {string}
+             */
+            tipo: "documento" | "contrato";
+            /**
+             * Descripcion
+             * @description «Cédula.pdf, del proceso Sucesión de Jorge Pérez».
+             */
+            descripcion: string;
+            /** Enlace */
+            enlace: string | null;
         };
         /** VistaPrevia */
         VistaPrevia: {
@@ -16005,6 +16619,1066 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["VistaPrevia"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+        };
+    };
+    listar_actividad: {
+        parameters: {
+            query?: {
+                /** @description Nombre de quien lo hizo. */
+                q?: string | null;
+                /** @description Solo lo que hizo esta persona. */
+                actor_id?: number | null;
+                area?: ("cuentas" | "procesos" | "tareas" | "documentos" | "cobros" | "mensajes" | "configuracion" | "otros") | null;
+                /** @description Día inicial, en hora de Colombia. */
+                desde?: string | null;
+                /** @description Día final, incluido. */
+                hasta?: string | null;
+                /** @description Solo los registros con error técnico. */
+                solo_errores?: boolean;
+                /** @description Incluir las acciones de rutina (descargas, alertas descartadas). */
+                todo?: boolean;
+                /** @description Elementos por página. */
+                limite?: number;
+                /** @description Valor de `siguiente` de la página anterior. */
+                cursor?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PaginaRegistro"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+        };
+    };
+    descargar_actividad: {
+        parameters: {
+            query?: {
+                /** @description Nombre de quien lo hizo. */
+                q?: string | null;
+                /** @description Solo lo que hizo esta persona. */
+                actor_id?: number | null;
+                area?: ("cuentas" | "procesos" | "tareas" | "documentos" | "cobros" | "mensajes" | "configuracion" | "otros") | null;
+                /** @description Día inicial, en hora de Colombia. */
+                desde?: string | null;
+                /** @description Día final, incluido. */
+                hasta?: string | null;
+                /** @description Solo los registros con error técnico. */
+                solo_errores?: boolean;
+                /** @description Incluir las acciones de rutina (descargas, alertas descartadas). */
+                todo?: boolean;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Hasta 5.000 registros. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/csv": unknown;
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+        };
+    };
+    detalle_actividad: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                registro_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DetalleRegistro"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+        };
+    };
+    carga_de_trabajo: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PanelCarga"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+        };
+    };
+    ver_datos_firma: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DatosFirma"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+        };
+    };
+    guardar_datos_firma: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TextosFirma"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DatosFirma"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+        };
+    };
+    contenido_almacenamiento: {
+        parameters: {
+            query?: {
+                /** @description Carpeta a listar; vacío es la raíz. */
+                ruta?: string;
+                /** @description Para pedir más archivos de la misma carpeta. */
+                siguiente?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ContenidoCarpeta"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+        };
+    };
+    enlace_almacenamiento: {
+        parameters: {
+            query: {
+                clave: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnlaceTemporal"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+        };
+    };
+    eliminar_archivo_guardado: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ArchivoAEliminar"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Eliminados"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+        };
+    };
+    eliminar_carpeta_guardada: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CarpetaAEliminar"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Eliminados"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+        };
+    };
+    listar_chats_para_limpiar: {
+        parameters: {
+            query?: {
+                /** @description Elementos por página. */
+                limite?: number;
+                /** @description Valor de `siguiente` de la página anterior. */
+                cursor?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PaginaChats"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+        };
+    };
+    vaciar_chat: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                chat_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ConfirmacionVaciado"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChatVaciado"];
                 };
             };
             /** @description Bad Request */

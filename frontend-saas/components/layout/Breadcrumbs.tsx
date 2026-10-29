@@ -42,8 +42,8 @@ const labels: Record<string, string> = {
   actividad: "Actividad",
   folios: "Folios",
   almacenamiento: "Almacenamiento",
-  firma: "Datos generales",
-  metricas: "Métricas",
+  firma: "Datos de la firma",
+  metricas: "Carga de trabajo",
   calendario: "Calendario",
   ayuda: "Ayuda",
   mensajes: "Mensajes",
@@ -58,6 +58,9 @@ const labelsEnSeccion: Record<string, string> = {
   "operacion/integraciones": "Integraciones",
   "operacion/mensajes": "Plantillas de avisos",
   "operacion/glosario": "Glosario",
+  "chat/limpiar": "Limpieza de chats",
+  "admin/chat": "Chats",
+  "admin/auditoria": "Auditoría técnica",
 };
 
 function labelFor(segment: string, anterior?: string) {
@@ -72,7 +75,8 @@ export default function Breadcrumbs() {
   const { token } = useSession();
   const [chatLabel, setChatLabel] = useState<{ href: string; titulo: string; subtitulo: string } | null>(null);
   const segments = pathname.split("/").filter(Boolean);
-  const chatIndex = segments.indexOf("chat");
+  // «chat/limpiar» es una pantalla de configuración, no una conversación.
+  const chatIndex = segments[segments.indexOf("chat") + 1] === "limpiar" ? -1 : segments.indexOf("chat");
 
   const mensajesAbogado = chatIndex > 0 && segments[chatIndex - 1] === "abogado";
   const claveChat = mensajesAbogado ? claveDeRuta(partesDeRuta(pathname)) : null;

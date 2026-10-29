@@ -1,5 +1,5 @@
-import AdminFirmSettingsPage from "@/components/admin/console/AdminFirmSettingsPage";
+import { PanelFirma } from "@/components/admin/sistema/PanelFirma";
 
-export default function AdminFirmSettingsRoute() {
-  return <AdminFirmSettingsPage />;
+export default function FirmaPage() {
+  return <PanelFirma />;
 }

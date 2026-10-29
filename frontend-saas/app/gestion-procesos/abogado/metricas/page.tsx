@@ -1,3 +1,5 @@
-import WorkloadDashboard from "@/components/admin/WorkloadDashboard";
+import { PanelCarga } from "@/components/admin/sistema/PanelCarga";
 
-export default function LawyerMetricsPage() { return <WorkloadDashboard />; }
+export default function CargaAbogadoPage() {
+  return <PanelCarga conFichas={false} />;
+}

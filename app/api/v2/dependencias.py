@@ -30,6 +30,12 @@ from app.modulos.operacion.envios import ServicioEnvios
 from app.modulos.operacion.integraciones import ServicioIntegraciones
 from app.modulos.operacion.plantillas import ServicioPlantillas
 from app.modulos.operacion.repositorio import RepositorioOperacion
+from app.modulos.sistema.actividad import ServicioActividad
+from app.modulos.sistema.almacenamiento import ServicioAlmacenamiento
+from app.modulos.sistema.carga import ServicioCarga
+from app.modulos.sistema.chats import ServicioLimpiezaChats
+from app.modulos.sistema.firma import ServicioFirma
+from app.modulos.sistema.repositorio import RepositorioSistema
 from app.modulos.glosario.servicio import ServicioGlosario
 from app.modulos.mensajes.repositorio import RepositorioMensajes
 from app.modulos.mensajes.servicio import ServicioMensajes
@@ -129,3 +135,23 @@ def servicio_integraciones(db: Session = Depends(obtener_bd)) -> ServicioIntegra
 
 def servicio_plantillas(db: Session = Depends(obtener_bd)) -> ServicioPlantillas:
     return ServicioPlantillas(db, RepositorioOperacion(db))
+
+
+def servicio_actividad(db: Session = Depends(obtener_bd)) -> ServicioActividad:
+    return ServicioActividad(RepositorioSistema(db))
+
+
+def servicio_carga(db: Session = Depends(obtener_bd)) -> ServicioCarga:
+    return ServicioCarga(RepositorioSistema(db))
+
+
+def servicio_firma(db: Session = Depends(obtener_bd)) -> ServicioFirma:
+    return ServicioFirma(db, RepositorioSistema(db))
+
+
+def servicio_almacenamiento(db: Session = Depends(obtener_bd)) -> ServicioAlmacenamiento:
+    return ServicioAlmacenamiento(db, RepositorioSistema(db))
+
+
+def servicio_limpieza_chats(db: Session = Depends(obtener_bd)) -> ServicioLimpiezaChats:
+    return ServicioLimpiezaChats(db, RepositorioSistema(db))

@@ -1,5 +1,5 @@
-import AdminChatCleanupPage from "@/components/admin/console/AdminChatCleanupPage";
+import { PanelLimpiezaChats } from "@/components/admin/sistema/PanelLimpiezaChats";
 
-export default function AdminChatCleanupRoute() {
-  return <AdminChatCleanupPage />;
+export default function LimpiezaChatsPage() {
+  return <PanelLimpiezaChats />;
 }
