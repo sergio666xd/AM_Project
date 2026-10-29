@@ -393,6 +393,14 @@
   .lectura { font-size: 17px; line-height: 1.6; }
 }
 
+/* Sitio público: la confirmación del formulario entra en la misma hoja. */
+@keyframes sitio-aparece {
+  from { opacity: 0; transform: translateY(6px); filter: blur(4px); }
+  to { opacity: 1; transform: none; filter: none; }
+}
+.sitio-aparece { animation: sitio-aparece 480ms var(--ease-out-expo) both; }
+@media (prefers-reduced-motion: reduce) { .sitio-aparece { animation: none; } }
+
 /* Estilos de elementos en la capa base: fuera de una capa ganarían a las
    utilidades de Tailwind (text-*, font-*) y obligarían a usar !important. */
 @layer base {

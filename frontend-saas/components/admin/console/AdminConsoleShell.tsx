@@ -57,7 +57,7 @@ const grupos: GrupoNav[] = [
       { id: "integraciones", label: "Integraciones", href: `${ADMIN}/operacion/integraciones`, icon: ServerCog },
       {
         id: "plantillas", label: "Plantillas y glosario", corto: "Plantillas", href: `${ADMIN}/operacion/mensajes`, icon: FileText,
-        rutas: [`${ADMIN}/operacion/glosario`],
+        rutas: [`${ADMIN}/operacion/glosario`, `${ADMIN}/operacion/etapas`],
       },
     ],
   },
@@ -72,7 +72,7 @@ const grupos: GrupoNav[] = [
         id: "configuracion", label: "Configuración", href: `${ADMIN}/firma`, icon: Settings,
         rutas: [`${ADMIN}/finanzas`, `${ADMIN}/almacenamiento`, `${ADMIN}/chat/limpiar`],
       },
-      { id: "contenido", label: "Contenido del sitio", corto: "Sitio", href: `${ADMIN}/contenido`, icon: Globe, recargar: true },
+      { id: "sitio", label: "Sitio público", corto: "Sitio", href: `${ADMIN}/sitio/mensajes`, icon: Globe, rutas: [`${ADMIN}/sitio/contenido`] },
     ],
   },
   {
@@ -122,6 +122,7 @@ const SECCIONES: { titulo: string; pestanas: { label: string; href: string }[] }
     pestanas: [
       { label: "Plantillas de avisos", href: `${ADMIN}/operacion/mensajes` },
       { label: "Glosario", href: `${ADMIN}/operacion/glosario` },
+      { label: "Etapas de los procesos", href: `${ADMIN}/operacion/etapas` },
     ],
   },
   {
@@ -139,6 +140,13 @@ const SECCIONES: { titulo: string; pestanas: { label: string; href: string }[] }
       { label: "Cobros y pagos", href: `${ADMIN}/finanzas` },
       { label: "Almacenamiento", href: `${ADMIN}/almacenamiento` },
       { label: "Limpieza de chats", href: `${ADMIN}/chat/limpiar` },
+    ],
+  },
+  {
+    titulo: "Sitio público",
+    pestanas: [
+      { label: "Mensajes", href: `${ADMIN}/sitio/mensajes` },
+      { label: "Contenido", href: `${ADMIN}/sitio/contenido` },
     ],
   },
 ];

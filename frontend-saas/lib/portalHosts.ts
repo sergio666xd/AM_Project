@@ -1,5 +1,6 @@
 export const ADMIN_PORTAL_HOST = "admin.alejandramunozabogada.com";
 export const USER_PORTAL_HOST = "panel.alejandramunozabogada.com";
+export const PUBLIC_SITE_HOST = "www.alejandramunozabogada.com";
 
 const ADMIN_HOME = "/";
 const CLIENT_HOME = "/";
@@ -51,4 +52,14 @@ export function portalHrefForRole(role: string, path?: string) {
 export function isLocalPortalHost(hostname: string) {
   const normalized = hostname.toLowerCase();
   return normalized === "localhost" || normalized === "127.0.0.1" || normalized.endsWith(".localhost");
+}
+
+/** Dirección de una página del sitio público desde cualquier portal. */
+export function urlSitioPublico(ruta: string) {
+  if (typeof window === "undefined") return `https://${PUBLIC_SITE_HOST}${ruta}`;
+  const { hostname, protocol, port } = window.location;
+  const host = hostname.toLowerCase();
+  if (isPreviewHost(host) || host === "localhost" || host === "127.0.0.1") return ruta;
+  if (host.endsWith(".localhost")) return `${protocol}//sitio.localhost${port ? `:${port}` : ""}${ruta}`;
+  return `https://${PUBLIC_SITE_HOST}${ruta}`;
 }

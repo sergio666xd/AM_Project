@@ -10,7 +10,7 @@ import { EmptyState } from "@/components/ui/EmptyState";
 import { Etapas } from "@/components/ui/Etapas";
 import { Sheet } from "@/components/ui/Sheet";
 import { api, mensajeDeError } from "@/lib/api-v2/cliente";
-import { ETAPAS, indiceEtapa, nombreEtapa } from "@/lib/etapas";
+import { indiceEtapa } from "@/lib/etapas";
 import { fechaLarga, horaDe } from "@/lib/fechas";
 import { rutaProceso, type ResumenProcesoCliente } from "@/lib/portalCliente";
 import { useLoadEffect } from "@/lib/useLoadEffect";
@@ -43,7 +43,7 @@ export default function ProcesosClientePage() {
         ) : (
           <ul className="divide-y divide-line">
             {procesos.map((proceso) => {
-              const indice = indiceEtapa(proceso.etapa);
+              const indice = indiceEtapa(proceso.etapas, proceso.etapa);
               return (
                 <li key={proceso.id}>
                   <Link href={rutaProceso(proceso.id)} className="group flex items-center gap-4 px-5 py-5 transition-colors hover:bg-sheet-2 sm:px-7">
@@ -57,9 +57,9 @@ export default function ProcesosClientePage() {
                         )}
                       </p>
                       <p className="mt-1 text-[15px] text-ink-2">
-                        {indice >= 0 ? `Etapa de ${nombreEtapa(proceso.etapa).toLowerCase()}` : "Etapa sin marcar"} · Lleva su caso {proceso.abogado.nombre}
+                        {proceso.etapa ? `Etapa de ${proceso.etapa.nombre.toLowerCase()}` : "Etapa sin marcar"} · Lleva su caso {proceso.abogado.nombre}
                       </p>
-                      {indice >= 0 && <Etapas etapas={ETAPAS.map((e) => e.nombre)} actual={indice} compacta className="mt-3 max-w-sm" />}
+                      {indice >= 0 && <Etapas etapas={proceso.etapas.map((e) => e.nombre)} actual={indice} compacta className="mt-3 max-w-sm" />}
                       {proceso.proxima_fecha && (
                         <p className="mt-3 flex items-start gap-2 text-[15px] text-ink-2">
                           <CalendarDays aria-hidden="true" size={16} strokeWidth={1.75} className="mt-1 shrink-0" />

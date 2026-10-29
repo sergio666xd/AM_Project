@@ -975,6 +975,51 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v2/plantillas-etapas": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Plantillas de etapas
+         * @description La predeterminada primero. Las etapas vienen en orden, incluidas las desactivadas.
+         */
+        get: operations["listar_plantillas_etapas"];
+        put?: never;
+        /** Crear una plantilla de etapas */
+        post: operations["crear_plantilla_etapas"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v2/plantillas-etapas/{plantilla_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Editar una plantilla de etapas
+         * @description Se envían todas las etapas en orden. Las que falten se borran si ningún proceso las usó; si no, se desactivan.
+         */
+        put: operations["editar_plantilla_etapas"];
+        post?: never;
+        /**
+         * Borrar una plantilla de etapas
+         * @description Solo si ningún proceso la usa ni la usó y no es la predeterminada.
+         */
+        delete: operations["eliminar_plantilla_etapas"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v2/cliente/inicio": {
         parameters: {
             query?: never;
@@ -2196,6 +2241,146 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v2/sitio/contacto": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Datos de contacto del sitio
+         * @description Sin sesión. Si la administración oculta el contacto, solo trae el nombre de la firma.
+         */
+        get: operations["ver_contacto_publico"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v2/sitio/paginas/{slug}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Contenido de una página pública
+         * @description Sin sesión. `contenido` es null mientras la página use su texto base.
+         */
+        get: operations["ver_pagina_publica"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v2/sitio/mensajes": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Enviar un mensaje desde el formulario de contacto
+         * @description Sin sesión. Guarda el mensaje; el aviso a la firma y la confirmación por correo salen después de responder.
+         */
+        post: operations["enviar_mensaje_sitio"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v2/admin/sitio/mensajes": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Mensajes del sitio */
+        get: operations["listar_mensajes_sitio"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v2/admin/sitio/mensajes/{mensaje_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Ver un mensaje del sitio */
+        get: operations["ver_mensaje_sitio"];
+        /**
+         * Marcar o anotar un mensaje del sitio
+         * @description Atendido, descartado (por ejemplo, publicidad) o de vuelta a nuevo; la nota es interna.
+         */
+        put: operations["cambiar_mensaje_sitio"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v2/admin/sitio/paginas": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Páginas del sitio y si tienen cambios */
+        get: operations["listar_paginas_sitio"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v2/admin/sitio/paginas/{slug}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Ver el contenido editado de una página
+         * @description `contenido` es null mientras la página use su texto base.
+         */
+        get: operations["ver_pagina_sitio"];
+        /**
+         * Guardar el contenido de una página
+         * @description La dirección de cada página es fija; `route` se ignora si llega.
+         */
+        put: operations["guardar_pagina_sitio"];
+        post?: never;
+        /** Volver al texto base de una página */
+        delete: operations["restaurar_pagina_sitio"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -2275,7 +2460,7 @@ export interface components {
              * Tipo
              * @enum {string}
              */
-            tipo: "consulta_fallida" | "entrega_fallida" | "solicitud_perfil" | "sin_ingreso";
+            tipo: "consulta_fallida" | "entrega_fallida" | "solicitud_perfil" | "sin_ingreso" | "mensaje_sitio";
             /**
              * Gravedad
              * @enum {string}
@@ -2553,10 +2738,10 @@ export interface components {
         /** CambiarEtapa */
         CambiarEtapa: {
             /**
-             * Etapa
-             * @enum {string}
+             * Etapa Id
+             * @description Una etapa activa de cualquier plantilla activa; el proceso pasa a seguir esa plantilla.
              */
-            etapa: "demanda" | "admision" | "pruebas" | "audiencia" | "sentencia";
+            etapa_id: number;
             /** Nota */
             nota?: string | null;
         };
@@ -2661,11 +2846,7 @@ export interface components {
         };
         /** CambioEtapa */
         CambioEtapa: {
-            /**
-             * Etapa
-             * @enum {string}
-             */
-            etapa: "demanda" | "admision" | "pruebas" | "audiencia" | "sentencia";
+            etapa: components["schemas"]["EtapaBreve"];
             /**
              * Fecha
              * Format: date-time
@@ -2686,6 +2867,23 @@ export interface components {
              * @description null quita la fecha límite.
              */
             fecha_limite: string | null;
+        };
+        /** CambioMensajeSitio */
+        CambioMensajeSitio: {
+            /** Estado */
+            estado?: ("nueva" | "atendida" | "descartada") | null;
+            /** Nota */
+            nota?: string | null;
+        };
+        /** CambioPaginaSitio */
+        CambioPaginaSitio: {
+            /**
+             * Contenido
+             * @description La página completa. La ruta no se cambia desde aquí.
+             */
+            contenido: {
+                [key: string]: unknown;
+            };
         };
         /** CambioUsuario */
         CambioUsuario: {
@@ -3012,6 +3210,30 @@ export interface components {
              */
             rol: "cliente" | "abogado" | "administrador";
         };
+        /**
+         * ContactoPublico
+         * @description Lo que el sitio muestra de la firma. Si la administración oculta el contacto, solo va el nombre.
+         */
+        ContactoPublico: {
+            /** Nombre */
+            nombre: string;
+            /** Mostrar Contacto */
+            mostrar_contacto: boolean;
+            /** Correo Contacto */
+            correo_contacto?: string | null;
+            /** Correo Pqr */
+            correo_pqr?: string | null;
+            /** Telefono */
+            telefono?: string | null;
+            /** Whatsapp */
+            whatsapp?: string | null;
+            /** Direccion */
+            direccion?: string | null;
+            /** Ciudad */
+            ciudad?: string | null;
+            /** Pais */
+            pais?: string | null;
+        };
         /** ContenidoCarpeta */
         ContenidoCarpeta: {
             /**
@@ -3038,6 +3260,15 @@ export interface components {
             fallidos: number;
             /** Pendientes */
             pendientes: number;
+        };
+        /** ConteoMensajesSitio */
+        ConteoMensajesSitio: {
+            /** Nueva */
+            nueva: number;
+            /** Atendida */
+            atendida: number;
+            /** Descartada */
+            descartada: number;
         };
         /** ConteoUsuarios */
         ConteoUsuarios: {
@@ -3237,6 +3468,23 @@ export interface components {
             /** Direccion */
             direccion?: string | null;
         };
+        /** DatosEtapa */
+        DatosEtapa: {
+            /**
+             * Id
+             * @description Vacío para una etapa nueva.
+             */
+            id?: number | null;
+            /** Nombre */
+            nombre: string;
+            /** Explicacion */
+            explicacion?: string | null;
+            /**
+             * Activa
+             * @default true
+             */
+            activa: boolean;
+        };
         /** DatosFirma */
         DatosFirma: {
             /** Nombre */
@@ -3306,6 +3554,28 @@ export interface components {
             palabras_clave?: string[];
             /** Pasos */
             pasos: components["schemas"]["PasoPlantilla"][];
+        };
+        /** DatosPlantillaEtapas */
+        DatosPlantillaEtapas: {
+            /** Nombre */
+            nombre: string;
+            /** Descripcion */
+            descripcion?: string | null;
+            /**
+             * Activa
+             * @default true
+             */
+            activa: boolean;
+            /**
+             * Predeterminada
+             * @default false
+             */
+            predeterminada: boolean;
+            /**
+             * Etapas
+             * @description Todas las etapas, en orden. Las que falten se borran si ningún proceso las usó; si no, se desactivan.
+             */
+            etapas: components["schemas"]["DatosEtapa"][];
         };
         /** DatosTermino */
         DatosTermino: {
@@ -3991,13 +4261,34 @@ export interface components {
             /** Enlace */
             enlace: string;
         };
+        /** EtapaActual */
+        EtapaActual: {
+            /** Id */
+            id: number;
+            /** Nombre */
+            nombre: string;
+            /**
+             * Posicion
+             * @description Lugar de la etapa en la línea del proceso, desde 1.
+             */
+            posicion: number;
+            /**
+             * Total
+             * @description Cuántas etapas tiene la línea del proceso.
+             */
+            total: number;
+        };
+        /** EtapaBreve */
+        EtapaBreve: {
+            /** Id */
+            id: number;
+            /** Nombre */
+            nombre: string;
+        };
         /** EtapaCliente */
         EtapaCliente: {
-            /**
-             * Clave
-             * @enum {string}
-             */
-            clave: "demanda" | "admision" | "pruebas" | "audiencia" | "sentencia";
+            /** Id */
+            id: number;
             /** Nombre */
             nombre: string;
             /**
@@ -4005,6 +4296,25 @@ export interface components {
              * @description Cuándo llegó el proceso a esta etapa, si ya pasó por ella.
              */
             fecha: string | null;
+        };
+        /** EtapaDePlantilla */
+        EtapaDePlantilla: {
+            /** Id */
+            id: number;
+            /** Nombre */
+            nombre: string;
+            /**
+             * Explicacion
+             * @description Qué pasa en la etapa, en palabras sencillas. Lo lee el cliente.
+             */
+            explicacion: string | null;
+            /** Activa */
+            activa: boolean;
+            /**
+             * Procesos
+             * @description Procesos que están hoy en esta etapa.
+             */
+            procesos: number;
         };
         /** EventoActividad */
         EventoActividad: {
@@ -4442,6 +4752,11 @@ export interface components {
             /** Items */
             items: components["schemas"]["Plantilla"][];
         };
+        /** ListaPlantillasEtapas */
+        ListaPlantillasEtapas: {
+            /** Items */
+            items: components["schemas"]["PlantillaDeEtapas"][];
+        };
         /** ListaSinContrato */
         ListaSinContrato: {
             /** Items */
@@ -4499,6 +4814,58 @@ export interface components {
              */
             folio: number | null;
         };
+        /** MensajeSitio */
+        MensajeSitio: {
+            /** Id */
+            id: number;
+            /** Nombre */
+            nombre: string;
+            /** Telefono */
+            telefono: string | null;
+            /** Correo */
+            correo: string | null;
+            /**
+             * Area
+             * @enum {string}
+             */
+            area: "familia" | "empresas" | "propiedad_horizontal" | "publico" | "poliza" | "otro";
+            /** Mensaje */
+            mensaje: string;
+            /**
+             * Estado
+             * @enum {string}
+             */
+            estado: "nueva" | "atendida" | "descartada";
+            /** Nota */
+            nota: string | null;
+            /**
+             * Aviso Firma
+             * @description Si el correo de aviso a la firma salió.
+             * @enum {string}
+             */
+            aviso_firma: "pendiente" | "enviado" | "fallido";
+            /** Aviso Error */
+            aviso_error: string | null;
+            /**
+             * Whatsapp Url
+             * @description Enlace para escribirle por WhatsApp, si dejó un número.
+             */
+            whatsapp_url: string | null;
+            /**
+             * Recibida En
+             * Format: date-time
+             */
+            recibida_en: string;
+            /** Atendida En */
+            atendida_en: string | null;
+            /** Atendida Por */
+            atendida_por: string | null;
+        };
+        /** MensajeSitioRecibido */
+        MensajeSitioRecibido: {
+            /** Mensaje */
+            mensaje: string;
+        };
         /** Motivo */
         Motivo: {
             /** Motivo */
@@ -4554,6 +4921,36 @@ export interface components {
             /** Texto */
             texto: string;
             referencia?: components["schemas"]["ReferenciaElegida"] | null;
+        };
+        /** NuevoMensajeSitio */
+        NuevoMensajeSitio: {
+            /** Nombre */
+            nombre: string;
+            /**
+             * Telefono
+             * @description WhatsApp o teléfono.
+             */
+            telefono?: string | null;
+            /** Correo */
+            correo?: string | null;
+            /**
+             * Area
+             * @enum {string}
+             */
+            area: "familia" | "empresas" | "propiedad_horizontal" | "publico" | "poliza" | "otro";
+            /** Mensaje */
+            mensaje: string;
+            /**
+             * Autorizacion
+             * @description Autoriza el tratamiento de sus datos (Ley 1581 de 2012).
+             */
+            autorizacion: boolean;
+            /**
+             * Website
+             * @description Campo trampa: las personas lo dejan vacío.
+             * @default
+             */
+            website: string;
         };
         /** NuevoUsuario */
         NuevoUsuario: {
@@ -4691,6 +5088,22 @@ export interface components {
              */
             nuevos: number;
         };
+        /** PaginaMensajesSitio */
+        PaginaMensajesSitio: {
+            /** Items */
+            items: components["schemas"]["MensajeSitio"][];
+            /**
+             * Total
+             * @description Cantidad total con los filtros aplicados, sin contar el cursor.
+             */
+            total: number;
+            /**
+             * Siguiente
+             * @description Cursor de la página siguiente, o null si no hay más.
+             */
+            siguiente: string | null;
+            conteo: components["schemas"]["ConteoMensajesSitio"];
+        };
         /** PaginaProcesos */
         PaginaProcesos: {
             /** Items */
@@ -4706,6 +5119,20 @@ export interface components {
              */
             siguiente: string | null;
         };
+        /** PaginaPublica */
+        PaginaPublica: {
+            /** Slug */
+            slug: string;
+            /**
+             * Contenido
+             * @description Lo que la administración cambió; null si la página usa su texto base.
+             */
+            contenido: {
+                [key: string]: unknown;
+            } | null;
+            /** Actualizada En */
+            actualizada_en: string | null;
+        };
         /** PaginaRegistro */
         PaginaRegistro: {
             /** Items */
@@ -4720,6 +5147,49 @@ export interface components {
              * @description Cursor de la página siguiente, o null si no hay más.
              */
             siguiente: string | null;
+        };
+        /** PaginaSitio */
+        PaginaSitio: {
+            /** Slug */
+            slug: string;
+            /** Nombre */
+            nombre: string;
+            /** Ruta */
+            ruta: string;
+            /**
+             * Editada
+             * @description False mientras la página use su texto base.
+             */
+            editada: boolean;
+            /** Actualizada En */
+            actualizada_en: string | null;
+            /** Actualizada Por */
+            actualizada_por: string | null;
+        };
+        /** PaginaSitioDetalle */
+        PaginaSitioDetalle: {
+            /** Slug */
+            slug: string;
+            /** Nombre */
+            nombre: string;
+            /** Ruta */
+            ruta: string;
+            /**
+             * Editada
+             * @description False mientras la página use su texto base.
+             */
+            editada: boolean;
+            /** Actualizada En */
+            actualizada_en: string | null;
+            /** Actualizada Por */
+            actualizada_por: string | null;
+            /**
+             * Contenido
+             * @description Lo guardado por la administración; null si usa el texto base.
+             */
+            contenido: {
+                [key: string]: unknown;
+            } | null;
         };
         /** PaginaUsuarios */
         PaginaUsuarios: {
@@ -5108,6 +5578,44 @@ export interface components {
             /** Actualizada En */
             actualizada_en: string | null;
         };
+        /** PlantillaBreve */
+        PlantillaBreve: {
+            /** Id */
+            id: number;
+            /** Nombre */
+            nombre: string;
+        };
+        /** PlantillaDeEtapas */
+        PlantillaDeEtapas: {
+            /** Id */
+            id: number;
+            /** Nombre */
+            nombre: string;
+            /** Descripcion */
+            descripcion: string | null;
+            /** Activa */
+            activa: boolean;
+            /**
+             * Predeterminada
+             * @description La que toman los procesos que no eligen otra.
+             */
+            predeterminada: boolean;
+            /**
+             * Etapas
+             * @description En orden, incluidas las desactivadas.
+             */
+            etapas: components["schemas"]["EtapaDePlantilla"][];
+            /**
+             * Procesos
+             * @description Procesos que usan la plantilla.
+             */
+            procesos: number;
+            /**
+             * Actualizada En
+             * Format: date-time
+             */
+            actualizada_en: string;
+        };
         /** ProcesoBreve */
         ProcesoBreve: {
             /** Id */
@@ -5124,8 +5632,7 @@ export interface components {
             /** Descripcion */
             descripcion: string | null;
             abogado: components["schemas"]["PersonaBreve"];
-            /** Etapa */
-            etapa: ("demanda" | "admision" | "pruebas" | "audiencia" | "sentencia") | null;
+            etapa: components["schemas"]["EtapaBreve"] | null;
             /**
              * Etapa Explicacion
              * @description Qué se hace en la etapa actual, en lenguaje claro.
@@ -5133,7 +5640,7 @@ export interface components {
             etapa_explicacion: string | null;
             /**
              * Etapas
-             * @description Las cinco etapas en orden, con la fecha de las ya recorridas.
+             * @description Las etapas de su proceso en orden, con la fecha de las ya recorridas.
              */
             etapas: components["schemas"]["EtapaCliente"][];
             proxima_fecha: components["schemas"]["FechaProxima"] | null;
@@ -5160,8 +5667,11 @@ export interface components {
             id: number;
             /** Nombre */
             nombre: string;
-            /** Etapa */
-            etapa: ("demanda" | "admision" | "pruebas" | "audiencia" | "sentencia") | null;
+            /**
+             * Etapa
+             * @description Nombre de la etapa actual.
+             */
+            etapa: string | null;
             /** Radicados */
             radicados: string[];
             /** Responsable */
@@ -5206,11 +5716,8 @@ export interface components {
              * @description Números de radicado de 23 dígitos vinculados al proceso.
              */
             radicados: string[];
-            /**
-             * Etapa
-             * @description Etapa actual; vacía mientras la firma no la fije.
-             */
-            etapa: ("demanda" | "admision" | "pruebas" | "audiencia" | "sentencia") | null;
+            /** @description Etapa actual; vacía mientras la firma no la fije. */
+            etapa: components["schemas"]["EtapaActual"] | null;
             /** Archivado En */
             archivado_en: string | null;
             /**
@@ -5228,6 +5735,13 @@ export interface components {
              * @description Abogados que colaboran. Al cliente solo le llegan los marcados como visibles.
              */
             colaboradores: components["schemas"]["PersonaBreve"][];
+            /** @description Plantilla de etapas que sigue el proceso. */
+            plantilla: components["schemas"]["PlantillaBreve"];
+            /**
+             * Linea Etapas
+             * @description Las etapas de esa plantilla, en orden.
+             */
+            linea_etapas: components["schemas"]["EtapaBreve"][];
             /**
              * Etapas
              * @description Historial de cambios de etapa, del más antiguo al más reciente.
@@ -5250,11 +5764,8 @@ export interface components {
              * @description Números de radicado de 23 dígitos vinculados al proceso.
              */
             radicados: string[];
-            /**
-             * Etapa
-             * @description Etapa actual; vacía mientras la firma no la fije.
-             */
-            etapa: ("demanda" | "admision" | "pruebas" | "audiencia" | "sentencia") | null;
+            /** @description Etapa actual; vacía mientras la firma no la fije. */
+            etapa: components["schemas"]["EtapaActual"] | null;
             /** Archivado En */
             archivado_en: string | null;
             /**
@@ -5578,8 +6089,7 @@ export interface components {
             /** Descripcion */
             descripcion: string | null;
             abogado: components["schemas"]["PersonaBreve"];
-            /** Etapa */
-            etapa: ("demanda" | "admision" | "pruebas" | "audiencia" | "sentencia") | null;
+            etapa: components["schemas"]["EtapaBreve"] | null;
             /**
              * Etapa Explicacion
              * @description Qué se hace en la etapa actual, en lenguaje claro.
@@ -5587,7 +6097,7 @@ export interface components {
             etapa_explicacion: string | null;
             /**
              * Etapas
-             * @description Las cinco etapas en orden, con la fecha de las ya recorridas.
+             * @description Las etapas de su proceso en orden, con la fecha de las ya recorridas.
              */
             etapas: components["schemas"]["EtapaCliente"][];
             proxima_fecha: components["schemas"]["FechaProxima"] | null;
@@ -11275,6 +11785,351 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["Explicacion"];
                 };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+        };
+    };
+    listar_plantillas_etapas: {
+        parameters: {
+            query?: {
+                /** @description Incluye las desactivadas. Solo para quien puede editarlas. */
+                todas?: boolean;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ListaPlantillasEtapas"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+        };
+    };
+    crear_plantilla_etapas: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DatosPlantillaEtapas"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PlantillaDeEtapas"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+        };
+    };
+    editar_plantilla_etapas: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                plantilla_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DatosPlantillaEtapas"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PlantillaDeEtapas"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+        };
+    };
+    eliminar_plantilla_etapas: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                plantilla_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
             /** @description Bad Request */
             400: {
@@ -17679,6 +18534,867 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ChatVaciado"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+        };
+    };
+    ver_contacto_publico: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ContactoPublico"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+        };
+    };
+    ver_pagina_publica: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                slug: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PaginaPublica"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+        };
+    };
+    enviar_mensaje_sitio: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["NuevoMensajeSitio"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MensajeSitioRecibido"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+        };
+    };
+    listar_mensajes_sitio: {
+        parameters: {
+            query?: {
+                /** @description Sin filtro trae todos. */
+                estado?: ("nueva" | "atendida" | "descartada") | null;
+                /** @description Elementos por página. */
+                limite?: number;
+                /** @description Valor de `siguiente` de la página anterior. */
+                cursor?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PaginaMensajesSitio"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+        };
+    };
+    ver_mensaje_sitio: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                mensaje_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MensajeSitio"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+        };
+    };
+    cambiar_mensaje_sitio: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                mensaje_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CambioMensajeSitio"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MensajeSitio"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+        };
+    };
+    listar_paginas_sitio: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PaginaSitio"][];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+        };
+    };
+    ver_pagina_sitio: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                slug: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PaginaSitioDetalle"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+        };
+    };
+    guardar_pagina_sitio: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                slug: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CambioPaginaSitio"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PaginaSitioDetalle"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+        };
+    };
+    restaurar_pagina_sitio: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                slug: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PaginaSitioDetalle"];
                 };
             };
             /** @description Bad Request */

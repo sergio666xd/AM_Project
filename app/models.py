@@ -423,8 +423,11 @@ class Proceso(Base):
     archivado_en = Column(DateTime(timezone=True), nullable=True, index=True)
     # Primera foliación del expediente; lo anterior entró revisado (ver FolioExpediente).
     foliado_en = Column(DateTime, nullable=True)
-    # Etapa actual (demanda, admision, pruebas, audiencia, sentencia); el historial va en EtapaProceso.
-    etapa = Column(String(16), nullable=True)
+    # Plantilla de etapas del proceso (vacía: la predeterminada) y etapa actual; el historial va en EtapaProceso.
+    plantilla_etapas_id = Column(Integer, ForeignKey("plantillas_etapas.id", ondelete="SET NULL"), nullable=True)
+    etapa_id = Column(Integer, ForeignKey("etapas_plantilla.id", ondelete="SET NULL"), nullable=True)
+    plantilla_etapas = relationship("PlantillaEtapas")
+    etapa = relationship("EtapaPlantilla")
     abogado = relationship("Usuario", back_populates="procesos", foreign_keys=[abogado_id])
     colaboradores = relationship(
         "ProcesoColaborador",
@@ -659,16 +662,47 @@ class NovedadRadicadoUsuario(Base):
     radicado = relationship("Radicado")
 
 
+class PlantillaEtapas(Base):
+    """Etapas por las que pasa un tipo de proceso, en orden. La firma las arma y edita."""
+    __tablename__ = "plantillas_etapas"
+
+    id = Column(Integer, primary_key=True)
+    nombre = Column(String(120), nullable=False)
+    descripcion = Column(Text, nullable=True)
+    activa = Column(Boolean, nullable=False, default=True)
+    # La que toman los procesos que aún no eligen otra.
+    predeterminada = Column(Boolean, nullable=False, default=False)
+    created_at = Column(DateTime, nullable=False, default=utc_ahora)
+    updated_at = Column(DateTime, nullable=False, default=utc_ahora, onupdate=utc_ahora)
+    etapas = relationship("EtapaPlantilla", back_populates="plantilla", order_by="EtapaPlantilla.orden",
+                          cascade="all, delete-orphan")
+
+
+class EtapaPlantilla(Base):
+    """Una etapa de una plantilla. Las que ya usó algún proceso no se borran: se desactivan."""
+    __tablename__ = "etapas_plantilla"
+
+    id = Column(Integer, primary_key=True)
+    plantilla_id = Column(Integer, ForeignKey("plantillas_etapas.id", ondelete="CASCADE"), nullable=False, index=True)
+    nombre = Column(String(80), nullable=False)
+    # Qué pasa en esta etapa, en palabras sencillas; lo lee el cliente en su portal.
+    explicacion = Column(Text, nullable=True)
+    orden = Column(Integer, nullable=False, default=0)
+    activa = Column(Boolean, nullable=False, default=True)
+    plantilla = relationship("PlantillaEtapas", back_populates="etapas")
+
+
 class EtapaProceso(Base):
     """Cada cambio de etapa de un proceso, con quién lo hizo y una nota opcional."""
     __tablename__ = "etapas_proceso"
 
     id = Column(Integer, primary_key=True)
     proceso_id = Column(Integer, ForeignKey("procesos.id", ondelete="CASCADE"), nullable=False, index=True)
-    etapa = Column(String(16), nullable=False)
+    etapa_id = Column(Integer, ForeignKey("etapas_plantilla.id"), nullable=False)
     nota = Column(Text, nullable=True)
     fecha = Column(DateTime, nullable=False, default=utc_ahora)
     usuario_id = Column(Integer, ForeignKey("usuarios.id", ondelete="SET NULL"), nullable=True)
+    etapa = relationship("EtapaPlantilla")
 
 
 class FolioExpediente(Base):
@@ -1386,3 +1420,28 @@ class IntentoLimitado(Base):
     id = Column(Integer, primary_key=True)
     clave = Column(String(80), nullable=False)
     creado_en = Column(DateTime, nullable=False, default=utc_ahora, index=True)
+
+
+class SolicitudContacto(Base):
+    """Mensaje que alguien deja en el formulario de contacto del sitio público."""
+    __tablename__ = "solicitudes_contacto"
+    __table_args__ = (
+        CheckConstraint("estado IN ('NUEVA', 'ATENDIDA', 'DESCARTADA')", name="ck_solicitud_contacto_estado"),
+        Index("ix_solicitud_contacto_estado_fecha", "estado", "created_at"),
+    )
+
+    id = Column(Integer, primary_key=True)
+    nombre = Column(String(150), nullable=False)
+    telefono = Column(String(40), nullable=True)
+    correo = Column(String(320), nullable=True)
+    area = Column(String(32), nullable=False)
+    mensaje = Column(Text, nullable=False)
+    autorizo_datos_en = Column(DateTime, nullable=False)
+    estado = Column(String(16), nullable=False, default="NUEVA")
+    nota = Column(Text, nullable=True)
+    aviso_firma = Column(String(16), nullable=False, default="PENDIENTE")
+    aviso_error = Column(Text, nullable=True)
+    atendida_por_id = Column(Integer, ForeignKey("usuarios.id", ondelete="SET NULL"), nullable=True)
+    atendida_en = Column(DateTime, nullable=True)
+    created_at = Column(DateTime, nullable=False, default=utc_ahora)
+    updated_at = Column(DateTime, nullable=False, default=utc_ahora, onupdate=utc_ahora)

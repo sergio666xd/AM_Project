@@ -7,7 +7,7 @@ from app.nucleo.zona_horaria import FechaHora
 
 # ---- Resumen ---------------------------------------------------------------
 
-TipoAlerta = Literal["consulta_fallida", "entrega_fallida", "solicitud_perfil", "sin_ingreso"]
+TipoAlerta = Literal["consulta_fallida", "entrega_fallida", "solicitud_perfil", "sin_ingreso", "mensaje_sitio"]
 Gravedad = Literal["alta", "media"]
 EstadoSalud = Literal["ok", "aviso", "falla", "sin_configurar"]
 ClaveIntegracion = Literal["rama_judicial", "correo", "whatsapp", "push", "almacenamiento"]
