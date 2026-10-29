@@ -258,3 +258,86 @@ def test_historia_en_lenguaje_claro_y_lo_nuevo(iniciar, crear_usuario, crear_pro
     assert (llegada["texto"], llegada["explicada"], llegada["texto_juzgado"]) == ("Auto decreta pruebas", False, None)
     assert cliente_http.post(f"/api/v2/cliente/procesos/{e['archivado'].id}/visto", headers=H).status_code == 404
     assert cliente_http.get(f"/api/v2/cliente/procesos/{p}/historia?cursor=no-vale").status_code == 422
+
+
+PDF = b"%PDF-1.4 prueba"
+
+
+def _r2(monkeypatch):
+    guardados = []
+
+    class R2:
+        def put_object(self, **datos):
+            guardados.append(datos["Key"])
+
+        def delete_object(self, **datos):
+            guardados.remove(datos["Key"])
+
+    monkeypatch.setattr("app.storage.get_r2_client", lambda: R2())
+    monkeypatch.setattr("app.storage.get_r2_bucket", lambda: "cubeta")
+    return guardados
+
+
+def test_pendientes_del_cliente(iniciar, crear_usuario, crear_proceso, cliente_http, sesion_bd, monkeypatch):
+    e = _escenario_portal(crear_usuario, crear_proceso, sesion_bd)
+    guardados = _r2(monkeypatch)
+    avisos = []
+    monkeypatch.setattr("app.modulos.portal_cliente.servicio.notificar", lambda db, destinatario, **k: avisos.append((destinatario.id, k)))
+    monkeypatch.setattr("app.routers.tareas.emitir_notificacion_workflow", lambda db, destinatario, *a, **k: avisos.append((destinatario.id, a[1])))
+    solicitud, poder, interna = e["solicitud"], e["poder"], e["interna"]
+    subtarea = next(s for s in interna.subtareas if s.asignada_cliente)
+    base = f"/api/v2/cliente/solicitudes/{solicitud.id}/pedidos"
+
+    iniciar(e["abogada"])
+    assert cliente_http.get("/api/v2/cliente/pendientes").status_code == 403
+
+    iniciar(e["gloria"])
+    datos = cliente_http.get("/api/v2/cliente/pendientes").json()
+    assert [p["clave"] for p in datos["pendientes"]] == [f"tarea:{poder.id}", f"solicitud:{solicitud.id}", f"subtarea:{subtarea.id}"]
+    documentos = datos["pendientes"][1]
+    assert documentos["pedido_por"]["nombre"] == "Alejandra Muñoz"
+    assert [(p["id"], p["estado"], p["nota"], p["puede_enviar"]) for p in documentos["pedidos"]] == [
+        ("a", "por_corregir", "Falta la última página.", True), ("b", "falta", None, True)]
+    assert datos["pendientes"][2]["tarea"] == "Radicar el inventario"
+    assert datos["recientes"] == []
+
+    # El archivo se valida antes de guardarlo.
+    falso = cliente_http.post(f"{base}/b/archivo", headers=H, files={"archivo": ("cert.pdf", b"no es pdf", "application/pdf")})
+    assert falso.status_code == 422 and falso.json()["codigo"] == "contenido_no_coincide"
+    exe = cliente_http.post(f"{base}/b/archivo", headers=H, files={"archivo": ("x.exe", b"MZ", "application/octet-stream")})
+    assert exe.json()["codigo"] == "tipo_no_permitido"
+    assert cliente_http.post(f"{base}/z/archivo", headers=H, files={"archivo": ("c.pdf", PDF, "application/pdf")}).status_code == 404
+    assert guardados == []
+
+    enviado = cliente_http.post(f"{base}/b/archivo", headers=H, files={"archivo": ("certificado.pdf", PDF, "application/pdf")})
+    assert enviado.status_code == 201, enviado.text
+    assert (enviado.json()["estado"], enviado.json()["puede_enviar"], enviado.json()["archivo"]["nombre"]) == (
+        "en_revision", False, "certificado.pdf")
+    assert len(guardados) == 1 and guardados[0].startswith(f"procesos/{e['proceso'].id}/clientes/{e['gloria'].id}/")
+    assert avisos[-1][0] == e["abogada"].id and avisos[-1][1]["variables"]["documento"] == "Certificado de tradición"
+    repetido = cliente_http.post(f"{base}/b/archivo", headers=H, files={"archivo": ("otra.pdf", PDF, "application/pdf")})
+    assert repetido.status_code == 409 and repetido.json()["codigo"] == "ya_enviado"
+    # La corrección de lo devuelto completa la solicitud: pasa a revisión.
+    assert cliente_http.post(f"{base}/a/archivo", headers=H, files={"archivo": ("escritura.pdf", PDF, "application/pdf")}).status_code == 201
+    sesion_bd.expire_all()
+    assert sesion_bd.get(models.SolicitudDocumento, solicitud.id).atendida_en is not None
+
+    assert cliente_http.post(f"/api/v2/cliente/tareas/{poder.id}/hecha", headers=H).status_code == 204
+    assert cliente_http.post(f"/api/v2/cliente/tareas/{poder.id}/hecha", headers=H).status_code == 204
+    assert cliente_http.post(f"/api/v2/cliente/subtareas/{subtarea.id}/hecha", headers=H).status_code == 204
+    # La tarea interna no es suya, aunque una de sus partes sí lo sea.
+    assert cliente_http.post(f"/api/v2/cliente/tareas/{interna.id}/hecha", headers=H).status_code == 404
+    assert [a[0] for a in avisos[-2:]] == [e["abogada"].id, e["abogada"].id]
+
+    datos = cliente_http.get("/api/v2/cliente/pendientes").json()
+    assert datos["pendientes"] == []
+    assert sorted((h["clave"], h["estado"]) for h in datos["recientes"]) == sorted([
+        (f"solicitud:{solicitud.id}", "en_revision"), (f"tarea:{poder.id}", "hecha"), (f"subtarea:{subtarea.id}", "hecha")])
+    sesion_bd.expire_all()
+    assert sesion_bd.get(models.Tarea, poder.id).estado == models.EstadoTarea.COMPLETADA
+
+    # Hernán no ve ni puede tocar lo de Gloria.
+    iniciar(e["hernan"])
+    assert cliente_http.get("/api/v2/cliente/pendientes").json() == {"pendientes": [], "recientes": []}
+    assert cliente_http.post(f"{base}/a/archivo", headers=H, files={"archivo": ("e.pdf", PDF, "application/pdf")}).status_code == 404
+    assert cliente_http.post(f"/api/v2/cliente/subtareas/{subtarea.id}/hecha", headers=H).status_code == 404

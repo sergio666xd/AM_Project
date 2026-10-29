@@ -6974,6 +6974,412 @@
           }
         }
       }
+    },
+    "/api/v2/cliente/pendientes": {
+      "get": {
+        "tags": [
+          "Portal del cliente"
+        ],
+        "summary": "Lo que la firma necesita del cliente",
+        "description": "Documentos por enviar y tareas por hacer en todos sus procesos, y lo que ya entregó en los últimos 30 días.",
+        "operationId": "pendientes_cliente",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PendientesCliente"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too Many Requests",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v2/cliente/solicitudes/{solicitud_id}/pedidos/{pedido_id}/archivo": {
+      "post": {
+        "tags": [
+          "Portal del cliente"
+        ],
+        "summary": "Enviar un documento pedido",
+        "description": "Sube el archivo de uno de los documentos de la solicitud. Si la firma lo devolvió, queda como nueva versión.",
+        "operationId": "enviar_documento_cliente",
+        "parameters": [
+          {
+            "name": "solicitud_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Solicitud Id"
+            }
+          },
+          {
+            "name": "pedido_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Pedido Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/Body_enviar_documento_cliente"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PedidoDocumento"
+                }
+              }
+            }
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Too Many Requests"
+          }
+        }
+      }
+    },
+    "/api/v2/cliente/tareas/{tarea_id}/hecha": {
+      "post": {
+        "tags": [
+          "Portal del cliente"
+        ],
+        "summary": "Marcar una tarea como hecha",
+        "description": "La tarea que la firma le asignó al cliente queda hecha y se le avisa a quien la lleva.",
+        "operationId": "marcar_tarea_hecha",
+        "parameters": [
+          {
+            "name": "tarea_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Tarea Id"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Too Many Requests"
+          }
+        }
+      }
+    },
+    "/api/v2/cliente/subtareas/{subtarea_id}/hecha": {
+      "post": {
+        "tags": [
+          "Portal del cliente"
+        ],
+        "summary": "Marcar una parte de una tarea como hecha",
+        "description": "La subtarea que le tocaba al cliente queda hecha y se le avisa a quien lleva la tarea.",
+        "operationId": "marcar_subtarea_hecha",
+        "parameters": [
+          {
+            "name": "subtarea_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Subtarea Id"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Too Many Requests"
+          }
+        }
+      }
     }
   },
   "components": {
@@ -7408,6 +7814,21 @@
           "agenda"
         ],
         "title": "Bandeja"
+      },
+      "Body_enviar_documento_cliente": {
+        "properties": {
+          "archivo": {
+            "type": "string",
+            "contentMediaType": "application/octet-stream",
+            "title": "Archivo",
+            "description": "PDF, JPG, PNG o Word (.docx), de máximo 15 MB."
+          }
+        },
+        "type": "object",
+        "required": [
+          "archivo"
+        ],
+        "title": "Body_enviar_documento_cliente"
       },
       "CalcularTermino": {
         "properties": {
@@ -8392,6 +8813,105 @@
         ],
         "title": "DatosTermino"
       },
+      "DetallePendiente": {
+        "properties": {
+          "clave": {
+            "type": "string",
+            "title": "Clave",
+            "description": "«solicitud:3», «tarea:5» o «subtarea:9»."
+          },
+          "tipo": {
+            "type": "string",
+            "enum": [
+              "documento",
+              "tarea"
+            ],
+            "title": "Tipo"
+          },
+          "titulo": {
+            "type": "string",
+            "title": "Titulo"
+          },
+          "detalle": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Detalle",
+            "description": "Qué falta: «Faltan 2 de 3 documentos», «Parte de: …»."
+          },
+          "proceso": {
+            "$ref": "#/components/schemas/ProcesoBreve"
+          },
+          "vence": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Vence"
+          },
+          "vencido": {
+            "type": "boolean",
+            "title": "Vencido"
+          },
+          "instrucciones": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Instrucciones",
+            "description": "Lo que escribió la firma al pedirlo."
+          },
+          "pedido_por": {
+            "$ref": "#/components/schemas/PersonaBreve"
+          },
+          "pedidos": {
+            "items": {
+              "$ref": "#/components/schemas/PedidoDocumento"
+            },
+            "type": "array",
+            "title": "Pedidos",
+            "description": "Solo en las solicitudes de documentos."
+          },
+          "tarea": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tarea",
+            "description": "En una subtarea, el título de la tarea a la que pertenece."
+          }
+        },
+        "type": "object",
+        "required": [
+          "clave",
+          "tipo",
+          "titulo",
+          "proceso",
+          "vence",
+          "vencido",
+          "pedido_por"
+        ],
+        "title": "DetallePendiente",
+        "description": "Un pendiente con lo necesario para resolverlo desde la misma tarjeta."
+      },
       "DocumentoCliente": {
         "properties": {
           "id": {
@@ -9364,6 +9884,54 @@
         ],
         "title": "FoliosRevisados"
       },
+      "HechoReciente": {
+        "properties": {
+          "clave": {
+            "type": "string",
+            "title": "Clave"
+          },
+          "tipo": {
+            "type": "string",
+            "enum": [
+              "documento",
+              "tarea"
+            ],
+            "title": "Tipo"
+          },
+          "titulo": {
+            "type": "string",
+            "title": "Titulo"
+          },
+          "proceso": {
+            "$ref": "#/components/schemas/ProcesoBreve"
+          },
+          "fecha": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Fecha"
+          },
+          "estado": {
+            "type": "string",
+            "enum": [
+              "en_revision",
+              "aprobado",
+              "hecha"
+            ],
+            "title": "Estado"
+          }
+        },
+        "type": "object",
+        "required": [
+          "clave",
+          "tipo",
+          "titulo",
+          "proceso",
+          "fecha",
+          "estado"
+        ],
+        "title": "HechoReciente",
+        "description": "Algo que el cliente ya entregó o hizo, para que vea que llegó."
+      },
       "Hilo": {
         "properties": {
           "conversacion": {
@@ -10240,6 +10808,66 @@
         "title": "Pedido",
         "description": "Un documento de los que pide la solicitud."
       },
+      "PedidoDocumento": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "nombre": {
+            "type": "string",
+            "title": "Nombre"
+          },
+          "estado": {
+            "type": "string",
+            "enum": [
+              "falta",
+              "por_corregir",
+              "no_aceptado",
+              "en_revision",
+              "aprobado"
+            ],
+            "title": "Estado"
+          },
+          "nota": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Nota",
+            "description": "Por qué la firma lo devolvió."
+          },
+          "archivo": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ArchivoEntrada"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "La última versión que envió el cliente."
+          },
+          "puede_enviar": {
+            "type": "boolean",
+            "title": "Puede Enviar",
+            "description": "Falta o hay que corregirlo: el cliente puede subir un archivo."
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "nombre",
+          "estado",
+          "puede_enviar"
+        ],
+        "title": "PedidoDocumento",
+        "description": "Uno de los documentos de una solicitud, con lo último que el cliente envió."
+      },
       "Pendiente": {
         "properties": {
           "clave": {
@@ -10436,6 +11064,31 @@
           "vencida"
         ],
         "title": "PendienteDelCliente"
+      },
+      "PendientesCliente": {
+        "properties": {
+          "pendientes": {
+            "items": {
+              "$ref": "#/components/schemas/DetallePendiente"
+            },
+            "type": "array",
+            "title": "Pendientes"
+          },
+          "recientes": {
+            "items": {
+              "$ref": "#/components/schemas/HechoReciente"
+            },
+            "type": "array",
+            "title": "Recientes",
+            "description": "Lo entregado o hecho en los últimos 30 días, lo más nuevo primero."
+          }
+        },
+        "type": "object",
+        "required": [
+          "pendientes",
+          "recientes"
+        ],
+        "title": "PendientesCliente"
       },
       "PeriodoInhabil": {
         "properties": {

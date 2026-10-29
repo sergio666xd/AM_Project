@@ -215,7 +215,45 @@ class RepositorioPortal:
                 U.asignada_cliente.is_(True), U.cliente_id == cliente_id, U.completada.is_(False),
                 T.proceso_id.in_(proceso_ids), T.estado.in_(ESTADOS_TAREA_ABIERTA),
             ).order_by(T.fecha_limite, U.orden, U.id)
-        ).tuples())
+        ).all())
+
+    def tareas_hechas(self, cliente_id: int, proceso_ids: list[int], desde: datetime) -> list[models.Tarea]:
+        if not proceso_ids:
+            return []
+        T = models.Tarea
+        return list(self._db.scalars(
+            select(T).where(T.cliente_id == cliente_id, T.proceso_id.in_(proceso_ids),
+                            T.estado == models.EstadoTarea.COMPLETADA, T.completada_en >= desde)
+        ))
+
+    def subtareas_hechas(self, cliente_id: int, proceso_ids: list[int], desde: datetime) -> list[tuple[models.Subtarea, models.Tarea]]:
+        if not proceso_ids:
+            return []
+        T, U = models.Tarea, models.Subtarea
+        return list(self._db.execute(
+            select(U, T).join(T, T.id == U.tarea_id).where(
+                U.asignada_cliente.is_(True), U.cliente_id == cliente_id, U.completada.is_(True),
+                U.completada_en >= desde, T.proceso_id.in_(proceso_ids),
+            )
+        ).all())
+
+    def solicitud(self, cliente_id: int, solicitud_id: int, proceso_ids: list[int]) -> models.SolicitudDocumento | None:
+        S = models.SolicitudDocumento
+        return self._db.scalar(select(S).where(S.id == solicitud_id, S.cliente_id == cliente_id, S.proceso_id.in_(proceso_ids or [0])))
+
+    def tarea(self, cliente_id: int, tarea_id: int, proceso_ids: list[int]) -> models.Tarea | None:
+        T = models.Tarea
+        return self._db.scalar(select(T).where(T.id == tarea_id, T.cliente_id == cliente_id, T.proceso_id.in_(proceso_ids or [0])))
+
+    def subtarea(self, cliente_id: int, subtarea_id: int, proceso_ids: list[int]) -> tuple[models.Subtarea, models.Tarea] | None:
+        T, U = models.Tarea, models.Subtarea
+        fila = self._db.execute(
+            select(U, T).join(T, T.id == U.tarea_id).where(
+                U.id == subtarea_id, U.asignada_cliente.is_(True), U.cliente_id == cliente_id,
+                T.proceso_id.in_(proceso_ids or [0]),
+            )
+        ).first()
+        return (fila[0], fila[1]) if fila else None
 
     def documentos(self, cliente_id: int, proceso_id: int) -> list[models.DocumentoProceso]:
         D = models.DocumentoProceso
