@@ -7380,6 +7380,310 @@
           }
         }
       }
+    },
+    "/api/v2/cliente/perfil": {
+      "get": {
+        "tags": [
+          "Portal del cliente"
+        ],
+        "summary": "Datos y avisos del cliente",
+        "description": "Sus datos para el contrato, el último cambio que pidió y cómo quiere recibir cada grupo de avisos.",
+        "operationId": "perfil_cliente",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PerfilCliente"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too Many Requests",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v2/cliente/avisos": {
+      "put": {
+        "tags": [
+          "Portal del cliente"
+        ],
+        "summary": "Elegir cómo recibir los avisos",
+        "description": "Correo y WhatsApp por grupo de avisos. En el portal y en la campana los ve siempre.",
+        "operationId": "cambiar_avisos_cliente",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "items": {
+                  "$ref": "#/components/schemas/CambioAvisos"
+                },
+                "type": "array",
+                "title": "Cambios"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/GrupoAvisos"
+                  },
+                  "type": "array",
+                  "title": "Response Cambiar Avisos Cliente"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too Many Requests",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v2/cliente/perfil/solicitud": {
+      "post": {
+        "tags": [
+          "Portal del cliente"
+        ],
+        "summary": "Pedir un cambio de datos",
+        "description": "Los datos del contrato cambian cuando la firma aprueba la solicitud.",
+        "operationId": "pedir_cambio_datos",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DatosCambio"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SolicitudCambio"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too Many Requests",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -7884,6 +8188,34 @@
           "etapa"
         ],
         "title": "CambiarEtapa"
+      },
+      "CambioAvisos": {
+        "properties": {
+          "clave": {
+            "type": "string",
+            "enum": [
+              "proceso",
+              "pedidos",
+              "mensajes"
+            ],
+            "title": "Clave"
+          },
+          "correo": {
+            "type": "boolean",
+            "title": "Correo"
+          },
+          "whatsapp": {
+            "type": "boolean",
+            "title": "Whatsapp"
+          }
+        },
+        "type": "object",
+        "required": [
+          "clave",
+          "correo",
+          "whatsapp"
+        ],
+        "title": "CambioAvisos"
       },
       "CambioEnLote": {
         "properties": {
@@ -8656,6 +8988,72 @@
           "actualizada_en"
         ],
         "title": "Conversacion"
+      },
+      "DatosCambio": {
+        "properties": {
+          "nombre": {
+            "type": "string",
+            "maxLength": 150,
+            "minLength": 3,
+            "title": "Nombre"
+          },
+          "documento": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 40
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Documento"
+          },
+          "genero": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "FEMENINO",
+                  "MASCULINO"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Genero"
+          },
+          "domicilio": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 120
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Domicilio"
+          },
+          "direccion": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 300
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Direccion"
+          }
+        },
+        "type": "object",
+        "required": [
+          "nombre"
+        ],
+        "title": "DatosCambio"
       },
       "DatosCliente": {
         "properties": {
@@ -9884,6 +10282,44 @@
         ],
         "title": "FoliosRevisados"
       },
+      "GrupoAvisos": {
+        "properties": {
+          "clave": {
+            "type": "string",
+            "enum": [
+              "proceso",
+              "pedidos",
+              "mensajes"
+            ],
+            "title": "Clave"
+          },
+          "titulo": {
+            "type": "string",
+            "title": "Titulo"
+          },
+          "descripcion": {
+            "type": "string",
+            "title": "Descripcion"
+          },
+          "correo": {
+            "type": "boolean",
+            "title": "Correo"
+          },
+          "whatsapp": {
+            "type": "boolean",
+            "title": "Whatsapp"
+          }
+        },
+        "type": "object",
+        "required": [
+          "clave",
+          "titulo",
+          "descripcion",
+          "correo",
+          "whatsapp"
+        ],
+        "title": "GrupoAvisos"
+      },
       "HechoReciente": {
         "properties": {
           "clave": {
@@ -11089,6 +11525,108 @@
           "recientes"
         ],
         "title": "PendientesCliente"
+      },
+      "PerfilCliente": {
+        "properties": {
+          "nombre": {
+            "type": "string",
+            "title": "Nombre"
+          },
+          "documento": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Documento"
+          },
+          "genero": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "FEMENINO",
+                  "MASCULINO"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Genero"
+          },
+          "domicilio": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Domicilio",
+            "description": "Ciudad de domicilio, como aparece en el contrato."
+          },
+          "direccion": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Direccion"
+          },
+          "correo": {
+            "type": "string",
+            "title": "Correo"
+          },
+          "whatsapp": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Whatsapp"
+          },
+          "solicitud": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SolicitudCambio"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "avisos": {
+            "items": {
+              "$ref": "#/components/schemas/GrupoAvisos"
+            },
+            "type": "array",
+            "title": "Avisos"
+          }
+        },
+        "type": "object",
+        "required": [
+          "nombre",
+          "documento",
+          "genero",
+          "domicilio",
+          "direccion",
+          "correo",
+          "whatsapp",
+          "solicitud",
+          "avisos"
+        ],
+        "title": "PerfilCliente"
       },
       "PeriodoInhabil": {
         "properties": {
@@ -12300,6 +12838,61 @@
           "titulo"
         ],
         "title": "SolicitudBreve"
+      },
+      "SolicitudCambio": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "estado": {
+            "type": "string",
+            "enum": [
+              "pendiente",
+              "aprobada",
+              "rechazada"
+            ],
+            "title": "Estado"
+          },
+          "solicitada_en": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Solicitada En"
+          },
+          "revisada_en": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Revisada En"
+          },
+          "comentario": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Comentario",
+            "description": "Lo que respondió la firma al revisarla."
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "estado",
+          "solicitada_en",
+          "revisada_en"
+        ],
+        "title": "SolicitudCambio",
+        "description": "El último pedido del cliente para corregir sus datos, que la firma aprueba."
       },
       "Suscripcion": {
         "properties": {

@@ -25,6 +25,7 @@ from app.modulos.mensajes.repositorio import RepositorioMensajes
 from app.modulos.mensajes.servicio import ServicioMensajes
 from app.modulos.identidad.repositorio import RepositorioUsuarios
 from app.modulos.identidad.servicio import ServicioSesion
+from app.modulos.portal_cliente.perfil import ServicioPerfilCliente
 from app.modulos.portal_cliente.repositorio import RepositorioPortal
 from app.modulos.portal_cliente.servicio import ServicioPortalCliente
 from app.modulos.tareas.repositorio import RepositorioTareas
@@ -86,3 +87,7 @@ def servicio_glosario(db: Session = Depends(obtener_bd)) -> ServicioGlosario:
 
 def servicio_portal_cliente(db: Session = Depends(obtener_bd)) -> ServicioPortalCliente:
     return ServicioPortalCliente(db, RepositorioPortal(db), ServicioFolios(db, RepositorioFolios(db), RepositorioProcesos(db)))
+
+
+def servicio_perfil_cliente(db: Session = Depends(obtener_bd)) -> ServicioPerfilCliente:
+    return ServicioPerfilCliente(db)

@@ -17,7 +17,7 @@ from app.firm_access import (
 )
 from app.security import obtener_usuario_actual
 from app.notification_service import emitir_notificacion_workflow
-from app.notification_policy import plan_whatsapp_habilitado
+from app.notification_policy import plan_whatsapp_habilitado, preferencia_de_cliente
 from app.reminder_workflow import iniciar_workflow_recordatorio, normalizar_utc_naive
 from app.workflow_service import user_portal_url
 from app.timezone import format_colombia_datetime
@@ -85,8 +85,9 @@ def _crear_recordatorios_sistema(db: Session, tarea: models.Tarea) -> list[int]:
     if destinatario is None or destinatario.estado != models.EstadoUsuario.ACTIVO:
         return []
     if destinatario.rol == models.RolUsuario.CLIENTE:
-        email = bool(destinatario.notificaciones_email and destinatario.email)
-        whatsapp = bool(destinatario.notificaciones_whatsapp and destinatario.whatsapp_numero.strip())
+        email, whatsapp = preferencia_de_cliente(destinatario, "RECORDATORIOS")
+        email = email and bool(destinatario.email)
+        whatsapp = whatsapp and destinatario.notificaciones_whatsapp and bool(destinatario.whatsapp_numero.strip())
     else:
         preferencias = (destinatario.preferencias_notificacion or {}).get("RECORDATORIOS", {})
         email = bool(preferencias.get("email", destinatario.notificaciones_email)) and bool(destinatario.email)

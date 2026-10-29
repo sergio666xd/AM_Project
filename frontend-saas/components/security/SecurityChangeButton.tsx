@@ -16,12 +16,14 @@ type Challenge = {
   verificado?: boolean;
 };
 
-export function SecurityChangeButton({ action, title, token, whatsappAvailable, onComplete }: {
+export function SecurityChangeButton({ action, title, token, whatsappAvailable, onComplete, claseBoton }: {
   action: SecurityAction;
   title: string;
   token: string | null;
   whatsappAvailable: boolean;
   onComplete: () => Promise<void>;
+  /** Clases del botón que abre el cambio, para igualarlo al resto de la pantalla. */
+  claseBoton?: string;
 }) {
   const [open, setOpen] = useState(false);
   const [challenge, setChallenge] = useState<Challenge | null>(null);
@@ -184,7 +186,7 @@ export function SecurityChangeButton({ action, title, token, whatsappAvailable, 
 
   return <>
     <div className="space-y-2">
-      <button type="button" onClick={() => { setError(""); cancelledRef.current = false; setOpen(true); openRef.current = true; }} className="inline-flex items-center gap-2 rounded-lg border border-border px-3 py-2 text-sm font-medium hover:bg-surface-hover">
+      <button type="button" onClick={() => { setError(""); cancelledRef.current = false; setOpen(true); openRef.current = true; }} className={claseBoton ?? "inline-flex items-center gap-2 rounded-lg border border-border px-3 py-2 text-sm font-medium hover:bg-surface-hover"}>
         {action === "email" ? <Mail className="size-4" /> : action === "whatsapp" ? <MessageCircle className="size-4" /> : <KeyRound className="size-4" />}
         {title}
       </button>

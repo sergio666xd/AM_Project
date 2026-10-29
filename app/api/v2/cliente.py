@@ -1,15 +1,21 @@
 from fastapi import APIRouter, Depends, File, UploadFile, status
 
 from app import models
-from app.api.v2.dependencias import servicio_portal_cliente
+from app.api.v2.dependencias import servicio_perfil_cliente, servicio_portal_cliente
 from app.document_validation import MAX_DOCUMENT_BYTES
 from app.modulos.portal_cliente.esquemas import (
+    CambioAvisos,
+    DatosCambio,
+    GrupoAvisos,
     InicioCliente,
     PaginaHistoria,
     PedidoDocumento,
     PendientesCliente,
+    PerfilCliente,
     ProcesoCliente,
+    SolicitudCambio,
 )
+from app.modulos.portal_cliente.perfil import ServicioPerfilCliente
 from app.modulos.portal_cliente.servicio import ServicioPortalCliente
 from app.nucleo.paginacion import ParametrosPagina, parametros_pagina
 from app.nucleo.sesion import usuario_actual
@@ -104,3 +110,33 @@ def marcar_subtarea_hecha(
 ):
     """La subtarea que le tocaba al cliente queda hecha y se le avisa a quien lleva la tarea."""
     servicio.marcar_subtarea_hecha(usuario, subtarea_id)
+
+
+@router.get("/perfil", response_model=PerfilCliente, summary="Datos y avisos del cliente")
+def perfil_cliente(
+    usuario: models.Usuario = Depends(usuario_actual),
+    servicio: ServicioPerfilCliente = Depends(servicio_perfil_cliente),
+):
+    """Sus datos para el contrato, el último cambio que pidió y cómo quiere recibir cada grupo de avisos."""
+    return servicio.perfil(usuario)
+
+
+@router.put("/avisos", response_model=list[GrupoAvisos], summary="Elegir cómo recibir los avisos")
+def cambiar_avisos_cliente(
+    cambios: list[CambioAvisos],
+    usuario: models.Usuario = Depends(usuario_actual),
+    servicio: ServicioPerfilCliente = Depends(servicio_perfil_cliente),
+):
+    """Correo y WhatsApp por grupo de avisos. En el portal y en la campana los ve siempre."""
+    return servicio.cambiar_avisos(usuario, cambios)
+
+
+@router.post("/perfil/solicitud", response_model=SolicitudCambio, status_code=status.HTTP_201_CREATED,
+             summary="Pedir un cambio de datos")
+def pedir_cambio_datos(
+    datos: DatosCambio,
+    usuario: models.Usuario = Depends(usuario_actual),
+    servicio: ServicioPerfilCliente = Depends(servicio_perfil_cliente),
+):
+    """Los datos del contrato cambian cuando la firma aprueba la solicitud."""
+    return servicio.pedir_cambio(usuario, datos)

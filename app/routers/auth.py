@@ -333,6 +333,8 @@ def actualizar_preferencias_notificaciones(datos: schemas.PreferenciasNotificaci
             raise HTTPException(status_code=400, detail="Configura un número de WhatsApp antes de habilitar ese canal.")
         usuario_actual.notificaciones_email = email_enabled
         usuario_actual.notificaciones_whatsapp = whatsapp_enabled
+        # Los interruptores generales vuelven a valer para todos los avisos.
+        usuario_actual.avisos_por_tipo = False
         usuario_actual.canal_notificacion_cliente = (
             "EMAIL" if email_enabled and not whatsapp_enabled
             else "WHATSAPP" if whatsapp_enabled and not email_enabled

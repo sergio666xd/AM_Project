@@ -341,3 +341,52 @@ def test_pendientes_del_cliente(iniciar, crear_usuario, crear_proceso, cliente_h
     assert cliente_http.get("/api/v2/cliente/pendientes").json() == {"pendientes": [], "recientes": []}
     assert cliente_http.post(f"{base}/a/archivo", headers=H, files={"archivo": ("e.pdf", PDF, "application/pdf")}).status_code == 404
     assert cliente_http.post(f"/api/v2/cliente/subtareas/{subtarea.id}/hecha", headers=H).status_code == 404
+
+
+def test_perfil_y_avisos_por_tipo(iniciar, crear_usuario, crear_proceso, cliente_http, sesion_bd):
+    from app.notification_policy import canales_habilitados
+
+    abogada = crear_usuario("ABOGADO_ADMIN", nombre="Alejandra Muñoz")
+    gloria = crear_usuario("CLIENTE", nombre="Gloria Restrepo")
+    gloria.whatsapp_numero = ""
+    crear_proceso(abogada, "Sucesión Restrepo", clientes=[gloria])
+
+    iniciar(abogada)
+    assert cliente_http.get("/api/v2/cliente/perfil").status_code == 403
+
+    iniciar(gloria)
+    perfil = cliente_http.get("/api/v2/cliente/perfil").json()
+    assert (perfil["nombre"], perfil["whatsapp"], perfil["solicitud"]) == ("Gloria Restrepo", None, None)
+    # Sin elegir por tipo, valen sus interruptores generales: correo sí, WhatsApp no.
+    assert [(g["clave"], g["correo"], g["whatsapp"]) for g in perfil["avisos"]] == [
+        ("proceso", True, False), ("pedidos", True, False), ("mensajes", True, False)]
+
+    elegir = [{"clave": "proceso", "correo": False, "whatsapp": True},
+              {"clave": "mensajes", "correo": False, "whatsapp": False}]
+    sin_numero = cliente_http.put("/api/v2/cliente/avisos", headers=H, json=elegir)
+    assert sin_numero.status_code == 422 and sin_numero.json()["codigo"] == "sin_whatsapp"
+
+    gloria.whatsapp_numero = "+573001112233"
+    sesion_bd.commit()
+    avisos = cliente_http.put("/api/v2/cliente/avisos", headers=H, json=elegir).json()
+    assert [(g["clave"], g["correo"], g["whatsapp"]) for g in avisos] == [
+        ("proceso", False, True), ("pedidos", True, False), ("mensajes", False, False)]
+    sesion_bd.expire_all()
+    usuario = sesion_bd.get(models.Usuario, gloria.id)
+    assert canales_habilitados(usuario, "ACTUACIONES") == ("WHATSAPP",)
+    assert canales_habilitados(usuario, "RECORDATORIOS") == ("EMAIL",)
+    assert canales_habilitados(usuario, "RESUMENES") == ()
+    # Los avisos de acceso a la cuenta siempre llegan al correo.
+    assert "EMAIL" in canales_habilitados(usuario, "ACCESO")
+
+    # Los datos del contrato se piden y la firma los aprueba.
+    igual = cliente_http.post("/api/v2/cliente/perfil/solicitud", headers=H, json={"nombre": "Gloria Restrepo"})
+    assert igual.status_code == 422 and igual.json()["codigo"] == "sin_cambios"
+    pedido = cliente_http.post("/api/v2/cliente/perfil/solicitud", headers=H,
+                               json={"nombre": "Gloria Inés Restrepo", "documento": "43.123.456", "domicilio": "Medellín"})
+    assert pedido.status_code == 201 and pedido.json()["estado"] == "pendiente"
+    otra = cliente_http.post("/api/v2/cliente/perfil/solicitud", headers=H, json={"nombre": "Gloria I. Restrepo"})
+    assert otra.status_code == 409 and otra.json()["codigo"] == "solicitud_pendiente"
+    solicitud = sesion_bd.query(models.SolicitudEdicionPerfilCliente).one()
+    assert (solicitud.numero_documento_solicitado, solicitud.domicilio_solicitado) == ("43123456", "MEDELLÍN")
+    assert cliente_http.get("/api/v2/cliente/perfil").json()["solicitud"]["estado"] == "pendiente"

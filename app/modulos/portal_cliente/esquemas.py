@@ -151,3 +151,50 @@ class HechoReciente(BaseModel):
 class PendientesCliente(BaseModel):
     pendientes: list[DetallePendiente]
     recientes: list[HechoReciente] = Field(description="Lo entregado o hecho en los últimos 30 días, lo más nuevo primero.")
+
+
+GrupoAviso = Literal["proceso", "pedidos", "mensajes"]
+
+
+class GrupoAvisos(BaseModel):
+    clave: GrupoAviso
+    titulo: str
+    descripcion: str
+    correo: bool
+    whatsapp: bool
+
+
+class CambioAvisos(BaseModel):
+    clave: GrupoAviso
+    correo: bool
+    whatsapp: bool
+
+
+class SolicitudCambio(BaseModel):
+    """El último pedido del cliente para corregir sus datos, que la firma aprueba."""
+
+    id: int
+    estado: Literal["pendiente", "aprobada", "rechazada"]
+    solicitada_en: FechaHora
+    revisada_en: FechaHora | None
+    comentario: str | None = Field(None, description="Lo que respondió la firma al revisarla.")
+
+
+class PerfilCliente(BaseModel):
+    nombre: str
+    documento: str | None
+    genero: Literal["MASCULINO", "FEMENINO"] | None
+    domicilio: str | None = Field(description="Ciudad de domicilio, como aparece en el contrato.")
+    direccion: str | None
+    correo: str
+    whatsapp: str | None
+    solicitud: SolicitudCambio | None
+    avisos: list[GrupoAvisos]
+
+
+class DatosCambio(BaseModel):
+    nombre: str = Field(min_length=3, max_length=150)
+    documento: str | None = Field(None, max_length=40)
+    genero: Literal["MASCULINO", "FEMENINO"] | None = None
+    domicilio: str | None = Field(None, max_length=120)
+    direccion: str | None = Field(None, max_length=300)
