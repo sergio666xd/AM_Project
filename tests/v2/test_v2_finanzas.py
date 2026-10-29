@@ -130,13 +130,15 @@ def test_quien_puede_cobrar(iniciar, crear_usuario, crear_proceso, cliente_http,
     assert {c["id"] for c in cliente_http.get("/api/v2/cuentas-cobro?filtro=todas").json()["items"]} == {propia["id"], cuenta["id"]}
     assert cliente_http.get("/api/v2/finanzas/configuracion").status_code == 200
     guardada = cliente_http.put("/api/v2/finanzas/configuracion", headers=H, json={
-        "remitente_nombre": "Cobros AM", "remitente_email": " cobros@am.test ", "datos_pago": "Bancolombia 123", "reply_to": ""}).json()
-    assert (guardada["remitente_email"], guardada["reply_to"], guardada["datos_pago"]) == ("cobros@am.test", None, "Bancolombia 123")
+        "remitente_nombre": "Cobros AM", "remitente_email": " cobros@am.com.co ", "datos_pago": "Bancolombia 123", "reply_to": ""}).json()
+    assert (guardada["remitente_email"], guardada["reply_to"], guardada["datos_pago"]) == ("cobros@am.com.co", None, "Bancolombia 123")
+    invalido = cliente_http.put("/api/v2/finanzas/configuracion", headers=H, json={"remitente_nombre": "Cobros AM", "reply_to": "cobros arroba am"})
+    assert invalido.status_code == 422 and "reply_to" in invalido.json()["campos"]
 
     iniciar(e["abogada"])
     assert cliente_http.get("/api/v2/finanzas/configuracion").status_code == 403
     _cuenta(cliente_http, e["gloria"], e["sucesion"])
-    assert (correos[-1]["remitente_nombre"], correos[-1]["remitente_email"]) == ("Cobros AM", "cobros@am.test")
+    assert (correos[-1]["remitente_nombre"], correos[-1]["remitente_email"]) == ("Cobros AM", "cobros@am.com.co")
     assert "Bancolombia 123" in correos[-1]["cuerpo"]
     iniciar(e["gloria"])
     assert cliente_http.get("/api/v2/estado-cuenta").json()["datos_pago"] == "Bancolombia 123"
