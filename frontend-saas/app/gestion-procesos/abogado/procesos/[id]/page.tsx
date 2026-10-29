@@ -10,6 +10,8 @@ import { Button } from "@/components/ui/Button";
 import { CabeceraExpediente } from "@/components/expediente/CabeceraExpediente";
 import { FoliosExpediente } from "@/components/expediente/FoliosExpediente";
 import { DocumentosProceso } from "@/components/documentos/DocumentosProceso";
+import { CobrosProceso } from "@/components/finanzas/CobrosProceso";
+import { useSession } from "@/context/SessionContext";
 
 import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
@@ -142,6 +144,7 @@ async function requestProcessDetail(id: string, token: string) {
 
 export default function ProcesoDetallePage({ section }: { section?: string }) {
   const { id } = useParams<{ id: string }>();
+  const session = useSession();
 
   const [process, setProcess] = useState<Process | null>(null);
   const [allClients, setAllClients] = useState<Client[]>([]);
@@ -264,7 +267,7 @@ export default function ProcesoDetallePage({ section }: { section?: string }) {
       }
       if (hashTab.startsWith("panel-")) hashTab = hashTab.slice("panel-".length);
       const requestedTab = hashTab || params.get("tab") || (requestedContractId > 0 ? "contratos" : section || "resumen");
-      const validTabs = ["resumen", "folios", "relaciones", "agenda", "tareas", "documentos", "contratos", "comunicaciones", "equipo"];
+      const validTabs = ["resumen", "folios", "relaciones", "agenda", "tareas", "documentos", "contratos", "cobros", "comunicaciones", "equipo"];
       // "actividad" era la línea de tiempo que hoy son los folios; los enlaces viejos siguen sirviendo.
       const pedida = requestedTab === "actividad" ? "folios" : requestedTab;
       const nextTab = validTabs.includes(pedida) ? pedida : "resumen";
@@ -544,6 +547,8 @@ export default function ProcesoDetallePage({ section }: { section?: string }) {
     };
   }, [id, now, process]);
 
+  // Las cuentas de cobro las maneja la administración de la firma.
+  const cobra = session.user?.rol === "ABOGADO_ADMIN" || session.user?.rol === "ADMIN";
   const processSections: { id: string; label: string }[] = [
     { id: "resumen", label: "Resumen" },
     { id: "folios", label: "Folios" },
@@ -552,6 +557,7 @@ export default function ProcesoDetallePage({ section }: { section?: string }) {
     { id: "tareas", label: "Tareas" },
     { id: "documentos", label: "Documentos" },
     { id: "contratos", label: "Contratos" },
+    ...(cobra ? [{ id: "cobros", label: "Cobros" }] : []),
     { id: "comunicaciones", label: "Chat" },
     ...(process?.admite_colaboradores ? [{ id: "equipo", label: "Equipo" }] : []),
   ];
@@ -1168,6 +1174,12 @@ export default function ProcesoDetallePage({ section }: { section?: string }) {
         <section id="panel-contratos" role="region" aria-label="Contratos del proceso" style={{ display: activeTab === "contratos" ? undefined : "none" }} className="motion-tab-panel scroll-mt-20 rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-4">
           <ProcessContracts processId={process.id} clients={process.clientes} onChange={load} initialContractId={contractFocusId} />
         </section>
+
+        {cobra && (
+          <section id="panel-cobros" role="region" aria-label="Cobros del proceso" style={{ display: activeTab === "cobros" ? undefined : "none" }} className="motion-tab-panel scroll-mt-20 rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-4 sm:p-5">
+            <CobrosProceso procesoId={process.id} clienteUnico={process.clientes.length === 1 ? process.clientes[0].id : undefined} />
+          </section>
+        )}
 
         {/* NOTIFICACIONES */}
         <section id="panel-comunicaciones" role="region" aria-label="Chat del proceso" style={{ display: activeTab === "comunicaciones" ? undefined : "none" }} className="motion-tab-panel scroll-mt-20 rounded-2xl border border-[var(--border)] bg-[var(--surface)]">
