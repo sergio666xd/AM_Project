@@ -3515,7 +3515,7 @@ def test_reminder_versions_follow_schedule_and_task_mutations(monkeypatch):
         reminder = crear_recordatorio(
             task.id,
             schemas.RecordatorioTareaCreate(
-                fecha_hora=datetime(2026, 11, 1, 12, 0, tzinfo=timezone.utc),
+                fecha_hora=datetime(2099, 11, 1, 12, 0, tzinfo=timezone.utc),
                 notificar_email=True,
                 notificar_whatsapp=False,
             ),
@@ -3523,14 +3523,14 @@ def test_reminder_versions_follow_schedule_and_task_mutations(monkeypatch):
             usuario_actual=lawyer,
         )
         assert reminder.version == 1
-        assert reminder.fecha_hora == datetime(2026, 11, 1, 12, 0)
+        assert reminder.fecha_hora == datetime(2099, 11, 1, 12, 0)
         assert launches == [reminder.id]
 
         reminder = actualizar_recordatorio(
             task.id,
             reminder.id,
             schemas.RecordatorioTareaUpdate(
-                fecha_hora=datetime(2026, 11, 1, 13, 0, tzinfo=timezone.utc),
+                fecha_hora=datetime(2099, 11, 1, 13, 0, tzinfo=timezone.utc),
             ),
             db=db,
             usuario_actual=lawyer,
@@ -3560,7 +3560,7 @@ def test_reminder_versions_follow_schedule_and_task_mutations(monkeypatch):
 
         actualizar_tarea(
             task.id,
-            schemas.TareaUpdate(fecha_limite=datetime(2026, 11, 2, 12, 0)),
+            schemas.TareaUpdate(fecha_limite=datetime(2099, 11, 2, 12, 0)),
             db=db,
             usuario_actual=lawyer,
         )
@@ -3580,7 +3580,7 @@ def test_reminder_versions_follow_schedule_and_task_mutations(monkeypatch):
         anticipation_task = models.Tarea(
             usuario_id=lawyer.id,
             titulo="Anticipation task",
-            fecha_limite=datetime(2026, 12, 1, 12, 0),
+            fecha_limite=datetime(2099, 12, 1, 12, 0),
         )
         db.add(anticipation_task)
         db.commit()
@@ -3591,7 +3591,7 @@ def test_reminder_versions_follow_schedule_and_task_mutations(monkeypatch):
             db=db,
             usuario_actual=lawyer,
         )
-        assert momento_programado(anticipation_reminder, anticipation_task) == datetime(2026, 12, 1, 11, 0)
+        assert momento_programado(anticipation_reminder, anticipation_task) == datetime(2099, 12, 1, 11, 0)
         assert launches[launches_before_anticipation:] == [anticipation_reminder.id]
 
         deleted_id = anticipation_reminder.id
