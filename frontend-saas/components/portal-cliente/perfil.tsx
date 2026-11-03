@@ -1,18 +1,16 @@
 "use client";
 
-import { useCallback, useState, type FormEvent, type ReactNode } from "react";
+import { useState, type FormEvent, type ReactNode } from "react";
 import { BellRing, Clock3, Mail, MessageCircle, Monitor, PencilLine, Smartphone, Trash2, XCircle } from "lucide-react";
 
+import { useDispositivosPush } from "@/components/push/useDispositivosPush";
 import { Button } from "@/components/ui/Button";
 import { Interruptor } from "@/components/ui/Interruptor";
 import { useToast } from "@/components/ui/ToastProvider";
-import { useSession } from "@/context/SessionContext";
-import { apiRequest, fetchApi } from "@/lib/api";
 import { api, mensajeDeError } from "@/lib/api-v2/cliente";
 import { cx } from "@/lib/cx";
 import { fechaLarga } from "@/lib/fechas";
 import type { GrupoAvisos, PerfilCliente, SolicitudCambio } from "@/lib/portalCliente";
-import { useLoadEffect } from "@/lib/useLoadEffect";
 
 export const CAMPO_CLIENTE =
   "block min-h-12 w-full rounded-lg border border-line-strong bg-sheet px-3.5 text-[17px] text-ink placeholder:text-ink-3 focus:border-navy focus:outline-none focus-visible:ring-2 focus-visible:ring-navy/25";
@@ -239,38 +237,19 @@ function FormularioCambio({ perfil, onCancelar, onEnviado }: {
   );
 }
 
-type Dispositivo = { id: number; device_label: string; user_agent: string; updated_at: string | null };
-
 /** Teléfonos y computadores donde el navegador le muestra los avisos al instante. */
 export function DispositivosCliente() {
-  const { token } = useSession();
-  const [dispositivos, setDispositivos] = useState<Dispositivo[] | null>(null);
-  const [quitando, setQuitando] = useState<number | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const { dispositivos, configurado, error, quitando, activando, navegador, quitar, activarAqui } = useDispositivosPush();
+  const [aviso, setAviso] = useState<string | null>(null);
 
-  const cargar = useCallback(async () => {
-    if (!token) return;
-    try {
-      setDispositivos(await fetchApi("/api/chat/push/dispositivos", { token }));
-    } catch {
-      setDispositivos([]);
-      setError("No pudimos cargar sus dispositivos.");
-    }
-  }, [token]);
-  useLoadEffect(cargar);
-
-  async function quitar(id: number) {
-    setQuitando(id);
-    setError(null);
-    try {
-      await apiRequest(`/api/chat/push/dispositivos/${id}`, { method: "DELETE", token });
-      setDispositivos((actual) => actual?.filter((d) => d.id !== id) ?? null);
-    } catch {
-      setError("No pudimos quitar ese dispositivo. Intente de nuevo.");
-    } finally {
-      setQuitando(null);
-    }
+  async function activar() {
+    setAviso(null);
+    const resultado = await activarAqui();
+    if (resultado === "denied") setAviso("El navegador tiene bloqueados los avisos de este sitio. Puede permitirlos desde la configuración del navegador.");
+    else if (resultado === "error") setAviso("No pudimos activar los avisos en este dispositivo. Intente de nuevo más tarde.");
   }
+
+  const puedeActivar = configurado && navegador === "default";
 
   return (
     <section aria-labelledby="titulo-dispositivos" className="rounded-2xl bg-sheet px-5 py-5 shadow-sheet sm:px-7">
@@ -280,23 +259,23 @@ export function DispositivosCliente() {
       <p className="mt-1 text-[16px] text-ink-2 [text-wrap:pretty]">
         En estos dispositivos el navegador le muestra cada aviso apenas llega, aunque no tenga el portal abierto.
       </p>
-      {error && <p role="alert" className="mt-3 text-[15px] text-bad">{error}</p>}
+      {(error || aviso) && <p role="alert" className="mt-3 text-[15px] text-bad">{aviso ?? error}</p>}
       {dispositivos === null ? (
         <div aria-busy="true" className="mt-4 h-16 animate-pulse rounded-xl bg-sheet-2" />
       ) : dispositivos.length === 0 ? (
         <p className="mt-4 rounded-xl bg-sheet-2 px-4 py-3 text-[16px] text-ink-2">
-          Todavía no los tiene en ningún dispositivo. Cuando el portal le pregunte si quiere recibir avisos, elija «Permitir».
+          {configurado ? "Todavía no los tiene en ningún dispositivo." : "Los avisos al instante todavía no están disponibles."}
         </p>
       ) : (
         <ul className="mt-3 divide-y divide-line">
           {dispositivos.map((d) => {
-            const Icono = /iphone|ipad|android|mobile/i.test(d.user_agent) ? Smartphone : Monitor;
+            const Icono = /iphone|ipad|android/i.test(d.nombre) ? Smartphone : Monitor;
             return (
               <li key={d.id} className="flex items-center gap-3 py-3">
                 <Icono aria-hidden="true" size={22} className="shrink-0 text-ink-2" />
                 <div className="min-w-0 flex-1">
-                  <p className="truncate font-semibold text-ink">{d.device_label || "Dispositivo"}</p>
-                  {d.updated_at && <p className="text-[15px] text-ink-3">Último aviso el {fechaLarga(d.updated_at)}</p>}
+                  <p className="truncate font-semibold text-ink">{d.nombre || "Dispositivo"}</p>
+                  {d.activado_en && <p className="text-[15px] text-ink-3">Activo desde el {fechaLarga(d.activado_en)}</p>}
                 </div>
                 <Button
                   variant="ghost"
@@ -304,7 +283,7 @@ export function DispositivosCliente() {
                   loading={quitando === d.id}
                   icon={<Trash2 aria-hidden="true" size={18} />}
                   onClick={() => void quitar(d.id)}
-                  aria-label={`Dejar de avisar en ${d.device_label || "este dispositivo"}`}
+                  aria-label={`Dejar de avisar en ${d.nombre || "este dispositivo"}`}
                 >
                   Quitar
                 </Button>
@@ -312,6 +291,13 @@ export function DispositivosCliente() {
             );
           })}
         </ul>
+      )}
+      {puedeActivar && (
+        <div className="mt-4">
+          <Button variant="secondary" size="lg" icon={<BellRing aria-hidden="true" size={18} />} loading={activando} onClick={() => void activar()}>
+            Activar en este dispositivo
+          </Button>
+        </div>
       )}
     </section>
   );

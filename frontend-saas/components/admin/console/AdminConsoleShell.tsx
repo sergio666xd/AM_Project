@@ -19,9 +19,9 @@ import {
   Users,
   Wallet,
 } from "lucide-react";
-import ChatFloatingButton from "@/components/chat/ChatFloatingButton";
-import ChatPresenceHeartbeat from "@/components/chat/ChatPresenceHeartbeat";
-import PushNotificationPrompt from "@/components/chat/PushNotificationPrompt";
+import { MensajesFlotante } from "@/components/mensajes/MensajesFlotante";
+import { AvisoNotificaciones } from "@/components/push/AvisoNotificaciones";
+import { PresenciaPanel } from "@/components/push/PresenciaPanel";
 import { BarraSuperior } from "@/components/layout/BarraSuperior";
 import { BusquedaGlobal } from "@/components/layout/BusquedaGlobal";
 import { MobileTabBar } from "@/components/layout/MobileTabBar";
@@ -201,8 +201,8 @@ export default function AdminConsoleShell({ children }: { children: ReactNode })
       className={cx("bg-ground text-ink lg:pl-[248px]", enChat ? "flex h-dvh flex-col overflow-hidden" : "min-h-dvh")}
       style={{ "--alto-barra": "56px" } as CSSProperties}
     >
-      <ChatPresenceHeartbeat />
-      <PushNotificationPrompt />
+      <PresenciaPanel />
+      <AvisoNotificaciones />
       <Sidebar grupos={grupos} inicio={ADMIN} areaHref={ADMIN} enlacesCuenta={enlacesCuenta} />
       <BarraSuperior inicio={ADMIN} areaHref={ADMIN} fija={!enChat} avisosHref={`${ADMIN}/notificaciones`} enlacesCuenta={enlacesCuenta} />
       <main className={cx("mx-auto w-full max-w-[1280px]", enChat ? "min-h-0 flex-1" : "px-4 pb-28 pt-5 sm:px-6 lg:px-8 lg:pb-12 lg:pt-7")}>
@@ -210,7 +210,7 @@ export default function AdminConsoleShell({ children }: { children: ReactNode })
         {children}
       </main>
       {!enChat && <MobileTabBar pestanas={pestanas} resto={resto} gruposResto={restoAgrupado} inicio={ADMIN} />}
-      {!enChat && <ChatFloatingButton />}
+      {!enChat && <MensajesFlotante />}
       <BusquedaGlobal area="admin" />
     </div>
   );

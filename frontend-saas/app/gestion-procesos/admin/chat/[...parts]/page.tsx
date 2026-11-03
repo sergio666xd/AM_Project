@@ -1,5 +1,5 @@
-import ChatWorkspace from "@/components/chat/ChatWorkspace";
+import { MensajesWorkspace } from "@/components/mensajes/MensajesWorkspace";
 
-export default function AdminChatConversationPage() {
-  return <ChatWorkspace />;
+export default function MensajesAdminPage() {
+  return <MensajesWorkspace base="/gestion-procesos/admin/chat" prefijoMio="Usted: " />;
 }

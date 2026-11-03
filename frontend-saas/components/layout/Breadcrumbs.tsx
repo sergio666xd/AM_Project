@@ -3,10 +3,8 @@
 import Link from "next/link";
 import { usePortalPathname } from "@/lib/usePortalPathname";
 import { useEffect, useState } from "react";
-import { useSession } from "@/context/SessionContext";
-import { apiRequest } from "@/lib/api";
 import { api } from "@/lib/api-v2/cliente";
-import { RUTA_MENSAJES, claveDeRuta, partesDeRuta } from "@/lib/mensajes";
+import { claveDeRuta, partesDeRuta } from "@/lib/mensajes";
 
 const labels: Record<string, string> = {
   "gestion-procesos": "Gestión de procesos",
@@ -85,16 +83,13 @@ function labelFor(segment: string, anterior?: string, antes?: string) {
 
 export default function Breadcrumbs() {
   const pathname = usePortalPathname();
-  const { token } = useSession();
   const [chatLabel, setChatLabel] = useState<{ href: string; titulo: string; subtitulo: string } | null>(null);
   const segments = pathname.split("/").filter(Boolean);
   // «chat/limpiar» es una pantalla de configuración, no una conversación.
   const chatIndex = segments[segments.indexOf("chat") + 1] === "limpiar" ? -1 : segments.indexOf("chat");
+  const claveChat = chatIndex >= 0 ? claveDeRuta(partesDeRuta(pathname)) : null;
 
-  const mensajesAbogado = chatIndex > 0 && segments[chatIndex - 1] === "abogado";
-  const claveChat = mensajesAbogado ? claveDeRuta(partesDeRuta(pathname)) : null;
-
-  // Mensajes del abogado (API v2): «Mensajes / Proceso / Persona».
+  // Mensajes: «Área / Mensajes / Proceso / Persona».
   useEffect(() => {
     if (!claveChat) return;
     let cancelled = false;
@@ -106,41 +101,21 @@ export default function Breadcrumbs() {
     return () => { cancelled = true; };
   }, [claveChat, pathname]);
 
-  useEffect(() => {
-    if (chatIndex < 0 || !token || mensajesAbogado) return;
-    let cancelled = false;
-    apiRequest("/api/chat/conversaciones", { token })
-      .then((response) => response.json())
-      .then((items: { href: string; titulo: string; subtitulo: string; proceso_id?: number | null }[]) => {
-        if (cancelled) return;
-        const currentPath = pathname.replace(/\/$/, "");
-        const match = items.find((item) => item.href.replace(/\/$/, "") === currentPath);
-        if (match) setChatLabel({ href: currentPath, titulo: match.titulo, subtitulo: match.subtitulo });
-        else {
-          const processRoute = currentPath.match(/\/chat\/(\d+)$/);
-          const processChat = processRoute && items.find((item) => Number(item.proceso_id) === Number(processRoute[1]));
-          setChatLabel(processChat
-            ? { href: currentPath, titulo: processChat.subtitulo, subtitulo: "" }
-            : { href: currentPath, titulo: "Chats", subtitulo: "" });
-        }
-      })
-      .catch(() => { if (!cancelled) setChatLabel(null); });
-    return () => { cancelled = true; };
-  }, [chatIndex, mensajesAbogado, pathname, token]);
-
   if (segments.length === 0) return null;
 
-  if (mensajesAbogado) {
+  if (chatIndex >= 0) {
     const currentPath = pathname.replace(/\/$/, "");
     const actual = claveChat && chatLabel?.href === currentPath ? chatLabel : null;
     const finales = claveChat ? (actual ? [actual.subtitulo, actual.titulo].filter(Boolean) : ["…"]) : [];
+    const area = chatIndex > 0 ? segments[chatIndex - 1] : null;
+    const rutaMensajes = `/${segments.slice(0, chatIndex + 1).join("/")}`;
     return (
       <nav aria-label="Ruta de navegación" className="min-w-0">
         <ol className="flex min-w-0 items-center gap-1.5 overflow-hidden whitespace-nowrap text-[13px] text-ink-3">
-          <li className="flex min-w-0 items-center gap-1.5"><Link href={RUTA_MENSAJES.replace(/\/chat$/, "")} className="truncate transition-colors hover:text-ink">Mi trabajo</Link></li>
+          {area && <li className="flex min-w-0 items-center gap-1.5"><Link href={`/${segments.slice(0, chatIndex).join("/")}`} className="truncate transition-colors hover:text-ink">{labelFor(area)}</Link></li>}
           <li className="flex min-w-0 items-center gap-1.5">
-            <span aria-hidden="true" className="text-line-strong">/</span>
-            {finales.length ? <Link href={RUTA_MENSAJES} className="truncate transition-colors hover:text-ink">Mensajes</Link> : <span aria-current="page" className="truncate font-semibold text-ink">Mensajes</span>}
+            {area && <span aria-hidden="true" className="text-line-strong">/</span>}
+            {finales.length ? <Link href={rutaMensajes} className="truncate transition-colors hover:text-ink">Mensajes</Link> : <span aria-current="page" className="truncate font-semibold text-ink">Mensajes</span>}
           </li>
           {finales.map((label, index) => (
             <li key={`${label}-${index}`} className="flex min-w-0 items-center gap-1.5">
@@ -151,24 +126,6 @@ export default function Breadcrumbs() {
         </ol>
       </nav>
     );
-  }
-
-  if (chatIndex >= 0) {
-    const prefix = segments.slice(0, chatIndex + 1);
-    const chatTail = segments.slice(chatIndex + 1);
-    const processGroupRoute = chatTail.length === 1 && /^\d+$/.test(chatTail[0]);
-    const processChat = chatTail.length >= 2 && chatTail[0] !== "directo";
-    const currentPath = pathname.replace(/\/$/, "");
-    const currentChatLabel = chatLabel?.href === currentPath ? chatLabel : null;
-    const labelsToShow = currentChatLabel
-      ? processGroupRoute
-        ? [currentChatLabel.titulo]
-        : [...(processChat && currentChatLabel.subtitulo !== "Conversación directa" ? [currentChatLabel.subtitulo] : []), currentChatLabel.titulo]
-      : chatTail.length ? ["Abriendo chat..."] : [];
-    return <nav aria-label="Ruta de navegación" className="min-w-0"><ol className="flex min-w-0 items-center gap-1.5 overflow-hidden whitespace-nowrap text-[13px] text-ink-3">
-      {prefix.map((segment, index) => <li key={index} className="flex min-w-0 items-center gap-1.5">{index > 0 && <span aria-hidden="true" className="text-line-strong">/</span>}{index === prefix.length - 1 ? <span className="truncate font-semibold text-ink">Chats</span> : <Link href={`/${prefix.slice(0, index + 1).join("/")}`} className="truncate transition-colors hover:text-ink">{labelFor(segment)}</Link>}</li>)}
-      {labelsToShow.map((label, index) => <li key={`${label}-${index}`} className="flex min-w-0 items-center gap-1.5"><span aria-hidden="true" className="text-line-strong">/</span><span aria-current={index === labelsToShow.length - 1 ? "page" : undefined} className={`truncate ${index === labelsToShow.length - 1 ? "font-semibold text-ink" : ""}`}>{label}</span></li>)}
-    </ol></nav>;
   }
 
   return (

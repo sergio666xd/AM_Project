@@ -19,9 +19,9 @@ import { useLoadEffect } from "@/lib/useLoadEffect";
 type Filtro = "todas" | "sin_leer" | "por_responder" | "equipo";
 
 const VACIOS: Record<Filtro, [string, string]> = {
-  todas: ["Aún no hay mensajes", "Escríbele a un cliente o a un colega; cada mensaje de un proceso queda en su expediente como un folio."],
-  sin_leer: ["Todo leído", "Los mensajes que aún no abres aparecen aquí."],
-  por_responder: ["Nadie espera respuesta", "Cuando un cliente te escribe y aún no le respondes, su conversación aparece aquí."],
+  todas: ["Aún no hay mensajes", "Los mensajes con clientes y colegas aparecen aquí; los de un proceso quedan en su expediente como un folio."],
+  sin_leer: ["Todo leído", "Los mensajes sin abrir aparecen aquí."],
+  por_responder: ["Nadie espera respuesta", "Cuando un cliente escribe y nadie le ha respondido, su conversación aparece aquí."],
   equipo: ["Sin mensajes del equipo", "Las conversaciones con colegas y con el equipo de cada proceso aparecen aquí."],
 };
 
@@ -30,7 +30,7 @@ function cuando(iso: string): string {
 }
 
 /** Mensajes del abogado: la lista de conversaciones y la conversación abierta, lado a lado en escritorio. */
-export function MensajesWorkspace() {
+export function MensajesWorkspace({ base = RUTA_MENSAJES, prefijoMio }: { base?: string; prefijoMio?: string }) {
   const pathname = usePathname();
   const router = useRouter();
   const partes = useMemo(() => partesDeRuta(pathname), [pathname]);
@@ -114,7 +114,7 @@ export function MensajesWorkspace() {
       <div className="hidden items-end justify-between gap-4 pb-4 lg:flex">
         <div>
           <h1 className="font-display text-[28px] leading-tight text-ink">Mensajes</h1>
-          <p className="mt-1 text-[14px] text-ink-2">Con tus clientes y con el equipo. Los de cada proceso quedan en su expediente.</p>
+          <p className="mt-1 text-[14px] text-ink-2">Con los clientes y con el equipo. Los de cada proceso quedan en su expediente.</p>
         </div>
         <Button icon={<PenSquare size={16} />} onClick={() => setNueva(true)} disabled={!lista}>Nuevo mensaje</Button>
       </div>
@@ -145,7 +145,7 @@ export function MensajesWorkspace() {
             {procesoFiltro && (
               <p className="flex items-center gap-2 rounded-lg bg-navy-soft py-1 pl-3 pr-1 text-[13px] text-navy-ink">
                 <span className="min-w-0 flex-1 truncate">Solo de <strong>{nombreProceso ?? "este proceso"}</strong></span>
-                <button type="button" onClick={() => router.push(RUTA_MENSAJES)} aria-label="Ver todas las conversaciones" className="grid size-8 place-items-center rounded-md hover:bg-sheet/60"><X aria-hidden="true" size={14} /></button>
+                <button type="button" onClick={() => router.push(base)} aria-label="Ver todas las conversaciones" className="grid size-8 place-items-center rounded-md hover:bg-sheet/60"><X aria-hidden="true" size={14} /></button>
               </p>
             )}
           </div>
@@ -173,7 +173,7 @@ export function MensajesWorkspace() {
               </div>
             ) : (
               <ul className="divide-y divide-line">
-                {visibles.map((c) => <FilaConversacion key={c.id} conversacion={c} activa={c.id === activaActual?.id} onAbrir={() => router.push(rutaDe(c))} />)}
+                {visibles.map((c) => <FilaConversacion key={c.id} conversacion={c} activa={c.id === activaActual?.id} prefijoMio={prefijoMio} onAbrir={() => router.push(rutaDe(c, base))} />)}
               </ul>
             )}
           </div>
@@ -181,13 +181,13 @@ export function MensajesWorkspace() {
 
         <div className={cx("min-h-0 min-w-0 flex-1 flex-col", abierta ? "flex" : "hidden md:flex")}>
           {activaActual ? (
-            <HiloMensajes key={activaActual.id} conversacion={activaActual} onVolver={() => router.push(RUTA_MENSAJES)} onActividad={alActividad} />
+            <HiloMensajes key={activaActual.id} conversacion={activaActual} onVolver={() => router.push(base)} onActividad={alActividad} />
           ) : abierta && resuelta?.clave === clave && resuelta.error ? (
             <div role="alert" className="grid flex-1 place-items-center p-8 text-center">
               <div className="max-w-sm space-y-3">
                 <p className="font-display text-[19px] text-ink">No pudimos abrir la conversación</p>
                 <p className="text-[14px] text-ink-2">{resuelta.error}</p>
-                <Button variant="secondary" onClick={() => router.push(RUTA_MENSAJES)}>Ver las conversaciones</Button>
+                <Button variant="secondary" onClick={() => router.push(base)}>Ver las conversaciones</Button>
               </div>
             </div>
           ) : abierta ? (
@@ -196,7 +196,7 @@ export function MensajesWorkspace() {
             <div className="grid flex-1 place-items-center bg-sheet-2 p-8 text-center">
               <div className="max-w-xs">
                 <MessageSquare aria-hidden="true" size={28} strokeWidth={1.5} className="mx-auto text-ink-3" />
-                <p className="mt-3 font-display text-[19px] text-ink">Elige una conversación</p>
+                <p className="mt-3 font-display text-[19px] text-ink">Ninguna conversación abierta</p>
                 <p className="mt-1.5 text-[13.5px] text-ink-3">Cada mensaje con un cliente queda en el expediente del proceso como un folio.</p>
               </div>
             </div>
@@ -204,14 +204,19 @@ export function MensajesWorkspace() {
         </div>
       </div>
 
-      <NuevaConversacion open={nueva} conversaciones={items} onClose={() => setNueva(false)} onElegir={(c) => router.push(rutaDe(c))} />
+      <NuevaConversacion open={nueva} conversaciones={items} onClose={() => setNueva(false)} onElegir={(c) => router.push(rutaDe(c, base))} />
     </div>
   );
 }
 
-function FilaConversacion({ conversacion: c, activa, onAbrir }: { conversacion: Conversacion; activa: boolean; onAbrir: () => void }) {
+export function FilaConversacion({ conversacion: c, activa, onAbrir, prefijoMio = "Tú: " }: {
+  conversacion: Conversacion;
+  activa: boolean;
+  onAbrir: () => void;
+  prefijoMio?: string;
+}) {
   const ultimo = c.ultimo;
-  const prefijo = ultimo ? (ultimo.es_mio ? "Tú: " : c.tipo === "colaboradores" && ultimo.autor ? `${ultimo.autor.split(" ")[0]}: ` : "") : "";
+  const prefijo = ultimo ? (ultimo.es_mio ? prefijoMio : c.tipo === "colaboradores" && ultimo.autor ? `${ultimo.autor.split(" ")[0]}: ` : "") : "";
   return (
     <li>
       <button

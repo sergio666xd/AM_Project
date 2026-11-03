@@ -46,7 +46,7 @@ export function NuevaConversacion({ open, conversaciones, onClose, onElegir }: {
         </label>
         <div className="max-h-[min(55dvh,26rem)] overflow-y-auto rounded-lg shadow-[0_0_0_1px_var(--line)]">
           {secciones.length === 0 ? (
-            <p className="px-4 py-8 text-center text-[14px] text-ink-3">{texto ? "Nadie coincide con la búsqueda." : "Aún no tienes con quién conversar: los clientes aparecen al vincularlos a tus procesos."}</p>
+            <p className="px-4 py-8 text-center text-[14px] text-ink-3">{texto ? "Nadie coincide con la búsqueda." : "Todavía no hay con quién conversar: los clientes aparecen al vincularlos a los procesos."}</p>
           ) : secciones.map((s) => (
             <section key={s.titulo}>
               <h3 className="sticky top-0 z-[1] border-b border-line bg-sheet-2 px-4 py-2 text-[12px] font-semibold text-ink-2">{s.titulo}</h3>
