@@ -24,3 +24,34 @@ export function encabezadosDeSesion(request: Request): Headers | Response {
   if (cookie) headers.set("cookie", cookie);
   return headers;
 }
+
+export type UsuarioDeSesion = { id: number; rol: string };
+
+/**
+ * Valida la sesión contra `GET /api/v2/sesion` y devuelve el usuario, o la
+ * respuesta de error lista para devolver. La API ya rechaza cuentas inactivas
+ * y a quien todavía debe cambiar la contraseña temporal no lo deja trabajar.
+ */
+export async function usuarioDeSesion(request: Request): Promise<UsuarioDeSesion | Response> {
+  const headers = encabezadosDeSesion(request);
+  if (headers instanceof Response) return headers;
+  let response: Response;
+  try {
+    response = await fetch(new URL("/api/v2/sesion", request.url), { headers, cache: "no-store" });
+  } catch {
+    return Response.json({ detail: "No fue posible validar la sesión." }, { status: 502 });
+  }
+  if (response.status === 403) return Response.json({ detail: "La cuenta no está activa." }, { status: 403 });
+  if (!response.ok) return Response.json({ detail: "Sesión inválida o expirada." }, { status: 401 });
+  if (!response.headers.get("content-type")?.includes("application/json")) {
+    return Response.json({ detail: "La validación recibió HTML en lugar de JSON; revise la protección del Preview." }, { status: 502 });
+  }
+  const usuario = (await response.json().catch(() => null)) as { id?: unknown; rol?: unknown; debe_cambiar_password?: unknown } | null;
+  if (!usuario || typeof usuario.id !== "number" || typeof usuario.rol !== "string") {
+    return Response.json({ detail: "No fue posible leer el usuario de la sesión." }, { status: 502 });
+  }
+  if (usuario.debe_cambiar_password === true) {
+    return Response.json({ detail: "Debe cambiar la contraseña temporal antes de continuar." }, { status: 403 });
+  }
+  return { id: usuario.id, rol: usuario.rol };
+}

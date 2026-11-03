@@ -1,10 +1,18 @@
-from fastapi import APIRouter, Depends, Request, Response, status
+from fastapi import APIRouter, BackgroundTasks, Depends, Request, Response, status
 
 from app import models
 from app.api.v2.dependencias import servicio_sesion
-from app.modulos.identidad.esquemas import IniciarSesion, UsuarioSesion
-from app.modulos.identidad.servicio import ServicioSesion
+from app.modulos.identidad.esquemas import (
+    CambioContrasenaTemporal,
+    IniciarSesion,
+    MensajeRecuperacion,
+    PedidoRecuperacion,
+    Restablecimiento,
+    UsuarioSesion,
+)
+from app.modulos.identidad.servicio import MENSAJE_RECUPERACION, ServicioSesion
 from app.nucleo.sesion import borrar_cookie_sesion, fijar_cookie_sesion, usuario_en_sesion
+from app.password_reset import send_password_reset_email
 from app.rate_limit import ip_cliente
 
 router = APIRouter(prefix="/sesion", tags=["Sesión"])
@@ -58,3 +66,38 @@ def cerrar_todas_las_sesiones(
 ):
     servicio.cerrar_todas(usuario)
     borrar_cookie_sesion(response)
+
+
+@router.post("/contrasena", response_model=UsuarioSesion, summary="Cambiar la contraseña temporal")
+def cambiar_contrasena_temporal(
+    datos: CambioContrasenaTemporal,
+    request: Request,
+    response: Response,
+    usuario: models.Usuario = Depends(usuario_en_sesion),
+    servicio: ServicioSesion = Depends(servicio_sesion),
+):
+    """Solo para quien entra con la contraseña temporal. Renueva la sesión al terminar."""
+    usuario = servicio.cambiar_contrasena_temporal(usuario, datos.contrasena_actual, datos.contrasena_nueva)
+    persistente = bool(request.state.sesion.get("persistent", True))
+    fijar_cookie_sesion(response, servicio.emitir_token(usuario, persistente=persistente), persistente=persistente)
+    return usuario
+
+
+@router.post("/recuperacion", response_model=MensajeRecuperacion, status_code=status.HTTP_202_ACCEPTED,
+             summary="Pedir un enlace para restablecer la contraseña")
+def pedir_recuperacion(
+    datos: PedidoRecuperacion,
+    request: Request,
+    background_tasks: BackgroundTasks,
+    servicio: ServicioSesion = Depends(servicio_sesion),
+):
+    """Responde lo mismo exista o no la cuenta. El enlace sirve una sola vez."""
+    enlace = servicio.pedir_recuperacion(datos.email, ip=ip_cliente(request))
+    if enlace:
+        background_tasks.add_task(send_password_reset_email, datos.email, enlace)
+    return MensajeRecuperacion(mensaje=MENSAJE_RECUPERACION)
+
+
+@router.post("/restablecimiento", status_code=status.HTTP_204_NO_CONTENT, summary="Restablecer la contraseña con el enlace")
+def restablecer_contrasena(datos: Restablecimiento, servicio: ServicioSesion = Depends(servicio_sesion)):
+    servicio.restablecer(datos.token, datos.contrasena_nueva)

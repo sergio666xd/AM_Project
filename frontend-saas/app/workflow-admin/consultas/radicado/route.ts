@@ -1,14 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { start } from "workflow/api";
-import { encabezadosDeSesion } from "@/lib/sesion-servidor";
+import { usuarioDeSesion } from "@/lib/sesion-servidor";
 import { consultationSweep } from "@/workflows/consultation-sweep";
-
-type AuthenticatedUser = {
-  id?: number;
-  rol?: string;
-  estado?: string;
-  plan?: { precio_mensual?: number } | null;
-};
 
 function fechaColombia(date: Date): string {
   const parts = new Intl.DateTimeFormat("en-CA", {
@@ -21,35 +14,8 @@ function fechaColombia(date: Date): string {
   return `${values.year}-${values.month}-${values.day}`;
 }
 
-async function authenticate(request: Request): Promise<AuthenticatedUser | Response> {
-  const headers = encabezadosDeSesion(request);
-  if (headers instanceof Response) return headers;
-
-  let response: Response;
-  try {
-    response = await fetch(new URL("/api/auth/me", request.url), {
-      headers,
-      cache: "no-store",
-    });
-  } catch {
-    return Response.json({ detail: "No fue posible validar la sesión." }, { status: 502 });
-  }
-  if (!response.ok) {
-    return Response.json({ detail: "Sesión inválida o expirada." }, { status: 401 });
-  }
-  if (!response.headers.get("content-type")?.includes("application/json")) {
-    return Response.json({ detail: "No fue posible validar la sesión." }, { status: 502 });
-  }
-
-  const user = (await response.json().catch(() => null)) as AuthenticatedUser | null;
-  if (!user || typeof user.id !== "number" || user.estado !== "ACTIVO") {
-    return Response.json({ detail: "Cuenta no activa." }, { status: 403 });
-  }
-  return user;
-}
-
 export async function POST(request: Request) {
-  const user = await authenticate(request);
+  const user = await usuarioDeSesion(request);
   if (user instanceof Response) return user;
 
   let body: {
@@ -81,11 +47,11 @@ export async function POST(request: Request) {
   if (manual && user.rol !== "ADMIN") {
     return Response.json({ detail: "Se requiere una cuenta ADMIN." }, { status: 403 });
   }
-  if (automaticNew && !["ABOGADO", "ABOGADO_ADMIN", "ADMIN"].includes(user.rol ?? "")) {
-    return Response.json({ detail: "No puedes consultar este radicado." }, { status: 403 });
+  if (automaticNew && !["ABOGADO", "ABOGADO_ADMIN", "ADMIN"].includes(user.rol)) {
+    return Response.json({ detail: "Esta cuenta no puede consultar radicados." }, { status: 403 });
   }
-  if (automaticNew && (typeof body.consulta_id !== "number" || user.rol === "ABOGADO" && user.plan?.precio_mensual === 0)) {
-    return Response.json({ detail: "La consulta inmediata no está disponible para este plan." }, { status: 403 });
+  if (automaticNew && typeof body.consulta_id !== "number") {
+    return Response.json({ detail: "Falta la consulta del radicado nuevo." }, { status: 400 });
   }
   if (automaticNew && selectedIds.length !== 1) {
     return Response.json({ detail: "La consulta inmediata solo admite el nuevo radicado." }, { status: 400 });

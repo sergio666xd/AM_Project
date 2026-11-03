@@ -8,7 +8,6 @@ export default function robots(): MetadataRoute.Robots {
       allow: "/",
       disallow: [
         "/gestion-procesos/admin/",
-        "/gestion-procesos/dashboard/",
         "/gestion-procesos/auth/",
       ],
     },

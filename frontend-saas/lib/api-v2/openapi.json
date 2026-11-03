@@ -455,6 +455,304 @@
         }
       }
     },
+    "/api/v2/sesion/contrasena": {
+      "post": {
+        "tags": [
+          "Sesión"
+        ],
+        "summary": "Cambiar la contraseña temporal",
+        "description": "Solo para quien entra con la contraseña temporal. Renueva la sesión al terminar.",
+        "operationId": "cambiar_contrasena_temporal",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CambioContrasenaTemporal"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UsuarioSesion"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too Many Requests",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v2/sesion/recuperacion": {
+      "post": {
+        "tags": [
+          "Sesión"
+        ],
+        "summary": "Pedir un enlace para restablecer la contraseña",
+        "description": "Responde lo mismo exista o no la cuenta. El enlace sirve una sola vez.",
+        "operationId": "pedir_recuperacion",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PedidoRecuperacion"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "202": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MensajeRecuperacion"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too Many Requests",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v2/sesion/restablecimiento": {
+      "post": {
+        "tags": [
+          "Sesión"
+        ],
+        "summary": "Restablecer la contraseña con el enlace",
+        "operationId": "restablecer_contrasena",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Restablecimiento"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too Many Requests",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v2/procesos": {
       "get": {
         "tags": [
@@ -24484,6 +24782,29 @@
         ],
         "title": "CambioConsultas"
       },
+      "CambioContrasenaTemporal": {
+        "properties": {
+          "contrasena_actual": {
+            "type": "string",
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Contrasena Actual"
+          },
+          "contrasena_nueva": {
+            "type": "string",
+            "maxLength": 200,
+            "minLength": 8,
+            "title": "Contrasena Nueva",
+            "description": "Mínimo 8 caracteres."
+          }
+        },
+        "type": "object",
+        "required": [
+          "contrasena_actual",
+          "contrasena_nueva"
+        ],
+        "title": "CambioContrasenaTemporal"
+      },
       "CambioCorreo": {
         "properties": {
           "servidor": {
@@ -31552,6 +31873,19 @@
         ],
         "title": "Mensaje"
       },
+      "MensajeRecuperacion": {
+        "properties": {
+          "mensaje": {
+            "type": "string",
+            "title": "Mensaje"
+          }
+        },
+        "type": "object",
+        "required": [
+          "mensaje"
+        ],
+        "title": "MensajeRecuperacion"
+      },
       "MensajeSitio": {
         "properties": {
           "id": {
@@ -33306,6 +33640,21 @@
         ],
         "title": "PedidoDocumento",
         "description": "Uno de los documentos de una solicitud, con lo último que el cliente envió."
+      },
+      "PedidoRecuperacion": {
+        "properties": {
+          "email": {
+            "type": "string",
+            "maxLength": 120,
+            "minLength": 3,
+            "title": "Email"
+          }
+        },
+        "type": "object",
+        "required": [
+          "email"
+        ],
+        "title": "PedidoRecuperacion"
       },
       "Pendiente": {
         "properties": {
@@ -35274,6 +35623,29 @@
         ],
         "title": "RelacionesProceso",
         "description": "Clientes con acceso al proceso y radicados que se siguen en él."
+      },
+      "Restablecimiento": {
+        "properties": {
+          "token": {
+            "type": "string",
+            "maxLength": 2000,
+            "minLength": 10,
+            "title": "Token"
+          },
+          "contrasena_nueva": {
+            "type": "string",
+            "maxLength": 200,
+            "minLength": 8,
+            "title": "Contrasena Nueva",
+            "description": "Mínimo 8 caracteres."
+          }
+        },
+        "type": "object",
+        "required": [
+          "token",
+          "contrasena_nueva"
+        ],
+        "title": "Restablecimiento"
       },
       "Resultado": {
         "properties": {

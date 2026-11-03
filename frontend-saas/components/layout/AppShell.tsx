@@ -21,7 +21,7 @@ import { estaActiva, navegacion, rutaAreaCuenta, type Variante } from "./navegac
 
 interface AppShellProps {
   children: ReactNode;
-  variant?: Exclude<Variante, "platform-admin">;
+  variant: Exclude<Variante, "platform-admin">;
 }
 
 /**
@@ -29,7 +29,7 @@ interface AppShellProps {
  * con búsqueda y avisos, y barra inferior en celular. Cliente: encabezado
  * blanco con el logo completo, letra más grande y pestañas inferiores altas.
  */
-export default function AppShell({ children, variant = "saas" }: AppShellProps) {
+export default function AppShell({ children, variant }: AppShellProps) {
   const { user } = useSession();
   const nav = navegacion(variant, user?.rol === "ABOGADO_ADMIN");
   const areaHref = rutaAreaCuenta(variant);
@@ -44,7 +44,7 @@ export default function AppShell({ children, variant = "saas" }: AppShellProps) 
   const comunes = (
     <>
       <PresenciaPanel />
-      {variant !== "saas" && <AvisoNotificaciones />}
+      <AvisoNotificaciones />
     </>
   );
 

@@ -10,57 +10,18 @@ import {
   ReactNode,
 } from "react";
 
-import {
-  getCurrentUser,
-  API_URL,
-  apiErrorStatus,
-  SESSION_EXPIRED_EVENT,
-  TOKEN_EN_COOKIE,
-} from "@/lib/api";
-import { api, SESION_TERMINADA } from "@/lib/api-v2/cliente";
+import { api, mensajeDeError, SESION_TERMINADA, type Esquemas } from "@/lib/api-v2/cliente";
 import { useLoadEffect } from "@/lib/useLoadEffect";
 
 /** Cada cuánto se renueva la sesión mientras el portal está abierto (12 horas). */
 const RENOVACION_MS = 12 * 60 * 60 * 1000;
 const CLAVE_ULTIMA_RENOVACION = "am:sesion-renovada-en";
 
-export interface UsuarioActual {
-  id: number;
-  email: string;
-  nombre_completo: string;
-  whatsapp_numero?: string | null;
-  genero?: "MASCULINO" | "FEMENINO" | null;
-  numero_documento?: string | null;
-  domicilio?: string | null;
-  direccion?: string | null;
-  tarjeta_profesional?: string | null;
-  rol: string;
-  estado: string;
-  debe_cambiar_password?: boolean;
-  notificaciones_email?: boolean;
-  notificaciones_whatsapp?: boolean;
-  preferencias_notificacion?: Record<string, { email: boolean; whatsapp: boolean }>;
-  canal_notificacion_cliente?: "EMAIL" | "WHATSAPP" | null;
-  silenciar_email_si_push?: boolean;
-  silenciar_whatsapp_si_push?: boolean;
-  plan?: {
-    id: number;
-    nombre: string;
-    limite_radicados: number;
-    precio_mensual: number;
-    notificaciones_whatsapp_procesos?: boolean;
-    notificaciones_whatsapp_tareas?: boolean;
-  } | null;
-}
+export type UsuarioActual = Esquemas["UsuarioSesion"];
 
 interface SessionContextType {
   user: UsuarioActual | null;
   loading: boolean;
-  /**
-   * Marcador de compatibilidad (`TOKEN_EN_COOKIE`) cuando hay sesión, o null.
-   * El token real está en una cookie httpOnly; no se puede leer desde aquí.
-   */
-  token: string | null;
   /** Mensaje cuando la sesión no se pudo validar por un fallo de red o del servidor. */
   sessionError: string | null;
   logout: () => Promise<void>;
@@ -101,26 +62,13 @@ function escribirAlmacen(clave: string, valor: string | null) {
   }
 }
 
-/**
- * Pasa a la cookie una sesión iniciada antes de este cambio, cuando el token
- * se guardaba en localStorage: renovarlo con ese token deja la cookie puesta
- * y nadie tiene que volver a iniciar sesión. Después se borra el token viejo.
- */
-async function migrarTokenAntiguo() {
-  const antiguo = leerAlmacen("token");
-  if (!antiguo) return;
-  try {
-    await fetch(`${API_URL}/api/auth/refresh-token`, {
-      method: "POST",
-      headers: { Authorization: `Bearer ${antiguo}` },
-      credentials: "same-origin",
-    });
-  } catch {
-    // Sin red: el usuario vuelve a iniciar sesión si la cookie no quedó.
-  } finally {
-    escribirAlmacen("token", null);
-    escribirAlmacen("remember_me", null);
-  }
+/** La sesión va en una cookie httpOnly; aquí solo se lee quién es el usuario. */
+async function leerSesion(): Promise<{ usuario: UsuarioActual | null; fallo: string | null }> {
+  const { data, error, response } = await api.GET("/api/v2/sesion");
+  if (data) return { usuario: data, fallo: null };
+  // 401 o 403 (cuenta inactiva): no hay sesión válida. Lo demás es un fallo de red o del servidor.
+  if (response && (response.status === 401 || response.status === 403)) return { usuario: null, fallo: null };
+  return { usuario: null, fallo: mensajeDeError(error) };
 }
 
 async function renovarSiToca() {
@@ -152,26 +100,21 @@ export function SessionProvider({
   const loadSession = useCallback(async () => {
     setSessionError(null);
     try {
-      await migrarTokenAntiguo();
-      const currentUser: UsuarioActual = await getCurrentUser();
-      setUser(currentUser);
-      persistPortalRole(currentUser.rol);
-      // Mantiene viva la ventana de la sesión sin retrasar la carga del portal.
-      void renovarSiToca().catch(() => undefined);
-    } catch (error) {
-      const status = apiErrorStatus(error);
-      if (status === 401 || status === 403) {
-        clearSession();
-      } else {
+      const { usuario, fallo } = await leerSesion();
+      if (usuario) {
+        setUser(usuario);
+        persistPortalRole(usuario.rol);
+        // Mantiene viva la ventana de la sesión sin retrasar la carga del portal.
+        void renovarSiToca().catch(() => undefined);
+      } else if (fallo) {
         // Un fallo de red o del servidor no invalida la sesión: se conserva
         // la cookie para que el usuario pueda reintentar sin volver a entrar.
-        console.error("No fue posible recuperar la sesión:", error);
-        setSessionError(
-          error instanceof Error
-            ? error.message
-            : "No fue posible conectar con el servidor.",
-        );
+        setSessionError(fallo);
+      } else {
+        clearSession();
       }
+    } catch {
+      setSessionError("No fue posible conectar con el servidor.");
     } finally {
       setLoading(false);
     }
@@ -190,12 +133,8 @@ export function SessionProvider({
     const handleExpired = () => {
       if (userRef.current) clearSession();
     };
-    window.addEventListener(SESSION_EXPIRED_EVENT, handleExpired);
     window.addEventListener(SESION_TERMINADA, handleExpired);
-    return () => {
-      window.removeEventListener(SESSION_EXPIRED_EVENT, handleExpired);
-      window.removeEventListener(SESION_TERMINADA, handleExpired);
-    };
+    return () => window.removeEventListener(SESION_TERMINADA, handleExpired);
   }, [clearSession]);
 
   const conSesion = Boolean(user);
@@ -206,14 +145,11 @@ export function SessionProvider({
   }, [conSesion]);
 
   const refreshUser = useCallback(async () => {
-    try {
-      const currentUser: UsuarioActual = await getCurrentUser();
-      setUser(currentUser);
-      persistPortalRole(currentUser.rol);
-    } catch (error) {
-      if (apiErrorStatus(error) === 401) clearSession();
-      else console.error("No fue posible actualizar el usuario:", error);
-    }
+    const { usuario, fallo } = await leerSesion().catch(() => ({ usuario: null, fallo: "sin conexión" }));
+    if (usuario) {
+      setUser(usuario);
+      persistPortalRole(usuario.rol);
+    } else if (!fallo) clearSession();
   }, [clearSession]);
 
   const salir = useCallback(async (todas: boolean) => {
@@ -231,7 +167,6 @@ export function SessionProvider({
       value={{
         user,
         loading,
-        token: user ? TOKEN_EN_COOKIE : null,
         sessionError,
         logout,
         logoutEverywhere,

@@ -36,7 +36,7 @@ export default function GuestOnly({ children }: { children: ReactNode }) {
   }, [loading, router, user]);
 
   if (loading || user) {
-    return <main role="status" aria-live="polite" className="grid min-h-screen place-items-center bg-[#f7f3e8] text-sm text-[#002060]/80">Verificando sesión…</main>;
+    return <main role="status" aria-live="polite" className="grid min-h-screen place-items-center bg-ground text-sm text-ink-2">Verificando sesión…</main>;
   }
 
   return <>{children}</>;
