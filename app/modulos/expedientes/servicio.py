@@ -12,7 +12,11 @@ from app.modulos.expedientes.esquemas import (
     PersonaBreve,
     ProcesoDetalle,
     ProcesoResumen,
+    RadicadoConActuaciones,
+    VinculosProceso,
 )
+from app.modulos.folios.repositorio import fecha_actuacion
+from app.modulos.tareas.esquemas import ActuacionBreve
 from app.modulos.expedientes.modelos import EtapaProceso, Proceso
 from app.modulos.expedientes.repositorio import FiltroProcesos, RepositorioProcesos
 from app.modulos.identidad.modelos import Usuario
@@ -21,6 +25,11 @@ from app.nucleo.paginacion import ParametrosPagina, codificar_cursor
 from app.nucleo.zona_horaria import ahora_utc
 
 NO_ENCONTRADO = "No encontramos el proceso, o no tienes acceso a él."
+
+
+def _dia(texto: str | None):
+    momento = fecha_actuacion(texto)
+    return momento.date() if momento else None
 
 
 def _persona(usuario: Usuario) -> PersonaBreve:
@@ -93,6 +102,23 @@ class ServicioProcesos:
                 CambioEtapa(etapa=EtapaBreve(id=cambio.etapa.id, nombre=cambio.etapa.nombre), fecha=cambio.fecha,
                             nota=None if cliente else cambio.nota, autor=autor)
                 for cambio, autor in self._procesos.historial_etapas(proceso.id)
+            ],
+        )
+
+    def vinculos(self, usuario: Usuario, proceso_id: int) -> VinculosProceso:
+        if politicas.es_cliente(usuario):
+            raise SinPermiso("Los vínculos del proceso son para el equipo de la firma.")
+        proceso = self._proceso_visible(usuario, proceso_id)
+        radicados = sorted((v.radicado for v in proceso.radicados if v.radicado), key=lambda r: r.numero)
+        actuaciones = self._procesos.actuaciones_recientes([r.id for r in radicados])
+        return VinculosProceso(
+            clientes=sorted((_persona(v.cliente) for v in proceso.clientes if v.cliente), key=lambda p: p.nombre),
+            radicados=[
+                RadicadoConActuaciones(id=r.id, numero=r.numero, actuaciones=[
+                    ActuacionBreve(id=a.id, texto=a.actuacion or "Actuación del juzgado", fecha=_dia(a.fecha_actuacion))
+                    for a in actuaciones[r.id]
+                ])
+                for r in radicados
             ],
         )
 

@@ -8,8 +8,7 @@ import { CampoFechaLimite, SelectorPrioridad } from "@/components/tareas/CamposT
 import { Button } from "@/components/ui/Button";
 import { Modal } from "@/components/ui/Modal";
 import { useToast } from "@/components/ui/ToastProvider";
-import { apiRequest } from "@/lib/api";
-import { api, type Esquemas } from "@/lib/api-v2/cliente";
+import { api, mensajeDeError, type Esquemas } from "@/lib/api-v2/cliente";
 import { cx } from "@/lib/cx";
 import { diaCorto } from "@/lib/fechas";
 import type { PrioridadTarea } from "@/lib/tareas";
@@ -17,10 +16,7 @@ import { useLoadEffect } from "@/lib/useLoadEffect";
 
 type Proceso = Esquemas["ProcesoResumen"];
 
-/**
- * Tarea nueva, general o de un proceso. La crea la API v1 (que programa los
- * recordatorios y avisa al cliente asignado) mientras se reescribe el detalle.
- */
+/** Tarea nueva, general o de un proceso. La API programa los recordatorios y avisa al cliente asignado. */
 export function NuevaTareaModal({ open, onClose, onCreada, procesoInicial }: {
   open: boolean;
   onClose: () => void;
@@ -69,27 +65,25 @@ export function NuevaTareaModal({ open, onClose, onCreada, procesoInicial }: {
     }
     setGuardando(true);
     setErrores({});
-    try {
-      await apiRequest("/api/tareas", {
-        method: "POST",
-        body: JSON.stringify({
-          titulo: titulo.trim(),
-          descripcion: [descripcion.trim(), explicacion].filter(Boolean).join("\n\n") || null,
-          prioridad,
-          proceso_id: procesoId ? Number(procesoId) : null,
-          cliente_id: clienteId ? Number(clienteId) : null,
-          // Vence al final del día en Bogotá, como las tareas que nacen de un folio.
-          fecha_limite: fecha ? `${fecha}T23:59:00-05:00` : null,
-        }),
-      });
-      toast({ title: "Tarea creada", description: fecha ? `Vence el ${diaCorto(fecha)}.` : "Sin fecha límite.", tone: "success" });
-      onCreada();
-      cerrar();
-    } catch (causa) {
-      setErrores({ general: causa instanceof Error ? causa.message : "No se pudo crear la tarea." });
-    } finally {
-      setGuardando(false);
+    const { error } = await api.POST("/api/v2/tareas", {
+      body: {
+        titulo: titulo.trim(),
+        descripcion: [descripcion.trim(), explicacion].filter(Boolean).join("\n\n") || null,
+        prioridad,
+        proceso_id: procesoId ? Number(procesoId) : null,
+        cliente_id: clienteId ? Number(clienteId) : null,
+        // Vence al final del día en Bogotá, como las tareas que nacen de un folio.
+        fecha_limite: fecha || null,
+      },
+    });
+    setGuardando(false);
+    if (error) {
+      setErrores({ general: mensajeDeError(error), ...error.campos });
+      return;
     }
+    toast({ title: "Tarea creada", description: fecha ? `Vence el ${diaCorto(fecha)}.` : "Sin fecha límite.", tone: "success" });
+    onCreada();
+    cerrar();
   }
 
   return (

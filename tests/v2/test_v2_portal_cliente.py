@@ -285,7 +285,7 @@ def test_pendientes_del_cliente(iniciar, crear_usuario, crear_proceso, cliente_h
     guardados = _r2(monkeypatch)
     avisos = []
     monkeypatch.setattr("app.modulos.portal_cliente.servicio.notificar", lambda db, destinatario, **k: avisos.append((destinatario.id, k)))
-    monkeypatch.setattr("app.routers.tareas.emitir_notificacion_workflow", lambda db, destinatario, *a, **k: avisos.append((destinatario.id, a[1])))
+    monkeypatch.setattr("app.modulos.tareas.avisos.emitir_notificacion_workflow", lambda db, destinatario, *a, **k: avisos.append((destinatario.id, a[1])))
     solicitud, poder, interna = e["solicitud"], e["poder"], e["interna"]
     subtarea = next(s for s in interna.subtareas if s.asignada_cliente)
     base = f"/api/v2/cliente/solicitudes/{solicitud.id}/pedidos"

@@ -103,6 +103,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v2/procesos/{proceso_id}/vinculos": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Clientes, radicados y actuaciones del proceso
+         * @description Para relacionar una tarea, un evento o un aviso con algo del proceso.
+         */
+        get: operations["vinculos_del_proceso"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v2/procesos/{proceso_id}/archivar": {
         parameters: {
             query?: never;
@@ -391,7 +411,12 @@ export interface paths {
          */
         get: operations["listar_tareas"];
         put?: never;
-        post?: never;
+        /**
+         * Crear una tarea
+         * @description General o de un proceso. Si se asigna a un cliente, le llega a su portal y la plataforma
+         *     le recuerda 24 y 12 horas antes del vencimiento; si no, se le recuerda al responsable.
+         */
+        post: operations["crear_tarea_nueva"];
         delete?: never;
         options?: never;
         head?: never;
@@ -474,6 +499,105 @@ export interface paths {
         options?: never;
         head?: never;
         patch?: never;
+        trace?: never;
+    };
+    "/api/v2/tareas/{tarea_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Ver una tarea */
+        get: operations["obtener_tarea"];
+        put?: never;
+        post?: never;
+        /** Eliminar una tarea */
+        delete: operations["eliminar_tarea"];
+        options?: never;
+        head?: never;
+        /**
+         * Cambiar una tarea
+         * @description Cambia solo lo enviado. Cerrarla descarta sus recordatorios; reabrirla o moverle la fecha
+         *     los vuelve a programar. A la otra parte (cliente asignado o responsable) se le avisa el cambio.
+         */
+        patch: operations["editar_tarea"];
+        trace?: never;
+    };
+    "/api/v2/tareas/{tarea_id}/subtareas": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Agregar una subtarea
+         * @description Con `cliente_id`, se le pide a un cliente del proceso: la ve en su portal y se le avisa.
+         */
+        post: operations["crear_subtarea"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v2/tareas/{tarea_id}/subtareas/{subtarea_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Quitar una subtarea */
+        delete: operations["eliminar_subtarea"];
+        options?: never;
+        head?: never;
+        /** Cambiar una subtarea */
+        patch: operations["editar_subtarea"];
+        trace?: never;
+    };
+    "/api/v2/tareas/{tarea_id}/recordatorios": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Programar un recordatorio
+         * @description Le llega al responsable de la tarea, en un momento exacto o con anticipación al vencimiento.
+         */
+        post: operations["crear_recordatorio"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v2/tareas/{tarea_id}/recordatorios/{recordatorio_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Quitar un recordatorio */
+        delete: operations["eliminar_recordatorio"];
+        options?: never;
+        head?: never;
+        /** Cambiar o pausar un recordatorio */
+        patch: operations["editar_recordatorio"];
         trace?: never;
     };
     "/api/v2/agenda": {
@@ -2398,6 +2522,15 @@ export interface components {
              */
             destino: string;
         };
+        /** ActuacionBreve */
+        ActuacionBreve: {
+            /** Id */
+            id: number;
+            /** Texto */
+            texto: string;
+            /** Fecha */
+            fecha?: string | null;
+        };
         /** Agenda */
         Agenda: {
             /**
@@ -2910,6 +3043,54 @@ export interface components {
              * @default false
              */
             borrar_token: boolean;
+        };
+        /** CambiosRecordatorio */
+        CambiosRecordatorio: {
+            /** Activo */
+            activo?: boolean | null;
+            /** Fecha Hora */
+            fecha_hora?: string | null;
+            /** Anticipacion Minutos */
+            anticipacion_minutos?: number | null;
+        };
+        /** CambiosSubtarea */
+        CambiosSubtarea: {
+            /** Titulo */
+            titulo?: string | null;
+            /** Completada */
+            completada?: boolean | null;
+            /** Orden */
+            orden?: number | null;
+            /** Cliente Id */
+            cliente_id?: number | null;
+            /** Avisar Correo */
+            avisar_correo?: boolean | null;
+            /** Avisar Whatsapp */
+            avisar_whatsapp?: boolean | null;
+        };
+        /**
+         * CambiosTarea
+         * @description Solo se cambian los campos enviados. `null` en una relación la quita.
+         */
+        CambiosTarea: {
+            /** Titulo */
+            titulo?: string | null;
+            /** Descripcion */
+            descripcion?: string | null;
+            /** Estado */
+            estado?: ("PENDIENTE" | "EN_CURSO" | "COMPLETADA" | "CANCELADA") | null;
+            /** Prioridad */
+            prioridad?: ("BAJA" | "MEDIA" | "ALTA" | "URGENTE") | null;
+            /** Fecha Limite */
+            fecha_limite?: string | null;
+            /** Proceso Id */
+            proceso_id?: number | null;
+            /** Radicado Id */
+            radicado_id?: number | null;
+            /** Actuacion Id */
+            actuacion_id?: number | null;
+            /** Cliente Id */
+            cliente_id?: number | null;
         };
         /** CargaPersona */
         CargaPersona: {
@@ -3576,6 +3757,87 @@ export interface components {
              * @description Todas las etapas, en orden. Las que falten se borran si ningún proceso las usó; si no, se desactivan.
              */
             etapas: components["schemas"]["DatosEtapa"][];
+        };
+        /** DatosRecordatorio */
+        DatosRecordatorio: {
+            /**
+             * Fecha Hora
+             * @description Un momento exacto, en el futuro.
+             */
+            fecha_hora?: string | null;
+            /**
+             * Anticipacion Minutos
+             * @description O minutos antes del vencimiento.
+             */
+            anticipacion_minutos?: number | null;
+            /**
+             * Correo
+             * @default true
+             */
+            correo: boolean;
+            /**
+             * Whatsapp
+             * @default false
+             */
+            whatsapp: boolean;
+        };
+        /** DatosSubtarea */
+        DatosSubtarea: {
+            /** Titulo */
+            titulo: string;
+            /**
+             * Cliente Id
+             * @description Pedírsela a un cliente del proceso.
+             */
+            cliente_id?: number | null;
+            /**
+             * Avisar Correo
+             * @default true
+             */
+            avisar_correo: boolean;
+            /**
+             * Avisar Whatsapp
+             * @default true
+             */
+            avisar_whatsapp: boolean;
+        };
+        /** DatosTarea */
+        DatosTarea: {
+            /** Titulo */
+            titulo: string;
+            /** Descripcion */
+            descripcion?: string | null;
+            /**
+             * Prioridad
+             * @default MEDIA
+             * @enum {string}
+             */
+            prioridad: "BAJA" | "MEDIA" | "ALTA" | "URGENTE";
+            /**
+             * Fecha Limite
+             * @description Vence al final de ese día, hora de Colombia.
+             */
+            fecha_limite?: string | null;
+            /**
+             * Proceso Id
+             * @description Sin proceso es una tarea general, sin radicado ni cliente.
+             */
+            proceso_id?: number | null;
+            /**
+             * Radicado Id
+             * @description Un radicado del proceso.
+             */
+            radicado_id?: number | null;
+            /**
+             * Actuacion Id
+             * @description Una actuación de ese radicado.
+             */
+            actuacion_id?: number | null;
+            /**
+             * Cliente Id
+             * @description Un cliente del proceso; la tarea le llega a su portal.
+             */
+            cliente_id?: number | null;
         };
         /** DatosTermino */
         DatosTermino: {
@@ -5805,6 +6067,25 @@ export interface components {
             /** Destino */
             destino: string;
         };
+        /** RadicadoBreve */
+        RadicadoBreve: {
+            /** Id */
+            id: number;
+            /** Numero */
+            numero: string;
+        };
+        /** RadicadoConActuaciones */
+        RadicadoConActuaciones: {
+            /** Id */
+            id: number;
+            /** Numero */
+            numero: string;
+            /**
+             * Actuaciones
+             * @description Las 40 más recientes, de la más nueva a la más antigua.
+             */
+            actuaciones: components["schemas"]["ActuacionBreve"][];
+        };
         /** RadicadoConError */
         RadicadoConError: {
             /** Radicado Id */
@@ -5831,6 +6112,34 @@ export interface components {
             numero: string;
             /** Proceso */
             proceso: string | null;
+        };
+        /** Recordatorio */
+        Recordatorio: {
+            /** Id */
+            id: number;
+            /**
+             * Fecha Hora
+             * @description Momento exacto, si se programó así.
+             */
+            fecha_hora?: string | null;
+            /**
+             * Anticipacion Minutos
+             * @description Minutos antes del vencimiento, si se programó así.
+             */
+            anticipacion_minutos?: number | null;
+            /**
+             * Cuando
+             * @description Cuándo sale; vacío si depende de una fecha límite que ya no hay.
+             */
+            cuando?: string | null;
+            /** Correo */
+            correo: boolean;
+            /** Whatsapp */
+            whatsapp: boolean;
+            /** Activo */
+            activo: boolean;
+            /** Enviado En */
+            enviado_en?: string | null;
         };
         /** Referencia */
         Referencia: {
@@ -6214,6 +6523,23 @@ export interface components {
              */
             comentario?: string | null;
         };
+        /** SubtareaDetalle */
+        SubtareaDetalle: {
+            /** Id */
+            id: number;
+            /** Titulo */
+            titulo: string;
+            /** Completada */
+            completada: boolean;
+            /** Completada En */
+            completada_en?: string | null;
+            /** @description Cliente al que se le pidió; la ve en su portal. */
+            cliente?: components["schemas"]["PersonaBreve"] | null;
+            /** Avisar Correo */
+            avisar_correo: boolean;
+            /** Avisar Whatsapp */
+            avisar_whatsapp: boolean;
+        };
         /** Suscripcion */
         Suscripcion: {
             /** Activa */
@@ -6252,6 +6578,59 @@ export interface components {
              * @enum {string}
              */
             prioridad: "BAJA" | "MEDIA" | "ALTA" | "URGENTE";
+        };
+        /** TareaDetalle */
+        TareaDetalle: {
+            /** Id */
+            id: number;
+            /** Titulo */
+            titulo: string;
+            /** Descripcion */
+            descripcion?: string | null;
+            /**
+             * Estado
+             * @enum {string}
+             */
+            estado: "PENDIENTE" | "EN_CURSO" | "COMPLETADA" | "CANCELADA";
+            /**
+             * Prioridad
+             * @enum {string}
+             */
+            prioridad: "BAJA" | "MEDIA" | "ALTA" | "URGENTE";
+            /** Fecha Limite */
+            fecha_limite?: string | null;
+            /** Completada En */
+            completada_en?: string | null;
+            /** Vencida */
+            vencida: boolean;
+            /**
+             * Creada En
+             * Format: date-time
+             */
+            creada_en: string;
+            /**
+             * Actualizada En
+             * Format: date-time
+             */
+            actualizada_en: string;
+            responsable: components["schemas"]["PersonaBreve"];
+            proceso?: components["schemas"]["ProcesoBreve"] | null;
+            radicado?: components["schemas"]["RadicadoBreve"] | null;
+            actuacion?: components["schemas"]["ActuacionBreve"] | null;
+            /** @description Cliente al que se le asignó la tarea. */
+            cliente?: components["schemas"]["PersonaBreve"] | null;
+            /** Subtareas */
+            subtareas: components["schemas"]["SubtareaDetalle"][];
+            /**
+             * Recordatorios
+             * @description Los que programó el equipo, en orden de salida.
+             */
+            recordatorios: components["schemas"]["Recordatorio"][];
+            /**
+             * Avisos Automaticos
+             * @description Avisos que la plataforma manda sola antes del vencimiento a quien debe hacer la tarea.
+             */
+            avisos_automaticos: string[];
         };
         /** TareaResumen */
         TareaResumen: {
@@ -6564,6 +6943,16 @@ export interface components {
             descripcion: string;
             /** Enlace */
             enlace: string | null;
+        };
+        /**
+         * VinculosProceso
+         * @description Con qué se puede relacionar algo del proceso: sus clientes, radicados y actuaciones.
+         */
+        VinculosProceso: {
+            /** Clientes */
+            clientes: components["schemas"]["PersonaBreve"][];
+            /** Radicados */
+            radicados: components["schemas"]["RadicadoConActuaciones"][];
         };
         /** VistaPrevia */
         VistaPrevia: {
@@ -7115,6 +7504,91 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ProcesoDetalle"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+        };
+    };
+    vinculos_del_proceso: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                proceso_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["VinculosProceso"];
                 };
             };
             /** @description Bad Request */
@@ -8491,6 +8965,93 @@ export interface operations {
             };
         };
     };
+    crear_tarea_nueva: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DatosTarea"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TareaDetalle"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+        };
+    };
     cambiar_tareas_en_lote: {
         parameters: {
             query?: never;
@@ -8945,6 +9506,793 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["TareasCreadas"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+        };
+    };
+    obtener_tarea: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                tarea_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TareaDetalle"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+        };
+    };
+    eliminar_tarea: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                tarea_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+        };
+    };
+    editar_tarea: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                tarea_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CambiosTarea"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TareaDetalle"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+        };
+    };
+    crear_subtarea: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                tarea_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DatosSubtarea"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TareaDetalle"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+        };
+    };
+    eliminar_subtarea: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                tarea_id: number;
+                subtarea_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TareaDetalle"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+        };
+    };
+    editar_subtarea: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                tarea_id: number;
+                subtarea_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CambiosSubtarea"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TareaDetalle"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+        };
+    };
+    crear_recordatorio: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                tarea_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DatosRecordatorio"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TareaDetalle"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+        };
+    };
+    eliminar_recordatorio: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                tarea_id: number;
+                recordatorio_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TareaDetalle"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+        };
+    };
+    editar_recordatorio: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                tarea_id: number;
+                recordatorio_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CambiosRecordatorio"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TareaDetalle"];
                 };
             };
             /** @description Bad Request */

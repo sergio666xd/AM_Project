@@ -4,6 +4,7 @@ from sqlalchemy import ColumnElement, exists, func, or_, select
 from sqlalchemy.orm import Session, selectinload
 
 from app.modulos.expedientes.modelos import (
+    Actuacion,
     EtapaProceso,
     Proceso,
     ProcesoCliente,
@@ -99,3 +100,15 @@ class RepositorioProcesos:
             .options(selectinload(EtapaProceso.etapa))
             .order_by(EtapaProceso.fecha, EtapaProceso.id)
         )]
+
+    def actuaciones_recientes(self, radicado_ids: list[int], por_radicado: int = 40) -> dict[int, list]:
+        """Actuaciones de cada radicado, de la más reciente a la más antigua (el orden del juzgado)."""
+        filas = self._db.scalars(
+            select(Actuacion).where(Actuacion.radicado_id.in_(radicado_ids))
+            .order_by(Actuacion.radicado_id, Actuacion.orden.asc(), Actuacion.id.desc())
+        ).all()
+        resultado: dict[int, list] = {i: [] for i in radicado_ids}
+        for actuacion in filas:
+            if len(resultado[actuacion.radicado_id]) < por_radicado:
+                resultado[actuacion.radicado_id].append(actuacion)
+        return resultado

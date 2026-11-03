@@ -1,5 +1,6 @@
 from pydantic import BaseModel, Field
 
+from app.modulos.tareas.esquemas import ActuacionBreve
 from app.modulos.etapas.esquemas import EtapaActual, EtapaBreve, PlantillaBreve
 from app.nucleo.paginacion import Pagina
 from app.nucleo.zona_horaria import FechaHora
@@ -46,3 +47,16 @@ class CambiarEtapa(BaseModel):
 
 class PaginaProcesos(Pagina[ProcesoResumen]):
     pass
+
+
+class RadicadoConActuaciones(BaseModel):
+    id: int
+    numero: str
+    actuaciones: list[ActuacionBreve] = Field(description="Las 40 más recientes, de la más nueva a la más antigua.")
+
+
+class VinculosProceso(BaseModel):
+    """Con qué se puede relacionar algo del proceso: sus clientes, radicados y actuaciones."""
+
+    clientes: list[PersonaBreve]
+    radicados: list[RadicadoConActuaciones]

@@ -32,6 +32,7 @@ from app.modulos.folios.esquemas import (
 )
 from app.modulos.folios.repositorio import GRUPOS, ORDEN_TIPOS, Contenido, RepositorioFolios
 from app.modulos.identidad.modelos import Usuario
+from app.modulos.tareas import recordatorios
 from app.nucleo.errores import Conflicto, ErrorDominio, NoEncontrado, SinPermiso
 from app.nucleo.paginacion import ParametrosPagina, codificar_cursor
 from app.nucleo.zona_horaria import fin_del_dia_utc
@@ -231,9 +232,6 @@ class ServicioFolios:
 
     def crear_tarea(self, usuario: Usuario, proceso_id: int, numero: int, datos: TareaDesdeFolio) -> TareaCreada:
         """Crea una tarea del proceso a partir de un folio y lo deja revisado."""
-        # Los recordatorios de las tareas viven en la API v1 hasta retirarla (Fase 7).
-        from app.routers.tareas import _crear_recordatorios_sistema, _lanzar_recordatorios_pendientes
-
         proceso = self._proceso_de_firma(usuario, proceso_id)
         folio = self._folio(proceso_id, numero)
         actuacion = self._db.get(models.Actuacion, folio.origen_id) if folio.tipo == "actuacion" else None
@@ -257,11 +255,11 @@ class ServicioFolios:
         )
         self._db.add(tarea)
         self._db.flush()
-        recordatorios = _crear_recordatorios_sistema(self._db, tarea)
+        por_lanzar = recordatorios.crear_sistema(self._db, tarea)
         self._folios.marcar_revisados(proceso_id, [numero], usuario.id, utc_ahora())
         registrar_evento_auditoria(self._db, usuario, "tarea.crear", "tarea", tarea.id, {"folio": numero})
         self._db.commit()
-        _lanzar_recordatorios_pendientes(self._db, tarea, recordatorios)
+        recordatorios.lanzar(self._db, tarea, por_lanzar)
         return TareaCreada(id=tarea.id, titulo=tarea.titulo, fecha_limite=tarea.fecha_limite)
 
     @staticmethod

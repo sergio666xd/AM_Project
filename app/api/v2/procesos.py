@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, Query
 
 from app import models
 from app.api.v2.dependencias import servicio_procesos
-from app.modulos.expedientes.esquemas import CambiarEtapa, PaginaProcesos, ProcesoDetalle
+from app.modulos.expedientes.esquemas import CambiarEtapa, PaginaProcesos, ProcesoDetalle, VinculosProceso
 from app.modulos.expedientes.repositorio import FiltroProcesos
 from app.modulos.expedientes.servicio import ServicioProcesos
 from app.nucleo.paginacion import ParametrosPagina, parametros_pagina
@@ -36,6 +36,16 @@ def obtener_proceso(
     servicio: ServicioProcesos = Depends(servicio_procesos),
 ):
     return servicio.obtener(usuario, proceso_id)
+
+
+@router.get("/{proceso_id}/vinculos", response_model=VinculosProceso, summary="Clientes, radicados y actuaciones del proceso")
+def vinculos_del_proceso(
+    proceso_id: int,
+    usuario: models.Usuario = Depends(usuario_actual),
+    servicio: ServicioProcesos = Depends(servicio_procesos),
+):
+    """Para relacionar una tarea, un evento o un aviso con algo del proceso."""
+    return servicio.vinculos(usuario, proceso_id)
 
 
 @router.post("/{proceso_id}/archivar", response_model=ProcesoDetalle, summary="Archivar un proceso")

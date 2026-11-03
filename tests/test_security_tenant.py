@@ -3493,10 +3493,8 @@ def test_reminder_versions_follow_schedule_and_task_mutations(monkeypatch):
     engine = create_engine("sqlite:///:memory:")
     models.Base.metadata.create_all(engine)
     launches = []
-    monkeypatch.setattr(
-        "app.routers.tareas.iniciar_workflow_recordatorio",
-        lambda db, reminder_id: launches.append(reminder_id) or True,
-    )
+    for ruta in ("app.routers.tareas.iniciar_workflow_recordatorio", "app.modulos.tareas.recordatorios.iniciar_workflow_recordatorio"):
+        monkeypatch.setattr(ruta, lambda db, reminder_id: launches.append(reminder_id) or True)
 
     with Session(engine) as db:
         lawyer = models.Usuario(
@@ -3675,7 +3673,7 @@ def test_subtask_inherits_scope_and_configures_client_notifications(monkeypatch)
     models.Base.metadata.create_all(engine)
     notifications = []
     monkeypatch.setattr(
-        "app.routers.tareas.emitir_notificacion_workflow",
+        "app.modulos.tareas.avisos.emitir_notificacion_workflow",
         lambda *args, **kwargs: notifications.append((args, kwargs)) or ["delivery"],
     )
 
