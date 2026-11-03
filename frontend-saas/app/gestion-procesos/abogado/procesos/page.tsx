@@ -1,155 +1,116 @@
 "use client";
 
-import { apiRequest, TOKEN_EN_COOKIE } from "@/lib/api";
+import { useCallback, useId, useState, type FormEvent } from "react";
+import { useRouter } from "next/navigation";
+import { Archive, ArchiveRestore, CalendarDays, FileText, FolderOpen, ListChecks, Plus, RefreshCw } from "lucide-react";
 
-import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
-
-import { OperationResult } from "@/components/ui/OperationResult";
-import { PageHeader } from "@/components/ui/PageHeader";
+import { CAMPO, ETIQUETA } from "@/components/expediente/CalculadoraTermino";
+import { Button } from "@/components/ui/Button";
+import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { DataTable, type DataTableColumn, type RowAction } from "@/components/ui/DataTable";
+import { Modal } from "@/components/ui/Modal";
+import { PageHeader } from "@/components/ui/PageHeader";
+import { Radicado } from "@/components/ui/Radicado";
 import { SegmentedControl } from "@/components/ui/SegmentedControl";
 import { SummaryStrip } from "@/components/ui/SummaryStrip";
-import { formatDate, formatDateTime, formatRelative, toDate } from "@/lib/labels";
-import { useNow } from "@/lib/useNow";
-import { Button } from "@/components/ui/Button";
-import { Badge } from "@/components/ui/Badge";
-import {
-  Archive,
-  ArchiveRestore,
-  CalendarDays,
-  FileText,
-  FolderOpen,
-  ListChecks,
-  Plus,
-  X,
-} from "lucide-react";
+import { useToast } from "@/components/ui/ToastProvider";
+import { useSession } from "@/context/SessionContext";
+import { api, mensajeDeError, type Esquemas } from "@/lib/api-v2/cliente";
+import { cx } from "@/lib/cx";
+import { diaCorto, fechaCorta } from "@/lib/fechas";
+import { useAccionDeUrl } from "@/lib/useAccionDeUrl";
+import { useLoadEffect } from "@/lib/useLoadEffect";
 
+type Proceso = Esquemas["ProcesoResumen"];
+type Filtro = "todos" | "vencidas" | "cliente" | "colaboro";
+const RUTA = "/gestion-procesos/abogado/procesos";
 
-type Process = {
-  id: number;
-  nombre: string;
-  descripcion?: string | null;
-  etapa?: string | null;
-  etapa_posicion?: number | null;
-  etapas_total?: number | null;
-  responsable?: { id: number; nombre_completo: string };
-  colaboradores?: { id: number; nombre_completo: string }[];
-  soy_responsable?: boolean;
-  archivado_en?: string | null;
-  radicados_count?: number;
-  clientes_count?: number;
-  clientes?: { id: number; nombre_completo: string }[];
-  tareas_pendientes?: number;
-  tareas_vencidas?: number;
-  documentos_pendientes?: number;
-  proxima_actividad?: string | null;
-  ultima_actividad?: string | null;
-  estado_atencion?: "ACTIVO" | "ATENCION";
-  riesgo?: boolean;
-  inactivo?: boolean;
-  radicados: {
-    id: number;
-    numero: string;
-    actuaciones: {
-      id: number;
-    }[];
-  }[];
-};
-
-async function requestProcesses(showArchived: boolean, headers: Record<string, string>) {
-  const route = showArchived ? "procesos/archivados" : "procesos";
-  const response = await apiRequest(`/api/expedientes/${route}`, { headers });
-  const data = await response.json();
-  if (!response.ok) throw new Error(data.detail || "No fue posible cargar los procesos.");
-  return data as Process[];
+/** Todas las páginas del listado: la firma tiene decenas o pocos cientos de procesos. */
+async function todosLosProcesos(archivados: boolean) {
+  const items: Proceso[] = [];
+  let cursor: string | undefined;
+  for (let pagina = 0; pagina < 20; pagina++) {
+    const { data, error } = await api.GET("/api/v2/procesos", { params: { query: { archivados, limite: 100, cursor } } });
+    if (!data) throw new Error(mensajeDeError(error));
+    items.push(...data.items);
+    if (!data.siguiente) break;
+    cursor = data.siguiente;
+  }
+  return items;
 }
 
 export default function ProcesosPage() {
-  const [items, setItems] = useState<Process[]>([]);
-  const [showArchived, setShowArchived] = useState(false);
-  const [scopeFilter, setScopeFilter] = useState("TODAS");
-  const now = useNow();
+  const router = useRouter();
+  const { toast } = useToast();
+  const { user } = useSession();
+  const [archivados, setArchivados] = useState(false);
+  const [filtro, setFiltro] = useState<Filtro>("todos");
+  const [procesos, setProcesos] = useState<Proceso[] | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [nuevo, setNuevo] = useState(false);
+  const [archivar, setArchivar] = useState<Proceso | null>(null);
 
-  const [name, setName] = useState("");
-  const [description, setDescription] = useState("");
+  useAccionDeUrl("nuevo", useCallback(() => setNuevo(true), []));
 
-  const [error, setError] = useState("");
-  const [notice, setNotice] = useState("");
-  const [noticeHref, setNoticeHref] = useState<string | null>(null);
-
-  const [loading, setLoading] = useState(true);
-  const [working, setWorking] = useState(false);
-  const [showCreateModal, setShowCreateModal] = useState(false);
-
-  const headers = useCallback(
-    () => ({
-      Authorization: `Bearer ${TOKEN_EN_COOKIE}`,
-    }),
-    []
-  );
-
-  const load = useCallback(async () => {
-    setLoading(true);
-    setError("");
-
+  const cargar = useCallback(async () => {
     try {
-      setItems(await requestProcesses(showArchived, headers()));
-    } catch (cause) {
-      setError(
-        cause instanceof Error
-          ? cause.message
-          : "Error al cargar los procesos."
-      );
-    } finally {
-      setLoading(false);
+      setProcesos(await todosLosProcesos(archivados));
+      setError(null);
+    } catch (causa) {
+      setError(causa instanceof Error ? causa.message : "No se pudieron cargar los procesos.");
     }
-  }, [headers, showArchived]);
+  }, [archivados]);
+  useLoadEffect(cargar);
 
-  useEffect(() => {
-    let active = true;
-    requestProcesses(showArchived, headers())
-      .then((data) => { if (active) setItems(data); })
-      .catch((cause: unknown) => {
-        if (active) setError(cause instanceof Error ? cause.message : "Error al cargar los procesos.");
-      })
-      .finally(() => { if (active) setLoading(false); });
-    return () => { active = false; };
-  }, [headers, showArchived]);
+  async function reabrir(p: Proceso) {
+    const { error: fallo } = await api.POST("/api/v2/procesos/{proceso_id}/reabrir", { params: { path: { proceso_id: p.id } } });
+    if (fallo) {
+      toast({ title: mensajeDeError(fallo), tone: "error" });
+      return;
+    }
+    toast({ title: `«${p.nombre}» volvió a los procesos activos`, tone: "success" });
+    void cargar();
+  }
 
-  const visibleProcesses = useMemo(
-    () =>
-      items.filter((item) =>
-        scopeFilter === "TODAS" ||
-        (scopeFilter === "PROPIOS" && item.soy_responsable) ||
-        (scopeFilter === "COLABORATIVOS" && !item.soy_responsable) ||
-        (scopeFilter === "ATENCION" && item.estado_atencion === "ATENCION") ||
-        (scopeFilter === "RIESGO" && item.riesgo),
-      ),
-    [items, scopeFilter],
+  async function confirmarArchivo() {
+    if (!archivar) return;
+    const { error: fallo } = await api.POST("/api/v2/procesos/{proceso_id}/archivar", { params: { path: { proceso_id: archivar.id } } });
+    if (fallo) throw new Error(mensajeDeError(fallo));
+    toast({ title: `«${archivar.nombre}» quedó archivado`, description: "Lo encuentra en Archivados si necesita reabrirlo.", tone: "success" });
+    void cargar();
+  }
+
+  const lista = procesos ?? [];
+  const colaboro = (p: Proceso) => p.responsable.id !== user?.id;
+  const conteo = {
+    todos: lista.length,
+    vencidas: lista.filter((p) => (p.actividad?.tareas_vencidas ?? 0) > 0).length,
+    cliente: lista.filter((p) => (p.actividad?.pendiente_cliente ?? 0) > 0).length,
+    colaboro: lista.filter(colaboro).length,
+  };
+  const visibles = lista.filter((p) =>
+    filtro === "todos"
+    || (filtro === "vencidas" && (p.actividad?.tareas_vencidas ?? 0) > 0)
+    || (filtro === "cliente" && (p.actividad?.pendiente_cliente ?? 0) > 0)
+    || (filtro === "colaboro" && colaboro(p)),
   );
 
-  const processStatus = (item: Process) =>
-    item.archivado_en
-      ? { label: "Archivado", tone: "archived" as const, rank: 0 }
-      : item.riesgo
-        ? { label: "En riesgo", tone: "risk" as const, rank: 4 }
-        : item.estado_atencion === "ATENCION"
-          ? { label: "Requiere atención", tone: "attention" as const, rank: 3 }
-          : item.inactivo
-            ? { label: "Sin actividad reciente", tone: "review" as const, rank: 2 }
-            : { label: "Al día", tone: "completed" as const, rank: 1 };
-
-  const processColumns: DataTableColumn<Process>[] = [
+  const columnas: DataTableColumn<Proceso>[] = [
     {
       key: "nombre",
       header: "Proceso",
       mobile: "title",
-      sortValue: (item) => item.nombre,
-      searchValue: (item) => `${item.nombre} ${item.descripcion ?? ""} ${item.radicados.map((radicado) => radicado.numero).join(" ")}`,
-      render: (item) => (
+      sortValue: (p) => p.nombre,
+      searchValue: (p) => `${p.nombre} ${p.radicados.join(" ")} ${p.clientes.map((c) => c.nombre).join(" ")}`,
+      render: (p) => (
         <span className="block min-w-0">
-          <span className="block truncate font-medium text-foreground">{item.nombre}</span>
-          {item.radicados.length > 0 && <span className="mt-0.5 block truncate font-mono text-xs font-normal text-foreground-muted">{item.radicados.map((radicado) => radicado.numero).join(" · ")}</span>}
+          <span className="block truncate font-semibold text-ink">{p.nombre}</span>
+          {p.radicados.length > 0 && (
+            <span className="mt-0.5 flex items-center gap-1.5 text-[12.5px] text-ink-3">
+              <Radicado numero={p.radicados[0]} copiable={false} className="truncate" />
+              {p.radicados.length > 1 && <span className="shrink-0">+{p.radicados.length - 1}</span>}
+            </span>
+          )}
         </span>
       ),
       className: "max-w-xs",
@@ -158,48 +119,37 @@ export default function ProcesosPage() {
       key: "clientes",
       header: "Clientes",
       mobile: "subtitle",
-      sortValue: (item) => (item.clientes || []).map((client) => client.nombre_completo).join(", "),
-      render: (item) => <span className="line-clamp-2">{(item.clientes || []).map((client) => client.nombre_completo).join(", ") || <span className="text-foreground-muted">Sin cliente</span>}</span>,
+      sortValue: (p) => p.clientes.map((c) => c.nombre).join(", "),
+      render: (p) => <span className="line-clamp-2">{p.clientes.map((c) => c.nombre).join(", ") || <span className="text-ink-3">Sin clientes</span>}</span>,
     },
     {
       key: "etapa",
       header: "Etapa",
       mobile: "meta",
-      sortValue: (item) => (item.etapa_posicion && item.etapas_total ? item.etapa_posicion / item.etapas_total : -1),
-      exportValue: (item) => item.etapa ?? "Sin etapa",
-      render: (item) =>
-        item.etapa ? (
-          <span className="inline-flex items-center gap-2 whitespace-nowrap">
-            <span aria-hidden="true" className="flex gap-0.5">
-              {Array.from({ length: item.etapas_total ?? 0 }, (_, i) => {
-                const actual = (item.etapa_posicion ?? 0) - 1;
-                return <span key={i} className={`h-1.5 w-2.5 rounded-full ${i < actual ? "bg-navy" : i === actual ? "bg-gold" : "bg-line-strong"}`} />;
-              })}
-            </span>
-            {item.etapa}
+      sortValue: (p) => (p.etapa ? p.etapa.posicion / Math.max(1, p.etapa.total) : -1),
+      exportValue: (p) => p.etapa?.nombre ?? "Sin etapa",
+      render: (p) => p.etapa ? (
+        <span className="inline-flex items-center gap-2 whitespace-nowrap">
+          <span aria-hidden="true" className="flex gap-0.5">
+            {Array.from({ length: p.etapa.total }, (_, i) => (
+              <span key={i} className={cx("h-1.5 w-2.5 rounded-full", i < p.etapa!.posicion - 1 ? "bg-navy" : i === p.etapa!.posicion - 1 ? "bg-gold" : "bg-line-strong")} />
+            ))}
           </span>
-        ) : (
-          <span className="text-foreground-muted">Sin etapa</span>
-        ),
-    },
-    {
-      key: "estado",
-      header: "Estado",
-      mobile: "badge",
-      sortValue: (item) => processStatus(item).rank,
-      exportValue: (item) => processStatus(item).label,
-      render: (item) => <Badge tone={processStatus(item).tone}>{processStatus(item).label}</Badge>,
+          {p.etapa.nombre}
+        </span>
+      ) : <span className="text-ink-3">Sin etapa</span>,
     },
     {
       key: "responsable",
       header: "Responsable",
       mobile: "meta",
       hideOnMobile: true,
-      sortValue: (item) => item.responsable?.nombre_completo,
-      render: (item) => (
+      wideOnly: true,
+      sortValue: (p) => p.responsable.nombre,
+      render: (p) => (
         <span className="block">
-          {item.responsable?.nombre_completo || "—"}
-          {!item.soy_responsable && <span className="block text-xs text-foreground-muted">Colaboras en este proceso</span>}
+          {p.responsable.nombre}
+          {colaboro(p) && <span className="block text-[12.5px] text-ink-3">Usted colabora</span>}
         </span>
       ),
     },
@@ -208,330 +158,164 @@ export default function ProcesosPage() {
       header: "Tareas",
       mobile: "meta",
       align: "right",
-      sortValue: (item) => (item.tareas_vencidas ?? 0) * 1000 + (item.tareas_pendientes ?? 0),
-      render: (item) => (
+      sortValue: (p) => (p.actividad?.tareas_vencidas ?? 0) * 1000 + (p.actividad?.tareas_abiertas ?? 0),
+      exportValue: (p) => String(p.actividad?.tareas_abiertas ?? 0),
+      render: (p) => (
         <span className="whitespace-nowrap tabular-nums">
-          {item.tareas_pendientes ?? 0}
-          {(item.tareas_vencidas ?? 0) > 0 && <span className="ml-1 font-semibold text-danger">({item.tareas_vencidas} venc.)</span>}
+          {p.actividad?.tareas_abiertas ?? 0}
+          {(p.actividad?.tareas_vencidas ?? 0) > 0 && <span className="ml-1 font-semibold text-bad">({p.actividad!.tareas_vencidas} vencida{p.actividad!.tareas_vencidas === 1 ? "" : "s"})</span>}
         </span>
       ),
     },
     {
-      key: "documentos",
-      header: "Documentos pend.",
-      mobileLabel: "Documentos pendientes",
+      key: "cliente",
+      header: "Del cliente",
+      mobileLabel: "Esperando al cliente",
       mobile: "hidden",
       align: "right",
       wideOnly: true,
-      sortValue: (item) => item.documentos_pendientes ?? 0,
-      render: (item) => <span className="tabular-nums">{item.documentos_pendientes ?? 0}</span>,
+      sortValue: (p) => p.actividad?.pendiente_cliente ?? 0,
+      render: (p) => <span className="tabular-nums">{p.actividad?.pendiente_cliente || <span className="text-ink-3">—</span>}</span>,
     },
     {
-      key: "proxima_actividad",
-      header: "Próximo vencimiento",
+      key: "vence",
+      header: archivados ? "Archivado" : "Vence",
+      mobileLabel: archivados ? "Archivado" : "Próxima tarea vence",
       mobile: "meta",
       className: "whitespace-nowrap",
-      sortValue: (item) => toDate(item.proxima_actividad),
-      exportValue: (item) => formatDateTime(item.proxima_actividad),
-      render: (item) => item.proxima_actividad ? formatDate(item.proxima_actividad) : <span className="text-foreground-muted">—</span>,
-    },
-    {
-      key: "ultima_actividad",
-      header: "Actividad",
-      mobile: "hidden",
-      hideOnMobile: true,
-      className: "whitespace-nowrap",
-      sortValue: (item) => toDate(item.ultima_actividad),
-      exportValue: (item) => formatDateTime(item.ultima_actividad),
-      render: (item) => item.ultima_actividad ? <span title={formatDateTime(item.ultima_actividad)}>{formatRelative(item.ultima_actividad, now)}</span> : "—",
+      sortValue: (p) => (archivados ? p.archivado_en : p.actividad?.proximo_vencimiento) ?? "",
+      exportValue: (p) => (archivados ? fechaCorta(p.archivado_en) : p.actividad?.proximo_vencimiento ?? ""),
+      render: (p) => archivados
+        ? fechaCorta(p.archivado_en)
+        : p.actividad?.proximo_vencimiento ? diaCorto(p.actividad.proximo_vencimiento.slice(0, 10)) : <span className="text-ink-3">—</span>,
     },
   ];
 
-  const processActions: RowAction<Process>[] = [
-    { label: "Abrir ficha", icon: <FolderOpen />, href: (item) => `/gestion-procesos/abogado/procesos/${item.id}` },
-    { label: "Tareas", icon: <ListChecks />, href: (item) => `/gestion-procesos/abogado/procesos/${item.id}/tareas`, hidden: (item) => Boolean(item.archivado_en) },
-    { label: "Agenda", icon: <CalendarDays />, href: (item) => `/gestion-procesos/abogado/procesos/${item.id}/agenda`, hidden: (item) => Boolean(item.archivado_en) },
-    { label: "Documentos", icon: <FileText />, href: (item) => `/gestion-procesos/abogado/documentos?proceso=${item.id}`, hidden: (item) => Boolean(item.archivado_en) },
-    {
-      label: "Archivar proceso",
-      icon: <Archive />,
-      tone: "danger",
-      separated: true,
-      hidden: (item) => Boolean(item.archivado_en) || !item.soy_responsable,
-      disabled: () => working,
-      onSelect: (item) => {
-        if (window.confirm(`¿Archivar “${item.nombre}”? Podrás restaurarlo desde Archivados.`)) void changeArchiveStatus(item.id, true);
-      },
-    },
-    {
-      label: "Restaurar proceso",
-      icon: <ArchiveRestore />,
-      hidden: (item) => !item.archivado_en,
-      disabled: () => working,
-      onSelect: (item) => changeArchiveStatus(item.id, false),
-    },
+  const acciones: RowAction<Proceso>[] = [
+    { label: "Abrir el expediente", icon: <FolderOpen size={16} />, href: (p) => `${RUTA}/${p.id}` },
+    { label: "Tareas", icon: <ListChecks size={16} />, href: (p) => `${RUTA}/${p.id}/tareas`, hidden: (p) => Boolean(p.archivado_en) },
+    { label: "Agenda", icon: <CalendarDays size={16} />, href: (p) => `${RUTA}/${p.id}/agenda`, hidden: (p) => Boolean(p.archivado_en) },
+    { label: "Documentos", icon: <FileText size={16} />, href: (p) => `${RUTA}/${p.id}/documentos`, hidden: (p) => Boolean(p.archivado_en) },
+    { label: "Archivar", icon: <Archive size={16} />, tone: "danger", separated: true, hidden: (p) => Boolean(p.archivado_en) || !p.puede_administrar, onSelect: (p) => setArchivar(p) },
+    { label: "Reabrir", icon: <ArchiveRestore size={16} />, hidden: (p) => !p.archivado_en || !p.puede_administrar, onSelect: (p) => void reabrir(p) },
   ];
 
-  async function create(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-
-    if (!name.trim()) return;
-
-    setWorking(true);
-    setError("");
-
-    try {
-      const response = await apiRequest(
-        `/api/expedientes/procesos`,
-        {
-          method: "POST",
-          headers: {
-            ...headers(),
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            nombre: name.trim(),
-            descripcion: description.trim() || null,
-          }),
-        }
-      );
-
-      const body = await response.json();
-
-      if (!response.ok) {
-        throw new Error(
-          body.detail || "No fue posible crear el proceso."
-        );
-      }
-
-      setName("");
-      setDescription("");
-      setShowCreateModal(false);
-
-      await load();
-
-      setNotice("Proceso creado correctamente.");
-      setNoticeHref(typeof body.id === "number" ? `/gestion-procesos/abogado/procesos/${body.id}` : null);
-    } catch (cause) {
-      setError(
-        cause instanceof Error
-          ? cause.message
-          : "Error al crear el proceso."
-      );
-    } finally {
-      setWorking(false);
-    }
-  }
-
-  async function changeArchiveStatus(processId: number, archive: boolean) {
-    setWorking(true);
-    setError("");
-    try {
-      const response = await apiRequest(`/api/expedientes/procesos/${processId}${archive ? "" : "/restaurar"}`, {
-        method: archive ? "DELETE" : "PATCH",
-        headers: headers(),
-      });
-      const body: { mensaje?: string; detail?: string } = await response.json().catch(() => ({}));
-      if (!response.ok) throw new Error(body.detail || "No fue posible actualizar el proceso.");
-      await load();
-      setNotice(body.mensaje || (archive ? "Proceso archivado." : "Proceso restaurado."));
-      setNoticeHref(null);
-    } catch (cause) {
-      setError(cause instanceof Error ? cause.message : "No fue posible actualizar el proceso.");
-    } finally {
-      setWorking(false);
-    }
-  }
+  const vacio = archivados
+    ? ["No hay procesos archivados", "Los procesos que archive aparecen aquí y se pueden reabrir."]
+    : filtro !== "todos"
+      ? ["Ningún proceso coincide", "Toque el filtro otra vez para ver todos."]
+      : ["Aún no hay procesos", "Cree el primer expediente de la firma."];
 
   return (
-    <div className="motion-swap mx-auto max-w-7xl space-y-5">
-      {/* TOAST */}
-      {notice && <OperationResult title={notice} description={noticeHref ? "El expediente quedó creado y puedes continuar con sus datos." : undefined} actionHref={noticeHref ?? undefined} actionLabel={noticeHref ? "Abrir expediente" : undefined} onDismiss={() => { setNotice(""); setNoticeHref(null); }} />}
-
-      {/* HEADER */}
+    <div className="mx-auto max-w-7xl">
       <PageHeader
-        overline="Despacho"
-        title={showArchived ? "Procesos archivados" : "Procesos"}
-        description="Administra los expedientes y procesos del despacho y accede a la ficha de cada uno para consultar su información."
-        action={
-          !showArchived ? (
-            <Button
-              variant="primary"
-              onClick={() => {
-                setError("");
-                setShowCreateModal(true);
-              }}
-              icon={<Plus className="size-4" />}
-            >
-              Nuevo proceso
-            </Button>
-          ) : undefined
-        }
+        title={archivados ? "Procesos archivados" : "Procesos"}
+        description="Los expedientes de la firma: su etapa, lo que vence y lo que falta del cliente."
+        action={!archivados ? <Button icon={<Plus size={16} />} onClick={() => setNuevo(true)}>Nuevo proceso</Button> : undefined}
       />
 
-      <SegmentedControl
-        label="Estado de los procesos"
-        value={showArchived ? "archivados" : "activos"}
-        onChange={(value) => {
-          const archived = value === "archivados";
-          if (archived === showArchived) return;
-          setLoading(true);
-          setItems([]);
-          setScopeFilter("TODAS");
-          setShowArchived(archived);
-        }}
-        options={[{ value: "activos", label: "Activos" }, { value: "archivados", label: "Archivados" }]}
-      />
+      <div className="mb-4">
+        <SegmentedControl
+          label="Procesos activos o archivados"
+          value={archivados ? "archivados" : "activos"}
+          onChange={(v) => { setProcesos(null); setFiltro("todos"); setArchivados(v === "archivados"); }}
+          options={[{ value: "activos", label: "Activos" }, { value: "archivados", label: "Archivados" }]}
+        />
+      </div>
 
-      {!showArchived && (
+      {!archivados && (
         <SummaryStrip
-          active={scopeFilter}
-          onSelect={(key) => setScopeFilter(key ?? "TODAS")}
+          active={filtro}
+          onSelect={(clave) => setFiltro(!clave || clave === filtro ? "todos" : (clave as Filtro))}
           items={[
-            { key: "TODAS", label: "Procesos activos", value: items.length },
-            { key: "RIESGO", label: "En riesgo", value: items.filter((item) => item.riesgo).length, tone: "danger" },
-            { key: "ATENCION", label: "Requieren atención", value: items.filter((item) => item.estado_atencion === "ATENCION").length, tone: "warning" },
-            { key: "COLABORATIVOS", label: "Como colaborador", value: items.filter((item) => !item.soy_responsable).length },
+            { key: "todos", label: "Procesos activos", value: procesos ? conteo.todos : "—" },
+            { key: "vencidas", label: "Con tareas vencidas", value: procesos ? conteo.vencidas : "—", tone: conteo.vencidas ? "danger" : "default" },
+            { key: "cliente", label: "Esperando al cliente", value: procesos ? conteo.cliente : "—", tone: conteo.cliente ? "warning" : "default" },
+            { key: "colaboro", label: "Donde colabora", value: procesos ? conteo.colaboro : "—" },
           ]}
         />
       )}
 
-      {error && (
-        <div role="alert" className="flex items-center justify-between gap-4 rounded-[var(--radius-lg)] border border-danger/30 bg-danger-light px-4 py-3 text-sm font-medium text-danger">
-          <span>{error}</span>
-          <Button variant="outline" size="sm" onClick={() => { setError(""); void load(); }}>Reintentar</Button>
-        </div>
-      )}
-
-      <DataTable
-        caption={showArchived ? "Procesos archivados" : "Procesos del despacho"}
-        rows={visibleProcesses}
-        columns={processColumns}
-        rowKey={(item) => item.id}
-        rowHref={(item) => `/gestion-procesos/abogado/procesos/${item.id}`}
-        rowActions={processActions}
-        rowTone={(item) => (item.riesgo ? "danger" : item.estado_atencion === "ATENCION" ? "warning" : undefined)}
-        searchPlaceholder="Buscar por proceso, cliente o radicado"
-        initialSort={{ key: "estado", direction: "desc" }}
-        exportFilename={showArchived ? "procesos-archivados" : "procesos"}
-        storageKey="abogado-procesos"
-        loading={loading}
-        onRefresh={() => void load()}
-        emptyTitle={showArchived ? "No hay procesos archivados" : scopeFilter !== "TODAS" ? "Ningún proceso coincide con este filtro" : "Aún no hay procesos"}
-        emptyDescription={showArchived ? "Los procesos que archives aparecerán aquí y podrás restaurarlos." : scopeFilter !== "TODAS" ? "Toca el indicador de nuevo para ver todos." : "Crea el primer expediente del despacho."}
-        emptyAction={!showArchived && scopeFilter === "TODAS" ? <Button variant="primary" onClick={() => { setError(""); setShowCreateModal(true); }} icon={<Plus className="size-4" />}>Nuevo proceso</Button> : undefined}
-      />
-
-      {/* MODAL CREAR PROCESO */}
-      {showCreateModal && (
-        <div className="motion-overlay fixed inset-0 z-50 flex items-center justify-center bg-brand-950/40 p-4 backdrop-blur-xs">
-          <div
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="create-process-title"
-            className="w-full max-w-lg overflow-hidden rounded-2xl border border-border bg-surface text-foreground shadow-2xl"
-          >
-            <div className="flex items-center justify-between border-b border-border px-5 py-4">
-              <div>
-                <h2
-                  id="create-process-title"
-                  className="text-base font-semibold text-foreground"
-                >
-                  Nuevo proceso
-                </h2>
-
-                <p className="mt-0.5 text-xs text-muted">
-                  Registra un nuevo proceso en el despacho.
-                </p>
-              </div>
-
-              <button
-                type="button"
-                onClick={() => {
-                  if (!working) {
-                    setShowCreateModal(false);
-                    setName("");
-                    setDescription("");
-                  }
-                }}
-                className="rounded-lg p-2 text-muted hover:bg-surface-secondary hover:text-foreground"
-              >
-                <X className="size-5" />
-              </button>
-            </div>
-
-            <form onSubmit={create}>
-              <div className="space-y-4 p-5">
-                <div>
-                  <label
-                    htmlFor="process-name"
-                    className="mb-1.5 block text-sm font-medium text-foreground"
-                  >
-                    Nombre del proceso
-                  </label>
-
-                  <input
-                    id="process-name"
-                    required
-                    autoFocus
-                    value={name}
-                    onChange={(event) => setName(event.target.value)}
-                    placeholder="Ej. Proceso ejecutivo Juan Pérez"
-                    className="w-full rounded-lg border border-border bg-surface-secondary px-3 py-2.5 text-sm text-foreground outline-none transition placeholder:text-muted focus:border-brand-500"
-                  />
-                </div>
-
-                <div>
-                  <label
-                    htmlFor="process-description"
-                    className="mb-1.5 block text-sm font-medium text-foreground"
-                  >
-                    Descripción
-                    <span className="ml-1 font-normal text-muted">
-                      (opcional)
-                    </span>
-                  </label>
-
-                  <textarea
-                    id="process-description"
-                    value={description}
-                    onChange={(event) =>
-                      setDescription(event.target.value)
-                    }
-                    placeholder="Descripción breve del proceso..."
-                    rows={4}
-                    className="w-full resize-none rounded-lg border border-border bg-surface-secondary px-3 py-2.5 text-sm text-foreground outline-none transition placeholder:text-muted focus:border-brand-500"
-                  />
-                </div>
-              </div>
-
-              <div className="flex flex-col-reverse gap-2 border-t border-border bg-surface-secondary px-5 py-4 sm:flex-row sm:justify-end">
-                <Button
-                  type="button"
-                  variant="outline"
-                  disabled={working}
-                  onClick={() => {
-                    setShowCreateModal(false);
-                    setName("");
-                    setDescription("");
-                  }}
-                >
-                  Cancelar
-                </Button>
-
-                <Button
-                  type="submit"
-                  variant="primary"
-                  loading={working}
-                  disabled={working || !name.trim()}
-                >
-                  Crear proceso
-                </Button>
-              </div>
-            </form>
+      <div className="mt-5">
+        {error ? (
+          <div role="alert" className="flex flex-wrap items-center gap-3 rounded-[var(--radius-lg)] bg-bad-soft px-4 py-3 text-bad">
+            <p className="flex-1 text-[14px]">{error}</p>
+            <Button size="sm" variant="secondary" icon={<RefreshCw size={14} />} onClick={() => void cargar()}>Reintentar</Button>
           </div>
-        </div>
-      )}
+        ) : (
+          <DataTable
+            caption={archivados ? "Procesos archivados" : "Procesos de la firma"}
+            rows={visibles}
+            columns={archivados ? columnas.filter((c) => c.key !== "tareas" && c.key !== "cliente") : columnas}
+            rowKey={(p) => p.id}
+            rowHref={(p) => `${RUTA}/${p.id}`}
+            rowActions={acciones}
+            rowTone={(p) => ((p.actividad?.tareas_vencidas ?? 0) > 0 ? "danger" : undefined)}
+            searchPlaceholder="Buscar por proceso, cliente o radicado"
+            initialSort={{ key: archivados ? "vence" : "nombre", direction: archivados ? "desc" : "asc" }}
+            exportFilename={archivados ? "procesos-archivados" : "procesos"}
+            storageKey="abogado-procesos-v2"
+            loading={!procesos}
+            onRefresh={() => void cargar()}
+            emptyTitle={vacio[0]}
+            emptyDescription={vacio[1]}
+            emptyAction={!archivados && filtro === "todos" ? <Button icon={<Plus size={16} />} onClick={() => setNuevo(true)}>Nuevo proceso</Button> : undefined}
+          />
+        )}
+      </div>
+
+      {nuevo && <NuevoProcesoModal onClose={() => setNuevo(false)} onCreado={(p) => router.push(`${RUTA}/${p.id}/relaciones`)} />}
+      <ConfirmDialog
+        open={archivar !== null}
+        onClose={() => setArchivar(null)}
+        onConfirm={confirmarArchivo}
+        title={`¿Archivar «${archivar?.nombre ?? ""}»?`}
+        description="Sale de las listas y de Hoy, y el cliente deja de verlo como activo. Todo su expediente se conserva y se puede reabrir."
+        confirmLabel="Archivar"
+      />
     </div>
+  );
+}
+
+function NuevoProcesoModal({ onClose, onCreado }: { onClose: () => void; onCreado: (p: Esquemas["ProcesoDetalle"]) => void }) {
+  const id = useId();
+  const { toast } = useToast();
+  const [nombre, setNombre] = useState("");
+  const [descripcion, setDescripcion] = useState("");
+  const [error, setError] = useState<string | null>(null);
+  const [guardando, setGuardando] = useState(false);
+
+  async function crear(evento: FormEvent) {
+    evento.preventDefault();
+    if (!nombre.trim()) {
+      setError("Escriba el nombre del proceso.");
+      return;
+    }
+    setGuardando(true);
+    const { data, error: fallo } = await api.POST("/api/v2/procesos", { body: { nombre: nombre.trim(), descripcion: descripcion.trim() || null } });
+    setGuardando(false);
+    if (!data) {
+      setError(mensajeDeError(fallo));
+      return;
+    }
+    toast({ title: "Proceso creado", description: "Ahora agregue sus clientes y radicados.", tone: "success" });
+    onCreado(data);
+    onClose();
+  }
+
+  return (
+    <Modal open onClose={onClose} title="Nuevo proceso" description="Usted queda como responsable. Los clientes, radicados y la etapa se agregan después.">
+      <form onSubmit={crear} noValidate>
+        <label htmlFor={`${id}-nombre`} className={ETIQUETA}>Nombre del proceso</label>
+        <input id={`${id}-nombre`} value={nombre} maxLength={255} autoFocus onChange={(e) => { setNombre(e.target.value); setError(null); }} placeholder="Ej.: Sucesión de Jorge Restrepo" aria-invalid={error ? true : undefined} className={CAMPO} />
+        <label htmlFor={`${id}-descripcion`} className={cx(ETIQUETA, "mt-4")}>Descripción <span className="font-normal text-ink-3">(opcional)</span></label>
+        <textarea id={`${id}-descripcion`} rows={4} maxLength={4000} value={descripcion} onChange={(e) => setDescripcion(e.target.value)} placeholder="De qué se trata, en pocas palabras." className={cx(CAMPO, "resize-y py-2.5")} />
+        {error && <p role="alert" className="mt-3 text-[13px] text-bad">{error}</p>}
+        <div className="mt-5 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+          <Button type="button" variant="ghost" onClick={onClose}>Cancelar</Button>
+          <Button type="submit" loading={guardando} icon={<Plus size={16} />}>Crear proceso</Button>
+        </div>
+      </form>
+    </Modal>
   );
 }

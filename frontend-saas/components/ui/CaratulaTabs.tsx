@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useRef } from "react";
 import Link from "next/link";
 import { cx } from "@/lib/cx";
 
@@ -22,8 +23,17 @@ export function CaratulaTabs<V extends string>({
   label: string;
   className?: string;
 }) {
+  const lista = useRef<HTMLDivElement>(null);
+  // En pantallas angostas la pestaña activa puede quedar fuera de vista: se centra sin mover la página.
+  useEffect(() => {
+    const contenedor = lista.current;
+    const activa = contenedor?.querySelector<HTMLElement>('[aria-selected="true"]');
+    if (!contenedor || !activa || contenedor.scrollWidth <= contenedor.clientWidth) return;
+    contenedor.scrollLeft = activa.offsetLeft - (contenedor.clientWidth - activa.offsetWidth) / 2;
+  }, [value]);
+
   return (
-    <div role="tablist" aria-label={label} className={cx("-mb-px flex gap-1 overflow-x-auto [scrollbar-width:none]", className)}>
+    <div ref={lista} role="tablist" aria-label={label} className={cx("relative -mb-px flex gap-1 overflow-x-auto [scrollbar-width:none]", className)}>
       {tabs.map((tab) => {
         const activa = tab.id === value;
         const clases = cx(

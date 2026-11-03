@@ -66,9 +66,18 @@ const labelsEnSeccion: Record<string, string> = {
   "sitio/mensajes": "Mensajes del sitio",
 };
 
-function labelFor(segment: string, anterior?: string) {
+// Pestañas del expediente («/procesos/7/relaciones»).
+const seccionesExpediente: Record<string, string> = {
+  resumen: "Resumen",
+  relaciones: "Clientes y radicados",
+  comunicaciones: "Chat",
+  equipo: "Equipo",
+};
+
+function labelFor(segment: string, anterior?: string, antes?: string) {
   const enSeccion = anterior ? labelsEnSeccion[`${anterior}/${segment}`] : undefined;
   if (enSeccion) return enSeccion;
+  if (antes === "procesos" && anterior && /^\d+$/.test(anterior) && seccionesExpediente[segment]) return seccionesExpediente[segment];
   if (/^\d+$/.test(segment) || /^[0-9a-f-]{16,}$/i.test(segment)) return "Detalle";
   return labels[segment] ?? decodeURIComponent(segment).replace(/-/g, " ");
 }
@@ -169,7 +178,7 @@ export default function Breadcrumbs() {
           if (index === 0 && segment === "gestion-procesos" && segments.length > 1) return null;
           const href = `/${segments.slice(0, index + 1).join("/")}`;
           const current = index === segments.length - 1;
-          const label = labelFor(segment, segments[index - 1]);
+          const label = labelFor(segment, segments[index - 1], segments[index - 2]);
           return (
             <li key={href} className="flex min-w-0 items-center gap-1.5">
               {index > (segments[0] === "gestion-procesos" ? 1 : 0) && <span aria-hidden="true" className="text-line-strong">/</span>}

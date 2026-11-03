@@ -38,3 +38,14 @@ class RepositorioAgenda:
 
     def suscripcion_por_hash(self, token_hash: str) -> SuscripcionCalendario | None:
         return self._db.scalar(select(SuscripcionCalendario).where(SuscripcionCalendario.token_hash == token_hash))
+
+    def eventos_de_proceso(self, proceso_id: int) -> list[EventoAgenda]:
+        E = EventoAgenda
+        return list(self._db.scalars(
+            select(E).where(E.proceso_id == proceso_id)
+            .options(selectinload(E.responsable), selectinload(E.cliente), selectinload(E.proceso))
+            .order_by(E.fecha_inicio)
+        ).all())
+
+    def evento(self, evento_id: int) -> EventoAgenda | None:
+        return self._db.get(EventoAgenda, evento_id)

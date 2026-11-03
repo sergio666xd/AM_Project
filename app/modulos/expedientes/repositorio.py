@@ -1,4 +1,5 @@
 from dataclasses import dataclass
+from datetime import datetime, timezone
 
 from sqlalchemy import ColumnElement, exists, func, or_, select
 from sqlalchemy.orm import Session, selectinload
@@ -12,8 +13,14 @@ from app.modulos.expedientes.modelos import (
     ProcesoRadicado,
     Radicado,
 )
+from app.modulos.documentos.modelos import DocumentoProceso, SolicitudDocumento
 from app.modulos.etapas.linea import cargas_etapa
-from app.modulos.identidad.modelos import Usuario
+from app.modulos.identidad.modelos import EstadoUsuario, RolUsuario, Usuario
+from app.modulos.tareas.modelos import EstadoTarea, Tarea
+from app.timezone import COLOMBIA
+
+ABIERTAS = (EstadoTarea.PENDIENTE, EstadoTarea.EN_CURSO)
+SIN_REVISAR = ("RECIBIDO", "EN_REVISION")
 
 
 @dataclass(frozen=True)
@@ -112,3 +119,56 @@ class RepositorioProcesos:
             if len(resultado[actuacion.radicado_id]) < por_radicado:
                 resultado[actuacion.radicado_id].append(actuacion)
         return resultado
+
+    def total_actuaciones(self, radicado_ids: list[int]) -> dict[int, int]:
+        if not radicado_ids:
+            return {}
+        return dict(self._db.execute(
+            select(Actuacion.radicado_id, func.count()).where(Actuacion.radicado_id.in_(radicado_ids))
+            .group_by(Actuacion.radicado_id)
+        ).all())
+
+    def actividad(self, proceso_ids: list[int], ahora: datetime) -> dict[int, dict]:
+        """Tareas abiertas y vencidas, entregas sin revisar y solicitudes abiertas de cada proceso."""
+        resultado = {i: {"tareas_abiertas": 0, "tareas_vencidas": 0, "por_revisar": 0, "pendiente_cliente": 0,
+                         "proximo_vencimiento": None} for i in proceso_ids}
+        if not proceso_ids:
+            return resultado
+        vencida = (Tarea.fecha_limite.is_not(None)) & (Tarea.fecha_limite < ahora)
+        for proceso_id, abiertas, vencidas, proximo in self._db.execute(
+            select(
+                Tarea.proceso_id,
+                func.count(),
+                func.count().filter(vencida),
+                func.min(Tarea.fecha_limite).filter(Tarea.fecha_limite >= ahora),
+            ).where(Tarea.proceso_id.in_(proceso_ids), Tarea.estado.in_(ABIERTAS)).group_by(Tarea.proceso_id)
+        ).all():
+            dia = proximo.replace(tzinfo=timezone.utc).astimezone(COLOMBIA).date() if proximo else None
+            resultado[proceso_id].update(tareas_abiertas=abiertas, tareas_vencidas=vencidas, proximo_vencimiento=dia)
+        for proceso_id, total in self._db.execute(
+            select(DocumentoProceso.proceso_id, func.count()).where(
+                DocumentoProceso.proceso_id.in_(proceso_ids),
+                DocumentoProceso.solicitud_id.is_not(None),
+                DocumentoProceso.contrato_id.is_(None),
+                DocumentoProceso.estado_revision.in_(SIN_REVISAR),
+            ).group_by(DocumentoProceso.proceso_id)
+        ).all():
+            resultado[proceso_id]["por_revisar"] = total
+        for proceso_id, total in self._db.execute(
+            select(SolicitudDocumento.proceso_id, func.count()).where(
+                SolicitudDocumento.proceso_id.in_(proceso_ids), SolicitudDocumento.atendida_en.is_(None),
+            ).group_by(SolicitudDocumento.proceso_id)
+        ).all():
+            resultado[proceso_id]["pendiente_cliente"] = total
+        return resultado
+
+    def abogados_de_la_firma(self) -> list[Usuario]:
+        return list(self._db.scalars(
+            select(Usuario).where(Usuario.rol == RolUsuario.ABOGADO_ADMIN, Usuario.estado == EstadoUsuario.ACTIVO)
+            .order_by(Usuario.nombre_completo, Usuario.id)
+        ).all())
+
+    def colaboracion(self, proceso_id: int, abogado_id: int) -> ProcesoColaborador | None:
+        return self._db.scalar(select(ProcesoColaborador).where(
+            ProcesoColaborador.proceso_id == proceso_id, ProcesoColaborador.abogado_id == abogado_id,
+        ))
