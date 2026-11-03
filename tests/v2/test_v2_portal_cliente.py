@@ -392,3 +392,39 @@ def test_perfil_y_avisos_por_tipo(iniciar, crear_usuario, crear_proceso, cliente
     solicitud = sesion_bd.query(models.SolicitudEdicionPerfilCliente).one()
     assert (solicitud.numero_documento_solicitado, solicitud.domicilio_solicitado) == ("43123456", "MEDELLÍN")
     assert cliente_http.get("/api/v2/cliente/perfil").json()["solicitud"]["estado"] == "pendiente"
+
+
+def test_documentos_del_cliente_y_su_archivo(iniciar, crear_usuario, crear_proceso, cliente_http, sesion_bd, monkeypatch):
+    import io
+
+    e = _escenario_portal(crear_usuario, crear_proceso, sesion_bd)
+    leidos = []
+
+    class R2:
+        def get_object(self, Bucket, Key):
+            leidos.append(Key)
+            return {"Body": io.BytesIO(b"%PDF-1.4 contenido")}
+
+    monkeypatch.setattr("app.storage.get_r2_client", lambda: R2())
+    monkeypatch.setattr("app.storage.get_r2_bucket", lambda: "cubeta")
+
+    iniciar(e["gloria"])
+    lista = cliente_http.get("/api/v2/cliente/documentos").json()["items"]
+    por_nombre = {d["nombre"]: d for d in lista}
+    assert set(por_nombre) == {"escritura.pdf", "cedula-causante.pdf", "contrato-firmado.pdf"}
+    assert all(d["proceso"]["nombre"] == "Sucesión Restrepo" for d in lista)
+    cedula = por_nombre["cedula-causante.pdf"]
+    assert cedula["url"] == f"/api/v2/cliente/documentos/{cedula['id']}/archivo"
+
+    vista = cliente_http.get(cedula["url"], params={"descargar": "false"})
+    assert vista.status_code == 200 and vista.content.startswith(b"%PDF")
+    assert vista.headers["content-disposition"].startswith("inline")
+    assert cliente_http.get(cedula["url"]).headers["content-disposition"].startswith("attachment")
+
+    # Ni el borrador del contrato ni lo de otro cliente.
+    otros = sesion_bd.query(models.DocumentoProceso).filter(models.DocumentoProceso.nombre_archivo.in_(["borrador.pdf", "de-hernan.pdf"])).all()
+    for documento in otros:
+        assert cliente_http.get(f"/api/v2/cliente/documentos/{documento.id}/archivo").status_code == 404
+
+    iniciar(e["abogada"])
+    assert cliente_http.get("/api/v2/cliente/documentos").status_code == 403

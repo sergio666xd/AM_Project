@@ -24,7 +24,7 @@ const labels: Record<string, string> = {
   pagos: "Pagos",
   clientes: "Clientes",
   agenda: "Agenda",
-  notificaciones: "Notificaciones",
+  notificaciones: "Avisos",
   auditoria: "Auditoría",
   operacion: "Operación",
   contenido: "Contenido",

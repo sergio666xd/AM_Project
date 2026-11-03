@@ -270,7 +270,7 @@ class RepositorioFolios:
                 detalle="Entregado por el cliente desde el portal." if entregado else "Incorporado al expediente por la firma.",
                 autor=nombres.get(documento.cliente_id) if entregado else None,
                 estado=estados.get(documento.estado_revision),
-                archivo=(documento.nombre_archivo, f"/api/expedientes/documentos/{documento.id}/archivo"),
+                archivo=(documento.nombre_archivo, f"/api/v2/documentos/{documento.id}/archivo?descargar=false"),
             )
         return salida
 

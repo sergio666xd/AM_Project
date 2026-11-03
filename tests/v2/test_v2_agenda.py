@@ -113,3 +113,36 @@ def test_ics_escapa_y_pliega_las_lineas():
     assert "Línea 1\\nLínea 2" in texto
     assert all(len(linea.encode()) <= 75 for linea in texto.split("\r\n"))
     assert "\r\n " in texto, "las líneas largas siguen con un espacio"
+
+
+def test_calendario_del_cliente(iniciar, crear_usuario, crear_proceso, cliente_http, sesion_bd):
+    abogada = crear_usuario("ABOGADO_ADMIN", nombre="Alejandra Muñoz")
+    gloria, otra = crear_usuario("CLIENTE"), crear_usuario("CLIENTE")
+    proceso = crear_proceso(abogada, "Sucesión Restrepo", clientes=(gloria, otra))
+    archivado = crear_proceso(abogada, "Archivado", clientes=(gloria,), archivado=True)
+    ajeno = crear_proceso(abogada, "Ajeno", clientes=(otra,))
+    pronto = utc_ahora() + timedelta(days=2)
+    sesion_bd.add_all([
+        models.EventoAgenda(titulo="Audiencia inicial", tipo="AUDIENCIA", fecha_inicio=pronto, proceso_id=proceso.id, responsable_id=abogada.id),
+        models.EventoAgenda(titulo="Solo para la otra", tipo="REUNION", fecha_inicio=pronto, proceso_id=proceso.id, cliente_id=otra.id),
+        models.EventoAgenda(titulo="Cancelada", tipo="REUNION", estado="CANCELADO", fecha_inicio=pronto, proceso_id=proceso.id),
+        models.EventoAgenda(titulo="Del archivado", tipo="AUDIENCIA", fecha_inicio=pronto, proceso_id=archivado.id),
+        models.EventoAgenda(titulo="De otro proceso", tipo="AUDIENCIA", fecha_inicio=pronto, proceso_id=ajeno.id),
+        models.Tarea(usuario_id=abogada.id, cliente_id=gloria.id, proceso_id=proceso.id, titulo="Subir el registro civil",
+                     fecha_limite=utc_ahora() + timedelta(days=1)),
+        models.Tarea(usuario_id=abogada.id, proceso_id=proceso.id, titulo="Interna", fecha_limite=utc_ahora() + timedelta(days=1)),
+    ])
+    sesion_bd.commit()
+    hoy = a_colombia(utc_ahora()).date()
+    rango = {"desde": hoy.isoformat(), "hasta": (hoy + timedelta(days=30)).isoformat()}
+
+    iniciar(gloria)
+    agenda = cliente_http.get("/api/v2/cliente/agenda", params=rango).json()
+    assert [(i["tipo"], i["titulo"]) for i in agenda["items"]] == [("tarea", "Subir el registro civil"), ("evento", "Audiencia inicial")]
+    assert agenda["items"][1]["enlace"] == f"/gestion-procesos/cliente/procesos/{proceso.id}"
+    assert agenda["items"][1]["responsable"] == "Alejandra Muñoz"
+    assert agenda["items"][0]["enlace"].endswith("/pendientes#tarea-" + agenda["items"][0]["clave"].split(":")[1])
+    assert cliente_http.get("/api/v2/cliente/agenda", params={"desde": hoy.isoformat(), "hasta": (hoy + timedelta(days=300)).isoformat()}).status_code == 422
+
+    iniciar(abogada)
+    assert cliente_http.get("/api/v2/cliente/agenda", params=rango).status_code == 403

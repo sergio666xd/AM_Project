@@ -157,6 +157,15 @@ def actividad_cliente(db: Session = Depends(get_db), usuario: models.Usuario = D
     return sorted(items, key=lambda item: item["fecha"] or "", reverse=True)[:30]
 
 
+_REVISION_CLIENTE = {
+    "RECIBIDO": "Lo recibimos y lo revisaremos pronto.",
+    "EN_REVISION": "Lo estamos revisando.",
+    "APROBADO": "Lo revisamos y quedó aprobado.",
+    "REQUIERE_CORRECCION": "Hay que corregirlo: mire la nota de la firma.",
+    "RECHAZADO": "No lo pudimos aceptar: mire la nota de la firma.",
+}
+
+
 def _notificaciones_cliente(db: Session, cliente: models.Usuario) -> list[dict]:
     procesos = db.query(models.Proceso).join(models.ProcesoCliente).filter(
         models.ProcesoCliente.cliente_id == cliente.id,
@@ -172,7 +181,7 @@ def _notificaciones_cliente(db: Session, cliente: models.Usuario) -> list[dict]:
     ).all()
     for task in tareas:
         items.append({"id": f"tarea:{task.id}", "tipo": "Tarea", "categoria": "TAREA", "titulo": task.titulo,
-                      "descripcion": "Tienes una tarea pendiente" if task.estado != models.EstadoTarea.COMPLETADA else "Tarea completada",
+                      "descripcion": "La firma le pidió algo" if task.estado != models.EstadoTarea.COMPLETADA else "Ya lo hizo",
                       "fecha": task.fecha_limite or task.created_at, "proceso": proceso_por_id[task.proceso_id].nombre,
                       "href": f"/gestion-procesos/cliente/tareas?tarea={task.id}#tarea-{task.id}"})
     solicitudes = db.query(models.SolicitudDocumento).filter_by(cliente_id=cliente.id).filter(
@@ -180,7 +189,7 @@ def _notificaciones_cliente(db: Session, cliente: models.Usuario) -> list[dict]:
     ).all()
     for request in solicitudes:
         items.append({"id": f"solicitud:{request.id}", "tipo": "Documento", "categoria": "DOCUMENTO",
-                      "titulo": request.titulo, "descripcion": "Solicitud pendiente de entrega" if request.atendida_en is None else "Documento entregado al despacho",
+                      "titulo": request.titulo, "descripcion": "La firma le pidió documentos" if request.atendida_en is None else "Ya entregó lo que le pedimos",
                       "fecha": request.atendida_en or request.created_at, "proceso": proceso_por_id[request.proceso_id].nombre,
                       "href": f"/gestion-procesos/cliente/documentos#solicitud-{request.id}"})
     documentos = db.query(models.DocumentoProceso).filter_by(cliente_id=cliente.id).filter(
@@ -188,7 +197,7 @@ def _notificaciones_cliente(db: Session, cliente: models.Usuario) -> list[dict]:
     ).all()
     for document in documentos:
         items.append({"id": f"documento:{document.id}:{document.estado_revision}", "tipo": "Documento", "categoria": "DOCUMENTO",
-                      "titulo": document.nombre_archivo, "descripcion": f"Estado de revisión: {document.estado_revision.replace('_', ' ').lower()}",
+                      "titulo": document.nombre_archivo, "descripcion": _REVISION_CLIENTE.get(document.estado_revision, "Lo recibimos."),
                       "fecha": document.revisado_en or document.created_at, "proceso": proceso_por_id[document.proceso_id].nombre,
                       "href": f"/gestion-procesos/cliente/procesos/{document.proceso_id}#documentos"})
     eventos = db.query(models.EventoAgenda).filter(
@@ -197,7 +206,7 @@ def _notificaciones_cliente(db: Session, cliente: models.Usuario) -> list[dict]:
     ).all()
     for event in eventos:
         items.append({"id": f"evento:{event.id}", "tipo": "Evento", "categoria": "EVENTO", "titulo": event.titulo,
-                      "descripcion": "Evento programado", "fecha": event.fecha_inicio, "proceso": proceso_por_id[event.proceso_id].nombre,
+                      "descripcion": "Cita programada", "fecha": event.fecha_inicio, "proceso": proceso_por_id[event.proceso_id].nombre,
                       "href": "/gestion-procesos/cliente/calendario"})
     mensajes = db.query(models.ComunicacionProceso).filter(
         models.ComunicacionProceso.proceso_id.in_(ids), models.ComunicacionProceso.cliente_id == cliente.id,
@@ -205,7 +214,7 @@ def _notificaciones_cliente(db: Session, cliente: models.Usuario) -> list[dict]:
     ).all()
     for message in mensajes:
         items.append({"id": f"mensaje:{message.id}", "tipo": "Mensaje", "categoria": "MENSAJE",
-                      "titulo": message.asunto, "descripcion": f"Nuevo mensaje de {message.actor.nombre_completo if message.actor else 'tu contacto'}" if message.actor_id != cliente.id else "Mensaje enviado al despacho",
+                      "titulo": message.asunto, "descripcion": f"Nuevo mensaje de {message.actor.nombre_completo if message.actor else 'la firma'}" if message.actor_id != cliente.id else "Mensaje enviado al despacho",
                       "fecha": message.created_at, "proceso": proceso_por_id[message.proceso_id].nombre,
                       "href": f"/gestion-procesos/cliente/procesos/{message.proceso_id}#comunicacion"})
     avisos = db.query(models.NotificacionProceso).filter(

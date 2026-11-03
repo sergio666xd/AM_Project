@@ -28,6 +28,8 @@ from app.modulos.glosario.repositorio import RepositorioGlosario
 from app.modulos.glosario.servicio import ServicioGlosario, texto_juzgado
 from app.modulos.identidad.modelos import Usuario
 from app.modulos.portal_cliente.esquemas import (
+    DocumentoEnProceso,
+    DocumentosCliente,
     ArchivoEntrada,
     DetallePendiente,
     DocumentoCliente,
@@ -94,7 +96,7 @@ def _persona(usuario: Usuario) -> PersonaBreve:
 
 
 def _archivo(documento: models.DocumentoProceso) -> ArchivoEntrada:
-    return ArchivoEntrada(nombre=documento.nombre_archivo, url=f"/api/expedientes/documentos/{documento.id}/archivo")
+    return ArchivoEntrada(nombre=documento.nombre_archivo, url=f"/api/v2/cliente/documentos/{documento.id}/archivo")
 
 
 class ServicioPortalCliente:
@@ -520,6 +522,32 @@ class ServicioPortalCliente:
                 url=_archivo(documento).url,
             ))
         return salida
+
+    def documentos(self, usuario: Usuario) -> DocumentosCliente:
+        """Los documentos de todos sus procesos activos: lo que envió, lo que la firma le compartió y sus contratos firmados."""
+        self._exigir_cliente(usuario)
+        items = [
+            DocumentoEnProceso(**documento.model_dump(), proceso=ProcesoBreve(id=proceso.id, nombre=proceso.nombre))
+            for proceso in self._repo.procesos(usuario.id)
+            for documento in self._documentos(usuario, proceso)
+        ]
+        items.sort(key=lambda d: (d.fecha, d.id), reverse=True)
+        return DocumentosCliente(items=items)
+
+    def contenido(self, usuario: Usuario, documento_id: int) -> tuple[object, models.DocumentoProceso]:
+        """El archivo guardado, para verlo o descargarlo."""
+        self._exigir_cliente(usuario)
+        documento = self._repo.documento(usuario.id, documento_id)
+        if documento is None:
+            raise NoEncontrado("No encontramos ese documento entre los suyos.")
+        try:
+            objeto = storage.get_r2_client().get_object(Bucket=storage.get_r2_bucket(), Key=documento.ruta_archivo)
+        except (BotoCoreError, ClientError) as exc:
+            logger.warning("No se pudo leer el documento %s de R2: %s", documento.id, exc)
+            raise ErrorDominio("No pudimos abrir el archivo. Inténtelo de nuevo en unos minutos.", codigo="almacenamiento_no_disponible") from exc
+        registrar_evento_auditoria(self._db, usuario, "documento.descargar", "documento_proceso", documento.id)
+        self._db.commit()
+        return objeto["Body"], documento
 
     # ---- Apoyo ----------------------------------------------------------
 

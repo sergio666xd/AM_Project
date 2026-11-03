@@ -26,12 +26,20 @@ class _Fuente:
     marcable: Callable[[str], bool] = lambda _id: True
 
 
+CATEGORIAS = {"proceso", "tarea", "documento", "solicitud", "radicado", "evento", "mensaje", "cliente"}
+
+
+def _categoria(valor) -> str:
+    valor = str(valor or "").lower()
+    return valor if valor in CATEGORIAS else "sistema"
+
+
 def _avisos_abogado(db: Session, usuario: Usuario) -> list[dict]:
     from app.routers.expedientes.notificaciones import _notificaciones_abogado
 
     return [
-        {"id": item["id"], "titulo": item["titulo"], "detalle": item.get("descripcion"), "proceso": item.get("proceso"),
-         "fecha": item.get("fecha"), "href": item["href"]}
+        {"id": item["id"], "categoria": _categoria(item.get("categoria")), "titulo": item["titulo"], "detalle": item.get("descripcion"),
+         "proceso": item.get("proceso"), "fecha": item.get("fecha"), "href": item["href"]}
         for item in _notificaciones_abogado(db, usuario)
     ]
 
@@ -40,8 +48,8 @@ def _avisos_cliente(db: Session, usuario: Usuario) -> list[dict]:
     from app.routers.expedientes.portal_cliente import _notificaciones_cliente
 
     return [
-        {"id": item["id"], "titulo": item["titulo"], "detalle": item.get("descripcion"), "proceso": item.get("proceso"),
-         "fecha": item.get("fecha"), "href": item["href"]}
+        {"id": item["id"], "categoria": _categoria(item.get("categoria")), "titulo": item["titulo"], "detalle": item.get("descripcion"),
+         "proceso": item.get("proceso"), "fecha": item.get("fecha"), "href": item["href"]}
         for item in _notificaciones_cliente(db, usuario)
     ]
 
@@ -50,7 +58,7 @@ def _avisos_admin(db: Session, _usuario: Usuario) -> list[dict]:
     from app.routers.admin.alertas import _alertas_admin
 
     return [
-        {"id": item["id"], "titulo": item["descripcion"], "detalle": item.get("accion_recomendada"), "proceso": None,
+        {"id": item["id"], "categoria": "sistema", "titulo": item["descripcion"], "detalle": item.get("accion_recomendada"), "proceso": None,
          "fecha": item.get("fecha"), "href": item["href"]}
         for item in _alertas_admin(db)
         if item.get("estado") != "ELIMINADA"
@@ -91,7 +99,7 @@ class ServicioAvisos:
     def _fuente(self, usuario: Usuario) -> _Fuente:
         fuente = _FUENTES.get(usuario.rol)
         if fuente is None:
-            raise SinPermiso("Tu cuenta no tiene avisos.")
+            raise SinPermiso("Su cuenta no tiene avisos.")
         return fuente
 
     def _leidos(self, fuente: _Fuente, usuario: Usuario) -> set[str]:

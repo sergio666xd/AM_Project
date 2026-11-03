@@ -1,271 +1,125 @@
 "use client";
 
-import { apiRequest } from "@/lib/api";
+import { useCallback, useMemo, useState } from "react";
+import { Download, Eye, RefreshCw } from "lucide-react";
 
-import { ChangeEvent, useEffect, useState } from "react";
-import { AlertCircle, CheckCircle2, Download, FileText, FileUp, FolderOpen, Loader2, RefreshCw, Upload } from "lucide-react";
-import { useSession } from "@/context/SessionContext";
-import { PageHeader } from "@/components/ui/PageHeader";
+import { FilasCargando, TituloCliente } from "@/components/portal-cliente/piezas";
 import { Button } from "@/components/ui/Button";
+import { SegmentedControl } from "@/components/ui/SegmentedControl";
+import { Sheet } from "@/components/ui/Sheet";
+import { Tag, type TonoTag } from "@/components/ui/Tag";
+import { api, mensajeDeError, type Esquemas } from "@/lib/api-v2/cliente";
+import { fechaCorta } from "@/lib/fechas";
+import { useLoadEffect } from "@/lib/useLoadEffect";
 
-const MAX_FILE_SIZE = 15 * 1024 * 1024;
-const ALLOWED_TYPES = new Set([
-	"application/pdf",
-	"image/jpeg",
-	"image/png",
-	"application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-]);
+type Documento = Esquemas["DocumentoEnProceso"];
+type Filtro = "todos" | Documento["origen"];
 
-type Request = {
-	id: number;
-	proceso: string;
-	titulo: string;
-	instrucciones?: string | null;
-	estado: string;
-	documentos_requeridos: { id: string; nombre: string; estado: string; documento?: { id: number; nombre_archivo: string; comentario_revision?: string | null } | null }[];
-	atendida_en?: string | null;
-	created_at: string;
+const ORIGEN: Record<Documento["origen"], string> = {
+  firma: "De la firma",
+  cliente: "Enviados por usted",
+  contrato: "Contratos firmados",
 };
+const PREVISUALIZABLE = /\.(pdf|png|jpe?g|webp|gif)$/i;
 
-type Document = {
-	id: number;
-	proceso_id: number;
-	solicitud_id: number | null;
-	contrato_id?: number | null;
-	proceso: string;
-	nombre_archivo: string;
-	mime_type: string;
-	estado_revision: string;
-	comentario_revision?: string | null;
-	created_at: string;
-};
-
-type DocumentsData = { solicitudes: Request[]; documentos: Document[] };
-
-function getRequestProgress(request: Request) {
-	const total = request.documentos_requeridos.length;
-	const faltantes = request.documentos_requeridos.filter((item) => item.estado === "FALTANTE").length;
-	const entregados = total - faltantes;
-	return { total, faltantes, entregados, percentage: total ? Math.round((entregados / total) * 100) : 0 };
+function tono(estado: string): TonoTag {
+  if (estado === "aprobado") return "ok";
+  if (estado === "recibido" || estado === "en revisión") return "neutral";
+  return "warn";
 }
 
-async function fetchDocuments(token: string): Promise<DocumentsData> {
-	const response = await apiRequest(`/api/expedientes/documentos`, {
-		headers: { Authorization: `Bearer ${token}` },
-	});
-	const data = await response.json();
-	if (!response.ok) throw new Error(data.detail || "No fue posible cargar los documentos.");
-	return data;
-}
-
+/** Lo que la firma le compartió, lo que usted envió y sus contratos firmados, en todos sus procesos. */
 export default function DocumentosClientePage() {
-	const { token, loading: sessionLoading } = useSession();
-	const [data, setData] = useState<DocumentsData>({ solicitudes: [], documentos: [] });
-	const [files, setFiles] = useState<Record<string, File | null>>({});
-	const [loading, setLoading] = useState(true);
-	const [workingId, setWorkingId] = useState<number | null>(null);
-	const [downloadingId, setDownloadingId] = useState<number | null>(null);
-	const [documentAction, setDocumentAction] = useState<"view" | "download" | null>(null);
-	const [error, setError] = useState("");
-	const [notice, setNotice] = useState("");
+  const [datos, setDatos] = useState<Esquemas["DocumentosCliente"] | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [filtro, setFiltro] = useState<Filtro>("todos");
 
-	useEffect(() => {
-		if (sessionLoading || !token) return;
-		let active = true;
-		fetchDocuments(token)
-			.then((result) => { if (active) setData(result); })
-			.catch((cause: unknown) => { if (active) setError(cause instanceof Error ? cause.message : "No fue posible cargar los documentos."); })
-			.finally(() => { if (active) setLoading(false); });
-		return () => { active = false; };
-	}, [sessionLoading, token]);
+  const cargar = useCallback(async () => {
+    setError(null);
+    const { data, error: fallo } = await api.GET("/api/v2/cliente/documentos");
+    if (data) setDatos(data);
+    else setError(mensajeDeError(fallo));
+  }, []);
+  useLoadEffect(cargar);
 
-	// Los enlaces #solicitud-N llegan antes de que exista la tarjeta; se desplaza al cargar.
-	useEffect(() => {
-		if (loading || !window.location.hash) return;
-		const target = document.getElementById(decodeURIComponent(window.location.hash.slice(1)));
-		if (!target) return;
-		target.scrollIntoView({ behavior: "smooth", block: "start" });
-		target.classList.add("ring-2", "ring-primary");
-		const timer = window.setTimeout(() => target.classList.remove("ring-2", "ring-primary"), 2500);
-		return () => window.clearTimeout(timer);
-	}, [loading]);
+  const items = useMemo(() => datos?.items ?? [], [datos]);
+  const origenes = useMemo(() => (Object.keys(ORIGEN) as Documento["origen"][]).filter((o) => items.some((d) => d.origen === o)), [items]);
+  const visibles = filtro === "todos" ? items : items.filter((d) => d.origen === filtro);
+  const conProceso = new Set(items.map((d) => d.proceso.id)).size > 1;
 
-	async function reload() {
-		if (!token) return;
-		setLoading(true);
-		setError("");
-		try {
-			setData(await fetchDocuments(token));
-		} catch (cause) {
-			setError(cause instanceof Error ? cause.message : "No fue posible cargar los documentos.");
-		} finally {
-			setLoading(false);
-		}
-	}
+  return (
+    <div>
+      <TituloCliente sub="Lo que la firma le compartió, lo que usted envió y sus contratos firmados.">Documentos</TituloCliente>
 
-	function selectFile(fileKey: string, event: ChangeEvent<HTMLInputElement>) {
-		const file = event.target.files?.[0] ?? null;
-		event.target.value = "";
-		setError("");
-		if (file && !ALLOWED_TYPES.has(file.type)) {
-			setFiles((current) => ({ ...current, [fileKey]: null }));
-			setError("El archivo debe ser PDF, JPG, PNG o DOCX.");
-			return;
-		}
-		if (file && file.size > MAX_FILE_SIZE) {
-			setFiles((current) => ({ ...current, [fileKey]: null }));
-			setError("El archivo no puede superar 15 MB.");
-			return;
-		}
-		setFiles((current) => ({ ...current, [fileKey]: file }));
-	}
-
-	async function upload(requestId: number, itemId: string) {
-		const fileKey = `${requestId}:${itemId}`;
-		const file = files[fileKey];
-		if (!token || !file) return;
-		setWorkingId(requestId);
-		setError("");
-		setNotice("");
-		try {
-			const form = new FormData();
-			form.append("archivo", file);
-			form.append("item_id", itemId);
-			const response = await apiRequest(`/api/expedientes/solicitudes-documento/${requestId}/archivo`, {
-				method: "POST",
-				headers: { Authorization: `Bearer ${token}` },
-				body: form,
-			});
-			const result: { detail?: string } = await response.json().catch(() => ({}));
-			if (!response.ok) throw new Error(result.detail || "No fue posible cargar el documento.");
-			setFiles((current) => ({ ...current, [fileKey]: null }));
-			setNotice("Documento entregado correctamente.");
-			await reload();
-		} catch (cause) {
-			setError(cause instanceof Error ? cause.message : "No fue posible cargar el documento.");
-		} finally {
-			setWorkingId(null);
-		}
-	}
-
-	async function download(document: Document) {
-		if (!token) return;
-		if (downloadingId !== null) return;
-		setDownloadingId(document.id);
-		setDocumentAction("download");
-		setError("");
-		try {
-			const response = await apiRequest(`/api/expedientes/documentos/${document.id}/archivo`, {
-				headers: { Authorization: `Bearer ${token}` },
-			});
-			if (!response.ok) {
-				const result: { detail?: string } = await response.json().catch(() => ({}));
-				throw new Error(result.detail || "No fue posible descargar el documento.");
-			}
-			const url = URL.createObjectURL(await response.blob());
-			const anchor = window.document.createElement("a");
-			anchor.href = url;
-			anchor.download = document.nombre_archivo;
-			anchor.click();
-			URL.revokeObjectURL(url);
-		} catch (cause) {
-			setError(cause instanceof Error ? cause.message : "No fue posible descargar el documento.");
-		} finally {
-			setDownloadingId(null);
-			setDocumentAction(null);
-		}
-	}
-
-	async function preview(document: Document) {
-		if (!token) return;
-		if (downloadingId !== null) return;
-		setDownloadingId(document.id);
-		setDocumentAction("view");
-		setError("");
-		try {
-			const response = await apiRequest(`/api/expedientes/documentos/${document.id}/archivo`, { headers: { Authorization: `Bearer ${token}` } });
-			if (!response.ok) {
-				const result: { detail?: string } = await response.json().catch(() => ({}));
-				throw new Error(result.detail || "No fue posible abrir el contrato.");
-			}
-			const url = URL.createObjectURL(await response.blob());
-			const opened = window.open(url, "_blank", "noopener,noreferrer");
-			if (!opened) {
-				const anchor = window.document.createElement("a");
-				anchor.href = url;
-				anchor.download = document.nombre_archivo;
-				anchor.click();
-			}
-			window.setTimeout(() => URL.revokeObjectURL(url), 60_000);
-		} catch (cause) {
-			setError(cause instanceof Error ? cause.message : "No fue posible abrir el contrato.");
-		} finally {
-			setDownloadingId(null);
-			setDocumentAction(null);
-		}
-	}
-
-	const contractDocuments = data.documentos.filter((document) => Boolean(document.contrato_id));
-	const requestStatusLabel: Record<string, string> = { FALTAN_DOCUMENTOS: "Faltan documentos", DOCUMENTOS_SUMINISTRADOS: "Documentos suministrados", EN_REVISION: "En revisión", RECHAZADO: "Rechazado", APROBADO: "Aprobado" };
-	const itemStatusLabel: Record<string, string> = { FALTANTE: "Pendiente", RECIBIDO: "Recibido", EN_REVISION: "En revisión", REQUIERE_CORRECCION: "Rechazado · requiere reemplazo", RECHAZADO: "Rechazado", APROBADO: "Aprobado" };
-
-	return (
-		<section className="mx-auto max-w-5xl space-y-6 pb-24">
-			<PageHeader
-				overline="Portal del cliente"
-				title="Documentos"
-				description="Solicitudes de tus procesos y archivos entregados."
-				action={
-					<Button
-						variant="outline"
-						size="sm"
-						onClick={() => void reload()}
-						loading={loading || sessionLoading}
-						icon={<RefreshCw className="size-4" />}
-					>
-						Actualizar
-					</Button>
-				}
-			/>
-
-			{error && (
-				<div role="alert" className="flex items-center gap-2 rounded-lg border border-risk/30 bg-risk/10 p-3.5 text-sm font-medium text-risk">
-					<AlertCircle className="size-4 shrink-0" />
-					{error}
-				</div>
-			)}
-			{notice && (
-				<div role="status" className="flex items-center gap-2 rounded-lg border border-completed/30 bg-completed/10 p-3.5 text-sm font-medium text-completed">
-					<CheckCircle2 className="size-4 shrink-0" />
-					{notice}
-				</div>
-			)}
-
-			{loading || sessionLoading ? <div className="motion-delayed-in flex min-h-40 items-center justify-center gap-3 text-sm text-(--foreground-muted)"><RefreshCw className="size-5 animate-spin" />Cargando documentos...</div> : <>
-								<section className="space-y-3">
-					<div><h2 className="font-semibold text-foreground">Solicitudes de documentos</h2><p className="mt-1 text-sm text-(--foreground-muted)">Carga cada archivo solicitado y consulta el estado individual de su revisión.</p></div>
-					{data.solicitudes.length ? data.solicitudes.map((request) => (
-						<article id={`solicitud-${request.id}`} key={request.id} className="rounded-lg border border-border bg-surface p-4 sm:p-5">
-							<div className="flex flex-wrap items-start justify-between gap-3"><div className="flex min-w-0 items-start gap-3"><span className="grid size-10 shrink-0 place-items-center rounded-lg bg-amber-500/10 text-amber-700"><FolderOpen className="size-5" /></span><div className="min-w-0"><p className="text-xs text-(--foreground-muted)">{request.proceso}</p><h3 className="mt-1 font-medium text-foreground">{request.titulo}</h3>{request.instrucciones && <p className="mt-1 text-sm text-(--foreground-muted)">{request.instrucciones}</p>}</div></div><span className="rounded-md bg-amber-500/10 px-2.5 py-1 text-xs text-amber-700">{requestStatusLabel[request.estado] || request.estado}</span></div>
-							<div className="mt-4 rounded-md border border-border bg-background p-3">
-								<div className="flex flex-wrap items-center justify-between gap-2 text-xs">
-									<span className="font-medium text-foreground">{getRequestProgress(request).entregados} de {getRequestProgress(request).total} documentos entregados</span>
-									<span className={getRequestProgress(request).faltantes ? "text-amber-700" : "text-emerald-700"}>{getRequestProgress(request).faltantes ? `${getRequestProgress(request).faltantes} pendientes` : "Sin pendientes de carga"}</span>
-								</div>
-								<div role="progressbar" aria-label={`Documentos entregados de la solicitud ${request.titulo}`} aria-valuemin={0} aria-valuemax={100} aria-valuenow={getRequestProgress(request).percentage} className="mt-2 h-2 overflow-hidden rounded-full bg-surface-secondary">
-									<div className="h-full rounded-full bg-primary transition-[width]" style={{ width: `${getRequestProgress(request).percentage}%` }} />
-								</div>
-							</div>
-							<div className="mt-4 divide-y divide-border rounded-md border border-border">
-								{request.documentos_requeridos.map((item) => { const fileKey = `${request.id}:${item.id}`; const canUpload = ["FALTANTE", "REQUIERE_CORRECCION"].includes(item.estado); return <div key={item.id} className="space-y-2 p-3"><div className="flex flex-wrap items-center justify-between gap-2"><div><p className="text-sm font-medium">{item.nombre}</p>{item.documento && <p className="text-xs text-(--foreground-muted)">Archivo entregado: {item.documento.nombre_archivo}</p>}</div><span className="rounded bg-surface-secondary px-2 py-1 text-xs">{itemStatusLabel[item.estado] || item.estado}</span></div>{item.documento?.comentario_revision && <p className="text-sm text-amber-800">Observación: {item.documento.comentario_revision}</p>}{canUpload && <div className="flex flex-col gap-2 sm:flex-row sm:items-center"><label className="flex min-h-12 min-w-0 flex-1 cursor-pointer items-center gap-3 rounded-lg border border-border bg-background px-3 py-2 text-sm hover:bg-surface-hover focus-within:ring-2 focus-within:ring-primary"><input type="file" accept=".pdf,.jpg,.jpeg,.png,.docx,application/pdf,image/jpeg,image/png,application/vnd.openxmlformats-officedocument.wordprocessingml.document" aria-label={`Seleccionar archivo para ${item.nombre}`} onChange={(event) => selectFile(fileKey, event)} className="sr-only" /><span className="shrink-0 rounded-md border border-border bg-surface-secondary px-3 py-2 font-medium text-foreground">Elegir archivo</span><span className="min-w-0 truncate text-(--foreground-muted)">{files[fileKey]?.name || "Ningún archivo seleccionado"}</span></label><button type="button" onClick={() => void upload(request.id, item.id)} disabled={!files[fileKey] || workingId !== null} className="inline-flex min-h-12 items-center justify-center gap-2 rounded-lg bg-[var(--primary)] px-4 py-2.5 text-sm font-medium !text-white disabled:cursor-not-allowed disabled:opacity-50"><Upload className="size-4" />{workingId === request.id ? "Entregando..." : "Entregar archivo"}</button></div>}</div>; })}
-							</div>
-							<p className="mt-2 text-xs text-(--foreground-muted)">PDF, JPG, PNG o DOCX; máximo 15 MB.</p>
-						</article>
-					)) : <div className="rounded-lg border border-dashed border-border px-5 py-8 text-center text-sm text-(--foreground-muted)"><FileUp className="mx-auto mb-2 size-6" />No tienes solicitudes de documentos.</div>}
-				</section>
-
-				<section className="space-y-3"><div><h2 className="font-semibold text-foreground">Contratos firmados</h2><p className="mt-1 text-sm text-(--foreground-muted)">Documentos oficiales asociados a tus procesos.</p></div>{contractDocuments.length ? <div className="overflow-hidden rounded-lg border border-border bg-surface">{contractDocuments.map((document, index) => <article key={document.id} className={`flex flex-wrap items-center justify-between gap-4 px-4 py-3 ${index ? "border-t border-border" : ""}`}><div className="flex min-w-0 items-center gap-3"><FileText className="size-5 shrink-0 text-[var(--primary)]" /><div className="min-w-0"><p className="truncate text-sm font-medium text-foreground">{document.nombre_archivo}</p><p className="mt-1 truncate text-xs text-(--foreground-muted)">{document.proceso} · Contrato #{document.contrato_id} · {new Date(document.created_at).toLocaleDateString("es-CO", { timeZone: "America/Bogota" })}</p></div></div><div className="flex gap-2"><button type="button" onClick={() => void preview(document)} disabled={downloadingId !== null} className="inline-flex items-center gap-2 rounded-md border border-border px-3 py-2 text-sm hover:bg-surface-hover disabled:opacity-50">{downloadingId === document.id && documentAction === "view" ? <><Loader2 className="size-4 animate-spin" />Abriendo…</> : "Ver PDF"}</button><button type="button" onClick={() => void download(document)} disabled={downloadingId !== null} className="inline-flex items-center gap-2 rounded-md border border-border px-3 py-2 text-sm hover:bg-surface-hover disabled:opacity-50">{downloadingId === document.id && documentAction === "download" ? <Loader2 className="size-4 animate-spin" /> : <Download className="size-4" />}{downloadingId === document.id && documentAction === "download" ? "Descargando…" : "Descargar"}</button></div></article>)}</div> : <div className="rounded-lg border border-dashed border-border px-5 py-8 text-center text-sm text-(--foreground-muted)"><FileText className="mx-auto mb-2 size-6" />Los contratos firmados de tus procesos aparecerán aquí.</div>}</section>
-			</>}
-		</section>
-	);
+      {error && !datos ? (
+        <Sheet className="flex flex-col items-center gap-4 px-6 py-12 text-center">
+          <p role="alert" className="text-bad">{error}</p>
+          <Button variant="secondary" size="lg" icon={<RefreshCw aria-hidden="true" size={16} />} onClick={() => void cargar()}>
+            Intentar de nuevo
+          </Button>
+        </Sheet>
+      ) : !datos ? (
+        <Sheet aria-busy="true"><FilasCargando filas={3} /></Sheet>
+      ) : items.length === 0 ? (
+        <Sheet className="px-6 py-12 text-center">
+          <p className="font-display text-[22px] text-ink">Aún no hay documentos</p>
+          <p className="mx-auto mt-2 max-w-md text-pretty text-ink-2">
+            Cuando la firma le comparta un documento o usted envíe uno que le pidamos, quedará aquí para verlo o descargarlo.
+          </p>
+        </Sheet>
+      ) : (
+        <>
+          {origenes.length > 1 && (
+            <div className="mb-4 overflow-x-auto">
+              <SegmentedControl<Filtro>
+                label="Qué documentos mostrar"
+                value={filtro}
+                onChange={setFiltro}
+                options={[{ value: "todos", label: "Todos" }, ...origenes.map((o) => ({ value: o, label: ORIGEN[o] }))]}
+              />
+            </div>
+          )}
+          <Sheet className="overflow-hidden">
+            <ul className="divide-y divide-line">
+              {visibles.map((d) => (
+                <li key={d.id} className="flex flex-col gap-3 px-5 py-4 sm:flex-row sm:items-center sm:gap-5 sm:px-7">
+                  <div className="min-w-0 flex-1">
+                    <p className="break-words text-[17px] font-semibold text-ink">{d.nombre}</p>
+                    <p className="mt-0.5 text-[15px] text-ink-2">
+                      {[ORIGEN[d.origen], conProceso ? d.proceso.nombre : null, fechaCorta(d.fecha)].filter(Boolean).join(" · ")}
+                    </p>
+                    {d.estado && (
+                      <p className="mt-2 flex flex-wrap items-center gap-2 text-[15px] text-ink-2">
+                        <Tag tone={tono(d.estado)}>{d.estado.charAt(0).toUpperCase() + d.estado.slice(1)}</Tag>
+                        {d.nota && <span className="text-pretty">{d.nota}</span>}
+                      </p>
+                    )}
+                  </div>
+                  <div className="flex shrink-0 gap-2">
+                    {PREVISUALIZABLE.test(d.nombre) && (
+                      <a
+                        href={`${d.url}?descargar=false`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex min-h-11 items-center gap-2 rounded-lg px-4 text-[15px] font-semibold text-navy-ink shadow-[0_0_0_1px_var(--line-strong)] hover:bg-manila"
+                      >
+                        <Eye aria-hidden size={17} /> Ver
+                      </a>
+                    )}
+                    <a
+                      href={d.url}
+                      className="inline-flex min-h-11 items-center gap-2 rounded-lg px-4 text-[15px] font-semibold text-navy-ink shadow-[0_0_0_1px_var(--line-strong)] hover:bg-manila"
+                      aria-label={`Descargar ${d.nombre}`}
+                    >
+                      <Download aria-hidden size={17} /> Descargar
+                    </a>
+                  </div>
+                </li>
+              ))}
+            </ul>
+          </Sheet>
+        </>
+      )}
+    </div>
+  );
 }

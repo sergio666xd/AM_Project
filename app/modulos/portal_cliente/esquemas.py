@@ -107,6 +107,14 @@ class DocumentoCliente(BaseModel):
     url: str
 
 
+class DocumentoEnProceso(DocumentoCliente):
+    proceso: ProcesoBreve
+
+
+class DocumentosCliente(BaseModel):
+    items: list[DocumentoEnProceso] = Field(description="De todos sus procesos activos, del más reciente al más antiguo.")
+
+
 class ProcesoCliente(ResumenProcesoCliente):
     despacho: str | None
     radicados: list[str]

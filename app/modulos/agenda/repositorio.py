@@ -33,6 +33,28 @@ class RepositorioAgenda:
             ).options(selectinload(T.usuario)).order_by(T.fecha_limite)
         ).all())
 
+    def eventos_cliente(self, cliente_id: int, desde: datetime, hasta: datetime) -> list[EventoAgenda]:
+        """Eventos programados de los procesos activos del cliente, para todos los clientes o para él."""
+        E, P, PC = EventoAgenda, models.Proceso, models.ProcesoCliente
+        return list(self._db.scalars(
+            select(E).join(P, P.id == E.proceso_id).join(PC, PC.proceso_id == P.id).where(
+                PC.cliente_id == cliente_id, P.archivado_en.is_(None), E.estado == "PROGRAMADO",
+                or_(E.cliente_id.is_(None), E.cliente_id == cliente_id),
+                E.fecha_inicio >= desde, E.fecha_inicio < hasta,
+            ).options(selectinload(E.responsable), selectinload(E.proceso)).order_by(E.fecha_inicio)
+        ).unique().all())
+
+    def tareas_cliente(self, cliente_id: int, desde: datetime, hasta: datetime) -> list[Tarea]:
+        """Tareas abiertas que la firma le pidió al cliente en sus procesos activos."""
+        T, P, PC = Tarea, models.Proceso, models.ProcesoCliente
+        return list(self._db.scalars(
+            select(T).join(P, P.id == T.proceso_id).join(PC, (PC.proceso_id == P.id) & (PC.cliente_id == cliente_id)).where(
+                T.cliente_id == cliente_id, P.archivado_en.is_(None),
+                T.estado.in_((EstadoTarea.PENDIENTE, EstadoTarea.EN_CURSO)),
+                T.fecha_limite >= desde, T.fecha_limite < hasta,
+            ).options(selectinload(T.proceso)).order_by(T.fecha_limite)
+        ).unique().all())
+
     def suscripcion(self, usuario_id: int) -> SuscripcionCalendario | None:
         return self._db.scalar(select(SuscripcionCalendario).where(SuscripcionCalendario.usuario_id == usuario_id))
 

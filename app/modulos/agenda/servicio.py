@@ -38,9 +38,11 @@ from app.timezone import utc_ahora
 from app.workflow_service import user_portal_url
 
 BASE = "/gestion-procesos/abogado"
+BASE_CLIENTE = "/gestion-procesos/cliente"
 RUTA_FEED = "/api/v2/agenda/feed.ics"
 MAXIMO_DIAS = 62
 ETIQUETAS = {"AUDIENCIA": "Audiencia", "REUNION": "Reunión", "FIRMA_CONTRATO": "Firma de contrato", "EVENTO": "Evento"}
+MAXIMO_DIAS_CLIENTE = 200
 SOLO_FIRMA = "La agenda del equipo es para la firma."
 # El feed cubre lo reciente y lo que viene: los calendarios lo vuelven a leer cada hora.
 FEED_ATRAS = timedelta(days=60)
@@ -102,6 +104,36 @@ class ServicioAgenda:
             ))
         items.sort(key=lambda item: item.inicio)
         return items
+
+    def agenda_cliente(self, usuario: Usuario, desde: date, hasta: date) -> Agenda:
+        """Lo que el cliente tiene en sus procesos: audiencias, reuniones y firmas, y lo que la firma le pidió."""
+        if not politicas.es_cliente(usuario):
+            raise SinPermiso("Esta es la agenda del portal del cliente.")
+        if hasta < desde:
+            raise DatosInvalidos("La fecha final va después de la inicial.", campos={"hasta": "Va después de «desde»."})
+        if (hasta - desde).days > MAXIMO_DIAS_CLIENTE:
+            raise DatosInvalidos(f"Consulte como máximo {MAXIMO_DIAS_CLIENTE} días.", campos={"hasta": "El rango es muy largo."})
+        inicio, fin, ahora = inicio_del_dia_utc(desde), inicio_del_dia_utc(hasta + timedelta(days=1)), utc_ahora()
+        items = [
+            ElementoAgenda(
+                clave=f"evento:{e.id}", tipo="evento", etiqueta=ETIQUETAS.get(e.tipo, "Evento"), titulo=e.titulo,
+                detalle=e.descripcion, inicio=e.fecha_inicio, fin=e.fecha_fin, todo_el_dia=False, estado=e.estado,
+                proceso=ProcesoBreve(id=e.proceso_id, nombre=e.proceso.nombre),
+                responsable=e.responsable.nombre_completo if e.responsable else None,
+                enlace=f"{BASE_CLIENTE}/procesos/{e.proceso_id}",
+            )
+            for e in self._repo.eventos_cliente(usuario.id, inicio, fin)
+        ] + [
+            ElementoAgenda(
+                clave=f"tarea:{t.id}", tipo="tarea", etiqueta="Vence", titulo=t.titulo, detalle=t.descripcion,
+                inicio=t.fecha_limite, todo_el_dia=True, estado=t.estado.value, vencida=t.fecha_limite < ahora,
+                proceso=ProcesoBreve(id=t.proceso_id, nombre=t.proceso.nombre),
+                enlace=f"{BASE_CLIENTE}/pendientes#tarea-{t.id}",
+            )
+            for t in self._repo.tareas_cliente(usuario.id, inicio, fin)
+        ]
+        items.sort(key=lambda item: item.inicio)
+        return Agenda(desde=desde, hasta=hasta, items=items)
 
     # ---- Eventos de un proceso --------------------------------------------
 

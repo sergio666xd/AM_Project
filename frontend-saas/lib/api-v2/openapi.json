@@ -3394,7 +3394,7 @@
             "required": false,
             "schema": {
               "type": "integer",
-              "maximum": 50,
+              "maximum": 200,
               "minimum": 1,
               "description": "Cuántos avisos devolver, del más reciente al más antiguo.",
               "default": 8,
@@ -12800,6 +12800,324 @@
         }
       }
     },
+    "/api/v2/cliente/agenda": {
+      "get": {
+        "tags": [
+          "Portal del cliente"
+        ],
+        "summary": "Calendario del cliente",
+        "description": "Audiencias, reuniones y firmas de sus procesos activos, y las fechas de lo que la firma le pidió.",
+        "operationId": "agenda_del_cliente",
+        "parameters": [
+          {
+            "name": "desde",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "date",
+              "title": "Desde"
+            }
+          },
+          {
+            "name": "hasta",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "date",
+              "description": "Inclusive. Como máximo 200 días después de «desde».",
+              "title": "Hasta"
+            },
+            "description": "Inclusive. Como máximo 200 días después de «desde»."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Agenda"
+                }
+              }
+            }
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Too Many Requests"
+          }
+        }
+      }
+    },
+    "/api/v2/cliente/documentos": {
+      "get": {
+        "tags": [
+          "Portal del cliente"
+        ],
+        "summary": "Documentos del cliente",
+        "description": "Lo que envió, lo que la firma le compartió y sus contratos firmados, en todos sus procesos activos.",
+        "operationId": "documentos_del_cliente",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DocumentosCliente"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too Many Requests",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v2/cliente/documentos/{documento_id}/archivo": {
+      "get": {
+        "tags": [
+          "Portal del cliente"
+        ],
+        "summary": "Ver o descargar un documento",
+        "operationId": "archivo_del_cliente",
+        "parameters": [
+          {
+            "name": "documento_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Documento Id"
+            }
+          },
+          {
+            "name": "descargar",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "description": "false lo muestra en el navegador si es PDF o imagen.",
+              "default": true,
+              "title": "Descargar"
+            },
+            "description": "false lo muestra en el navegador si es PDF o imagen."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "El archivo.",
+            "content": {
+              "application/octet-stream": {}
+            }
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Too Many Requests"
+          }
+        }
+      }
+    },
     "/api/v2/cuentas-cobro": {
       "get": {
         "tags": [
@@ -21772,6 +22090,11 @@
             "title": "Id",
             "description": "Identificador estable del aviso; sirve para marcarlo como leído."
           },
+          "categoria": {
+            "type": "string",
+            "title": "Categoria",
+            "description": "proceso, tarea, documento, solicitud, radicado, evento, mensaje, cliente o sistema."
+          },
           "titulo": {
             "type": "string",
             "title": "Titulo"
@@ -21824,6 +22147,7 @@
         "type": "object",
         "required": [
           "id",
+          "categoria",
           "titulo",
           "href",
           "leido"
@@ -26012,6 +26336,72 @@
         ],
         "title": "DocumentoCliente"
       },
+      "DocumentoEnProceso": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "nombre": {
+            "type": "string",
+            "title": "Nombre"
+          },
+          "fecha": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Fecha"
+          },
+          "origen": {
+            "type": "string",
+            "enum": [
+              "cliente",
+              "firma",
+              "contrato"
+            ],
+            "title": "Origen"
+          },
+          "estado": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Estado",
+            "description": "Revisión de lo que envió el cliente: «en revisión», «aprobado»..."
+          },
+          "nota": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Nota"
+          },
+          "url": {
+            "type": "string",
+            "title": "Url"
+          },
+          "proceso": {
+            "$ref": "#/components/schemas/ProcesoBreve"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "nombre",
+          "fecha",
+          "origen",
+          "url",
+          "proceso"
+        ],
+        "title": "DocumentoEnProceso"
+      },
       "DocumentoFirmado": {
         "properties": {
           "id": {
@@ -26035,6 +26425,23 @@
           "subido_en"
         ],
         "title": "DocumentoFirmado"
+      },
+      "DocumentosCliente": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/DocumentoEnProceso"
+            },
+            "type": "array",
+            "title": "Items",
+            "description": "De todos sus procesos activos, del más reciente al más antiguo."
+          }
+        },
+        "type": "object",
+        "required": [
+          "items"
+        ],
+        "title": "DocumentosCliente"
       },
       "Ejecucion": {
         "properties": {

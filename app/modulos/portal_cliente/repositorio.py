@@ -255,6 +255,17 @@ class RepositorioPortal:
         ).first()
         return (fila[0], fila[1]) if fila else None
 
+    def documento(self, cliente_id: int, documento_id: int) -> models.DocumentoProceso | None:
+        """Un documento del cliente en uno de sus procesos activos; los de contrato solo si está firmado."""
+        D, P, V = models.DocumentoProceso, models.Proceso, models.ProcesoCliente
+        return self._db.scalar(
+            select(D).join(P, P.id == D.proceso_id).where(
+                D.id == documento_id, D.cliente_id == cliente_id, P.archivado_en.is_(None),
+                P.id.in_(select(V.proceso_id).where(V.cliente_id == cliente_id)),
+                or_(D.contrato_id.is_(None), D.contrato_id.in_(_firmados())),
+            )
+        )
+
     def documentos(self, cliente_id: int, proceso_id: int) -> list[models.DocumentoProceso]:
         D = models.DocumentoProceso
         return list(self._db.scalars(

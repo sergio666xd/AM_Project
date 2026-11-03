@@ -11,7 +11,7 @@ router = APIRouter(prefix="/avisos", tags=["Avisos"])
 
 @router.get("", response_model=Avisos, summary="Avisos de la campana")
 def listar_avisos(
-    limite: int = Query(8, ge=1, le=50, description="Cuántos avisos devolver, del más reciente al más antiguo."),
+    limite: int = Query(8, ge=1, le=200, description="Cuántos avisos devolver, del más reciente al más antiguo."),
     usuario: models.Usuario = Depends(usuario_actual),
     servicio: ServicioAvisos = Depends(servicio_avisos),
 ):
