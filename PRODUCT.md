@@ -36,10 +36,10 @@ A firm-specific case desk that reads Colombian court activity automatically (Ram
 
 ## Capabilities and Constraints
 
-- Single organization; no multi-tenant SaaS, no public sign-up (legacy SaaS pieces are being retired).
+- Single organization; no multi-tenant SaaS, no public sign-up. The old SaaS code is gone; its tables remain in the database until a separate, confirmed cleanup.
 - Clients only see explicitly assigned case files, tasks and document requests.
 - Court data is read-only from the Rama Judicial; the firm does not file through the platform.
-- Billing rules (partial payments, taxes, ePayco) are undecided; see plan.md decision table.
+- Billing rules (partial payments, taxes, ePayco) are undecided; see the decision table in docs/historico/plan-contratos-y-finanzas.md.
 
 ## Brand Commitments
 
