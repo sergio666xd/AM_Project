@@ -3,18 +3,14 @@
 from sqlalchemy import create_engine
 from sqlalchemy.orm import Session
 
-from app import models, schemas
+from app import models
+from app.api.internos import esquemas as schemas
 from app.message_templates import radicado_legible
 from app.notification_policy import abogados_notificables_para_radicado
 from app.radicados import obtener_o_vincular_radicado
-from app.routers.dashboard import obtener_dashboard
-from app.routers.expedientes.notificaciones import (
-    _notificaciones_abogado,
-    leer_todas_notificaciones_abogado,
-)
-from app.routers.expedientes.panel import dashboard_abogado
-from app.routers.radicados import obtener_radicado
-from app.routers.workflows import (
+from app.modulos.avisos.fuentes import avisos_abogado
+from app.modulos.radicados.repositorio import RepositorioRadicados
+from app.api.internos.workflows import (
     ejecutar_consulta_barrido_radicado,
     preparar_notificaciones_actuaciones,
 )
@@ -114,7 +110,7 @@ def test_new_actuations_stay_flagged_until_the_lawyer_opens_the_radicado(monkeyp
     engine = create_engine("sqlite:///:memory:")
     models.Base.metadata.create_all(engine)
     monkeypatch.setattr(
-        "app.routers.workflows.ejecutar_consulta_api_radicado",
+        "app.api.internos.workflows.ejecutar_consulta_api_radicado",
         lambda db, radicado, reconciliar_historial=False: {
             "estado": "ok", "actuaciones_nuevas": [ACTUACION, {**ACTUACION, "orden": 2}],
         },
@@ -127,53 +123,13 @@ def test_new_actuations_stay_flagged_until_the_lawyer_opens_the_radicado(monkeyp
         ejecutar_consulta_barrido_radicado(ejecucion.id, radicado.id, _=None, db=db)
 
         detalle = f"/gestion-procesos/abogado/radicados/{radicado.id}"
-        atencion = dashboard_abogado(db=db, usuario=abogado)["atencion"]
-        assert atencion[0] == {
-            "tipo": "RADICADO", "titulo": radicado.numero,
-            "descripcion": "2 actuaciones nuevas sin revisar",
-            "fecha": atencion[0]["fecha"], "href": detalle,
-        }
-        aviso = next(item for item in _notificaciones_abogado(db, abogado) if item["tipo"] == "ACTUACIONES_NUEVAS")
+        radicados = RepositorioRadicados(db)
+        assert radicados.novedades(abogado.id) == {radicado.id: 2}
+        aviso = next(item for item in avisos_abogado(db, abogado) if item["tipo"] == "ACTUACIONES_NUEVAS")
         assert aviso["href"] == detalle
-        assert aviso["leida"] is False
+        assert aviso["descripcion"].startswith("2 actuaciones nuevas")
 
-        # Marcar todo como leído no quita el aviso: solo abrir el detalle lo hace.
-        leer_todas_notificaciones_abogado(db=db, usuario=abogado)
-        aviso = next(item for item in _notificaciones_abogado(db, abogado) if item["tipo"] == "ACTUACIONES_NUEVAS")
-        assert aviso["leida"] is False
-
-        respuesta = obtener_radicado(radicado.id, usuario_actual=abogado, db=db)
-        assert respuesta["actuaciones_nuevas_sin_revisar"] == 2
-        assert not any(item["tipo"] == "ACTUACIONES_NUEVAS" for item in _notificaciones_abogado(db, abogado))
-        assert not any(item["tipo"] == "RADICADO" for item in dashboard_abogado(db=db, usuario=abogado)["atencion"])
-        assert obtener_radicado(radicado.id, usuario_actual=abogado, db=db)["actuaciones_nuevas_sin_revisar"] == 0
-
-
-def test_saas_dashboard_flags_new_actuations_with_a_link_to_the_detail(monkeypatch):
-    engine = create_engine("sqlite:///:memory:")
-    models.Base.metadata.create_all(engine)
-    monkeypatch.setattr(
-        "app.routers.workflows.ejecutar_consulta_api_radicado",
-        lambda db, radicado, reconciliar_historial=False: {"estado": "ok", "actuaciones_nuevas": [ACTUACION]},
-    )
-    with Session(engine) as db:
-        plan = models.Plan(nombre="Pro", limite_radicados=10, precio_mensual=50000)
-        db.add(plan)
-        db.flush()
-        abogado = _usuario(db, "saas@example.test", models.RolUsuario.ABOGADO, plan_id=plan.id)
-        radicado, _ = obtener_o_vincular_radicado(db, abogado, "44444444444444444444444")
-        ejecucion = _ejecucion(db, radicado, estado_radicado=None)
-        ejecutar_consulta_barrido_radicado(ejecucion.id, radicado.id, _=None, db=db)
-
-        panel = obtener_dashboard(usuario_actual=abogado, db=db)
-        assert panel["resumen"]["actuaciones_nuevas"] == 1
-        assert panel["procesos_atencion"] == [{
-            "radicado_id": radicado.id, "numero": radicado.numero,
-            "motivo": "1 actuación nueva sin revisar", "tipo": "ACTUACIONES_NUEVAS",
-            "href": f"/gestion-procesos/dashboard/radicados/{radicado.id}",
-        }]
-
-        obtener_radicado(radicado.id, usuario_actual=abogado, db=db)
-        panel = obtener_dashboard(usuario_actual=abogado, db=db)
-        assert panel["resumen"]["actuaciones_nuevas"] == 0
-        assert panel["procesos_atencion"] == []
+        # Abrir el detalle del radicado es lo que quita el aviso.
+        radicados.marcar_revisado(abogado.id, radicado.id)
+        assert radicados.novedades(abogado.id) == {}
+        assert not any(item["tipo"] == "ACTUACIONES_NUEVAS" for item in avisos_abogado(db, abogado))

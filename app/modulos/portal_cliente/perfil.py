@@ -1,7 +1,7 @@
 """Datos y avisos del cliente.
 
 Los datos del cliente salen en su contrato, así que no los cambia él mismo: los
-pide y la firma los aprueba (la misma solicitud de la API v1). Los avisos se
+pide y la firma los aprueba. Los avisos se
 eligen por grupo y canal; cada grupo agrupa tipos de notificación del sistema.
 Los avisos de acceso a la cuenta siempre llegan al correo.
 """

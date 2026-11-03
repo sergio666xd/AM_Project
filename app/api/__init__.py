@@ -1,1 +1,1 @@
-"""Capa HTTP de la API. `v2` reemplaza poco a poco a los routers de `app/routers` (v1)."""
+"""Capa HTTP: `v2` es la API de la aplicación e `internos` la que llaman los flujos programados."""

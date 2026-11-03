@@ -1,6 +1,6 @@
 """Quién puede ver y administrar cada proceso.
 
-Reglas (las mismas de la API v1, en un solo lugar):
+Reglas, en un solo lugar:
 
 - ADMIN ve y administra todos los procesos de la firma.
 - ABOGADO_ADMIN ve los procesos de los que es responsable o colaborador.

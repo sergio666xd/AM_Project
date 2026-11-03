@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "Gestión de procesos AM · API v2",
-    "description": "API de Alejandra Muñoz | Abogada y Asociados. Las rutas nuevas viven en `/api/v2` (sesión por cookie, errores uniformes, listados por cursor); el resto es la API v1, que se retira a medida que cada panel migra.",
+    "description": "API de Alejandra Muñoz | Abogada y Asociados. La aplicación usa `/api/v2` (sesión por cookie, errores uniformes, listados por cursor); `/api/internal/workflows` la llaman solo los flujos programados, con su credencial.",
     "version": "2.0.0"
   },
   "paths": {
@@ -4548,6 +4548,101 @@
             "application/json": {
               "schema": {
                 "$ref": "#/components/schemas/Diagnostico"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too Many Requests",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v2/push/entregado": {
+      "post": {
+        "tags": [
+          "Notificaciones del navegador"
+        ],
+        "summary": "El dispositivo recibió el aviso",
+        "description": "Lo llama el service worker al mostrar la notificación; la firma del aviso reemplaza la sesión.",
+        "operationId": "confirmar_entrega_push",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ConfirmacionEntrega"
               }
             }
           },
@@ -26734,6 +26829,34 @@
           "configurado"
         ],
         "title": "ConfiguracionWhatsapp"
+      },
+      "ConfirmacionEntrega": {
+        "properties": {
+          "usuario_id": {
+            "type": "integer",
+            "exclusiveMinimum": 0.0,
+            "title": "Usuario Id"
+          },
+          "mensaje_id": {
+            "type": "integer",
+            "exclusiveMinimum": 0.0,
+            "title": "Mensaje Id"
+          },
+          "firma": {
+            "type": "string",
+            "maxLength": 64,
+            "minLength": 64,
+            "title": "Firma"
+          }
+        },
+        "type": "object",
+        "required": [
+          "usuario_id",
+          "mensaje_id",
+          "firma"
+        ],
+        "title": "ConfirmacionEntrega",
+        "description": "Lo que envía el service worker al mostrar la notificación de un mensaje."
       },
       "ConfirmacionVaciado": {
         "properties": {

@@ -68,7 +68,8 @@ class ResumenAdmin(BaseModel):
 # ---- Usuarios --------------------------------------------------------------
 
 Rol = Literal["ABOGADO_ADMIN", "ABOGADO", "CLIENTE", "ADMIN"]
-# Los abogados asociados (ABOGADO) se crean cuando dejen el portal SaaS y usen el panel del abogado.
+# Los abogados asociados (ABOGADO) todavía arrastran el alcance aislado del SaaS (radicados y
+# planes); se podrán crear cuando se retire ese alcance junto con las tablas del SaaS.
 RolCreable = Literal["ABOGADO_ADMIN", "CLIENTE"]
 EstadoCuenta = Literal["activo", "suspendido", "pendiente", "rechazado"]
 Acceso = Literal["activo", "sin_ingreso", "suspendido"]

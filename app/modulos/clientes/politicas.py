@@ -1,4 +1,4 @@
-"""Qué clientes ve cada usuario (las mismas reglas de la API v1).
+"""Qué clientes ve cada usuario.
 
 - ADMIN ve a todos los clientes de la firma.
 - Un abogado ve a los clientes que creó y a los vinculados a procesos activos que ve.

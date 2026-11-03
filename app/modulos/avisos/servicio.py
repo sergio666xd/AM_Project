@@ -1,9 +1,8 @@
 """Reúne los avisos de cada rol en el formato de la campana.
 
-Cada rol ya tenía su centro de notificaciones en la API v1 (abogado, cliente y
-alertas de administración), con su propia tabla de lecturas. Este servicio
-los usa como fuentes y les da una forma común; cuando esos paneles pasen a la
-v2, la construcción de cada lista se mueve a este módulo.
+Cada rol tiene su fuente de avisos (`fuentes`: abogado, cliente y alertas de
+administración) y su propia tabla de lecturas. Este servicio les da una forma
+común y marca qué se leyó.
 """
 
 from dataclasses import dataclass
@@ -13,6 +12,7 @@ from typing import Callable
 from sqlalchemy.orm import Session
 
 from app import models
+from app.modulos.avisos import fuentes
 from app.modulos.avisos.esquemas import Aviso, Avisos
 from app.modulos.identidad.modelos import Usuario
 from app.nucleo.errores import SinPermiso
@@ -35,40 +35,32 @@ def _categoria(valor) -> str:
 
 
 def _avisos_abogado(db: Session, usuario: Usuario) -> list[dict]:
-    from app.routers.expedientes.notificaciones import _notificaciones_abogado
-
     return [
         {"id": item["id"], "categoria": _categoria(item.get("categoria")), "titulo": item["titulo"], "detalle": item.get("descripcion"),
          "proceso": item.get("proceso"), "fecha": item.get("fecha"), "href": item["href"]}
-        for item in _notificaciones_abogado(db, usuario)
+        for item in fuentes.avisos_abogado(db, usuario)
     ]
 
 
 def _avisos_cliente(db: Session, usuario: Usuario) -> list[dict]:
-    from app.routers.expedientes.portal_cliente import _notificaciones_cliente
-
     return [
         {"id": item["id"], "categoria": _categoria(item.get("categoria")), "titulo": item["titulo"], "detalle": item.get("descripcion"),
          "proceso": item.get("proceso"), "fecha": item.get("fecha"), "href": item["href"]}
-        for item in _notificaciones_cliente(db, usuario)
+        for item in fuentes.avisos_cliente(db, usuario)
     ]
 
 
 def _avisos_admin(db: Session, _usuario: Usuario) -> list[dict]:
-    from app.routers.admin.alertas import _alertas_admin
-
     return [
         {"id": item["id"], "categoria": "sistema", "titulo": item["descripcion"], "detalle": item.get("accion_recomendada"), "proceso": None,
          "fecha": item.get("fecha"), "href": item["href"]}
-        for item in _alertas_admin(db)
+        for item in fuentes.alertas_admin(db)
         if item.get("estado") != "ELIMINADA"
     ]
 
 
 def _no_es_actuacion(aviso_id: str) -> bool:
-    from app.routers.expedientes.notificaciones import PREFIJO_AVISO_ACTUACIONES
-
-    return not aviso_id.startswith(PREFIJO_AVISO_ACTUACIONES)
+    return not aviso_id.startswith(fuentes.PREFIJO_AVISO_ACTUACIONES)
 
 
 _FUENTES = {

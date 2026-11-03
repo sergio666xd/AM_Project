@@ -1,4 +1,4 @@
-"""Modelos ORM de documentos (definidos en `app.models` mientras viva la API v1)."""
+"""Modelos ORM de documentos (definidos en `app.models`)."""
 
 from app.models import DocumentoProceso, SolicitudDocumento
 

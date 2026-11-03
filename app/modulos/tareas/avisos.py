@@ -14,10 +14,8 @@ def ruta_tarea(usuario: models.Usuario, tarea_id: int | None = None) -> str:
     """La pantalla de la tarea en el portal de quien recibe el aviso; sin id, la lista."""
     if usuario.rol == models.RolUsuario.CLIENTE:
         return f"/gestion-procesos/cliente/tareas?tarea={tarea_id}#tarea-{tarea_id}" if tarea_id else "/gestion-procesos/cliente/tareas"
-    if usuario.rol == models.RolUsuario.ABOGADO:
-        return f"/gestion-procesos/dashboard/tareas/{tarea_id}" if tarea_id else "/gestion-procesos/dashboard/tareas"
     if usuario.rol == models.RolUsuario.ADMIN:
-        return f"/gestion-procesos/admin/tareas?detalle={tarea_id}" if tarea_id else "/gestion-procesos/admin/tareas"
+        return f"/gestion-procesos/admin/tareas/{tarea_id}" if tarea_id else "/gestion-procesos/admin/tareas"
     return f"/gestion-procesos/abogado/tareas/{tarea_id}" if tarea_id else "/gestion-procesos/abogado/tareas"
 
 

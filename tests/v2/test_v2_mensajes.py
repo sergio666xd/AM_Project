@@ -5,7 +5,7 @@ H = {"X-AM-Solicitud": "1"}
 
 def _sin_avisos(monkeypatch):
     avisados = []
-    monkeypatch.setattr("app.modulos.mensajes.legado.avisar", lambda db, conversacion, mensaje, usuario: avisados.append(mensaje.id))
+    monkeypatch.setattr("app.modulos.mensajes.reglas.avisar", lambda db, conversacion, mensaje, usuario: avisados.append(mensaje.id))
     return avisados
 
 
@@ -123,3 +123,27 @@ def test_aviso_real_al_cliente_no_falla(iniciar, crear_usuario, crear_proceso, c
     cid = cliente_http.get(f"/api/v2/conversaciones/resolver?clave=process:{e['sucesion'].id}:{e['gloria'].id}").json()["id"]
     respuesta = cliente_http.post(f"/api/v2/conversaciones/{cid}/mensajes", json={"texto": "Hola, Gloria"})
     assert respuesta.status_code == 201, respuesta.text
+
+
+def test_el_dispositivo_confirma_la_entrega_del_aviso(iniciar, crear_usuario, crear_proceso, cliente_http, monkeypatch):
+    """El service worker confirma con la firma del aviso, sin sesión; la firma vale solo para ese destinatario."""
+    from app.modulos.mensajes.reglas import _ack_entrega_push
+
+    _sin_avisos(monkeypatch)
+    cliente_http.headers.update(H)
+    e = _escenario(crear_usuario, crear_proceso)
+    iniciar(e["abogada"])
+    cid = cliente_http.get(f"/api/v2/conversaciones/resolver?clave=process:{e['sucesion'].id}:{e['gloria'].id}").json()["id"]
+    mensaje = cliente_http.post(f"/api/v2/conversaciones/{cid}/mensajes", json={"texto": "Hola"}).json()
+
+    ack = _ack_entrega_push(e["gloria"].id, mensaje["id"])
+    assert ack["url"] == "/api/v2/push/entregado"
+    cliente_http.cookies.clear()
+    ajena = {"usuario_id": e["abogada"].id, "mensaje_id": mensaje["id"], "firma": ack["firma"]}
+    assert cliente_http.post("/api/v2/push/entregado", json=ajena).status_code == 403
+    datos = {k: ack[k] for k in ("usuario_id", "mensaje_id", "firma")}
+    assert cliente_http.post("/api/v2/push/entregado", json=datos).status_code == 204
+
+    iniciar(e["abogada"])
+    hilo = cliente_http.get(f"/api/v2/conversaciones/{cid}").json()
+    assert hilo["mensajes"][-1]["entrega"]["estado"] == "entregado"

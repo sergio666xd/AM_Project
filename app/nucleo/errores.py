@@ -5,7 +5,7 @@ Los manejadores de este módulo los convierten en:
 
     {"codigo": "no_encontrado", "mensaje": "No encontramos el proceso.", "campos": {}}
 
-Las rutas de la API v1 conservan el formato `{"detail": ...}` de FastAPI.
+La API interna de los flujos programados conserva el formato `{"detail": ...}` de FastAPI.
 """
 
 from fastapi import FastAPI, Request
@@ -85,9 +85,9 @@ CODIGO_POR_ESTADO = {
 }
 
 MENSAJE_POR_ESTADO = {
-    401: "Inicia sesión para continuar.",
-    403: "No tienes permiso para realizar esta acción.",
-    404: "No encontramos lo que buscas.",
+    401: "Hace falta iniciar sesión para continuar.",
+    403: "Esta cuenta no tiene permiso para esta acción.",
+    404: "No encontramos lo que se pidió.",
     405: "Esta acción no está disponible.",
 }
 

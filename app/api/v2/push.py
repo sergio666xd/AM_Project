@@ -5,6 +5,7 @@ from app.api.v2.dependencias import servicio_push
 from app.modulos.push.esquemas import (
     BajaSuscripcion,
     ClavePublica,
+    ConfirmacionEntrega,
     Diagnostico,
     Dispositivo,
     Dispositivos,
@@ -81,6 +82,13 @@ def diagnostico_push(
 ):
     """El navegador avisa en qué paso falló la activación, para revisarlo en los registros."""
     servicio.diagnostico(usuario, datos)
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+@router.post("/entregado", status_code=status.HTTP_204_NO_CONTENT, summary="El dispositivo recibió el aviso")
+def confirmar_entrega_push(datos: ConfirmacionEntrega, servicio: ServicioPush = Depends(servicio_push)):
+    """Lo llama el service worker al mostrar la notificación; la firma del aviso reemplaza la sesión."""
+    servicio.confirmar_entrega(datos)
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 

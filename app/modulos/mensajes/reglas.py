@@ -1,32 +1,39 @@
-from __future__ import annotations
+"""Reglas del chat: quién conversa con quién, qué se puede adjuntar y cómo se avisa.
 
+Cada proceso tiene sus conversaciones (cliente y responsable, colaboradores,
+equipo y administración). Aquí se crean las que le corresponden a cada
+persona, se valida el acceso, se guardan los mensajes y se avisa por push,
+correo o WhatsApp respetando la presencia en el panel y una pausa entre avisos.
+"""
 import hashlib
 import hmac
-import logging
 import json
+import logging
 import os
 from datetime import timedelta
-from app.timezone import utc_ahora
-from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import func, or_
-from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, selectinload
 
-from app import models, schemas, security
+from app import models, security
 from app.audit import registrar_evento_auditoria
-from app.database import get_db
 from app.firm_access import lawyer_process_ids, require_process_access, role_name
-from app.notification_service import emitir_notificacion_workflow
 from app.notification_policy import canales_habilitados
-from app.workflow_service import compact_portal_path, user_portal_url
+from app.notification_service import emitir_notificacion_workflow
+from app.nucleo.errores import DatosInvalidos, NoEncontrado, SinPermiso
+from app.timezone import utc_ahora
 from app.web_push import firm_push_icon
+from app.workflow_service import compact_portal_path, user_portal_url
 
-router = APIRouter(prefix="/api/chat", tags=["Chat"])
 logger = logging.getLogger(__name__)
+
+
 STAFF_ROLES = {"ADMIN", "ABOGADO", "ABOGADO_ADMIN"}
+
+
 PANEL_PRESENCE_TTL = timedelta(seconds=90)
+
+
 CHAT_NOTIFICATION_COOLDOWN = timedelta(hours=1)
 
 
@@ -40,188 +47,6 @@ def _chat_area(user: models.Usuario) -> str:
 
 def _supports_firm_panel_presence(user: models.Usuario) -> bool:
     return _role(user) in {"CLIENTE", "ABOGADO_ADMIN", "ADMIN"}
-
-
-@router.post("/presencia")
-def actualizar_presencia_panel(
-    data: schemas.ChatPresenciaUpdate,
-    db: Session = Depends(get_db),
-    user: models.Usuario = Depends(security.obtener_usuario_actual),
-):
-    if not _supports_firm_panel_presence(user):
-        return {"activo": False}
-    now = utc_ahora()
-    db.query(models.ChatPresenciaPanel).filter(
-        models.ChatPresenciaPanel.last_seen_at < now - PANEL_PRESENCE_TTL
-    ).delete(synchronize_session=False)
-    presence = db.query(models.ChatPresenciaPanel).filter_by(
-        usuario_id=user.id, session_id=data.session_id,
-    ).with_for_update().first()
-    if presence is None:
-        presence = models.ChatPresenciaPanel(
-            usuario_id=user.id, session_id=data.session_id, last_seen_at=now,
-        )
-        db.add(presence)
-    else:
-        presence.last_seen_at = now
-    try:
-        db.commit()
-    except IntegrityError:
-        # Dos pestañas del mismo panel pueden crear la fila a la vez; la otra
-        # ya la dejó vigente, así que basta con actualizarla.
-        db.rollback()
-        db.query(models.ChatPresenciaPanel).filter_by(
-            usuario_id=user.id, session_id=data.session_id,
-        ).update({"last_seen_at": now}, synchronize_session=False)
-        db.commit()
-    return {"activo": True, "expira_en_segundos": int(PANEL_PRESENCE_TTL.total_seconds())}
-
-
-@router.delete("/presencia")
-def cerrar_presencia_panel(
-    data: schemas.ChatPresenciaUpdate,
-    db: Session = Depends(get_db),
-    user: models.Usuario = Depends(security.obtener_usuario_actual),
-):
-    db.query(models.ChatPresenciaPanel).filter_by(
-        usuario_id=user.id, session_id=data.session_id,
-    ).delete(synchronize_session=False)
-    db.commit()
-    return {"activo": False}
-
-
-@router.get("/push/clave-publica")
-def obtener_clave_publica_push(user: models.Usuario = Depends(security.obtener_usuario_actual)):
-    public_key = os.getenv("WEB_PUSH_VAPID_PUBLIC_KEY", "").strip()
-    if not public_key:
-        raise HTTPException(status_code=503, detail="Las notificaciones del navegador aún no están configuradas.")
-    return {"public_key": public_key}
-
-
-@router.post("/push/suscripciones", status_code=201)
-def guardar_suscripcion_push(
-    data: schemas.ChatPushSubscriptionCreate,
-    db: Session = Depends(get_db),
-    user: models.Usuario = Depends(security.obtener_usuario_actual),
-):
-    if user.estado != models.EstadoUsuario.ACTIVO:
-        raise HTTPException(status_code=403, detail="La cuenta no está activa.")
-    if not os.getenv("WEB_PUSH_VAPID_PUBLIC_KEY") or not os.getenv("WEB_PUSH_VAPID_PRIVATE_KEY"):
-        raise HTTPException(status_code=503, detail="Las notificaciones del navegador aún no están configuradas.")
-    subscription = db.query(models.ChatPushSubscription).filter_by(endpoint=data.endpoint).with_for_update().first()
-    if subscription is None:
-        subscription = models.ChatPushSubscription(
-            usuario_id=user.id, endpoint=data.endpoint,
-            p256dh=data.keys["p256dh"], auth=data.keys["auth"],
-            user_agent=data.user_agent, device_label=data.device_label,
-        )
-        db.add(subscription)
-    else:
-        subscription.usuario_id = user.id
-        subscription.p256dh = data.keys["p256dh"]
-        subscription.auth = data.keys["auth"]
-        subscription.user_agent = data.user_agent
-        subscription.device_label = data.device_label
-        subscription.updated_at = utc_ahora()
-    db.commit()
-    return {"registrada": True}
-
-
-@router.delete("/push/suscripciones")
-def eliminar_suscripcion_push(
-    data: schemas.ChatPushSubscriptionDelete,
-    db: Session = Depends(get_db),
-    user: models.Usuario = Depends(security.obtener_usuario_actual),
-):
-    db.query(models.ChatPushSubscription).filter_by(usuario_id=user.id, endpoint=data.endpoint).delete(synchronize_session=False)
-    db.commit()
-    return {"registrada": False}
-
-
-@router.get("/push/dispositivos")
-def listar_dispositivos_push(
-    db: Session = Depends(get_db),
-    user: models.Usuario = Depends(security.obtener_usuario_actual),
-):
-    """Lista los dispositivos del usuario con notificaciones push activas."""
-    subs = (
-        db.query(models.ChatPushSubscription)
-        .filter_by(usuario_id=user.id)
-        .order_by(models.ChatPushSubscription.updated_at.desc())
-        .all()
-    )
-    return [
-        {
-            "id": s.id,
-            "device_label": s.device_label or _label_from_user_agent(s.user_agent),
-            "user_agent": s.user_agent,
-            "created_at": s.created_at.isoformat() if s.created_at else None,
-            "updated_at": s.updated_at.isoformat() if s.updated_at else None,
-        }
-        for s in subs
-    ]
-
-
-@router.delete("/push/dispositivos/{device_id}")
-def eliminar_dispositivo_push(
-    device_id: int,
-    db: Session = Depends(get_db),
-    user: models.Usuario = Depends(security.obtener_usuario_actual),
-):
-    """Elimina una suscripción push específica del usuario por ID."""
-    deleted = (
-        db.query(models.ChatPushSubscription)
-        .filter_by(id=device_id, usuario_id=user.id)
-        .delete(synchronize_session=False)
-    )
-    if not deleted:
-        raise HTTPException(status_code=404, detail="Dispositivo no encontrado.")
-    db.commit()
-    return {"eliminado": True}
-
-
-def _label_from_user_agent(ua: str) -> str:
-    """Genera una etiqueta legible a partir del user-agent."""
-    if not ua:
-        return "Dispositivo desconocido"
-    ua_lower = ua.lower()
-    # Detectar SO
-    os_name = "Dispositivo"
-    if "iphone" in ua_lower or "ipad" in ua_lower:
-        os_name = "iPhone" if "iphone" in ua_lower else "iPad"
-    elif "android" in ua_lower:
-        os_name = "Android"
-    elif "macintosh" in ua_lower or "mac os" in ua_lower:
-        os_name = "Mac"
-    elif "windows" in ua_lower:
-        os_name = "Windows"
-    elif "linux" in ua_lower:
-        os_name = "Linux"
-    # Detectar navegador
-    browser = ""
-    if "edg/" in ua_lower or "edga/" in ua_lower or "edgios/" in ua_lower:
-        browser = "Edge"
-    elif "chrome/" in ua_lower and "safari/" in ua_lower and "edg" not in ua_lower:
-        browser = "Chrome"
-    elif "firefox/" in ua_lower or "fxios/" in ua_lower:
-        browser = "Firefox"
-    elif "safari/" in ua_lower and "chrome" not in ua_lower:
-        browser = "Safari"
-    elif "samsung" in ua_lower:
-        browser = "Samsung Internet"
-    return f"{os_name} · {browser}" if browser else os_name
-
-
-@router.post("/push/diagnosticos", status_code=204)
-def registrar_error_configuracion_push(
-    data: schemas.ChatPushDiagnosticCreate,
-    user: models.Usuario = Depends(security.obtener_usuario_actual),
-):
-    logger.warning(
-        "No se pudo configurar Push en navegador para usuario %s: etapa=%s error=%s mensaje=%s",
-        user.id, data.etapa, data.nombre_error, data.mensaje_error,
-    )
-    return None
 
 
 def _send_chat_push(
@@ -326,86 +151,40 @@ def _firma_entrega_push(usuario_id: int, mensaje_id: int) -> str:
     ).hexdigest()
 
 
+def firma_valida(usuario_id: int, mensaje_id: int, firma: str) -> bool:
+    return hmac.compare_digest(firma, _firma_entrega_push(usuario_id, mensaje_id))
+
+
 def _ack_entrega_push(usuario_id: int, mensaje_id: int) -> dict:
     return {
-        "url": "/api/chat/push/entregado",
+        "url": "/api/v2/push/entregado",
         "usuario_id": usuario_id,
         "mensaje_id": mensaje_id,
         "firma": _firma_entrega_push(usuario_id, mensaje_id),
     }
 
 
-@router.post("/push/entregado", status_code=204)
-def confirmar_entrega_push(data: schemas.ChatPushEntrega, db: Session = Depends(get_db)):
-    """El service worker confirma que la notificación llegó al dispositivo.
-
-    No lleva sesión: la firma HMAC emitida con el push autoriza solo ese mensaje para ese usuario.
-    """
-    if not hmac.compare_digest(data.firma, _firma_entrega_push(data.usuario_id, data.mensaje_id)):
-        raise HTTPException(status_code=403, detail="Confirmación de entrega no válida.")
-    message = db.get(models.ChatMensaje, data.mensaje_id)
-    if not message:
-        return None
-    participant = db.query(models.ChatParticipante).filter_by(
-        conversacion_id=message.conversacion_id,
-        usuario_id=data.usuario_id,
-    ).first()
-    if participant and participant.ultimo_entregado_mensaje_id < message.id:
-        participant.ultimo_entregado_mensaje_id = message.id
-        db.commit()
-    return None
-
-
-@router.post("/push/prueba")
-def probar_notificacion_push(
-    db: Session = Depends(get_db),
-    user: models.Usuario = Depends(security.obtener_usuario_actual),
-):
-    if user.estado != models.EstadoUsuario.ACTIVO:
-        raise HTTPException(status_code=403, detail="La cuenta no esta activa.")
-    if not os.getenv("WEB_PUSH_VAPID_PUBLIC_KEY", "").strip() or not os.getenv("WEB_PUSH_VAPID_PRIVATE_KEY", "").strip():
-        raise HTTPException(status_code=503, detail="Las notificaciones del navegador aun no estan configuradas.")
-    subscription_exists = db.query(models.ChatPushSubscription.id).filter_by(usuario_id=user.id).first()
-    if not subscription_exists:
-        raise HTTPException(status_code=409, detail="Este navegador no tiene una suscripcion Push registrada. Activa las notificaciones en este dispositivo.")
-
-    chat_path = f"/gestion-procesos/{_chat_area(user)}/chat"
-    delivered = _send_chat_push(
-        db,
-        user,
-        user,
-        user_portal_url(user, chat_path),
-        title="Prueba de notificaciones",
-        body="Las notificaciones Push de este navegador estan funcionando.",
-        tag=f"chat-test-{user.id}",
-    )
-    if not delivered:
-        raise HTTPException(status_code=502, detail="El servicio Push rechazo el envio. Revisa los logs del backend y confirma que las claves VAPID correspondan a las usadas al crear la suscripcion.")
-    db.commit()
-    return {"entregada": True}
-
-
 def _path_id(value: str) -> int:
     if not value.isdecimal():
-        raise HTTPException(status_code=404, detail="Ruta de chat no válida.")
+        raise NoEncontrado("Ruta de chat no válida.")
     return int(value)
 
 
 def _active_user(db: Session, user_id: int) -> models.Usuario:
     user = db.query(models.Usuario).filter_by(id=user_id).first()
     if not user or user.estado != models.EstadoUsuario.ACTIVO:
-        raise HTTPException(status_code=404, detail="Participante no disponible.")
+        raise NoEncontrado("Participante no disponible.")
     return user
 
 
 def _process(db: Session, process_id: int, user: models.Usuario) -> models.Proceso:
     process = db.query(models.Proceso).filter_by(id=process_id, archivado_en=None).first()
     if not process:
-        raise HTTPException(status_code=404, detail="Proceso no disponible.")
+        raise NoEncontrado("Proceso no disponible.")
     if _role(user) == "CLIENTE":
         linked = db.query(models.ProcesoCliente).filter_by(proceso_id=process_id, cliente_id=user.id).first()
         if not linked:
-            raise HTTPException(status_code=403, detail="No tienes acceso a este proceso.")
+            raise SinPermiso("Esta cuenta no tiene acceso a este proceso.")
     else:
         require_process_access(user, process.abogado_id, process_id=process.id, db=db)
     return process
@@ -438,12 +217,12 @@ def _upsert_conversation(
 def _conversation_for_actor(db: Session, conversation_id: int, user: models.Usuario) -> models.ChatConversacion:
     conversation = db.query(models.ChatConversacion).filter_by(id=conversation_id).first()
     if not conversation:
-        raise HTTPException(status_code=404, detail="Conversación no encontrada.")
+        raise NoEncontrado("Conversación no encontrada.")
     participant = db.query(models.ChatParticipante).filter_by(
         conversacion_id=conversation.id, usuario_id=user.id,
     ).first()
     if not participant:
-        raise HTTPException(status_code=403, detail="No tienes acceso a esta conversación.")
+        raise SinPermiso("Esta cuenta no tiene acceso a esta conversación.")
     if conversation.proceso_id is not None:
         _process(db, conversation.proceso_id, user)
     return conversation
@@ -605,27 +384,6 @@ def _message_reference_url(message: models.ChatMensaje, conversation: models.Cha
     return message.referencia_url
 
 
-def _message_delivery(message: models.ChatMensaje, participants: list[models.ChatParticipante]) -> dict:
-    recipients = [item for item in participants if item.usuario_id != message.remitente_id]
-    recipient_count = len(recipients)
-    delivered_count = sum(item.ultimo_entregado_mensaje_id >= message.id for item in recipients)
-    read_count = sum(item.ultimo_leido_mensaje_id >= message.id for item in recipients)
-    if recipient_count and read_count == recipient_count:
-        status = "LEIDO"
-    elif recipient_count and delivered_count == recipient_count:
-        status = "ENTREGADO"
-    elif delivered_count:
-        status = "ENTREGADO_PARCIAL"
-    else:
-        status = "ENVIADO"
-    return {
-        "estado_entrega": status,
-        "entregados": delivered_count,
-        "leidos": read_count,
-        "destinatarios": recipient_count,
-    }
-
-
 def _create_available_conversations(db: Session, user: models.Usuario) -> list[models.ChatConversacion]:
     role = _role(user)
     conversations: list[models.ChatConversacion] = []
@@ -687,32 +445,32 @@ def _resolve(db: Session, key: str, user: models.Usuario) -> models.ChatConversa
     parts = key.split(":")
     if parts[0] == "direct" and len(parts) == 2:
         if role not in STAFF_ROLES:
-            raise HTTPException(status_code=403, detail="Esta conversación es solo para el equipo jurídico.")
+            raise SinPermiso("Esta conversación es solo para el equipo jurídico.")
         if parts[1].lower() in {"admin", "administrador"}:
             peer = db.query(models.Usuario).filter(
                 models.Usuario.rol == "ADMIN", models.Usuario.estado == models.EstadoUsuario.ACTIVO,
                 models.Usuario.id != user.id,
             ).order_by(models.Usuario.id).first()
             if not peer:
-                raise HTTPException(status_code=404, detail="No hay un administrador disponible.")
+                raise NoEncontrado("No hay un administrador disponible.")
         else:
             peer = _active_user(db, _path_id(parts[1]))
             if _role(peer) not in STAFF_ROLES or peer.id == user.id:
-                raise HTTPException(status_code=400, detail="El destinatario no es un integrante del equipo.")
+                raise DatosInvalidos("El destinatario no es un integrante del equipo.")
         a, b = sorted((user.id, peer.id))
         return _upsert_conversation(db, key=f"staff:{a}:{b}", kind="STAFF_DIRECT", actor=user, participants=[user, peer])
 
     if parts[0] == "process" and len(parts) == 3:
         if role == "ADMIN":
-            raise HTTPException(status_code=403, detail="El chat del proceso está reservado a sus participantes.")
+            raise SinPermiso("El chat del proceso está reservado a sus participantes.")
         process = _process(db, _path_id(parts[1]), user)
         if parts[2] == "collaborators":
             if role == "CLIENTE":
-                raise HTTPException(status_code=403, detail="El chat de colaboradores es interno.")
+                raise SinPermiso("El chat de colaboradores es interno.")
             collaborators = [row.abogado for row in process.colaboradores if row.abogado and row.abogado.estado == models.EstadoUsuario.ACTIVO]
             participants = list({item.id: item for item in [process.abogado, *collaborators] if item}.values())
             if user not in participants:
-                raise HTTPException(status_code=403, detail="No participas en este proceso.")
+                raise SinPermiso("Esta cuenta no participa en este proceso.")
             return _upsert_conversation(db, key=f"process:{process.id}:collaborators", kind="PROCESO_COLABORADORES", actor=user, participants=participants, process_id=process.id)
         target = _active_user(db, _path_id(parts[2]))
         if role == "CLIENTE":
@@ -720,7 +478,7 @@ def _resolve(db: Session, key: str, user: models.Usuario) -> models.ChatConversa
                 proceso_id=process.id, abogado_id=target.id, visible_cliente=True,
             ).first()
             if target.id != process.abogado_id and not collaborator:
-                raise HTTPException(status_code=403, detail="El contacto no corresponde a este proceso.")
+                raise SinPermiso("El contacto no corresponde a este proceso.")
             client = user
             peer = target
         else:
@@ -730,53 +488,18 @@ def _resolve(db: Session, key: str, user: models.Usuario) -> models.ChatConversa
                     proceso_id=process.id, abogado_id=user.id, visible_cliente=True,
                 ).first()
                 if user.id != process.abogado_id and not collaborator:
-                    raise HTTPException(status_code=403, detail="Solo el abogado responsable puede abrir el chat con el cliente.")
+                    raise SinPermiso("Solo el abogado responsable puede abrir el chat con el cliente.")
                 client, peer = target, user
             elif target.id == process.abogado_id or db.query(models.ProcesoColaborador).filter_by(proceso_id=process.id, abogado_id=target.id).first():
                 if target.id == user.id:
-                    raise HTTPException(status_code=400, detail="Selecciona a otro participante.")
+                    raise DatosInvalidos("Hace falta elegir a otro participante.")
                 a, b = sorted((user.id, target.id))
                 return _upsert_conversation(db, key=f"process:{process.id}:direct:{a}:{b}", kind="PROCESO_DIRECTO", actor=user, participants=[user, target], process_id=process.id)
             else:
-                raise HTTPException(status_code=403, detail="El destinatario no pertenece a este proceso.")
+                raise SinPermiso("El destinatario no pertenece a este proceso.")
         a, b = sorted((client.id, peer.id))
         return _upsert_conversation(db, key=f"process:{process.id}:direct:{a}:{b}", kind="PROCESO_DIRECTO", actor=user, participants=[client, peer], process_id=process.id, client_id=client.id)
-    raise HTTPException(status_code=404, detail="Ruta de chat no válida.")
-
-
-@router.get("/conversaciones")
-def listar_conversaciones(
-    sincronizar: bool = True,
-    db: Session = Depends(get_db),
-    user: models.Usuario = Depends(security.obtener_usuario_actual),
-):
-    """Lista las conversaciones del usuario.
-
-    ``sincronizar=false`` omite la creación de conversaciones disponibles (que
-    escribe en la base de datos) y sirve para los sondeos periódicos.
-    """
-    if sincronizar:
-        _create_available_conversations(db, user)
-        db.commit()
-    member_ids = db.query(models.ChatParticipante.conversacion_id).filter_by(usuario_id=user.id)
-    conversations = (
-        db.query(models.ChatConversacion)
-        .filter(models.ChatConversacion.id.in_(member_ids))
-        .options(
-            selectinload(models.ChatConversacion.participantes).selectinload(models.ChatParticipante.usuario),
-            selectinload(models.ChatConversacion.proceso),
-        )
-        .all()
-    )
-    allowed_process_ids = _accessible_process_ids(
-        db, user, {item.proceso_id for item in conversations if item.proceso_id is not None},
-    )
-    visible = [
-        item for item in conversations
-        if item.proceso_id is None or item.proceso_id in allowed_process_ids
-    ]
-    result = _display_conversations(db, visible, user)
-    return sorted(result, key=lambda item: item["updated_at"], reverse=True)
+    raise NoEncontrado("Ruta de chat no válida.")
 
 
 def _accessible_process_ids(db: Session, user: models.Usuario, process_ids: set[int]) -> set[int]:
@@ -795,80 +518,6 @@ def _accessible_process_ids(db: Session, user: models.Usuario, process_ids: set[
     elif role != "ADMIN":
         query = query.filter(models.Proceso.id.in_(lawyer_process_ids(db, user)))
     return {row[0] for row in query.all()}
-
-
-@router.get("/resolver")
-def resolver_conversacion(
-    clave: str,
-    after_id: int = 0,
-    before_id: int = 0,
-    limite: Annotated[int, Query(ge=1, le=200)] = 30,
-    db: Session = Depends(get_db),
-    user: models.Usuario = Depends(security.obtener_usuario_actual),
-):
-    conversation = _resolve(db, clave, user)
-    conversation = _conversation_for_actor(db, conversation.id, user)
-    participant = next((item for item in conversation.participantes if item.usuario_id == user.id), None)
-    message_query = db.query(models.ChatMensaje).filter(models.ChatMensaje.conversacion_id == conversation.id)
-    has_more = False
-    if after_id > 0:
-        messages = message_query.filter(models.ChatMensaje.id > after_id).order_by(models.ChatMensaje.id.asc()).limit(500).all()
-    else:
-        # Carga paginada desde el final: los últimos `limite` mensajes, o los anteriores a `before_id`.
-        if before_id > 0:
-            message_query = message_query.filter(models.ChatMensaje.id < before_id)
-        page = message_query.order_by(models.ChatMensaje.id.desc()).limit(limite + 1).all()
-        has_more = len(page) > limite
-        messages = list(reversed(page[:limite]))
-    if before_id > 0:
-        # Al subir en el historial solo se piden mensajes antiguos; los estados ya están en el cliente.
-        status_messages = []
-    else:
-        status_messages = db.query(models.ChatMensaje).filter_by(
-            conversacion_id=conversation.id,
-            remitente_id=user.id,
-        ).order_by(models.ChatMensaje.id.desc()).limit(200).all()
-    if participant and messages and before_id <= 0:
-        participant.ultimo_entregado_mensaje_id = max(
-            participant.ultimo_entregado_mensaje_id,
-            messages[-1].id,
-        )
-    db.commit()
-    return {
-        "conversacion": _display_conversation(db, conversation, user),
-        "hay_mas": has_more,
-        "participantes": [{"id": item.usuario.id, "nombre": item.usuario.nombre_completo} for item in conversation.participantes if item.usuario],
-        "estados_mensajes": [{"id": item.id, **_message_delivery(item, conversation.participantes)} for item in status_messages],
-        "mensajes": [{
-            "id": item.id, "contenido": item.contenido, "remitente_id": item.remitente_id,
-            "remitente": item.remitente.nombre_completo if item.remitente else "Usuario eliminado",
-            "es_mio": item.remitente_id == user.id, "created_at": item.created_at,
-            **_message_delivery(item, conversation.participantes),
-            "referencia": ({"tipo": item.referencia_tipo, "id": item.referencia_id, "titulo": item.referencia_titulo, "url": _message_reference_url(item, conversation, user, db)} if item.referencia_tipo else None),
-        } for item in messages],
-    }
-
-
-@router.post("/conversaciones/{conversation_id}/leido")
-def marcar_conversacion_leida(
-    conversation_id: int,
-    data: schemas.ChatMensajeLeidoUpdate,
-    db: Session = Depends(get_db),
-    user: models.Usuario = Depends(security.obtener_usuario_actual),
-):
-    conversation = _conversation_for_actor(db, conversation_id, user)
-    participant = next((item for item in conversation.participantes if item.usuario_id == user.id), None)
-    message = db.query(models.ChatMensaje).filter_by(
-        id=data.mensaje_id,
-        conversacion_id=conversation.id,
-    ).first()
-    if not participant or not message:
-        raise HTTPException(status_code=404, detail="No se encontró el mensaje de esta conversación.")
-    participant.ultimo_entregado_mensaje_id = max(participant.ultimo_entregado_mensaje_id, message.id)
-    participant.ultimo_leido_mensaje_id = max(participant.ultimo_leido_mensaje_id, message.id)
-    participant.ultimo_leido_en = utc_ahora()
-    db.commit()
-    return {"leido_hasta": participant.ultimo_leido_mensaje_id}
 
 
 def _document_visible_to_user(db: Session, document: models.DocumentoProceso, process: models.Proceso, viewer: models.Usuario) -> bool:
@@ -893,7 +542,7 @@ def _document_visible_to_user(db: Session, document: models.DocumentoProceso, pr
 
 def _listar_referencias(process: models.Proceso, conversation: models.ChatConversacion, db: Session, user: models.Usuario):
     if _role(user) == "CLIENTE":
-        raise HTTPException(status_code=403, detail="Solo el equipo puede adjuntar referencias.")
+        raise SinPermiso("Solo el equipo puede adjuntar referencias.")
     client_id = conversation.cliente_id
     if client_id is None:
         client_id = next((
@@ -999,29 +648,15 @@ def _listar_referencias(process: models.Proceso, conversation: models.ChatConver
     return result
 
 
-@router.get("/referencias/{process_id}")
-def listar_referencias(process_id: int, conversation_id: int | None = None, clave: str | None = None, db: Session = Depends(get_db), user: models.Usuario = Depends(security.obtener_usuario_actual)):
-    process = _process(db, process_id, user)
-    if conversation_id is not None:
-        conversation = _conversation_for_actor(db, conversation_id, user)
-    elif clave:
-        conversation = _resolve(db, clave, user)
-    else:
-        raise HTTPException(status_code=400, detail="Debes indicar la conversacion para validar el acceso.")
-    if conversation.proceso_id != process.id:
-        raise HTTPException(status_code=404, detail="La conversacion no corresponde a este proceso.")
-    return _listar_referencias(process, conversation, db, user)
-
-
 def buscar_referencia(db: Session, conversation: models.ChatConversacion, user: models.Usuario, tipo: str, referencia_id: int | None) -> dict:
     """La referencia elegida, validada contra lo que el usuario puede adjuntar en esta conversación."""
     if _role(user) == "CLIENTE" or conversation.proceso_id is None:
-        raise HTTPException(status_code=403, detail="No puedes adjuntar referencias en esta conversación.")
+        raise SinPermiso("En esta conversación no se pueden adjuntar referencias.")
     process = _process(db, conversation.proceso_id, user)
     options = _listar_referencias(process, conversation, db, user)
     reference = next((item for item in options if item["tipo"] == tipo and item["id"] == referencia_id), None)
     if not reference:
-        raise HTTPException(status_code=404, detail="La referencia no pertenece a este proceso.")
+        raise NoEncontrado("La referencia no pertenece a este proceso.")
     return reference
 
 
@@ -1043,18 +678,6 @@ def crear_mensaje(db: Session, conversation: models.ChatConversacion, user: mode
     db.commit()
     db.refresh(message)
     return message
-
-
-@router.post("/conversaciones/{conversation_id}/mensajes", status_code=201)
-def enviar_mensaje(conversation_id: int, data: schemas.ChatMensajeCreate, db: Session = Depends(get_db), user: models.Usuario = Depends(security.obtener_usuario_actual)):
-    conversation = _conversation_for_actor(db, conversation_id, user)
-    content = data.contenido.strip()
-    if not content:
-        raise HTTPException(status_code=400, detail="Escribe un mensaje antes de enviarlo.")
-    reference = buscar_referencia(db, conversation, user, data.referencia_tipo, data.referencia_id) if data.referencia_tipo else None
-    message = crear_mensaje(db, conversation, user, content, reference)
-    avisar_mensaje(db, conversation, message, user)
-    return {"id": message.id, "mensaje": "Mensaje enviado."}
 
 
 def avisar_mensaje(db: Session, conversation: models.ChatConversacion, message: models.ChatMensaje, user: models.Usuario) -> None:
@@ -1160,3 +783,50 @@ def avisar_mensaje(db: Session, conversation: models.ChatConversacion, message: 
                 else:
                     current_notice.ultima_notificacion_en = previous_notice_at
                 db.commit()
+
+
+# ---- Lo que usa el servicio de mensajes ---------------------------------
+
+def sincronizar(db: Session, usuario: models.Usuario) -> None:
+    """Crea las conversaciones que le corresponden al usuario y aún no existen."""
+    _create_available_conversations(db, usuario)
+    db.commit()
+
+
+def resolver(db: Session, clave: str, usuario: models.Usuario) -> models.ChatConversacion:
+    conversacion = _resolve(db, clave, usuario)
+    db.commit()
+    return _conversation_for_actor(db, conversacion.id, usuario)
+
+
+def conversacion(db: Session, conversacion_id: int, usuario: models.Usuario) -> models.ChatConversacion:
+    return _conversation_for_actor(db, conversacion_id, usuario)
+
+
+def procesos_accesibles(db: Session, usuario: models.Usuario, proceso_ids: set[int]) -> set[int]:
+    return _accessible_process_ids(db, usuario, proceso_ids)
+
+
+def referencias(db: Session, conversacion: models.ChatConversacion, usuario: models.Usuario) -> list[dict]:
+    if conversacion.proceso_id is None:
+        return []
+    proceso = _process(db, conversacion.proceso_id, usuario)
+    return _listar_referencias(proceso, conversacion, db, usuario)
+
+
+def enlace_referencia(db: Session, mensaje: models.ChatMensaje, conversacion: models.ChatConversacion, usuario: models.Usuario) -> str | None:
+    return _message_reference_url(mensaje, conversacion, usuario, db)
+
+
+def enviar(db: Session, conversacion: models.ChatConversacion, usuario: models.Usuario, texto: str,
+           referencia: tuple[str, int] | None) -> models.ChatMensaje:
+    elegida = buscar_referencia(db, conversacion, usuario, *referencia) if referencia else None
+    return crear_mensaje(db, conversacion, usuario, texto, elegida)
+
+
+def avisar(db: Session, conversacion: models.ChatConversacion, mensaje: models.ChatMensaje, usuario: models.Usuario) -> None:
+    avisar_mensaje(db, conversacion, mensaje, usuario)
+
+
+def ttl_presencia():
+    return PANEL_PRESENCE_TTL

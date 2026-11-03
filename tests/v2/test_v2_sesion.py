@@ -125,7 +125,6 @@ def test_un_enlace_de_recuperacion_no_sirve_como_sesion(crear_usuario, cliente_h
     cabecera = {"Authorization": f"Bearer {token}"}
 
     assert cliente_http.get("/api/v2/sesion", headers=cabecera).status_code == 401
-    assert cliente_http.get("/api/auth/me", headers=cabecera).status_code == 401
 
 
 def test_renovar_emite_otra_cookie_y_conserva_recordarme(iniciar, crear_usuario, cliente_http):
@@ -146,7 +145,7 @@ def test_cerrar_sesion_borra_la_cookie(iniciar, crear_usuario, cliente_http):
     assert cliente_http.get("/api/v2/sesion").status_code == 401
 
 
-def test_cerrar_todas_invalida_los_tokens_anteriores_tambien_en_v1(iniciar, crear_usuario, cliente_http, sesion_bd):
+def test_cerrar_todas_invalida_los_tokens_anteriores(iniciar, crear_usuario, cliente_http, sesion_bd):
     usuario = crear_usuario()
     token_anterior = security.create_access_token({"sub": str(usuario.id)})
     iniciar(usuario)
@@ -155,25 +154,16 @@ def test_cerrar_todas_invalida_los_tokens_anteriores_tambien_en_v1(iniciar, crea
 
     cabecera = {"Authorization": f"Bearer {token_anterior}"}
     assert cliente_http.get("/api/v2/sesion", headers=cabecera).status_code == 401
-    assert cliente_http.get("/api/auth/me", headers=cabecera).status_code == 401
     # Una sesión nueva funciona.
     iniciar(usuario)
     assert cliente_http.get("/api/v2/sesion").status_code == 200
 
 
-def test_el_login_de_v1_tambien_deja_la_cookie(cliente_http, crear_usuario):
-    usuario = crear_usuario()
-    respuesta = cliente_http.post(
-        "/api/auth/login", data={"username": usuario.email, "password": PASSWORD, "remember_me": "false"}
-    )
-    assert respuesta.status_code == 200
-    assert respuesta.json()["access_token"]
-    assert f"{COOKIE}=" in _set_cookie(respuesta)
-    assert cliente_http.get("/api/v2/sesion").json()["id"] == usuario.id
-
-
-def test_v1_conserva_su_formato_de_error(cliente_http):
-    respuesta = cliente_http.get("/api/auth/me")
+def test_la_api_v1_ya_no_existe_y_la_interna_conserva_su_formato(cliente_http, monkeypatch):
+    assert cliente_http.get("/api/auth/me").status_code == 404
+    assert cliente_http.get("/api/expedientes/procesos").status_code == 404
+    monkeypatch.setenv("WORKFLOW_SERVICE_TOKEN", "secreto")
+    respuesta = cliente_http.get("/api/internal/workflows/consultas/health")
     assert respuesta.status_code == 401
     assert "detail" in respuesta.json()
 

@@ -2,8 +2,7 @@
 
 Quién ve qué: las tareas de los procesos activos que el usuario ve (ver
 `expedientes.politicas`) y sus tareas generales, sin proceso. ADMIN ve también
-las tareas generales de todo el equipo. Quien ve una tarea puede cambiarla,
-como en la API v1.
+las tareas generales de todo el equipo. Quien ve una tarea puede cambiarla.
 
 Cada cambio reprograma los recordatorios (`recordatorios`) y le avisa a la otra
 parte (`avisos`): al cliente asignado o, si no hay, al responsable.
@@ -181,7 +180,7 @@ class ServicioTareas:
                 cambios.append("vencimiento actualizado")
             if not cambios:
                 continue
-            # Igual que `PUT /api/tareas/{id}`: cerrar descarta los recordatorios, reabrir o
+            # Igual que al editar una tarea: cerrar descarta los recordatorios, reabrir o
             # mover la fecha los vuelve a programar.
             if tarea.estado in CERRADAS:
                 recordatorios.descartar(self._db, tarea)

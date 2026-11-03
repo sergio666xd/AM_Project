@@ -1,4 +1,4 @@
-"""Modelos ORM del glosario (definidos en `app.models` mientras viva la API v1)."""
+"""Modelos ORM del glosario (definidos en `app.models`)."""
 
 from app.models import Actuacion, NotificacionProceso, TerminoGlosario
 

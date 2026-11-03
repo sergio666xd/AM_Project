@@ -1,8 +1,8 @@
 """Notificaciones del navegador (Web Push) y presencia del panel.
 
-Las suscripciones y la presencia viven en las tablas que ya usaba el chat de la
-API v1. El envío de cada notificación sigue en `app.routers.chat` hasta que la
-Fase 7e lo mueva aquí.
+Las suscripciones y la presencia viven en las tablas del chat. El envío de
+cada notificación y la firma de su confirmación están en
+`app.modulos.mensajes.reglas`, junto con el resto de los avisos de mensajes.
 """
 
 import logging
@@ -16,6 +16,7 @@ from sqlalchemy.orm import Session
 from app import models
 from app.modulos.identidad.modelos import EstadoUsuario, Usuario
 from app.modulos.push.esquemas import (
+    ConfirmacionEntrega,
     BajaSuscripcion,
     ClavePublica,
     Diagnostico,
@@ -131,7 +132,7 @@ class ServicioPush:
 
     def probar(self, usuario: Usuario) -> None:
         """Envía una notificación de prueba a los dispositivos del usuario."""
-        from app.routers.chat import _chat_area, _send_chat_push
+        from app.modulos.mensajes.reglas import _chat_area, _send_chat_push
         from app.workflow_service import user_portal_url
 
         if usuario.estado != EstadoUsuario.ACTIVO:
@@ -153,6 +154,24 @@ class ServicioPush:
     def diagnostico(self, usuario: Usuario, datos: Diagnostico) -> None:
         logger.warning("No se pudo configurar Push para el usuario %s: etapa=%s error=%s mensaje=%s",
                        usuario.id, datos.etapa, datos.nombre_error, datos.mensaje_error)
+
+    def confirmar_entrega(self, datos: ConfirmacionEntrega) -> None:
+        """Marca el mensaje como entregado en ese dispositivo.
+
+        No lleva sesión: la firma emitida con el push autoriza solo ese mensaje para ese usuario.
+        """
+        from app.modulos.mensajes.reglas import firma_valida
+
+        if not firma_valida(datos.usuario_id, datos.mensaje_id, datos.firma):
+            raise SinPermiso("La confirmación de entrega no es válida.")
+        mensaje = self._db.get(models.ChatMensaje, datos.mensaje_id)
+        if mensaje is None:
+            return
+        P = models.ChatParticipante
+        participante = self._db.scalar(select(P).where(P.conversacion_id == mensaje.conversacion_id, P.usuario_id == datos.usuario_id))
+        if participante and participante.ultimo_entregado_mensaje_id < mensaje.id:
+            participante.ultimo_entregado_mensaje_id = mensaje.id
+            self._db.commit()
 
     # ---- Presencia del panel ------------------------------------------------
 

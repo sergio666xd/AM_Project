@@ -1,6 +1,6 @@
 """Casos de uso de contratos para la página Contratos.
 
-Quién: ADMIN y ABOGADO_ADMIN (las mismas reglas de la API v1), sobre los
+Quién: ADMIN y ABOGADO_ADMIN, sobre los
 procesos que ven, también los archivados. Redactar, agendar la firma, subir el
 escaneado y cerrar el contrato es del responsable del proceso o de ADMIN, y
 nunca en un expediente archivado.

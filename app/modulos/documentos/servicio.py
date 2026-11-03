@@ -2,8 +2,7 @@
 
 Quién ve qué: los documentos y solicitudes de los procesos activos que el
 usuario ve (ver `expedientes.politicas`). Los documentos de contratos viven en
-Contratos y no salen aquí. El portal del cliente sigue en la API v1 hasta la
-Fase 5.
+Contratos y no salen aquí.
 
 Versiones: cuando la firma devuelve una entrega para corregir, el cliente sube
 otro archivo para el mismo documento pedido. Cada archivo es una versión; la
@@ -66,10 +65,10 @@ ESTADOS_LEGIBLES = {"EN_REVISION": "EN REVISION", "APROBADO": "APROBADO", "REQUI
 
 
 def notificar(db: Session, destinatario: Usuario, **datos) -> None:
-    """Avisos al cliente con las plantillas de la API v1 (las pruebas lo sustituyen)."""
-    from app.routers.expedientes.comun import _notificar
+    """Avisos al cliente (las pruebas lo sustituyen)."""
+    from app.notification_service import notificar as emitir
 
-    _notificar(db, destinatario, **datos)
+    emitir(db, destinatario, **datos)
 
 
 def dia_legible(dia: date) -> str:
@@ -104,7 +103,7 @@ class EstadoDeSolicitud:
         return [p["nombre"] for p in self.pedidos if self.estado_pedido(p["id"]) == "FALTANTE" or self.estado_pedido(p["id"]) in DEVUELTOS]
 
     def atendida(self) -> bool:
-        """Todo entregado y nada devuelto: la regla de `atendida_en` de la API v1."""
+        """Todo entregado y nada devuelto: la regla de `atendida_en`."""
         return self.estado != "esperando_cliente"
 
 

@@ -64,7 +64,7 @@ class RepositorioAdministracion:
         ))
 
     def disposiciones(self) -> dict[str, str]:
-        """La última decisión sobre cada alerta: descartada, atendida (API v1) o vuelta a mostrar."""
+        """La última decisión sobre cada alerta: descartada, atendida o vuelta a mostrar."""
         A = models.EventoAuditoria
         filas = self._db.execute(
             select(A.recurso_id, A.accion).where(A.tipo_recurso == "alerta", A.recurso_id.is_not(None)).order_by(A.id.desc())
