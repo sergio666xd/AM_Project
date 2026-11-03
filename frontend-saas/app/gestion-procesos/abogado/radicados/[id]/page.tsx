@@ -1,1066 +1,262 @@
 "use client";
 
-import { useCallback, useMemo, useState } from "react";
-import { useParams, useRouter } from "next/navigation";
-import { useLoadEffect } from "@/lib/useLoadEffect";
-import {
-  AlertCircle,
-  ArrowDown,
-  ArrowLeft,
-  ArrowUp,
-  Bell,
-  CheckCircle2,
-  Clock,
-  FileText,
-  RefreshCw,
-  UserCheck,
-  X,
-} from "lucide-react";
+import { useCallback, useState, type ReactNode } from "react";
+import Link from "next/link";
+import { useParams } from "next/navigation";
+import { AlertTriangle, ArrowLeft, ChevronRight, RefreshCw, Search } from "lucide-react";
 
-import { fetchApi, iniciarWorkflowConsultaRadicado } from "@/lib/api";
-import { useSession } from "@/context/SessionContext";
-import { PageHeader } from "@/components/ui/PageHeader";
+import { CAMPO } from "@/components/expediente/CalculadoraTermino";
 import { Button } from "@/components/ui/Button";
+import { Radicado } from "@/components/ui/Radicado";
+import { Tag } from "@/components/ui/Tag";
+import { useToast } from "@/components/ui/ToastProvider";
+import { api, mensajeDeError, type Esquemas } from "@/lib/api-v2/cliente";
+import { cx } from "@/lib/cx";
+import { diaCorto, fechaConHora } from "@/lib/fechas";
+import { lanzarConsulta } from "@/lib/operacion";
+import { RUTA_RADICADOS, TONO_CONSULTA, textoNovedades } from "@/lib/radicados";
+import { useLoadEffect } from "@/lib/useLoadEffect";
 
-interface Actuacion {
-  id: number;
-  orden: number;
-  fecha_actuacion: string;
-  actuacion: string;
-  anotacion: string;
-  es_fijacion: boolean;
-  fecha_inicia_termino: string;
-  fecha_finaliza_termino: string;
-  fecha_registro: string;
+type Detalle = Esquemas["RadicadoDetalle"];
+type Actuacion = Detalle["actuaciones"][number];
+const RUTA_PROCESOS = "/gestion-procesos/abogado/procesos";
+const ZONA = "America/Bogota";
+const mes = new Intl.DateTimeFormat("es-CO", { timeZone: ZONA, month: "short" });
+const anio = new Intl.DateTimeFormat("es-CO", { timeZone: ZONA, year: "numeric" });
+
+const AVISO: Partial<Record<Detalle["consulta"]["estado"], string>> = {
+  no_encontrado: "La Rama Judicial no devuelve este número. Revise que esté bien escrito; si lo está, puede que el despacho aún no lo haya publicado.",
+  privado: "Es un proceso privado: la Rama Judicial no publica sus actuaciones, así que no llegan avisos automáticos.",
+  error: "La última consulta a la Rama Judicial falló. La consulta programada lo intentará de nuevo.",
+};
+
+function normalizar(texto: string) {
+  return texto.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
 }
 
-interface RadicadoDetalle {
-  id: number;
-  numero: string;
-  estado_consulta: string;
-  despacho_departamento: string;
-  demandante: string;
-  demandado: string;
-  consultado_en: string;
-  alerta_enviada: boolean;
-  detalle_pendiente: string;
-  actuaciones_nuevas_sin_revisar?: number;
-  actuaciones: Actuacion[];
-}
+export default function RadicadoPage() {
+  const { id } = useParams<{ id: string }>();
+  const radicadoId = Number(id);
+  const { toast } = useToast();
+  const [detalle, setDetalle] = useState<Detalle | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [busqueda, setBusqueda] = useState("");
+  const [consultando, setConsultando] = useState(false);
 
-type OrdenActuaciones = "asc" | "desc";
-
-function normalizarTexto(
-  texto: string | null | undefined
-): string {
-  return (texto ?? "")
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .toLowerCase()
-    .trim();
-}
-
-function formatearEstado(
-  estado: string | null | undefined
-) {
-  const estadoNormalizado = normalizarTexto(estado);
-
-  if (estadoNormalizado === "ok") {
-    return {
-      label: "Consultado",
-      className: "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400",
-    };
-  }
-
-  if (estadoNormalizado.includes("no_encontrado") || estadoNormalizado.includes("no encontrado")) {
-    return {
-      label: "No encontrado en la Rama Judicial",
-      className: "bg-amber-500/10 text-amber-600 dark:text-amber-400",
-    };
-  }
-
-  if (estadoNormalizado.includes("privado")) {
-    return {
-      label: "Proceso privado",
-      className: "bg-blue-500/10 text-blue-600 dark:text-blue-400",
-    };
-  }
-
-  if (estadoNormalizado.startsWith("error")) {
-    return {
-      label: "Error de consulta",
-      className: "bg-red-500/10 text-red-600 dark:text-red-400",
-    };
-  }
-
-  if (estadoNormalizado === "sin consultar") {
-    return {
-      label: "Sin consultar",
-      className:
-        "bg-[var(--surface-secondary)] text-[var(--foreground-muted)]",
-    };
-  }
-
-  if (estadoNormalizado === "encolada") {
-    return {
-      label: "En cola",
-      className:
-        "bg-amber-500/10 text-amber-600 dark:text-amber-400",
-    };
-  }
-
-  if (estadoNormalizado === "ejecutando") {
-    return {
-      label: "Consultando",
-      className:
-        "motion-breathe bg-blue-500/10 text-blue-600 dark:text-blue-400",
-    };
-  }
-
-  if (estadoNormalizado === "error") {
-    return {
-      label: "Error",
-      className:
-        "bg-red-500/10 text-red-600 dark:text-red-400",
-    };
-  }
-
-  return {
-    label: estado || "Disponible",
-    className:
-      "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400",
-  };
-}
-
-function validarTermino(
-  valor: string | null | undefined
-) {
-  if (
-    !valor ||
-    valor === "1900-01-01" ||
-    valor === "-" ||
-    valor.trim() === ""
-  ) {
-    return "No registrado";
-  }
-
-  return valor;
-}
-
-export default function DetalleRadicadoPage() {
-  const params = useParams();
-  const router = useRouter();
-
-  const {
-    user,
-    token,
-    loading: sessionLoading,
-  } = useSession();
-
-  const id = Array.isArray(params?.id)
-    ? params.id[0]
-    : params?.id;
-
-  const [radicado, setRadicado] =
-    useState<RadicadoDetalle | null>(null);
-
-  const [loading, setLoading] = useState(true);
-
-  const [consultando, setConsultando] =
-    useState(false);
-
-  const [error, setError] = useState("");
-
-  /*
-   * IMPORTANTE:
-   *
-   * "asc" significa orden 1 → N.
-   * Visualmente, cuando estamos en ascendente,
-   * mostramos la flecha hacia abajo.
-   *
-   * Esto es deliberado porque el usuario solicitó
-   * que inicialmente aparezca la flecha hacia abajo
-   * aunque los registros estén ordenados 1 → N.
-   */
-  const [ordenActuaciones, setOrdenActuaciones] =
-    useState<OrdenActuaciones>("asc");
-
-  const [notification, setNotification] =
-    useState<{
-      type: "success" | "error" | "warning";
-      message: string;
-    } | null>(null);
-
-  /*
-   * ============================================================
-   * NOTIFICACIONES
-   * ============================================================
-   */
-
-  function mostrarNotificacion(
-    type: "success" | "error" | "warning",
-    message: string
-  ) {
-    setNotification({
-      type,
-      message,
-    });
-
-    window.setTimeout(() => {
-      setNotification(null);
-    }, 4000);
-  }
-
-  /*
-   * ============================================================
-   * CARGAR DETALLE
-   * ============================================================
-   *
-   * GET /api/radicados/{id} devuelve solo el radicado solicitado
-   * con su historial de actuaciones autorizado.
-   */
-
-  const cargarDetalle = useCallback(async (authToken: string) => {
-    try {
-      setLoading(true);
-      setError("");
-
-      const actual = (await fetchApi(
-        `/api/radicados/${encodeURIComponent(String(id))}`,
-        { method: "GET", token: authToken },
-      )) as RadicadoDetalle;
-
-      setRadicado(actual);
-    } catch (err) {
-      setRadicado(null);
-      console.error(
-        "Error cargando detalle del radicado:",
-        err
-      );
-
-      setError(
-        err instanceof Error
-          ? err.message
-          : "No fue posible cargar el detalle del radicado."
-      );
-    } finally {
-      setLoading(false);
-    }
-  }, [id]);
-
-  const cargarAlAbrir = useCallback(() => {
-    if (sessionLoading || !token || !id) return;
-    return cargarDetalle(token);
-  }, [id, token, sessionLoading, cargarDetalle]);
-
-  useLoadEffect(cargarAlAbrir);
-
-  // Sin id en la URL no hay nada que cargar; el aviso se deriva al renderizar.
-  const mensajeError = id ? error : "No se especificó el radicado.";
-
-  /*
-   * ============================================================
-   * CONSULTAR RAMA JUDICIAL
-   * ============================================================
-   */
-
-  async function handleConsultar() {
-    if (!token || !id) {
+  const cargar = useCallback(async () => {
+    setError(null);
+    const { data, error: fallo } = await api.GET("/api/v2/radicados/{radicado_id}", { params: { path: { radicado_id: radicadoId } } });
+    if (!data) {
+      setError(mensajeDeError(fallo));
       return;
     }
+    setDetalle(data);
+    // Las marcas de "Nueva" se quedan en pantalla; la próxima visita ya no las trae.
+    if (data.novedades > 0) void api.POST("/api/v2/radicados/{radicado_id}/revisado", { params: { path: { radicado_id: radicadoId } } });
+  }, [radicadoId]);
+  useLoadEffect(cargar);
 
-    try {
-      setConsultando(true);
-      setError("");
-
-      await iniciarWorkflowConsultaRadicado(token, {
-        tipo: "MANUAL",
-        radicado_id: Number(id),
-      });
-
-      /*
-       * La consulta queda encolada en backend.
-       * Actualizamos inmediatamente el estado visual.
-       */
-
-      setRadicado((actual) =>
-        actual
-          ? {
-              ...actual,
-              estado_consulta: "ENCOLADA",
-            }
-          : actual
-      );
-
-      mostrarNotificacion(
-        "success",
-        "La consulta fue enviada correctamente a la cola."
-      );
-
-      await cargarDetalle(token);
-    } catch (err) {
-      console.error(
-        "Error consultando el radicado:",
-        err
-      );
-
-      const mensaje =
-        err instanceof Error
-          ? err.message
-          : "No fue posible ejecutar la consulta.";
-
-      setError(mensaje);
-
-      mostrarNotificacion(
-        "error",
-        mensaje
-      );
-    } finally {
-      setConsultando(false);
+  async function consultarAhora() {
+    setConsultando(true);
+    const fallo = await lanzarConsulta([radicadoId]);
+    setConsultando(false);
+    if (fallo) {
+      toast({ title: fallo, tone: "error" });
+      return;
     }
+    toast({ title: "Consulta iniciada", description: "Las actuaciones nuevas aparecen aquí en unos minutos.", tone: "success" });
+    setDetalle((d) => d && { ...d, consulta: { ...d.consulta, estado: "consultando", etiqueta: "Consultando", detalle: null } });
   }
 
-  /*
-   * ============================================================
-   * ACTUACIONES ORDENADAS
-   * ============================================================
-   *
-   * IMPORTANTE:
-   *
-   * El botón está ubicado en "Fecha de actuación",
-   * pero NO ordenamos por fecha.
-   *
-   * El único criterio real de ordenamiento es:
-   *
-   *     actuacion.orden
-   *
-   * ASC:
-   *     1 → 2 → 3 → ... → N
-   *
-   * DESC:
-   *     N → ... → 3 → 2 → 1
-   */
-
-  const actuacionesRadicado = radicado?.actuaciones;
-
-  const actuacionesOrdenadas = useMemo(() => {
-    if (!actuacionesRadicado) {
-      return [];
-    }
-
-    const actuaciones = [
-      ...actuacionesRadicado,
-    ];
-
-    actuaciones.sort((a, b) => {
-      if (ordenActuaciones === "asc") {
-        return a.orden - b.orden;
-      }
-
-      return b.orden - a.orden;
-    });
-
-    return actuaciones;
-  }, [
-    actuacionesRadicado,
-    ordenActuaciones,
-  ]);
-
-  /*
-   * Actuaciones nuevas desde la última vez que el usuario abrió el
-   * detalle: son las de menor "orden" (orden 1 = la más reciente).
-   * Abrir el detalle es lo que quita el aviso de "actuaciones nuevas".
-   */
-
-  const idsActuacionesNuevas = useMemo(() => {
-    const cantidad = radicado?.actuaciones_nuevas_sin_revisar ?? 0;
-    if (!actuacionesRadicado?.length || cantidad <= 0) {
-      return new Set<number>();
-    }
-
-    return new Set(
-      [...actuacionesRadicado]
-        .sort((a, b) => a.orden - b.orden)
-        .slice(0, cantidad)
-        .map((act) => act.id)
-    );
-  }, [actuacionesRadicado, radicado?.actuaciones_nuevas_sin_revisar]);
-
-  /*
-   * ============================================================
-   * ACTUACIÓN ACTUAL
-   * ============================================================
-   *
-   * La actuación actual SIEMPRE es la que tiene
-   * el menor valor de "orden".
-   *
-   * Normalmente:
-   *
-   *     orden = 1
-   *
-   * Esto es independiente del orden visual de la tabla.
-   */
-
-  const actuacionActual = useMemo(() => {
-    if (!actuacionesRadicado?.length) {
-      return null;
-    }
-
-    return [...actuacionesRadicado].sort(
-      (a, b) => a.orden - b.orden
-    )[0];
-  }, [actuacionesRadicado]);
-
-  /*
-   * ============================================================
-   * ESTADO
-   * ============================================================
-   */
-
-  const estadoConsulta = formatearEstado(
-    radicado?.estado_consulta
-  );
-
-  /*
-   * ============================================================
-   * LOADING DE SESIÓN
-   * ============================================================
-   */
-
-  if (sessionLoading) {
+  if (error) {
     return (
-      <div className="flex min-h-[400px] items-center justify-center">
-        <div className="flex items-center gap-3 text-[var(--foreground-muted)]">
-          <RefreshCw className="h-5 w-5 animate-spin" />
-          Verificando sesión...
+      <div>
+        <Volver />
+        <div role="alert" className="mt-4 flex flex-wrap items-center gap-3 rounded-[var(--radius-lg)] bg-bad-soft px-4 py-3 text-bad">
+          <p className="flex-1 text-[14px]">{error}</p>
+          <Button size="sm" variant="secondary" icon={<RefreshCw size={14} />} onClick={() => void cargar()}>Reintentar</Button>
         </div>
       </div>
     );
   }
 
-  if (!token) {
-    return null;
-  }
-
-  /*
-   * ============================================================
-   * LOADING
-   * ============================================================
-   */
-
-  if (loading && id) {
+  if (!detalle) {
     return (
-      <div className="flex min-h-[400px] items-center justify-center">
-        <div className="flex items-center gap-3 text-[var(--foreground-muted)]">
-          <RefreshCw className="h-5 w-5 animate-spin" />
-          Cargando expediente...
+      <div aria-label="Cargando el radicado" aria-busy="true">
+        <Volver />
+        <div className="mt-4 h-20 animate-pulse rounded-[var(--radius-lg)] bg-manila" />
+        <div className="mt-6 grid gap-5 lg:grid-cols-[minmax(0,1fr)_320px]">
+          <div className="h-80 animate-pulse rounded-[var(--radius-lg)] bg-manila" />
+          <div className="h-60 animate-pulse rounded-[var(--radius-lg)] bg-manila" />
         </div>
       </div>
     );
   }
 
-  /*
-   * ============================================================
-   * VISTA
-   * ============================================================
-   */
+  const { consulta } = detalle;
+  const aviso = AVISO[consulta.estado];
+  const filtro = normalizar(busqueda.trim());
+  const actuaciones = filtro
+    ? detalle.actuaciones.filter((a) => normalizar(`${a.actuacion} ${a.anotacion ?? ""}`).includes(filtro))
+    : detalle.actuaciones;
 
   return (
-    <div className="motion-swap space-y-5">
-      {/* ========================================================
-          NOTIFICACIÓN
-      ========================================================= */}
-
-      {notification && (
-        <div
-          className={`fixed right-4 top-4 z-[10000] flex max-w-[calc(100vw-2rem)] items-start gap-3 rounded-xl border px-4 py-3 shadow-xl ${
-            notification.type === "success"
-              ? "border-emerald-500/20 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300"
-              : notification.type === "warning"
-              ? "border-amber-500/20 bg-amber-500/10 text-amber-700 dark:text-amber-300"
-              : "border-red-500/20 bg-red-500/10 text-red-700 dark:text-red-300"
-          }`}
-        >
-          {notification.type === "success" ? (
-            <CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0" />
-          ) : (
-            <AlertCircle className="mt-0.5 h-5 w-5 shrink-0" />
-          )}
-
-          <span className="text-sm font-medium">
-            {notification.message}
-          </span>
-
-          <button
-            type="button"
-            onClick={() =>
-              setNotification(null)
-            }
-            className="ml-2 shrink-0 opacity-70 transition hover:opacity-100"
-          >
-            <X className="h-4 w-4" />
-          </button>
-        </div>
-      )}
-
-      {/* ========================================================
-          VOLVER
-      ========================================================= */}
-
-      <Button
-        variant="ghost"
-        size="sm"
-        onClick={() =>
-          router.push(
-            "/gestion-procesos/abogado/radicados"
-          )
-        }
-        icon={<ArrowLeft className="size-4" />}
-      >
-        Volver a Radicados
-      </Button>
-
-      {/* ========================================================
-          ERROR
-      ========================================================= */}
-
-      {mensajeError && (
-        <div className="flex items-start justify-between gap-4 rounded-xl border border-risk/30 bg-risk/10 p-4 text-risk">
-          <div className="flex items-start gap-3">
-            <AlertCircle className="mt-0.5 h-5 w-5 shrink-0" />
-
-            <div>
-              <p className="font-medium">
-                No fue posible completar la operación
-              </p>
-
-              <p className="mt-1 text-sm opacity-90">
-                {mensajeError}
-              </p>
-            </div>
+    <div>
+      <Volver />
+      <header className="mt-3 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+        <div className="min-w-0">
+          <h1 className="leading-tight">
+            <Radicado numero={detalle.numero} grande className="font-medium" />
+          </h1>
+          <p className="mt-1 text-[14.5px] text-pretty text-ink-2">{detalle.despacho ?? "Despacho aún sin consultar"}</p>
+          <div className="mt-2 flex flex-wrap items-center gap-2 text-[13.5px] text-ink-2">
+            <Tag tone={TONO_CONSULTA[consulta.estado]}>{consulta.etiqueta}</Tag>
+            {consulta.consultado_en && <span>Última consulta: {fechaConHora(consulta.consultado_en)}</span>}
+            {detalle.novedades > 0 && <Tag tone="gold">{textoNovedades(detalle.novedades)} desde su última visita</Tag>}
           </div>
-
-          {radicado && (
-            <button
-              type="button"
-              onClick={() => setError("")}
-              className="shrink-0 rounded-lg p-1 transition hover:bg-risk/20"
-            >
-              <X className="h-4 w-4" />
-            </button>
-          )}
         </div>
-      )}
-
-      {!radicado ? (
-        <div className="rounded-xl border border-border bg-surface p-10 text-center shadow-xs">
-          <FileText className="mx-auto h-10 w-10 text-muted" />
-
-          <h2 className="mt-4 text-lg font-semibold text-foreground">
-            Radicado no encontrado
-          </h2>
-
-          <p className="mx-auto mt-1 max-w-md text-sm text-muted">
-            El radicado solicitado no existe o no se
-            encuentra disponible para tu cuenta.
-          </p>
-
-          <Button
-            variant="primary"
-            onClick={() =>
-              router.push(
-                "/gestion-procesos/abogado/radicados"
-              )
-            }
-            className="mt-5"
-          >
-            Volver a Radicados
+        {detalle.puede_consultar && (
+          <Button variant="secondary" className="shrink-0" icon={<RefreshCw size={16} />} loading={consultando} disabled={consulta.estado === "consultando"} onClick={() => void consultarAhora()}>
+            Consultar ahora
           </Button>
+        )}
+      </header>
+
+      {aviso && (
+        <div role="status" className={cx("mt-5 flex items-start gap-3 rounded-[var(--radius-lg)] px-4 py-3 sm:px-5", consulta.estado === "error" ? "bg-bad-soft" : "bg-warn-soft")}>
+          <AlertTriangle aria-hidden="true" size={18} className="mt-0.5 shrink-0 text-ink-2" />
+          <p className="min-w-0 text-[14px] text-pretty text-ink">
+            {aviso}
+            {consulta.detalle && <span className="mt-1 block font-mono text-[12.5px] text-ink-2">{consulta.detalle}</span>}
+          </p>
         </div>
-      ) : (
-        <>
-          {/* ======================================================
-              CABECERA DEL EXPEDIENTE
-          ======================================================= */}
-
-          <PageHeader
-            overline="Expediente judicial"
-            title={radicado.numero}
-            description={radicado.despacho_departamento || "Despacho no especificado"}
-            action={
-              user?.rol === "ADMIN" ? (
-                <Button
-                  variant="primary"
-                  onClick={handleConsultar}
-                  loading={consultando}
-                  icon={<RefreshCw className="size-4" />}
-                >
-                  Consultar ahora
-                </Button>
-              ) : undefined
-            }
-          />
-
-          <section className="rounded-xl border border-border bg-surface shadow-xs">
-            {/* Barra indeterminada mientras se consulta la Rama Judicial. */}
-            {consultando && <div aria-hidden="true" className="motion-progress h-0.5 rounded-t-xl bg-[var(--primary)]/10 text-[var(--primary)]" />}
-
-            {/* ====================================================
-                INFORMACIÓN GENERAL
-            ===================================================== */}
-
-            <div className="grid grid-cols-1 border-t border-[var(--border)] md:grid-cols-2">
-              {/* Partes */}
-
-              <div className="border-b border-[var(--border)] p-5 md:border-r md:p-6">
-                <div className="flex items-center gap-2 border-b border-[var(--border)] pb-3">
-                  <UserCheck className="h-4 w-4 text-[var(--primary)]" />
-
-                  <h2 className="text-xs font-semibold uppercase tracking-wider text-[var(--foreground-muted)]">
-                    Partes del proceso
-                  </h2>
-                </div>
-
-                <div className="mt-4 space-y-4">
-                  <div>
-                    <p className="text-xs text-[var(--foreground-muted)]">
-                      Demandante
-                    </p>
-
-                    <p className="mt-1 break-words text-sm font-medium text-[var(--foreground)]">
-                      {radicado.demandante ||
-                        "No registrado"}
-                    </p>
-                  </div>
-
-                  <div>
-                    <p className="text-xs text-[var(--foreground-muted)]">
-                      Demandado
-                    </p>
-
-                    <p className="mt-1 break-words text-sm font-medium text-[var(--foreground)]">
-                      {radicado.demandado ||
-                        "No registrado"}
-                    </p>
-                  </div>
-                </div>
-              </div>
-
-              {/* Estado */}
-
-              <div className="border-b border-[var(--border)] p-5 md:p-6">
-                <div className="flex items-center gap-2 border-b border-[var(--border)] pb-3">
-                  <RefreshCw className="h-4 w-4 text-[var(--primary)]" />
-
-                  <h2 className="text-xs font-semibold uppercase tracking-wider text-[var(--foreground-muted)]">
-                    Estado de la consulta
-                  </h2>
-                </div>
-
-                <div className="mt-4 space-y-4">
-                  <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
-                    <span className="text-xs text-[var(--foreground-muted)]">
-                      Estado
-                    </span>
-
-                    <span
-                      className={`inline-flex w-fit rounded-full px-2.5 py-1 text-xs font-medium ${estadoConsulta.className}`}
-                    >
-                      {estadoConsulta.label}
-                    </span>
-                  </div>
-
-                  <div className="flex flex-col gap-1 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
-                    <span className="text-xs text-[var(--foreground-muted)]">
-                      Consultado en
-                    </span>
-
-                    <span className="break-all text-left text-xs font-mono text-[var(--foreground)] sm:text-right">
-                      {radicado.consultado_en ||
-                        "No registrado"}
-                    </span>
-                  </div>
-
-                  <div className="flex items-center justify-between gap-4">
-                    <span className="text-xs text-[var(--foreground-muted)]">
-                      Alerta enviada
-                    </span>
-
-                    <span className="text-xs font-medium text-[var(--foreground)]">
-                      {radicado.alerta_enviada
-                        ? "Sí"
-                        : "No"}
-                    </span>
-                  </div>
-                </div>
-              </div>
-
-              {/* Actuación actual */}
-
-              <div className="border-b border-[var(--border)] p-5 md:border-r md:border-b-0 md:p-6">
-                <div className="flex items-center gap-2 border-b border-[var(--border)] pb-3">
-                  <FileText className="h-4 w-4 text-[var(--primary)]" />
-
-                  <h2 className="text-xs font-semibold uppercase tracking-wider text-[var(--foreground-muted)]">
-                    Actuación actual
-                  </h2>
-                </div>
-
-                <div className="mt-4 space-y-4">
-                  <div>
-                    <p className="text-xs text-[var(--foreground-muted)]">
-                      Orden
-                    </p>
-
-                    <p className="mt-1 text-sm font-mono text-[var(--foreground)]">
-                      {actuacionActual?.orden ??
-                        "No registrado"}
-                    </p>
-                  </div>
-
-                  <div>
-                    <p className="text-xs text-[var(--foreground-muted)]">
-                      Fecha de actuación
-                    </p>
-
-                    <p className="mt-1 text-sm font-mono text-[var(--foreground)]">
-                      {actuacionActual?.fecha_actuacion ||
-                        "No registrado"}
-                    </p>
-                  </div>
-
-                  <div>
-                    <p className="text-xs text-[var(--foreground-muted)]">
-                      Actuación
-                    </p>
-
-                    <p className="mt-1 break-words text-sm font-medium text-[var(--foreground)]">
-                      {actuacionActual?.actuacion ||
-                        "No registrado"}
-                    </p>
-                  </div>
-
-                  <div>
-                    <p className="text-xs text-[var(--foreground-muted)]">
-                      Anotación
-                    </p>
-
-                    <p
-                      className="mt-1 line-clamp-3 break-words text-sm text-[var(--foreground)]"
-                      title={
-                        actuacionActual?.anotacion
-                      }
-                    >
-                      {actuacionActual?.anotacion ||
-                        "No registrado"}
-                    </p>
-                  </div>
-
-                  <div className="flex items-center justify-between gap-4">
-                    <span className="text-xs text-[var(--foreground-muted)]">
-                      Fijación
-                    </span>
-
-                    <span className="text-xs font-medium text-[var(--foreground)]">
-                      {actuacionActual?.es_fijacion
-                        ? "Sí"
-                        : "No"}
-                    </span>
-                  </div>
-                </div>
-              </div>
-
-              {/* Términos */}
-
-              <div className="p-5 md:p-6">
-                <div className="flex items-center gap-2 border-b border-[var(--border)] pb-3">
-                  <Clock className="h-4 w-4 text-[var(--primary)]" />
-
-                  <h2 className="text-xs font-semibold uppercase tracking-wider text-[var(--foreground-muted)]">
-                    Términos y novedades
-                  </h2>
-                </div>
-
-                <div className="mt-4 space-y-4">
-                  <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
-                    <span className="text-xs text-[var(--foreground-muted)]">
-                      Inicia término
-                    </span>
-
-                    <span className="text-xs font-mono text-[var(--foreground)] sm:text-right">
-                      {validarTermino(
-                        actuacionActual?.fecha_inicia_termino
-                      )}
-                    </span>
-                  </div>
-
-                  <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
-                    <span className="text-xs text-[var(--foreground-muted)]">
-                      Finaliza término
-                    </span>
-
-                    <span className="text-xs font-mono text-[var(--foreground)] sm:text-right">
-                      {validarTermino(
-                        actuacionActual?.fecha_finaliza_termino
-                      )}
-                    </span>
-                  </div>
-
-                  <div className="border-t border-[var(--border)] pt-3">
-                    <div className="flex items-start gap-2">
-                      <Bell className="mt-0.5 h-3.5 w-3.5 shrink-0 text-amber-500" />
-
-                      <div className="min-w-0">
-                        <p className="text-xs text-[var(--foreground-muted)]">
-                          Novedad pendiente
-                        </p>
-
-                        <p
-                          className="mt-1 line-clamp-3 break-words text-xs text-amber-600 dark:text-amber-400"
-                          title={
-                            radicado.detalle_pendiente
-                          }
-                        >
-                          {radicado.detalle_pendiente ||
-                            "Ninguna"}
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </section>
-
-          {/* ======================================================
-              HISTORIAL DE ACTUACIONES
-          ======================================================= */}
-
-          <section className="overflow-hidden rounded-xl border border-[var(--border)] bg-[var(--surface)]">
-            {/* Cabecera */}
-
-            <div className="flex flex-col gap-3 border-b border-[var(--border)] p-5 sm:flex-row sm:items-center sm:justify-between sm:p-6">
-              <div>
-                <h2 className="text-lg font-semibold text-[var(--foreground)]">
-                  Historial de actuaciones
-                </h2>
-
-                <p className="mt-1 text-sm text-[var(--foreground-muted)]">
-                  Registro de actuaciones asociadas al proceso.
-                  {idsActuacionesNuevas.size > 0 && (
-                    <span className="ml-1 font-medium text-red-700 dark:text-red-400">
-                      {idsActuacionesNuevas.size === 1
-                        ? "1 actuación nueva desde tu última revisión."
-                        : `${idsActuacionesNuevas.size} actuaciones nuevas desde tu última revisión.`}
-                    </span>
-                  )}
-                </p>
-              </div>
-
-              <div className="flex items-center gap-3">
-                <span className="rounded-full bg-[var(--surface-secondary)] px-2.5 py-1 text-xs font-medium text-[var(--foreground-muted)]">
-                  {actuacionesOrdenadas.length}{" "}
-                  {actuacionesOrdenadas.length === 1
-                    ? "actuación"
-                    : "actuaciones"}
-                </span>
-              </div>
-            </div>
-
-            {/* Tabla */}
-
-            {actuacionesOrdenadas.length === 0 ? (
-              <div className="flex min-h-[250px] flex-col items-center justify-center px-6 text-center">
-                <div className="flex h-12 w-12 items-center justify-center rounded-full bg-[var(--surface-secondary)]">
-                  <FileText className="h-5 w-5 text-[var(--foreground-muted)]" />
-                </div>
-
-                <h3 className="mt-4 font-semibold text-[var(--foreground)]">
-                  No hay actuaciones registradas
-                </h3>
-
-                <p className="mt-1 max-w-md text-sm text-[var(--foreground-muted)]">
-                  Realiza una consulta para intentar actualizar
-                  la información del proceso.
-                </p>
-              </div>
-            ) : (
-              <div className="overflow-x-auto">
-                <table className="w-full min-w-[1050px] border-collapse">
-                  <thead>
-                    <tr className="border-b border-[var(--border)] bg-[var(--surface-secondary)]/50">
-                      {/* Fecha de actuación */}
-
-                      <th className="px-4 py-3 text-left">
-                        <button
-                          type="button"
-                          onClick={() =>
-                            setOrdenActuaciones(
-                              (actual) =>
-                                actual === "asc"
-                                  ? "desc"
-                                  : "asc"
-                            )
-                          }
-                          className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-[var(--foreground-muted)] transition hover:text-[var(--foreground)]"
-                          title="Ordenar por orden de actuación"
-                        >
-                          Fecha de actuación
-
-                          {ordenActuaciones === "asc" ? (
-                            /*
-                             * ASC = 1 → N
-                             *
-                             * La flecha solicitada es hacia abajo.
-                             */
-                            <ArrowDown className="h-3.5 w-3.5" />
-                          ) : (
-                            /*
-                             * DESC = N → 1
-                             *
-                             * La flecha cambia hacia arriba.
-                             */
-                            <ArrowUp className="h-3.5 w-3.5" />
-                          )}
-                        </button>
-                      </th>
-
-                      <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-[var(--foreground-muted)]">
-                        Actuación
-                      </th>
-
-                      <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-[var(--foreground-muted)]">
-                        Anotación
-                      </th>
-
-                      <th className="px-4 py-3 text-center text-xs font-semibold uppercase tracking-wide text-[var(--foreground-muted)]">
-                        Fecha inicia término
-                      </th>
-
-                      <th className="px-4 py-3 text-center text-xs font-semibold uppercase tracking-wide text-[var(--foreground-muted)]">
-                        Fecha finaliza término
-                      </th>
-
-                      <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-[var(--foreground-muted)]">
-                        Fecha de registro
-                      </th>
-                    </tr>
-                  </thead>
-
-                  <tbody>
-                    {actuacionesOrdenadas.map(
-                      (act) => (
-                        <tr
-                          key={act.id}
-                          className={`border-b border-[var(--border)] last:border-b-0 transition ${
-                            act.es_fijacion
-                              ? "bg-amber-500/[0.04] hover:bg-amber-500/[0.08]"
-                              : "hover:bg-[var(--surface-secondary)]/40"
-                          }`}
-                        >
-                          {/* Fecha actuación */}
-
-                          <td className="px-4 py-4 align-top">
-                            <div className="flex items-start gap-2">
-                              {act.es_fijacion && (
-                                <span
-                                  className="mt-1 h-2 w-2 shrink-0 rounded-full bg-amber-500"
-                                  title="Fijación"
-                                />
-                              )}
-
-                              <div className="flex flex-col gap-1">
-                                <span className="whitespace-nowrap text-xs font-mono text-[var(--foreground)]">
-                                  {act.fecha_actuacion ||
-                                    "No registrada"}
-                                </span>
-
-                                <span className="text-[10px] text-[var(--foreground-muted)]">
-                                  Orden {act.orden}
-                                </span>
-                              </div>
-                            </div>
-                          </td>
-
-                          {/* Actuación */}
-
-                          <td className="max-w-[260px] px-4 py-4 align-top">
-                            <div className="flex flex-col items-start gap-2">
-                              {idsActuacionesNuevas.has(act.id) && (
-                                <span className="motion-pop inline-flex items-center gap-1 rounded-full border border-red-500/20 bg-red-500/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-red-700 dark:text-red-400">
-                                  <span aria-hidden="true" className="motion-attention size-1.5 rounded-full bg-red-600 dark:bg-red-400" />
-                                  Nueva
-                                </span>
-                              )}
-
-                              <span className="break-words text-sm font-medium text-[var(--foreground)]">
-                                {act.actuacion ||
-                                  "No registrada"}
-                              </span>
-
-                              {act.es_fijacion && (
-                                <span className="rounded-full border border-amber-500/20 bg-amber-500/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-amber-600 dark:text-amber-400">
-                                  Fijación
-                                </span>
-                              )}
-                            </div>
-                          </td>
-
-                          {/* Anotación */}
-
-                          <td className="max-w-[360px] px-4 py-4 align-top">
-                            <p
-                              className="break-words text-xs leading-relaxed text-[var(--foreground-muted)]"
-                              title={act.anotacion}
-                            >
-                              {act.anotacion || "—"}
-                            </p>
-                          </td>
-
-                          {/* Inicio término */}
-
-                          <td className="px-4 py-4 text-center align-top">
-                            <span className="whitespace-nowrap text-xs font-mono text-[var(--foreground-muted)]">
-                              {validarTermino(
-                                act.fecha_inicia_termino
-                              ) ===
-                              "No registrado"
-                                ? "—"
-                                : act.fecha_inicia_termino}
-                            </span>
-                          </td>
-
-                          {/* Final término */}
-
-                          <td className="px-4 py-4 text-center align-top">
-                            <span className="whitespace-nowrap text-xs font-mono text-[var(--foreground-muted)]">
-                              {validarTermino(
-                                act.fecha_finaliza_termino
-                              ) ===
-                              "No registrado"
-                                ? "—"
-                                : act.fecha_finaliza_termino}
-                            </span>
-                          </td>
-
-                          {/* Fecha registro */}
-
-                          <td className="px-4 py-4 align-top">
-                            <span className="whitespace-nowrap text-xs font-mono text-[var(--foreground-muted)]">
-                              {act.fecha_registro ||
-                                "—"}
-                            </span>
-                          </td>
-                        </tr>
-                      )
-                    )}
-                  </tbody>
-                </table>
-              </div>
-            )}
-          </section>
-        </>
       )}
+
+      <div className="mt-6 grid items-start gap-5 lg:grid-cols-[minmax(0,1fr)_320px]">
+        <Seccion
+          titulo="Actuaciones"
+          cuenta={detalle.total_actuaciones}
+          accion={detalle.actuaciones.length > 6 ? (
+            <label className="relative block w-full sm:w-64">
+              <span className="sr-only">Buscar en las actuaciones</span>
+              <Search aria-hidden="true" size={15} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-ink-3" />
+              <input type="search" value={busqueda} onChange={(e) => setBusqueda(e.target.value)} placeholder="Buscar en las actuaciones" className={cx(CAMPO, "mt-0 h-9 pl-9 text-[14px]")} />
+            </label>
+          ) : undefined}
+        >
+          {detalle.actuaciones.length === 0 ? (
+            <Vacio>
+              {consulta.estado === "sin_consultar" || consulta.estado === "consultando"
+                ? "Todavía no lo hemos consultado. Las actuaciones aparecen aquí después de la primera consulta."
+                : "La Rama Judicial no reporta actuaciones para este radicado."}
+            </Vacio>
+          ) : actuaciones.length === 0 ? (
+            <Vacio>Ninguna actuación menciona «{busqueda.trim()}».</Vacio>
+          ) : (
+            <ol className="divide-y divide-line">
+              {actuaciones.map((a) => <FilaActuacion key={a.id} actuacion={a} />)}
+            </ol>
+          )}
+        </Seccion>
+
+        <aside className="space-y-5">
+          <Seccion titulo={detalle.procesos.length === 1 ? "Proceso" : "Procesos"}>
+            {detalle.procesos.length ? (
+              <ul className="divide-y divide-line">
+                {detalle.procesos.map((p) => (
+                  <li key={p.id}>
+                    <Link href={`${RUTA_PROCESOS}/${p.id}`} className="group flex min-h-12 items-center gap-3 px-4 py-3 transition-colors hover:bg-manila/60 sm:px-5">
+                      <span className="min-w-0 flex-1">
+                        <span className="block font-semibold text-pretty text-ink">{p.nombre}</span>
+                        {p.archivado && <span className="block text-[13px] text-ink-3">Archivado</span>}
+                      </span>
+                      <ChevronRight aria-hidden="true" size={16} className="shrink-0 text-ink-3 transition-transform group-hover:translate-x-0.5" />
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <Vacio>No está en ningún proceso, así que ningún cliente lo ve. Agréguelo desde el proceso que corresponda.</Vacio>
+            )}
+          </Seccion>
+
+          <Seccion titulo="Partes">
+            <dl className="py-1.5 text-[14px]">
+              <Dato nombre="Demandante">{detalle.demandante}</Dato>
+              <Dato nombre="Demandado">{detalle.demandado}</Dato>
+            </dl>
+          </Seccion>
+        </aside>
+      </div>
+    </div>
+  );
+}
+
+function FilaActuacion({ actuacion: a }: { actuacion: Actuacion }) {
+  const fecha = a.fecha ? new Date(`${a.fecha}T12:00:00-05:00`) : null;
+  const termino = a.inicia_termino && a.finaliza_termino
+    ? `Término del ${diaCorto(a.inicia_termino)} al ${diaCorto(a.finaliza_termino)}`
+    : a.finaliza_termino ? `Término hasta el ${diaCorto(a.finaliza_termino)}` : null;
+  return (
+    <li id={`actuacion-${a.id}`} className={cx("flex items-start gap-3 px-4 py-3.5 sm:px-5", a.nueva && "bg-gold-soft/40")}>
+      <div className="w-12 shrink-0 pt-0.5 text-center">
+        {fecha ? (
+          <>
+            <span className="block text-[12px] font-semibold uppercase tracking-wide text-ink-3">{mes.format(fecha).replace(".", "")}</span>
+            <span className="block font-display text-[22px] leading-none tabular-nums text-ink">{fecha.getDate()}</span>
+            <span className="mt-0.5 block text-[11.5px] tabular-nums text-ink-3">{anio.format(fecha)}</span>
+          </>
+        ) : <span className="text-[12px] text-ink-3">Sin fecha</span>}
+      </div>
+      <div className="min-w-0 flex-1">
+        <p className="flex flex-wrap items-center gap-x-2 gap-y-1">
+          <span className="text-[14.5px] font-semibold text-pretty text-ink">{a.actuacion}</span>
+          {a.nueva && <Tag tone="gold" className="h-5">Nueva</Tag>}
+          {a.fijacion && <Tag className="h-5">Por estado</Tag>}
+        </p>
+        {a.anotacion && <p className="mt-1 whitespace-pre-wrap text-[14px] text-pretty text-ink-2">{a.anotacion}</p>}
+        {(termino || (a.registrada && a.registrada !== a.fecha)) && (
+          <p className="mt-1.5 text-[12.5px] text-ink-3">
+            {[termino, a.registrada && a.registrada !== a.fecha ? `Registrada el ${diaCorto(a.registrada)}` : null].filter(Boolean).join(" · ")}
+          </p>
+        )}
+      </div>
+    </li>
+  );
+}
+
+function Volver() {
+  return (
+    <Link href={RUTA_RADICADOS} className="inline-flex min-h-10 items-center gap-1.5 text-[14px] text-ink-2 hover:text-ink">
+      <ArrowLeft aria-hidden="true" size={16} /> Radicados
+    </Link>
+  );
+}
+
+function Seccion({ titulo, cuenta, accion, children }: { titulo: string; cuenta?: number; accion?: ReactNode; children: ReactNode }) {
+  return (
+    <section className="overflow-hidden rounded-[var(--radius-lg)] bg-sheet shadow-[0_0_0_1px_var(--line),0_1px_2px_rgb(24_32_58/0.05)]">
+      <header className="flex flex-wrap items-center justify-between gap-3 border-b border-line px-4 py-3 sm:px-5">
+        <h2 className="font-semibold text-ink">
+          {titulo}
+          {cuenta !== undefined && cuenta > 0 && <span className="ml-2 text-[13px] font-normal tabular-nums text-ink-3">{cuenta}</span>}
+        </h2>
+        {accion}
+      </header>
+      {children}
+    </section>
+  );
+}
+
+function Vacio({ children }: { children: ReactNode }) {
+  return <p className="px-4 py-6 text-[14px] text-pretty text-ink-3 sm:px-5">{children}</p>;
+}
+
+function Dato({ nombre, children }: { nombre: string; children: ReactNode }) {
+  return (
+    <div className="grid grid-cols-[6.5rem_minmax(0,1fr)] gap-3 px-4 py-2 sm:px-5">
+      <dt className="text-ink-3">{nombre}</dt>
+      <dd className="min-w-0 text-pretty text-ink">{children ?? <span className="text-ink-3">Sin registrar</span>}</dd>
     </div>
   );
 }

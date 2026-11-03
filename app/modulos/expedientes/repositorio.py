@@ -109,10 +109,10 @@ class RepositorioProcesos:
         )]
 
     def actuaciones_recientes(self, radicado_ids: list[int], por_radicado: int = 40) -> dict[int, list]:
-        """Actuaciones de cada radicado, de la más reciente a la más antigua (el orden del juzgado)."""
+        """Actuaciones de cada radicado, de la más reciente a la más antigua (por fecha y luego el orden del juzgado)."""
         filas = self._db.scalars(
             select(Actuacion).where(Actuacion.radicado_id.in_(radicado_ids))
-            .order_by(Actuacion.radicado_id, Actuacion.orden.asc(), Actuacion.id.desc())
+            .order_by(Actuacion.radicado_id, Actuacion.fecha_actuacion.desc(), Actuacion.orden.asc(), Actuacion.id.desc())
         ).all()
         resultado: dict[int, list] = {i: [] for i in radicado_ids}
         for actuacion in filas:

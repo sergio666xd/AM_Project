@@ -19,10 +19,13 @@ const SEGMENTOS: [number, number, string][] = [
 export function Radicado({
   numero,
   copiable = true,
+  grande = false,
   className,
 }: {
   numero: string;
   copiable?: boolean;
+  /** Para el título de la página del radicado. */
+  grande?: boolean;
   className?: string;
 }) {
   const digitos = numero.replace(/\D/g, "");
@@ -45,12 +48,12 @@ export function Radicado({
 
   return (
     <span className={cx("inline-flex min-w-0 items-center gap-1.5", className)}>
-      <span className="truncate font-mono text-[12.5px] tracking-tight text-ink-2 tabular-nums" aria-label={`Radicado ${digitos}`}>
+      <span className={cx("truncate font-mono tracking-tight tabular-nums", grande ? "text-[19px] text-ink sm:text-[24px]" : "text-[12.5px] text-ink-2")} aria-label={`Radicado ${digitos}`}>
         {digitos.length === 23
           ? SEGMENTOS.map(([desde, hasta, nombre], i) => (
               <span key={nombre} title={nombre} className={i % 2 ? "text-ink-3" : undefined}>
                 {digitos.slice(desde, hasta)}
-                {i < SEGMENTOS.length - 1 && <span className="inline-block w-[3px]" aria-hidden="true" />}
+                {i < SEGMENTOS.length - 1 && <span className={grande ? "inline-block w-[6px]" : "inline-block w-[3px]"} aria-hidden="true" />}
               </span>
             ))
           : numero}

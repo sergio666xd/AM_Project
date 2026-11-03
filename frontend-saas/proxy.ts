@@ -166,6 +166,7 @@ export function proxy(request: NextRequest) {
 export const config = {
   // Portal URLs son rutas arbitrarias de primer nivel (/usuarios, /operacion,
   // /ayuda, etc.). Interceptar todas evita que caigan en el 404 público de Next.
-  // API, assets, Workflow y archivos estáticos mantienen su manejo propio.
-  matcher: ["/((?!api/|_next/|\\.well-known/|robots\\.txt$|sitemap\\.xml$|favicon\\.ico$|.*\\.[^/]+$).*)"],
+  // API, assets, Workflow (y sus rutas /workflow-admin) y archivos estáticos
+  // mantienen su manejo propio.
+  matcher: ["/((?!api/|workflow-admin/|_next/|\\.well-known/|robots\\.txt$|sitemap\\.xml$|favicon\\.ico$|.*\\.[^/]+$).*)"],
 };

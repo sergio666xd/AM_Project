@@ -1,648 +1,192 @@
 "use client";
 
-import { apiRequest, iniciarWorkflowConsultaRadicado, TOKEN_EN_COOKIE } from "@/lib/api";
+import { useCallback, useState } from "react";
+import Link from "next/link";
+import { FolderOpen, Plus, RefreshCw, ScrollText } from "lucide-react";
 
-import { FormEvent, useCallback, useEffect, useState } from "react";
-import { PageHeader } from "@/components/ui/PageHeader";
-import { DataTable, type DataTableColumn, type RowAction } from "@/components/ui/DataTable";
-import { SummaryStrip } from "@/components/ui/SummaryStrip";
-import { consultaLabel } from "@/lib/labels";
+import { AgregarRadicadoModal } from "@/components/radicados/AgregarRadicadoModal";
 import { Button } from "@/components/ui/Button";
-import { Badge } from "@/components/ui/Badge";
-import {
-  ChevronRight,
-  Plus,
-  RefreshCw,
-  Trash2,
-  X,
-} from "lucide-react";
+import { DataTable, type DataTableColumn, type RowAction } from "@/components/ui/DataTable";
+import { PageHeader } from "@/components/ui/PageHeader";
+import { Radicado } from "@/components/ui/Radicado";
+import { SummaryStrip } from "@/components/ui/SummaryStrip";
+import { Tag } from "@/components/ui/Tag";
+import { useToast } from "@/components/ui/ToastProvider";
+import { api, mensajeDeError, type Esquemas } from "@/lib/api-v2/cliente";
+import { diaCorto } from "@/lib/fechas";
+import { RUTA_RADICADOS, TONO_CONSULTA, textoNovedades } from "@/lib/radicados";
+import { useAccionDeUrl } from "@/lib/useAccionDeUrl";
+import { useLoadEffect } from "@/lib/useLoadEffect";
 
-
-type Actuacion = {
-  id: number;
-  orden: number;
-  fecha_actuacion?: string | null;
-  actuacion?: string | null;
-  anotacion?: string | null;
-  fecha_inicia_termino?: string | null;
-  fecha_finaliza_termino?: string | null;
-  fecha_registro?: string | null;
-  es_fijacion?: boolean | null;
-};
-
-type Radicado = {
-  id: number;
-  numero: string;
-  estado_consulta?: string | null;
-  despacho_departamento?: string | null;
-  demandante?: string | null;
-  demandado?: string | null;
-  consultado_en?: string | null;
-  alerta_enviada?: boolean | null;
-  detalle_pendiente?: string | null;
-  actuaciones?: Actuacion[];
-};
-
-function getLatestActuacion(
-  radicado: Radicado
-): Actuacion | null {
-  if (!radicado.actuaciones?.length) {
-    return null;
-  }
-
-  return [...radicado.actuaciones].sort((a, b) => {
-    const dateA = a.fecha_actuacion
-      ? new Date(a.fecha_actuacion).getTime()
-      : 0;
-
-    const dateB = b.fecha_actuacion
-      ? new Date(b.fecha_actuacion).getTime()
-      : 0;
-
-    if (dateA !== dateB) {
-      return dateB - dateA;
-    }
-
-    // Orden 1 es la actuación más reciente en la Rama Judicial.
-    return (a.orden ?? 0) - (b.orden ?? 0);
-  })[0];
-}
-
-function formatDate(value?: string | null) {
-  if (!value) return "—";
-
-  const date = new Date(value);
-
-  if (Number.isNaN(date.getTime())) {
-    return value;
-  }
-
-  return date.toLocaleDateString("es-CO", { timeZone: "America/Bogota",
-    day: "2-digit",
-    month: "2-digit",
-    year: "numeric",
-  });
-}
+type Fila = Esquemas["RadicadoFila"];
+type Filtro = "todos" | "novedades" | "problemas" | "sin_consultar";
+const RUTA_PROCESOS = "/gestion-procesos/abogado/procesos";
 
 export default function RadicadosPage() {
-  const [radicados, setRadicados] = useState<Radicado[]>([]);
+  const { toast } = useToast();
+  const [lista, setLista] = useState<Esquemas["ListaRadicados"] | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [filtro, setFiltro] = useState<Filtro>("todos");
+  const [agregar, setAgregar] = useState(false);
 
-  const [quickFilter, setQuickFilter] = useState<string | null>(null);
+  useAccionDeUrl("nuevo", useCallback(() => setAgregar(true), []));
 
-  const [loading, setLoading] = useState(true);
-  const [creating, setCreating] = useState(false);
-  const [, setRefreshing] = useState(false);
-
-  const [consultingId, setConsultingId] = useState<number | null>(
-    null
-  );
-
-  const [deletingId, setDeletingId] = useState<number | null>(
-    null
-  );
-
-  const [, setBulkLoading] = useState(false);
-
-  const [error, setError] = useState("");
-  const [message, setMessage] = useState("");
-
-  const [showCreateModal, setShowCreateModal] = useState(false);
-  const [nuevoNumero, setNuevoNumero] = useState("");
-
-  const token = () => TOKEN_EN_COOKIE;
-
-  const loadRadicados = useCallback(async () => {
-    setError("");
-
-    try {
-      const response = await apiRequest(`/api/radicados`, {
-        headers: {
-          Authorization: `Bearer ${token()}`,
-        },
-      });
-
-      const data = await response.json().catch(() => null);
-
-      if (!response.ok) {
-        throw new Error(
-          data?.detail ||
-            "No fue posible cargar los radicados."
-        );
-      }
-
-      setRadicados(Array.isArray(data) ? data : []);
-    } catch (cause) {
-      setError(
-        cause instanceof Error
-          ? cause.message
-          : "No fue posible cargar los radicados."
-      );
+  const cargar = useCallback(async () => {
+    const { data, error: fallo } = await api.GET("/api/v2/radicados");
+    if (data) {
+      setLista(data);
+      setError(null);
+    } else {
+      setError(mensajeDeError(fallo));
     }
   }, []);
+  useLoadEffect(cargar);
 
-  useEffect(() => {
-    async function initialLoad() {
-      setLoading(true);
+  const filas = lista?.items ?? [];
+  const visibles = filas.filter((f) =>
+    filtro === "todos"
+    || (filtro === "novedades" && f.novedades > 0)
+    || (filtro === "problemas" && (f.consulta.estado === "error" || f.consulta.estado === "no_encontrado"))
+    || (filtro === "sin_consultar" && f.consulta.estado === "sin_consultar"));
+  const resumen = lista?.resumen;
 
-      try {
-        await loadRadicados();
-      } finally {
-        setLoading(false);
-      }
-    }
-
-    void initialLoad();
-  }, [loadRadicados]);
-
-  async function refresh() {
-    setRefreshing(true);
-    setMessage("");
-
-    try {
-      await loadRadicados();
-    } finally {
-      setRefreshing(false);
-    }
-  }
-
-  async function createRadicado(event: FormEvent) {
-    event.preventDefault();
-
-    const numero = nuevoNumero.trim();
-
-    if (!numero) {
-      setError("Ingresa el número de radicado.");
-      return;
-    }
-
-    setCreating(true);
-    setError("");
-    setMessage("");
-
-    try {
-      const response = await apiRequest(`/api/radicados`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token()}`,
-        },
-        body: JSON.stringify({
-          numero,
-        }),
-      });
-
-      const data = await response.json().catch(() => null);
-
-      if (!response.ok) {
-        throw new Error(
-          data?.detail ||
-            "No fue posible crear el radicado."
-        );
-      }
-
-      if (typeof data?.consulta_id === "number") {
-        await iniciarWorkflowConsultaRadicado(token(), {
-          tipo: "AUTOMATICA_NUEVO",
-          radicado_id: data.id,
-          consulta_id: data.consulta_id,
-        });
-      }
-
-      setShowCreateModal(false);
-      setNuevoNumero("");
-
-      await loadRadicados();
-
-      setMessage(
-        data?.mensaje || `El radicado ${numero} fue agregado correctamente.`
-      );
-    } catch (cause) {
-      setError(
-        cause instanceof Error
-          ? cause.message
-          : "No fue posible crear el radicado."
-      );
-    } finally {
-      setCreating(false);
-    }
-  }
-
-  async function consultarRadicado(radicado: Radicado) {
-    setConsultingId(radicado.id);
-    setError("");
-    setMessage("");
-
-    try {
-      await iniciarWorkflowConsultaRadicado(token(), {
-        tipo: "MANUAL",
-        radicado_id: radicado.id,
-      });
-
-      setMessage(
-        `La consulta del radicado ${radicado.numero} fue enviada a segundo plano.`
-      );
-
-      await loadRadicados();
-    } catch (cause) {
-      setError(
-        cause instanceof Error
-          ? cause.message
-          : "No fue posible iniciar la consulta."
-      );
-    } finally {
-      setConsultingId(null);
-    }
-  }
-
-  async function deleteRadicado(radicado: Radicado) {
-    const confirmed = window.confirm(
-      `¿Quitar el radicado ${radicado.numero} de tu lista? Dejarás de recibir sus actuaciones.`
-    );
-
-    if (!confirmed) return;
-
-    setDeletingId(radicado.id);
-    setError("");
-    setMessage("");
-
-    try {
-      const response = await apiRequest(
-        `/api/radicados/${radicado.id}`,
-        {
-          method: "DELETE",
-          headers: {
-            Authorization: `Bearer ${token()}`,
-          },
-        }
-      );
-
-      const data = await response.json().catch(() => null);
-
-      if (!response.ok) {
-        throw new Error(
-          data?.detail ||
-            "No fue posible eliminar el radicado."
-        );
-      }
-
-      setRadicados((current) =>
-        current.filter((item) => item.id !== radicado.id)
-      );
-
-
-      setMessage(
-        `El radicado ${radicado.numero} fue eliminado correctamente.`
-      );
-    } catch (cause) {
-      setError(
-        cause instanceof Error
-          ? cause.message
-          : "No fue posible eliminar el radicado."
-      );
-    } finally {
-      setDeletingId(null);
-    }
-  }
-
-  async function consultSelected(selectedIds: number[]) {
-    if (!selectedIds.length) return;
-
-    setBulkLoading(true);
-    setError("");
-    setMessage("");
-
-    try {
-      await iniciarWorkflowConsultaRadicado(token(), {
-        tipo: "MANUAL",
-        radicado_ids: selectedIds,
-      });
-      setMessage(`${selectedIds.length} consulta(s) enviadas al Workflow.`);
-      await loadRadicados();
-    } catch (cause) {
-      setError(
-        cause instanceof Error
-          ? cause.message
-          : "No fue posible procesar las consultas."
-      );
-    } finally {
-      setBulkLoading(false);
-    }
-  }
-
-  async function deleteSelected(selectedIds: number[]) {
-    if (!selectedIds.length) return;
-
-    const confirmed = window.confirm(
-      `¿Quitar los ${selectedIds.length} radicados seleccionados de tu lista?`
-    );
-
-    if (!confirmed) return;
-
-    setBulkLoading(true);
-    setError("");
-    setMessage("");
-
-    try {
-      const results = await Promise.allSettled(
-        selectedIds.map(async (id) => {
-          const response = await apiRequest(
-            `/api/radicados/${id}`,
-            {
-              method: "DELETE",
-              headers: {
-                Authorization: `Bearer ${token()}`,
-              },
-            }
-          );
-
-          const data = await response.json().catch(() => null);
-
-          if (!response.ok) {
-            throw new Error(
-              data?.detail ||
-                `No fue posible eliminar el radicado ${id}.`
-            );
-          }
-
-          return data;
-        })
-      );
-
-      const successful = results.filter(
-        (result) => result.status === "fulfilled"
-      ).length;
-
-      const failed = results.length - successful;
-
-      if (successful > 0) {
-        const successfulIds = selectedIds.filter(
-          (_, index) =>
-            results[index].status === "fulfilled"
-        );
-
-        setRadicados((current) =>
-          current.filter(
-            (radicado) => !successfulIds.includes(radicado.id)
-          )
-        );
-
-      }
-
-      if (failed > 0) {
-        setError(
-          `${successful} radicado(s) eliminado(s) y ${failed} no pudieron eliminarse.`
-        );
-      } else {
-        setMessage(
-          `${successful} radicado(s) eliminado(s) correctamente.`
-        );
-      }
-    } catch (cause) {
-      setError(
-        cause instanceof Error
-          ? cause.message
-          : "No fue posible eliminar los radicados."
-      );
-    } finally {
-      setBulkLoading(false);
-    }
-  }
-
-
-  const consulta = (radicado: Radicado) => consultaLabel(radicado.estado_consulta);
-  const hasIssue = (radicado: Radicado) => ["risk", "attention"].includes(consulta(radicado).tone);
-  const visibleRadicados = radicados.filter((radicado) =>
-    !quickFilter ||
-    (quickFilter === "OK" && consulta(radicado).label === "Consultado") ||
-    (quickFilter === "INCIDENCIAS" && hasIssue(radicado)) ||
-    (quickFilter === "SIN_CONSULTAR" && consulta(radicado).label === "Sin consultar"),
-  );
-
-  const radicadoColumns: DataTableColumn<Radicado>[] = [
+  const columnas: DataTableColumn<Fila>[] = [
     {
       key: "numero",
       header: "Radicado",
       mobile: "title",
-      sortValue: (radicado) => radicado.numero,
-      searchValue: (radicado) => [radicado.numero, radicado.demandante, radicado.demandado, radicado.despacho_departamento, getLatestActuacion(radicado)?.actuacion].filter(Boolean).join(" "),
-      render: (radicado) => <span className="font-mono text-[13px] font-medium text-foreground">{radicado.numero}</span>,
-    },
-    {
-      key: "partes",
-      header: "Partes",
-      mobile: "subtitle",
-      sortValue: (radicado) => radicado.demandante,
-      render: (radicado) => (
-        <span className="block max-w-72">
-          <span className="line-clamp-2">{[radicado.demandante, radicado.demandado].filter(Boolean).join(" vs. ") || <span className="text-foreground-muted">Pendiente de consulta</span>}</span>
-          {radicado.despacho_departamento && <span className="block truncate text-xs text-foreground-muted">{radicado.despacho_departamento}</span>}
+      sortValue: (f) => f.numero,
+      exportValue: (f) => f.numero,
+      searchValue: (f) => [f.numero, f.despacho, f.demandante, f.demandado, f.ultima_actuacion?.texto, ...f.procesos.map((p) => p.nombre)].filter(Boolean).join(" "),
+      render: (f) => (
+        <span className="block min-w-0">
+          <Radicado numero={f.numero} copiable={false} className="text-[13px] font-medium text-ink" />
+          {f.despacho && <span className="mt-0.5 block max-w-64 truncate text-[12.5px] text-ink-3">{f.despacho}</span>}
         </span>
       ),
     },
     {
-      key: "estado",
-      header: "Consulta",
-      mobile: "badge",
-      sortValue: (radicado) => consulta(radicado).label,
-      render: (radicado) => <Badge tone={consulta(radicado).tone}>{consultingId === radicado.id ? "Consultando…" : consulta(radicado).label}</Badge>,
+      key: "proceso",
+      header: "Proceso",
+      mobile: "subtitle",
+      sortValue: (f) => f.procesos[0]?.nombre ?? "",
+      exportValue: (f) => f.procesos.map((p) => p.nombre).join(", "),
+      render: (f) => f.procesos.length ? (
+        <span className="block max-w-60">
+          <span className="line-clamp-2">{f.procesos.map((p) => p.nombre).join(", ")}</span>
+          {f.procesos.every((p) => p.archivado) && <span className="block text-[12.5px] text-ink-3">Archivado</span>}
+        </span>
+      ) : <span className="text-ink-3">Sin proceso</span>,
     },
     {
-      key: "ultima_actuacion",
+      key: "partes",
+      header: "Partes",
+      mobile: "hidden",
+      wideOnly: true,
+      sortValue: (f) => f.demandante ?? "",
+      exportValue: (f) => [f.demandante, f.demandado].filter(Boolean).join(" contra "),
+      render: (f) => (f.demandante || f.demandado)
+        ? <span className="line-clamp-2 block max-w-56">{[f.demandante, f.demandado].filter(Boolean).join(" contra ")}</span>
+        : <span className="text-ink-3">—</span>,
+    },
+    {
+      key: "actuacion",
       header: "Última actuación",
       mobile: "meta",
-      sortValue: (radicado) => getLatestActuacion(radicado)?.fecha_actuacion,
-      exportValue: (radicado) => [getLatestActuacion(radicado)?.fecha_actuacion, getLatestActuacion(radicado)?.actuacion].filter(Boolean).join(" · "),
-      render: (radicado) => {
-        const latest = getLatestActuacion(radicado);
-        return latest ? (
-          <span className="block max-w-64">
-            <span className="block truncate">{latest.actuacion || "Actuación"}</span>
-            <span className="text-xs text-foreground-muted">{formatDate(latest.fecha_actuacion)}</span>
+      mobileLabel: "Última actuación",
+      sortValue: (f) => f.ultima_actuacion?.fecha ?? "",
+      exportValue: (f) => [f.ultima_actuacion?.fecha, f.ultima_actuacion?.texto].filter(Boolean).join(" · "),
+      render: (f) => f.ultima_actuacion ? (
+        <span className="block max-w-72">
+          <span className="line-clamp-2 text-ink">{f.ultima_actuacion.texto}</span>
+          <span className="mt-0.5 flex items-center gap-2 text-[12.5px] text-ink-3">
+            {f.ultima_actuacion.fecha ? diaCorto(f.ultima_actuacion.fecha) : "Sin fecha"}
+            {f.novedades > 0 && <Tag tone="gold" className="h-5">{textoNovedades(f.novedades)}</Tag>}
           </span>
-        ) : <span className="text-foreground-muted">Sin actuaciones</span>;
-      },
+        </span>
+      ) : <span className="text-ink-3">Sin actuaciones</span>,
     },
     {
-      key: "actuaciones",
-      header: "Actuaciones",
-      mobile: "hidden",
-      align: "right",
-      hideOnMobile: true,
-      sortValue: (radicado) => radicado.actuaciones?.length ?? 0,
-      render: (radicado) => <span className="tabular-nums">{radicado.actuaciones?.length ?? 0}</span>,
-    },
-    {
-      key: "consultado_en",
-      header: "Consultado",
-      mobile: "meta",
-      wideOnly: true,
-      className: "whitespace-nowrap",
-      sortValue: (radicado) => radicado.consultado_en,
-      render: (radicado) => radicado.consultado_en || <span className="text-foreground-muted">Nunca</span>,
+      key: "consulta",
+      header: "Consulta",
+      mobile: "badge",
+      sortValue: (f) => f.consulta.etiqueta,
+      exportValue: (f) => f.consulta.etiqueta,
+      render: (f) => f.consulta.estado === "consultado"
+        ? <span className="whitespace-nowrap text-[13px] text-ink-2">Al día</span>
+        : <Tag tone={TONO_CONSULTA[f.consulta.estado]}>{f.consulta.etiqueta}</Tag>,
     },
   ];
 
-  const radicadoActions: RowAction<Radicado>[] = [
-    { label: "Ver actuaciones", icon: <ChevronRight />, href: (radicado) => `/gestion-procesos/abogado/radicados/${radicado.id}` },
-    { label: "Consultar ahora", icon: <RefreshCw />, onSelect: (radicado) => consultarRadicado(radicado), disabled: (radicado) => consultingId === radicado.id },
-    { label: "Quitar de mi lista", icon: <Trash2 />, tone: "danger", separated: true, onSelect: (radicado) => deleteRadicado(radicado), disabled: (radicado) => deletingId === radicado.id },
+  const acciones: RowAction<Fila>[] = [
+    { label: "Ver las actuaciones", icon: <ScrollText size={16} />, href: (f) => `${RUTA_RADICADOS}/${f.id}` },
+    { label: "Abrir el proceso", icon: <FolderOpen size={16} />, hidden: (f) => f.procesos.length === 0, href: (f) => `${RUTA_PROCESOS}/${f.procesos[0]?.id}/relaciones` },
   ];
+
+  const vacio = filas.length === 0
+    ? ["La firma aún no sigue radicados", "Agregue el número de 23 dígitos a un proceso y lo consultamos en la Rama Judicial todos los días."]
+    : ["Ningún radicado coincide", "Toque el filtro otra vez para ver todos."];
 
   return (
-    <section className="motion-swap mx-auto max-w-7xl space-y-5">
+    <div className="mx-auto max-w-7xl">
       <PageHeader
-        overline="Expedientes"
         title="Radicados"
-        description="Radicados judiciales que sigues, con el estado de su consulta y la última actuación registrada."
-        action={
-          <Button variant="primary" onClick={() => { setError(""); setMessage(""); setShowCreateModal(true); }} icon={<Plus className="size-4" />}>
-            Nuevo radicado
-          </Button>
-        }
+        description="Lo que la firma sigue en la Rama Judicial: la última actuación de cada radicado y cómo terminó su consulta."
+        action={<Button icon={<Plus size={16} />} onClick={() => setAgregar(true)}>Agregar radicado</Button>}
       />
 
       <SummaryStrip
-        active={quickFilter}
-        onSelect={setQuickFilter}
+        active={filtro}
+        onSelect={(clave) => setFiltro(!clave || clave === filtro ? "todos" : (clave as Filtro))}
         items={[
-          { key: "TODOS", label: "Radicados", value: radicados.length },
-          { key: "OK", label: "Consultados", value: radicados.filter((radicado) => consulta(radicado).label === "Consultado").length, tone: "success" },
-          { key: "INCIDENCIAS", label: "Con incidencias", value: radicados.filter(hasIssue).length, tone: "danger" },
-          { key: "SIN_CONSULTAR", label: "Sin consultar", value: radicados.filter((radicado) => consulta(radicado).label === "Sin consultar").length, tone: "warning" },
+          { key: "todos", label: "Radicados", value: resumen ? resumen.total : "—" },
+          { key: "novedades", label: "Con actuaciones nuevas", value: resumen ? resumen.con_novedades : "—", tone: resumen?.con_novedades ? "warning" : "default" },
+          { key: "problemas", label: "Con problemas de consulta", value: resumen ? resumen.con_problemas : "—", tone: resumen?.con_problemas ? "danger" : "default" },
+          { key: "sin_consultar", label: "Sin consultar", value: resumen ? resumen.sin_consultar : "—" },
         ]}
       />
 
-      {error && (
-        <div role="alert" className="flex items-center justify-between gap-3 rounded-[var(--radius-lg)] border border-danger/30 bg-danger-light px-4 py-3 text-sm text-danger">
-          <span>{error}</span>
-          <button type="button" onClick={() => setError("")} aria-label="Cerrar error"><X className="size-4" /></button>
-        </div>
-      )}
-      {message && (
-        <div role="status" className="flex items-center justify-between gap-3 rounded-[var(--radius-lg)] border border-success/30 bg-success-light px-4 py-3 text-sm text-success">
-          <span>{message}</span>
-          <button type="button" onClick={() => setMessage("")} aria-label="Cerrar aviso"><X className="size-4" /></button>
-        </div>
-      )}
-
-      <DataTable
-        caption="Radicados"
-        rows={quickFilter === "TODOS" ? radicados : visibleRadicados}
-        columns={radicadoColumns}
-        rowKey={(radicado) => radicado.id}
-        rowHref={(radicado) => `/gestion-procesos/abogado/radicados/${radicado.id}`}
-        rowActions={radicadoActions}
-        bulkActions={[
-          { label: "Consultar", icon: <RefreshCw />, onRun: (rows) => consultSelected(rows.map((radicado) => radicado.id)) },
-          { label: "Quitar de mi lista", icon: <Trash2 />, tone: "danger", onRun: (rows) => deleteSelected(rows.map((radicado) => radicado.id)) },
-        ]}
-        rowTone={(radicado) => (consulta(radicado).tone === "risk" ? "danger" : undefined)}
-        searchPlaceholder="Buscar por número, partes, despacho o actuación"
-        initialSort={{ key: "ultima_actuacion", direction: "desc" }}
-        exportFilename="radicados"
-        storageKey="abogado-radicados"
-        loading={loading}
-        onRefresh={() => void refresh()}
-        emptyTitle={radicados.length === 0 ? "Aún no sigues ningún radicado" : "Ningún radicado coincide con este filtro"}
-        emptyDescription={radicados.length === 0 ? "Agrega el número de 23 dígitos para consultar sus actuaciones automáticamente." : "Toca el indicador de nuevo para ver todos."}
-        emptyAction={radicados.length === 0 ? <Button variant="primary" onClick={() => setShowCreateModal(true)} icon={<Plus className="size-4" />}>Nuevo radicado</Button> : undefined}
-      />
-
-      {/* MODAL CREAR RADICADO */}
-      {showCreateModal && (
-        <div
-          className="motion-overlay fixed inset-0 z-50 flex items-center justify-center bg-brand-950/40 px-4 backdrop-blur-xs"
-          onMouseDown={(event) => {
-            if (event.target === event.currentTarget) {
-              setShowCreateModal(false);
-            }
-          }}
-        >
-          <div
-            className="w-full max-w-md overflow-hidden rounded-2xl border border-border bg-surface text-foreground shadow-2xl"
-          >
-            <div className="flex items-center justify-between border-b border-border px-5 py-4">
-              <div>
-                <h2 className="text-base font-semibold text-foreground">
-                  Nuevo radicado
-                </h2>
-
-                <p className="mt-0.5 text-xs text-muted">
-                  Agrega un proceso para iniciar su seguimiento.
-                </p>
-              </div>
-
-              <button
-                type="button"
-                onClick={() =>
-                  setShowCreateModal(false)
-                }
-                className="rounded-lg p-2 text-muted hover:bg-surface-secondary hover:text-foreground"
-              >
-                <X size={18} />
-              </button>
-            </div>
-
-            <form onSubmit={createRadicado}>
-              <div className="space-y-4 p-5">
-                <div>
-                  <label
-                    htmlFor="numero-radicado"
-                    className="mb-1.5 block text-sm font-medium text-foreground"
-                  >
-                    Número de radicado
-                  </label>
-
-                  <input
-                    id="numero-radicado"
-                    type="text"
-                    value={nuevoNumero}
-                    onChange={(event) =>
-                      setNuevoNumero(
-                        event.target.value
-                      )
-                    }
-                    placeholder="Ej. 05001310300120260012300"
-                    autoFocus
-                    required
-                    className="w-full rounded-lg border border-border bg-surface-secondary px-3 py-2.5 text-sm text-foreground outline-none transition placeholder:text-muted focus:border-brand-500"
-                  />
-
-                  <p className="mt-1.5 text-xs text-muted">
-                    El número será utilizado para consultar
-                    automáticamente el proceso.
-                  </p>
-                </div>
-              </div>
-
-              <div className="flex justify-end gap-2 border-t border-border px-5 py-4">
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() =>
-                    setShowCreateModal(false)
-                  }
-                  disabled={creating}
-                >
-                  Cancelar
-                </Button>
-
-                <Button
-                  type="submit"
-                  variant="primary"
-                  loading={creating}
-                  disabled={
-                    creating ||
-                    !nuevoNumero.trim()
-                  }
-                >
-                  Agregar radicado
-                </Button>
-              </div>
-            </form>
+      <div className="mt-5">
+        {error ? (
+          <div role="alert" className="flex flex-wrap items-center gap-3 rounded-[var(--radius-lg)] bg-bad-soft px-4 py-3 text-bad">
+            <p className="flex-1 text-[14px]">{error}</p>
+            <Button size="sm" variant="secondary" icon={<RefreshCw size={14} />} onClick={() => void cargar()}>Reintentar</Button>
           </div>
-        </div>
+        ) : (
+          <DataTable
+            caption="Radicados de la firma"
+            rows={visibles}
+            columns={columnas}
+            rowKey={(f) => f.id}
+            rowHref={(f) => `${RUTA_RADICADOS}/${f.id}`}
+            rowActions={acciones}
+            rowTone={(f) => (f.consulta.estado === "error" || f.consulta.estado === "no_encontrado" ? "danger" : undefined)}
+            searchPlaceholder="Buscar por número, proceso, partes o actuación"
+            initialSort={{ key: "actuacion", direction: "desc" }}
+            exportFilename="radicados"
+            storageKey="abogado-radicados-v2"
+            loading={!lista}
+            onRefresh={() => void cargar()}
+            emptyTitle={vacio[0]}
+            emptyDescription={vacio[1]}
+            emptyAction={filas.length === 0 ? <Button icon={<Plus size={16} />} onClick={() => setAgregar(true)}>Agregar radicado</Button> : undefined}
+          />
+        )}
+      </div>
+
+      {filas.some((f) => f.procesos.length === 0) && (
+        <p className="mt-3 text-[13px] text-ink-3">
+          Los radicados sin proceso vienen de la cuenta anterior. Para que el cliente los vea, agréguelos a su proceso desde{" "}
+          <Link href={RUTA_PROCESOS} className="text-navy-ink underline underline-offset-2">Procesos</Link>.
+        </p>
       )}
-    </section>
+
+      {agregar && (
+        <AgregarRadicadoModal
+          onClose={() => setAgregar(false)}
+          onListo={(_, aviso) => { toast({ title: "Radicado agregado", description: aviso, tone: "success" }); void cargar(); }}
+        />
+      )}
+    </div>
   );
 }

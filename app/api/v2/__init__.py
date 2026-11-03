@@ -9,7 +9,7 @@ from fastapi import APIRouter, Depends
 from app.api.v2 import (
     admin, agenda, avisos, bandeja, busqueda, cliente, clientes, contratos, documentos, etapas, finanzas, folios, glosario, mensajes,
     operacion,
-    procesos, sesion, sistema, sitio, tareas, terminos,
+    procesos, radicados, sesion, sistema, sitio, tareas, terminos,
 )
 from app.nucleo.errores import PREFIJO_V2, RESPUESTAS_ERROR
 from app.nucleo.sesion import proteger_csrf
@@ -23,6 +23,7 @@ router = APIRouter(
 )
 router.include_router(sesion.router)
 router.include_router(procesos.router)
+router.include_router(radicados.router)
 router.include_router(folios.router)
 router.include_router(bandeja.router)
 router.include_router(avisos.router)
