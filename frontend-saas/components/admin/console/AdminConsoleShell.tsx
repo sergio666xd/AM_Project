@@ -32,7 +32,7 @@ import { usePortalPathname } from "@/lib/usePortalPathname";
 
 const ADMIN = "/gestion-procesos/admin";
 
-const EXPEDIENTES = ["procesos", "radicados", "tareas", "agenda", "documentos", "contratos"].map((r) => `${ADMIN}/${r}`);
+const EXPEDIENTES = ["procesos", "radicados", "tareas", "agenda", "documentos", "contratos", "clientes"].map((r) => `${ADMIN}/${r}`);
 
 const grupos: GrupoNav[] = [
   {
@@ -101,6 +101,7 @@ const SECCIONES: { titulo: string; pestanas: { label: string; href: string }[] }
       { label: "Agenda", href: `${ADMIN}/agenda` },
       { label: "Documentos", href: `${ADMIN}/documentos` },
       { label: "Contratos", href: `${ADMIN}/contratos` },
+      { label: "Clientes", href: `${ADMIN}/clientes` },
     ],
   },
   {

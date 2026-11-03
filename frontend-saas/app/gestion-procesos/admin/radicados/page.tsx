@@ -1,2 +1,2 @@
-import { SectorInventoryPage } from "@/components/admin/SectorInventoryPage";
-export default function RadicadosAdminPage() { return <SectorInventoryPage sector="FIRMA" />; }
+// La consola usa la misma vista que el panel de la firma.
+export { default } from "@/app/gestion-procesos/abogado/radicados/page";

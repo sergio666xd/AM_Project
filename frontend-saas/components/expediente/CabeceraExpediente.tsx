@@ -117,7 +117,7 @@ export function CabeceraExpediente({ procesoId, nombre, onCambio }: { procesoId:
         description={
           confirmando === "reabrir"
             ? "Vuelve a las listas activas y a Hoy."
-            : "Sale de las listas activas y de Hoy. No se borra nada y puedes reabrirlo cuando quieras."
+            : "Sale de las listas activas y de Hoy. No se borra nada y se puede reabrir en cualquier momento."
         }
         confirmLabel={confirmando === "reabrir" ? "Reabrir" : "Archivar"}
       />

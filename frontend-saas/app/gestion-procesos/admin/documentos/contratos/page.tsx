@@ -1,5 +1,6 @@
-import { SectorInventoryPage } from "@/components/admin/SectorInventoryPage";
+import { redirect } from "next/navigation";
 
-export default function AdminContractDocumentsPage() {
-  return <SectorInventoryPage sector="FIRMA" />;
+// Los contratos firmados están en su propia pestaña.
+export default function ContratosCargadosRoute() {
+  redirect("/gestion-procesos/admin/contratos");
 }

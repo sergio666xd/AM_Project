@@ -43,6 +43,8 @@ export default function ProcesosPage() {
   const router = useRouter();
   const { toast } = useToast();
   const { user } = useSession();
+  // En la consola de administración se ven todos los procesos y nadie colabora.
+  const consola = user?.rol === "ADMIN";
   const [archivados, setArchivados] = useState(false);
   const [filtro, setFiltro] = useState<Filtro>("todos");
   const [procesos, setProcesos] = useState<Proceso[] | null>(null);
@@ -81,7 +83,7 @@ export default function ProcesosPage() {
   }
 
   const lista = procesos ?? [];
-  const colaboro = (p: Proceso) => p.responsable.id !== user?.id;
+  const colaboro = (p: Proceso) => !consola && p.responsable.id !== user?.id;
   const conteo = {
     todos: lista.length,
     vencidas: lista.filter((p) => (p.actividad?.tareas_vencidas ?? 0) > 0).length,
@@ -204,14 +206,14 @@ export default function ProcesosPage() {
     ? ["No hay procesos archivados", "Los procesos que archive aparecen aquí y se pueden reabrir."]
     : filtro !== "todos"
       ? ["Ningún proceso coincide", "Toque el filtro otra vez para ver todos."]
-      : ["Aún no hay procesos", "Cree el primer expediente de la firma."];
+      : ["Aún no hay procesos", consola ? "Los abogados crean los expedientes desde su panel." : "Cree el primer expediente de la firma."];
 
   return (
     <div className="mx-auto max-w-7xl">
       <PageHeader
         title={archivados ? "Procesos archivados" : "Procesos"}
         description="Los expedientes de la firma: su etapa, lo que vence y lo que falta del cliente."
-        action={!archivados ? <Button icon={<Plus size={16} />} onClick={() => setNuevo(true)}>Nuevo proceso</Button> : undefined}
+        action={!archivados && !consola ? <Button icon={<Plus size={16} />} onClick={() => setNuevo(true)}>Nuevo proceso</Button> : undefined}
       />
 
       <div className="mb-4">
@@ -231,7 +233,7 @@ export default function ProcesosPage() {
             { key: "todos", label: "Procesos activos", value: procesos ? conteo.todos : "—" },
             { key: "vencidas", label: "Con tareas vencidas", value: procesos ? conteo.vencidas : "—", tone: conteo.vencidas ? "danger" : "default" },
             { key: "cliente", label: "Esperando al cliente", value: procesos ? conteo.cliente : "—", tone: conteo.cliente ? "warning" : "default" },
-            { key: "colaboro", label: "Donde colabora", value: procesos ? conteo.colaboro : "—" },
+            ...(consola ? [] : [{ key: "colaboro", label: "Donde colabora", value: procesos ? conteo.colaboro : "—" }]),
           ]}
         />
       )}
@@ -259,7 +261,7 @@ export default function ProcesosPage() {
             onRefresh={() => void cargar()}
             emptyTitle={vacio[0]}
             emptyDescription={vacio[1]}
-            emptyAction={!archivados && filtro === "todos" ? <Button icon={<Plus size={16} />} onClick={() => setNuevo(true)}>Nuevo proceso</Button> : undefined}
+            emptyAction={!archivados && !consola && filtro === "todos" ? <Button icon={<Plus size={16} />} onClick={() => setNuevo(true)}>Nuevo proceso</Button> : undefined}
           />
         )}
       </div>

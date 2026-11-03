@@ -1,5 +1,6 @@
-﻿import AdminNotificationDeliveriesPage from "@/components/admin/console/AdminNotificationDeliveriesPage";
+import { redirect } from "next/navigation";
 
-export default function AdminNotificationDeliveriesRoute() {
-  return <AdminNotificationDeliveriesPage />;
+// Los envíos de avisos viven ahora en Operación.
+export default function EntregasRoute() {
+  redirect("/gestion-procesos/admin/operacion/notificaciones");
 }

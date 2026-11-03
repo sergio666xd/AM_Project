@@ -146,7 +146,7 @@ export function CambiarFechaModal({ solicitud, onClose, onGuardar }: {
   function enviar(evento: FormEvent) {
     evento.preventDefault();
     if (!valor) {
-      setError("Elige una fecha.");
+      setError("Falta la fecha.");
       return;
     }
     void guardar(valor, "guardar");

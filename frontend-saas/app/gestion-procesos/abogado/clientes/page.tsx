@@ -18,8 +18,8 @@ import { useAccionDeUrl } from "@/lib/useAccionDeUrl";
 import { useLoadEffect } from "@/lib/useLoadEffect";
 
 const VACIOS: Record<GrupoClientes, [string, string]> = {
-  todos: ["Aún no hay clientes", "Crea el primero; le enviamos su acceso al portal para que siga sus procesos."],
-  con_pendientes: ["Nadie debe documentos", "Cuando le pidas documentos a un cliente, aparece aquí hasta que los entregue."],
+  todos: ["Aún no hay clientes", "Al crear un cliente le enviamos su acceso al portal para que siga sus procesos."],
+  con_pendientes: ["Nadie debe documentos", "Un cliente al que se le piden documentos aparece aquí hasta que los entrega."],
   sin_ingreso: ["Todos ya entraron al portal", "Los clientes que no han usado su contraseña temporal aparecen aquí."],
   sin_procesos: ["Todos tienen procesos activos", "Los clientes sin un proceso activo aparecen aquí."],
 };

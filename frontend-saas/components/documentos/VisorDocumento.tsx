@@ -162,7 +162,7 @@ function VistaPrevia({ version }: { version: Version }) {
             <div>
               <FileText aria-hidden="true" className="mx-auto size-10 text-ink-3" strokeWidth={1.5} />
               <p className="mt-3 font-semibold text-ink">{tipoDeArchivo(version.tipo_archivo)}: no se puede ver aquí</p>
-              <p className="mt-1 text-[14px] text-ink-3">Descárgalo para abrirlo en tu computador.</p>
+              <p className="mt-1 text-[14px] text-ink-3">Este formato se abre al descargarlo.</p>
             </div>
           </div>
         ) : error ? (
@@ -235,7 +235,7 @@ function Revision({ archivo, onRevisado }: { archivo: Archivo; onRevisado: (arch
   return (
     <section aria-labelledby={`${id}-titulo`} className="rounded-xl bg-gold-soft/60 p-4 shadow-[inset_0_0_0_1px_var(--line)]">
       <h3 id={`${id}-titulo`} className="font-semibold text-ink">¿Sirve este documento?</h3>
-      <p className="mt-0.5 text-[13px] text-ink-2">El cliente recibe un aviso con tu respuesta.</p>
+      <p className="mt-0.5 text-[13px] text-ink-2">El cliente recibe un aviso con la respuesta.</p>
       {devolviendo ? (
         <div className="mt-3">
           <label htmlFor={`${id}-comentario`} className={ETIQUETA}>Qué debe corregir</label>

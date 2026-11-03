@@ -54,7 +54,7 @@ export function EditorPlantilla({ plantilla, abierto, onClose, onGuardada }: {
     const validos = pasos.filter((p) => p.titulo.trim());
     const nuevosErrores: Record<string, string> = {};
     if (!nombre.trim()) nuevosErrores.nombre = "Ponle un nombre a la plantilla.";
-    if (validos.length === 0) nuevosErrores.pasos = "Agrega al menos un paso.";
+    if (validos.length === 0) nuevosErrores.pasos = "Falta al menos un paso.";
     if (validos.some((p) => p.dias !== "" && !(Number(p.dias) >= 0 && Number(p.dias) <= 365))) nuevosErrores.pasos = "Los días hábiles van de 0 a 365.";
     if (Object.keys(nuevosErrores).length) {
       setErrores(nuevosErrores);

@@ -1,5 +1,6 @@
-import { SectorInventoryPage } from "@/components/admin/SectorInventoryPage";
+import { redirect } from "next/navigation";
 
-export default function AdminDocumentRequestsPage() {
-  return <SectorInventoryPage sector="FIRMA" />;
+// Las solicitudes son una vista de Documentos.
+export default function SolicitudesDocumentosRoute() {
+  redirect("/gestion-procesos/admin/documentos");
 }

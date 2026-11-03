@@ -99,6 +99,11 @@ export function proxy(request: NextRequest) {
     if (pathname === "/gestion-procesos/admin" || pathname.startsWith("/gestion-procesos/admin/")) {
       return redirectToPath(request, stripPrefix(pathname, "/gestion-procesos/admin"));
     }
+    // La consola reutiliza las vistas del expediente del abogado: sus enlaces
+    // internos llevan a la misma ruta corta dentro de la consola.
+    if (pathname === "/gestion-procesos/abogado" || pathname.startsWith("/gestion-procesos/abogado/")) {
+      return redirectToPath(request, stripPrefix(pathname, "/gestion-procesos/abogado"));
+    }
     if (pathname.startsWith("/gestion-procesos/")) return NextResponse.next();
     return rewrite(request, `/gestion-procesos/admin${pathname}`);
   }

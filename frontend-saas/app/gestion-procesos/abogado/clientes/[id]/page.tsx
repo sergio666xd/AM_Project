@@ -170,7 +170,7 @@ export default function FichaClientePage() {
           </Seccion>
 
           {ficha.expedientes.length > 0 && (
-            <Seccion titulo="Lo que le has contado" descripcion="Los últimos avisos de actuaciones que le enviaste.">
+            <Seccion titulo="Lo que se le ha contado" descripcion="Los últimos avisos de actuaciones que le enviaste.">
               {ficha.avisos.length ? (
                 <ul className="divide-y divide-line">
                   {ficha.avisos.map((a, i) => (
@@ -184,7 +184,7 @@ export default function FichaClientePage() {
                   ))}
                 </ul>
               ) : (
-                <Vacio>Aún no le has avisado de ninguna actuación. Desde los folios del expediente, «Avisar al cliente» le explica qué pasó.</Vacio>
+                <Vacio>Aún no se le ha avisado de ninguna actuación. Desde los folios del expediente, «Avisar al cliente» le explica qué pasó.</Vacio>
               )}
             </Seccion>
           )}
