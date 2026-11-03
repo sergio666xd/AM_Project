@@ -4,11 +4,11 @@ import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { ArrowLeft, RefreshCw } from "lucide-react";
 
-import ProcessContracts from "@/components/contracts/ProcessContracts";
 import { DocumentosProceso } from "@/components/documentos/DocumentosProceso";
 import { CabeceraExpediente } from "@/components/expediente/CabeceraExpediente";
 import { FoliosExpediente } from "@/components/expediente/FoliosExpediente";
 import { PanelAgenda } from "@/components/expediente/PanelAgenda";
+import { PanelContratos } from "@/components/contratos/PanelContratos";
 import { PanelChat } from "@/components/expediente/PanelChat";
 import { PanelEquipo } from "@/components/expediente/PanelEquipo";
 import { PanelRelaciones } from "@/components/expediente/PanelRelaciones";
@@ -156,16 +156,7 @@ export function Expediente({ procesoId, section }: { procesoId: number; section?
               {activa === "agenda" && <PanelAgenda procesoId={procesoId} clientes={clientes} archivado={Boolean(proceso.archivado_en)} />}
               {activa === "tareas" && <PanelTareas procesoId={procesoId} />}
               {activa === "documentos" && <div className="p-4 sm:p-5"><DocumentosProceso procesoId={procesoId} hayClientes={clientes.length > 0} onCambio={recargar} /></div>}
-              {activa === "contratos" && (
-                <div className="p-4 sm:p-5">
-                  <ProcessContracts
-                    processId={procesoId}
-                    clients={clientes.map((c) => ({ id: c.id, nombre_completo: c.nombre, email: c.email, whatsapp_numero: c.whatsapp ?? undefined }))}
-                    onChange={async () => recargar()}
-                    initialContractId={ubicacion.contrato}
-                  />
-                </div>
-              )}
+              {activa === "contratos" && <PanelContratos procesoId={procesoId} contratoInicial={ubicacion.contrato} onCambio={recargar} />}
               {activa === "cobros" && <div className="p-4 sm:p-5"><CobrosProceso procesoId={procesoId} clienteUnico={clientes.length === 1 ? clientes[0].id : undefined} /></div>}
               {activa === "comunicaciones" && <PanelChat procesoId={procesoId} clientes={clientes} />}
               {activa === "equipo" && <PanelEquipo procesoId={procesoId} onCambio={recargar} />}

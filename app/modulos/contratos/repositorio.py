@@ -1,9 +1,11 @@
 from sqlalchemy import ColumnElement, select
 from sqlalchemy.orm import Session, selectinload
 
+from app.models import EntregaCorreoContrato, EventoAgenda
 from app.modulos.contratos.modelos import ContratoServicio
 from app.modulos.documentos.modelos import DocumentoProceso
 from app.modulos.expedientes.modelos import Proceso, ProcesoCliente
+from app.modulos.identidad.modelos import RolUsuario, Usuario
 
 
 class RepositorioContratos:
@@ -40,3 +42,44 @@ class RepositorioContratos:
             .options(selectinload(Proceso.abogado), selectinload(Proceso.clientes).selectinload(ProcesoCliente.cliente))
             .order_by(Proceso.created_at.desc(), Proceso.id.desc())
         ).all())
+
+    def proceso(self, proceso_id: int, visibles: ColumnElement[bool]) -> Proceso | None:
+        return self._db.scalar(
+            select(Proceso).where(Proceso.id == proceso_id, visibles)
+            .options(selectinload(Proceso.abogado), selectinload(Proceso.clientes).selectinload(ProcesoCliente.cliente))
+        )
+
+    def contratos_del_proceso(self, proceso_id: int) -> list[ContratoServicio]:
+        C = ContratoServicio
+        return list(self._db.scalars(
+            select(C).where(C.proceso_id == proceso_id)
+            .options(selectinload(C.proceso), selectinload(C.cliente), selectinload(C.versiones))
+            .order_by(C.created_at.desc(), C.id.desc())
+        ).all())
+
+    def cliente_del_proceso(self, proceso_id: int, cliente_id: int) -> Usuario | None:
+        return self._db.scalar(
+            select(Usuario).join(ProcesoCliente, ProcesoCliente.cliente_id == Usuario.id)
+            .where(ProcesoCliente.proceso_id == proceso_id, Usuario.id == cliente_id, Usuario.rol == RolUsuario.CLIENTE)
+        )
+
+    def firmas(self, contrato_ids: list[int], *, para_cambiar: bool = False) -> dict[int, list[EventoAgenda]]:
+        """Las citas de firma no canceladas de cada contrato."""
+        if not contrato_ids:
+            return {}
+        consulta = select(EventoAgenda).where(
+            EventoAgenda.contrato_id.in_(contrato_ids), EventoAgenda.tipo == "FIRMA_CONTRATO", EventoAgenda.estado != "CANCELADO",
+        ).order_by(EventoAgenda.fecha_inicio.desc(), EventoAgenda.id.desc())
+        if para_cambiar:
+            consulta = consulta.with_for_update()
+        resultado: dict[int, list[EventoAgenda]] = {i: [] for i in contrato_ids}
+        for evento in self._db.scalars(consulta).all():
+            resultado[evento.contrato_id].append(evento)
+        return resultado
+
+    def ultimas_entregas(self, contrato_ids: list[int]) -> dict[int, EntregaCorreoContrato]:
+        if not contrato_ids:
+            return {}
+        E = EntregaCorreoContrato
+        entregas = self._db.scalars(select(E).where(E.contrato_id.in_(contrato_ids)).order_by(E.created_at, E.id)).all()
+        return {e.contrato_id: e for e in entregas}

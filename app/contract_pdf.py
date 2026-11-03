@@ -169,7 +169,7 @@ def validate_contract_fields(raw: dict[str, str], *, require_complete: bool = Tr
             "abogado_tarjeta", "abogado_correo", "abogado_telefono", "abogado_domicilio",
         ):
             if not fields[required]:
-                raise ValueError(f"Completa el campo {FIELD_LABELS[required].lower()}.")
+                raise ValueError(f"Complete el campo {FIELD_LABELS[required].lower()}.")
     return fields
 
 
