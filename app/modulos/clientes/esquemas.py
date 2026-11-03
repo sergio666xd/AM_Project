@@ -117,3 +117,29 @@ class NuevoCliente(DatosCliente):
 class AccesoEnviado(BaseModel):
     canal: Canal
     destino: str = Field(description="Correo o WhatsApp al que se envió.")
+
+
+class DiferenciaPerfil(BaseModel):
+    campo: Literal["nombre", "correo", "whatsapp", "documento", "genero", "domicilio", "direccion"]
+    etiqueta: str
+    antes: str | None
+    despues: str | None
+
+
+class CambioPerfil(BaseModel):
+    """Lo que un cliente pidió corregir en sus datos, frente a lo que tiene hoy."""
+
+    id: int
+    cliente_id: int
+    cliente: str
+    solicitada_en: FechaHora
+    procesos: list[ProcesoBreve]
+    diferencias: list[DiferenciaPerfil] = Field(description="Solo los datos que cambian.")
+
+
+class CambiosPerfil(BaseModel):
+    items: list[CambioPerfil]
+
+
+class RevisionCambio(BaseModel):
+    comentario: str | None = Field(default=None, max_length=1000, description="Se le muestra al cliente. Obligatorio al rechazar.")

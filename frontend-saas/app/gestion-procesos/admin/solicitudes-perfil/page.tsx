@@ -1,5 +1,7 @@
-import ClientProfileRequestsReviewPage from "@/components/client/ClientProfileRequestsReviewPage";
+"use client";
 
-export default function AdminProfileRequestsRoute() {
-  return <ClientProfileRequestsReviewPage />;
+import { CambiosPerfil } from "@/components/clientes/CambiosPerfil";
+
+export default function CambiosPerfilAdminPage() {
+  return <CambiosPerfil trato="usted" rutaProceso={(id) => `/gestion-procesos/admin/procesos/${id}`} />;
 }
