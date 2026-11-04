@@ -5,6 +5,7 @@ from app.nucleo.zona_horaria import FechaHora
 
 class Aviso(BaseModel):
     id: str = Field(description="Identificador estable del aviso; sirve para marcarlo como leído.")
+    categoria: str = Field(description="proceso, tarea, documento, solicitud, radicado, evento, mensaje, cliente o sistema.")
     titulo: str
     detalle: str | None = None
     proceso: str | None = Field(None, description="Nombre del proceso relacionado, si lo hay.")

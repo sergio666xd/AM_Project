@@ -1,9 +1,16 @@
-from fastapi import APIRouter, Depends, File, UploadFile, status
+from datetime import date
+from urllib.parse import quote
+
+from fastapi import APIRouter, Depends, File, Query, UploadFile, status
+from fastapi.responses import StreamingResponse
 
 from app import models
-from app.api.v2.dependencias import servicio_perfil_cliente, servicio_portal_cliente
+from app.api.v2.dependencias import servicio_agenda, servicio_perfil_cliente, servicio_portal_cliente
+from app.modulos.agenda.esquemas import Agenda
+from app.modulos.agenda.servicio import ServicioAgenda
 from app.document_validation import MAX_DOCUMENT_BYTES
 from app.modulos.portal_cliente.esquemas import (
+    DocumentosCliente,
     CambioAvisos,
     DatosCambio,
     GrupoAvisos,
@@ -15,6 +22,7 @@ from app.modulos.portal_cliente.esquemas import (
     ProcesoCliente,
     SolicitudCambio,
 )
+from app.modulos.documentos.servicio import VISTA_PREVIA
 from app.modulos.portal_cliente.perfil import ServicioPerfilCliente
 from app.modulos.portal_cliente.servicio import ServicioPortalCliente
 from app.nucleo.paginacion import ParametrosPagina, parametros_pagina
@@ -140,3 +148,49 @@ def pedir_cambio_datos(
 ):
     """Los datos del contrato cambian cuando la firma aprueba la solicitud."""
     return servicio.pedir_cambio(usuario, datos)
+
+
+@router.get("/agenda", response_model=Agenda, summary="Calendario del cliente")
+def agenda_del_cliente(
+    desde: date = Query(...),
+    hasta: date = Query(..., description="Inclusive. Como máximo 200 días después de «desde»."),
+    usuario: models.Usuario = Depends(usuario_actual),
+    servicio: ServicioAgenda = Depends(servicio_agenda),
+):
+    """Audiencias, reuniones y firmas de sus procesos activos, y las fechas de lo que la firma le pidió."""
+    return servicio.agenda_cliente(usuario, desde, hasta)
+
+
+@router.get("/documentos", response_model=DocumentosCliente, summary="Documentos del cliente")
+def documentos_del_cliente(
+    usuario: models.Usuario = Depends(usuario_actual),
+    servicio: ServicioPortalCliente = Depends(servicio_portal_cliente),
+):
+    """Lo que envió, lo que la firma le compartió y sus contratos firmados, en todos sus procesos activos."""
+    return servicio.documentos(usuario)
+
+
+@router.get(
+    "/documentos/{documento_id}/archivo",
+    response_class=StreamingResponse,
+    responses={200: {"content": {"application/octet-stream": {}}, "description": "El archivo."}},
+    summary="Ver o descargar un documento",
+)
+def archivo_del_cliente(
+    documento_id: int,
+    descargar: bool = Query(True, description="false lo muestra en el navegador si es PDF o imagen."),
+    usuario: models.Usuario = Depends(usuario_actual),
+    servicio: ServicioPortalCliente = Depends(servicio_portal_cliente),
+):
+    cuerpo, documento = servicio.contenido(usuario, documento_id)
+    en_linea = not descargar and documento.mime_type in VISTA_PREVIA
+    nombre = quote(documento.nombre_archivo, safe="")
+    return StreamingResponse(
+        cuerpo,
+        media_type=documento.mime_type or "application/octet-stream",
+        headers={
+            "Content-Disposition": f"{'inline' if en_linea else 'attachment'}; filename*=UTF-8''{nombre}",
+            "Cache-Control": "private, no-store",
+            "X-Content-Type-Options": "nosniff",
+        },
+    )
