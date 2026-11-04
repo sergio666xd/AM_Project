@@ -15,11 +15,16 @@ SaaS, con la confirmación de la firma:
 No se puede deshacer: `downgrade` vuelve a crear las tablas y la columna,
 vacías, pero no recupera los datos.
 
+No corre en los despliegues de vista previa de Vercel (`VERCEL_ENV=preview`):
+allí la revisión falla a propósito, la transacción se revierte y la API arranca
+igual. Así un PR abierto nunca borra datos; solo lo hace producción al fusionar.
+
 Revision ID: 0016
 Revises: 0015
 Create Date: 2026-11-04
 '''
 import logging
+import os
 from typing import Sequence, Union
 
 from alembic import op
@@ -255,6 +260,8 @@ class _Borrado:
 
 
 def upgrade() -> None:
+    if os.getenv("VERCEL_ENV") == "preview":
+        raise RuntimeError("El retiro del SaaS borra datos y solo se aplica en producción, no en una vista previa.")
     conexion = op.get_bind()
     inspector = sa.inspect(conexion)
 

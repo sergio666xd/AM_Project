@@ -1,5 +1,6 @@
 """Revisión 0016: el retiro del antiguo portal SaaS."""
 
+import pytest
 from sqlalchemy import create_engine, inspect, text
 
 from app import models
@@ -124,3 +125,19 @@ def test_sin_datos_del_saas_solo_retira_las_tablas(tmp_path):
     with engine.connect() as conexion:
         assert {fila[0] for fila in conexion.execute(text("SELECT id FROM usuarios"))} == {1, 2}
     assert "planes" not in inspect(engine).get_table_names()
+
+
+def test_no_se_aplica_en_una_vista_previa_de_vercel(tmp_path, monkeypatch):
+    engine = create_engine(f"sqlite:///{tmp_path / 'vista.db'}")
+    _base_en_0015(engine)
+    with engine.begin() as conexion:
+        _usuario(conexion, 1, "ABOGADO")
+    monkeypatch.setenv("VERCEL_ENV", "preview")
+
+    with pytest.raises(RuntimeError, match="solo se aplica en producción"):
+        aplicar_migraciones(engine)
+
+    with engine.connect() as conexion:
+        assert conexion.execute(text("SELECT version_num FROM alembic_version")).scalar() == "0015"
+        assert conexion.execute(text("SELECT COUNT(*) FROM usuarios")).scalar() == 1
+    assert "planes" in inspect(engine).get_table_names()
