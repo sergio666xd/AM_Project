@@ -32,6 +32,8 @@ from app.modulos.operacion.envios import ServicioEnvios
 from app.modulos.operacion.integraciones import ServicioIntegraciones
 from app.modulos.operacion.plantillas import ServicioPlantillas
 from app.modulos.operacion.repositorio import RepositorioOperacion
+from app.modulos.radicados.repositorio import RepositorioRadicados
+from app.modulos.radicados.servicio import ServicioRadicados
 from app.modulos.sistema.actividad import ServicioActividad
 from app.modulos.sistema.almacenamiento import ServicioAlmacenamiento
 from app.modulos.sistema.carga import ServicioCarga
@@ -167,3 +169,7 @@ def servicio_limpieza_chats(db: Session = Depends(obtener_bd)) -> ServicioLimpie
 
 def servicio_sitio(db: Session = Depends(obtener_bd)) -> ServicioSitio:
     return ServicioSitio(db, RepositorioSitio(db))
+
+
+def servicio_radicados(db: Session = Depends(obtener_bd)) -> ServicioRadicados:
+    return ServicioRadicados(db, RepositorioRadicados(db))

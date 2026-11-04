@@ -2342,6 +2342,297 @@
         }
       }
     },
+    "/api/v2/radicados": {
+      "get": {
+        "tags": [
+          "Radicados"
+        ],
+        "summary": "Radicados de la firma",
+        "description": "Los radicados de los procesos que usted ve, con su última actuación, sus novedades sin revisar y\ncómo terminó la última consulta a la Rama Judicial. Del más reciente movimiento al más antiguo.",
+        "operationId": "listar_radicados",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ListaRadicados"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too Many Requests",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v2/radicados/{radicado_id}": {
+      "get": {
+        "tags": [
+          "Radicados"
+        ],
+        "summary": "Un radicado con sus actuaciones",
+        "description": "Todas las actuaciones del radicado; las que usted aún no revisa vienen con `nueva`.",
+        "operationId": "obtener_radicado_detalle",
+        "parameters": [
+          {
+            "name": "radicado_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Radicado Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RadicadoDetalle"
+                }
+              }
+            }
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Too Many Requests"
+          }
+        }
+      }
+    },
+    "/api/v2/radicados/{radicado_id}/revisado": {
+      "post": {
+        "tags": [
+          "Radicados"
+        ],
+        "summary": "Marcar las novedades como revisadas",
+        "description": "Quita el aviso de actuaciones nuevas de este radicado para usted.",
+        "operationId": "marcar_radicado_revisado",
+        "parameters": [
+          {
+            "name": "radicado_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Radicado Id"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Too Many Requests"
+          }
+        }
+      }
+    },
     "/api/v2/procesos/{proceso_id}/folios": {
       "get": {
         "tags": [
@@ -19140,6 +19431,130 @@
         ],
         "title": "ActuacionBreve"
       },
+      "ActuacionDelRadicado": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "orden": {
+            "type": "integer",
+            "title": "Orden"
+          },
+          "fecha": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fecha"
+          },
+          "actuacion": {
+            "type": "string",
+            "title": "Actuacion"
+          },
+          "anotacion": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Anotacion"
+          },
+          "inicia_termino": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Inicia Termino"
+          },
+          "finaliza_termino": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Finaliza Termino"
+          },
+          "registrada": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Registrada"
+          },
+          "fijacion": {
+            "type": "boolean",
+            "title": "Fijacion",
+            "description": "Se notificó por estado (fijación)."
+          },
+          "nueva": {
+            "type": "boolean",
+            "title": "Nueva",
+            "description": "Llegó en una consulta que usted no había revisado."
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "orden",
+          "actuacion",
+          "fijacion",
+          "nueva"
+        ],
+        "title": "ActuacionDelRadicado"
+      },
+      "ActuacionResumen": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "texto": {
+            "type": "string",
+            "title": "Texto"
+          },
+          "fecha": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fecha"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "texto"
+        ],
+        "title": "ActuacionResumen"
+      },
       "Agenda": {
         "properties": {
           "desde": {
@@ -21569,6 +21984,57 @@
           "confirmacion"
         ],
         "title": "ConfirmacionVaciado"
+      },
+      "ConsultaRadicado": {
+        "properties": {
+          "estado": {
+            "type": "string",
+            "enum": [
+              "consultado",
+              "sin_consultar",
+              "consultando",
+              "no_encontrado",
+              "privado",
+              "error"
+            ],
+            "title": "Estado"
+          },
+          "etiqueta": {
+            "type": "string",
+            "title": "Etiqueta",
+            "description": "El estado en palabras, para mostrarlo tal cual."
+          },
+          "detalle": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Detalle",
+            "description": "Qué falló, cuando la consulta terminó en error."
+          },
+          "consultado_en": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Consultado En",
+            "description": "Última consulta, en hora de Bogotá (ISO sin zona)."
+          }
+        },
+        "type": "object",
+        "required": [
+          "estado",
+          "etiqueta"
+        ],
+        "title": "ConsultaRadicado"
       },
       "Contacto": {
         "properties": {
@@ -25895,6 +26361,26 @@
         ],
         "title": "ListaPlantillasEtapas"
       },
+      "ListaRadicados": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/RadicadoFila"
+            },
+            "type": "array",
+            "title": "Items"
+          },
+          "resumen": {
+            "$ref": "#/components/schemas/ResumenRadicados"
+          }
+        },
+        "type": "object",
+        "required": [
+          "items",
+          "resumen"
+        ],
+        "title": "ListaRadicados"
+      },
       "ListaSinContrato": {
         "properties": {
           "items": {
@@ -28471,6 +28957,29 @@
         ],
         "title": "ProcesoDelFolio"
       },
+      "ProcesoDelRadicado": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "nombre": {
+            "type": "string",
+            "title": "Nombre"
+          },
+          "archivado": {
+            "type": "boolean",
+            "title": "Archivado"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "nombre",
+          "archivado"
+        ],
+        "title": "ProcesoDelRadicado"
+      },
       "ProcesoDelUsuario": {
         "properties": {
           "id": {
@@ -29023,6 +29532,191 @@
           "actuaciones"
         ],
         "title": "RadicadoDelProceso"
+      },
+      "RadicadoDetalle": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "numero": {
+            "type": "string",
+            "title": "Numero"
+          },
+          "despacho": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Despacho"
+          },
+          "demandante": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Demandante"
+          },
+          "demandado": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Demandado"
+          },
+          "consulta": {
+            "$ref": "#/components/schemas/ConsultaRadicado"
+          },
+          "procesos": {
+            "items": {
+              "$ref": "#/components/schemas/ProcesoDelRadicado"
+            },
+            "type": "array",
+            "title": "Procesos",
+            "description": "Procesos de la firma que siguen este radicado y usted puede ver."
+          },
+          "ultima_actuacion": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ActuacionResumen"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "total_actuaciones": {
+            "type": "integer",
+            "title": "Total Actuaciones"
+          },
+          "novedades": {
+            "type": "integer",
+            "title": "Novedades",
+            "description": "Actuaciones nuevas que usted aún no revisa."
+          },
+          "actuaciones": {
+            "items": {
+              "$ref": "#/components/schemas/ActuacionDelRadicado"
+            },
+            "type": "array",
+            "title": "Actuaciones",
+            "description": "De la más reciente a la más antigua."
+          },
+          "puede_consultar": {
+            "type": "boolean",
+            "title": "Puede Consultar",
+            "description": "Puede pedir una consulta inmediata (solo la administración)."
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "numero",
+          "consulta",
+          "procesos",
+          "total_actuaciones",
+          "novedades",
+          "actuaciones",
+          "puede_consultar"
+        ],
+        "title": "RadicadoDetalle"
+      },
+      "RadicadoFila": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "numero": {
+            "type": "string",
+            "title": "Numero"
+          },
+          "despacho": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Despacho"
+          },
+          "demandante": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Demandante"
+          },
+          "demandado": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Demandado"
+          },
+          "consulta": {
+            "$ref": "#/components/schemas/ConsultaRadicado"
+          },
+          "procesos": {
+            "items": {
+              "$ref": "#/components/schemas/ProcesoDelRadicado"
+            },
+            "type": "array",
+            "title": "Procesos",
+            "description": "Procesos de la firma que siguen este radicado y usted puede ver."
+          },
+          "ultima_actuacion": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ActuacionResumen"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "total_actuaciones": {
+            "type": "integer",
+            "title": "Total Actuaciones"
+          },
+          "novedades": {
+            "type": "integer",
+            "title": "Novedades",
+            "description": "Actuaciones nuevas que usted aún no revisa."
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "numero",
+          "consulta",
+          "procesos",
+          "total_actuaciones",
+          "novedades"
+        ],
+        "title": "RadicadoFila"
       },
       "Recordatorio": {
         "properties": {
@@ -29797,6 +30491,35 @@
           "ultima"
         ],
         "title": "ResumenProcesoCliente"
+      },
+      "ResumenRadicados": {
+        "properties": {
+          "total": {
+            "type": "integer",
+            "title": "Total"
+          },
+          "con_novedades": {
+            "type": "integer",
+            "title": "Con Novedades"
+          },
+          "con_problemas": {
+            "type": "integer",
+            "title": "Con Problemas",
+            "description": "No encontrados en la Rama Judicial o con error en la última consulta."
+          },
+          "sin_consultar": {
+            "type": "integer",
+            "title": "Sin Consultar"
+          }
+        },
+        "type": "object",
+        "required": [
+          "total",
+          "con_novedades",
+          "con_problemas",
+          "sin_consultar"
+        ],
+        "title": "ResumenRadicados"
       },
       "ResumenTareas": {
         "properties": {

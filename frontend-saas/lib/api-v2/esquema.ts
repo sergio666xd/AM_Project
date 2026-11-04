@@ -322,6 +322,67 @@ export interface paths {
         patch: operations["cambiar_miembro_del_equipo"];
         trace?: never;
     };
+    "/api/v2/radicados": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Radicados de la firma
+         * @description Los radicados de los procesos que usted ve, con su última actuación, sus novedades sin revisar y
+         *     cómo terminó la última consulta a la Rama Judicial. Del más reciente movimiento al más antiguo.
+         */
+        get: operations["listar_radicados"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v2/radicados/{radicado_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Un radicado con sus actuaciones
+         * @description Todas las actuaciones del radicado; las que usted aún no revisa vienen con `nueva`.
+         */
+        get: operations["obtener_radicado_detalle"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v2/radicados/{radicado_id}/revisado": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Marcar las novedades como revisadas
+         * @description Quita el aviso de actuaciones nuevas de este radicado para usted.
+         */
+        post: operations["marcar_radicado_revisado"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v2/procesos/{proceso_id}/folios": {
         parameters: {
             query?: never;
@@ -2747,6 +2808,44 @@ export interface components {
             /** Fecha */
             fecha?: string | null;
         };
+        /** ActuacionDelRadicado */
+        ActuacionDelRadicado: {
+            /** Id */
+            id: number;
+            /** Orden */
+            orden: number;
+            /** Fecha */
+            fecha?: string | null;
+            /** Actuacion */
+            actuacion: string;
+            /** Anotacion */
+            anotacion?: string | null;
+            /** Inicia Termino */
+            inicia_termino?: string | null;
+            /** Finaliza Termino */
+            finaliza_termino?: string | null;
+            /** Registrada */
+            registrada?: string | null;
+            /**
+             * Fijacion
+             * @description Se notificó por estado (fijación).
+             */
+            fijacion: boolean;
+            /**
+             * Nueva
+             * @description Llegó en una consulta que usted no había revisado.
+             */
+            nueva: boolean;
+        };
+        /** ActuacionResumen */
+        ActuacionResumen: {
+            /** Id */
+            id: number;
+            /** Texto */
+            texto: string;
+            /** Fecha */
+            fecha?: string | null;
+        };
         /** Agenda */
         Agenda: {
             /**
@@ -3640,6 +3739,29 @@ export interface components {
              * @constant
              */
             confirmacion: "VACIAR";
+        };
+        /** ConsultaRadicado */
+        ConsultaRadicado: {
+            /**
+             * Estado
+             * @enum {string}
+             */
+            estado: "consultado" | "sin_consultar" | "consultando" | "no_encontrado" | "privado" | "error";
+            /**
+             * Etiqueta
+             * @description El estado en palabras, para mostrarlo tal cual.
+             */
+            etiqueta: string;
+            /**
+             * Detalle
+             * @description Qué falló, cuando la consulta terminó en error.
+             */
+            detalle?: string | null;
+            /**
+             * Consultado En
+             * @description Última consulta, en hora de Bogotá (ISO sin zona).
+             */
+            consultado_en?: string | null;
         };
         /** Contacto */
         Contacto: {
@@ -5382,6 +5504,12 @@ export interface components {
             /** Items */
             items: components["schemas"]["PlantillaDeEtapas"][];
         };
+        /** ListaRadicados */
+        ListaRadicados: {
+            /** Items */
+            items: components["schemas"]["RadicadoFila"][];
+            resumen: components["schemas"]["ResumenRadicados"];
+        };
         /** ListaSinContrato */
         ListaSinContrato: {
             /** Items */
@@ -6339,6 +6467,15 @@ export interface components {
             /** Nombre */
             nombre: string;
         };
+        /** ProcesoDelRadicado */
+        ProcesoDelRadicado: {
+            /** Id */
+            id: number;
+            /** Nombre */
+            nombre: string;
+            /** Archivado */
+            archivado: boolean;
+        };
         /** ProcesoDelUsuario */
         ProcesoDelUsuario: {
             /** Id */
@@ -6541,6 +6678,70 @@ export interface components {
              * @description Las 5 más recientes, de la más nueva a la más antigua.
              */
             actuaciones: components["schemas"]["ActuacionBreve"][];
+        };
+        /** RadicadoDetalle */
+        RadicadoDetalle: {
+            /** Id */
+            id: number;
+            /** Numero */
+            numero: string;
+            /** Despacho */
+            despacho?: string | null;
+            /** Demandante */
+            demandante?: string | null;
+            /** Demandado */
+            demandado?: string | null;
+            consulta: components["schemas"]["ConsultaRadicado"];
+            /**
+             * Procesos
+             * @description Procesos de la firma que siguen este radicado y usted puede ver.
+             */
+            procesos: components["schemas"]["ProcesoDelRadicado"][];
+            ultima_actuacion?: components["schemas"]["ActuacionResumen"] | null;
+            /** Total Actuaciones */
+            total_actuaciones: number;
+            /**
+             * Novedades
+             * @description Actuaciones nuevas que usted aún no revisa.
+             */
+            novedades: number;
+            /**
+             * Actuaciones
+             * @description De la más reciente a la más antigua.
+             */
+            actuaciones: components["schemas"]["ActuacionDelRadicado"][];
+            /**
+             * Puede Consultar
+             * @description Puede pedir una consulta inmediata (solo la administración).
+             */
+            puede_consultar: boolean;
+        };
+        /** RadicadoFila */
+        RadicadoFila: {
+            /** Id */
+            id: number;
+            /** Numero */
+            numero: string;
+            /** Despacho */
+            despacho?: string | null;
+            /** Demandante */
+            demandante?: string | null;
+            /** Demandado */
+            demandado?: string | null;
+            consulta: components["schemas"]["ConsultaRadicado"];
+            /**
+             * Procesos
+             * @description Procesos de la firma que siguen este radicado y usted puede ver.
+             */
+            procesos: components["schemas"]["ProcesoDelRadicado"][];
+            ultima_actuacion?: components["schemas"]["ActuacionResumen"] | null;
+            /** Total Actuaciones */
+            total_actuaciones: number;
+            /**
+             * Novedades
+             * @description Actuaciones nuevas que usted aún no revisa.
+             */
+            novedades: number;
         };
         /** Recordatorio */
         Recordatorio: {
@@ -6857,6 +7058,20 @@ export interface components {
             /** Nuevos */
             nuevos: number;
             ultima: components["schemas"]["EntradaHistoria"] | null;
+        };
+        /** ResumenRadicados */
+        ResumenRadicados: {
+            /** Total */
+            total: number;
+            /** Con Novedades */
+            con_novedades: number;
+            /**
+             * Con Problemas
+             * @description No encontrados en la Rama Judicial o con error en la última consulta.
+             */
+            con_problemas: number;
+            /** Sin Consultar */
+            sin_consultar: number;
         };
         /** ResumenTareas */
         ResumenTareas: {
@@ -9259,6 +9474,257 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["EquipoProceso"];
                 };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+        };
+    };
+    listar_radicados: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ListaRadicados"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+        };
+    };
+    obtener_radicado_detalle: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                radicado_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RadicadoDetalle"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+        };
+    };
+    marcar_radicado_revisado: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                radicado_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
             /** @description Bad Request */
             400: {

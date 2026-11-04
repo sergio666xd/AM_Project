@@ -78,6 +78,7 @@ function labelFor(segment: string, anterior?: string, antes?: string) {
   const enSeccion = anterior ? labelsEnSeccion[`${anterior}/${segment}`] : undefined;
   if (enSeccion) return enSeccion;
   if (antes === "procesos" && anterior && /^\d+$/.test(anterior) && seccionesExpediente[segment]) return seccionesExpediente[segment];
+  if (anterior === "radicados" && /^\d+$/.test(segment)) return "Radicado";
   if (/^\d+$/.test(segment) || /^[0-9a-f-]{16,}$/i.test(segment)) return "Detalle";
   return labels[segment] ?? decodeURIComponent(segment).replace(/-/g, " ");
 }
