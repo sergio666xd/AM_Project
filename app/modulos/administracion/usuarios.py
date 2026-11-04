@@ -202,7 +202,6 @@ class ServicioUsuariosAdmin:
             ),
             tipo="ACCESO",
             origen=f"USUARIO:{cuenta.id}:ACCESO",
-            emisor=admin,
             # La contraseña temporal solo viaja por correo.
             incluir_email=True,
             plantilla_clave="CLIENTE_CREDENCIALES" if cliente else "ABOGADO_CREDENCIALES",
@@ -252,7 +251,6 @@ class ServicioUsuariosAdmin:
                     campos={"rol": "Cree una cuenta nueva con el rol que necesita."},
                 )
             cuenta.rol = rol_nuevo
-            cuenta.plan_id = None
             cuenta.canal_notificacion_cliente = "EMAIL" if rol_nuevo == RolUsuario.CLIENTE else None
             if rol_nuevo != RolUsuario.CLIENTE:
                 cuenta.creado_por_abogado_id = None

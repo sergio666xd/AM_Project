@@ -48,7 +48,7 @@ def notificar_cambio(db: Session, tarea: models.Tarea, actor: models.Usuario, ac
         )
         emitir_notificacion_workflow(
             db, destinatario, "TAREAS", f"TAREA_ACCION:{tarea.id}:{utc_ahora().timestamp()}",
-            f"{accion.capitalize()}: {tarea.titulo}", cuerpo, emisor=actor, incluir_email=True,
+            f"{accion.capitalize()}: {tarea.titulo}", cuerpo, incluir_email=True,
             plantilla_clave="TAREA_ACCION",
             variables={"nombre": destinatario.nombre_completo, "actor": actor.nombre_completo,
                        "accion": accion, "tarea": tarea.titulo, "detalle": detalle,
@@ -70,7 +70,7 @@ def notificar_subtarea_asignada(db: Session, subtarea: models.Subtarea, actor: m
     emitir_notificacion_workflow(
         db, cliente, "SUBTAREAS", f"SUBTAREA:{subtarea.id}:{cliente.id}", "Nueva subtarea asignada",
         f"{actor.nombre_completo} le ha asignado la subtarea: {subtarea.titulo}.\nAbrir tarea: {enlace}",
-        emisor=actor, plantilla_clave="SUBTAREA_ASIGNADA",
+        plantilla_clave="SUBTAREA_ASIGNADA",
         variables={"nombre": cliente.nombre_completo, "actor": actor.nombre_completo,
                    "subtarea": subtarea.titulo, "tarea": tarea.titulo if tarea else ""},
         enlace_texto="Ver tarea", enlace_url=enlace,

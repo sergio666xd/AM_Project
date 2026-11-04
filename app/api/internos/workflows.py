@@ -177,13 +177,12 @@ def _obtener_id_actuacion(
 def _agregar_actuaciones_a_grupo(
     grupos: dict,
     usuario: models.Usuario,
-    emisor: models.Usuario | None,
     radicado: models.Radicado,
     proceso: models.Proceso | None,
     actuaciones: list[dict],
     db: Session,
 ) -> None:
-    for canal in canales_habilitados(usuario, "ACTUACIONES", emisor=emisor, db=db):
+    for canal in canales_habilitados(usuario, "ACTUACIONES", db=db):
         clave = (usuario.id, canal)
         grupo = grupos.setdefault(clave, {"usuario": usuario, "canal": canal, "secciones": {}})
         proceso_id = proceso.id if proceso else None
@@ -379,7 +378,7 @@ def preparar_notificaciones_actuaciones(
             )
         for lawyer in lawyers:
             if (
-                not canales_habilitados(lawyer, "ACTUACIONES", emisor=lawyer, db=db)
+                not canales_habilitados(lawyer, "ACTUACIONES", db=db)
                 and not db.query(models.ChatPushSubscription.id).filter_by(usuario_id=lawyer.id).first()
             ):
                 # Sin correo, WhatsApp ni Push el aviso queda registrado como omitido,
@@ -397,7 +396,6 @@ def preparar_notificaciones_actuaciones(
                     f"ACTUACIONES:{ejecucion.id}:{radicado.id}",
                     "Novedades judiciales",
                     omitida,
-                    emisor=lawyer,
                     iniciar_workflow=False,
                     actuacion_ids=[actuacion["id"] for actuacion in nuevas],
                     plantilla_clave="ACTUACIONES_DIGEST",
@@ -411,7 +409,6 @@ def preparar_notificaciones_actuaciones(
                     _agregar_actuaciones_a_grupo(
                         grupos,
                         lawyer,
-                        lawyer,
                         radicado,
                         proceso,
                         nuevas,
@@ -423,7 +420,6 @@ def preparar_notificaciones_actuaciones(
                 _agregar_actuaciones_a_grupo(
                     grupos,
                     lawyer,
-                    lawyer,
                     radicado,
                     None,
                     nuevas,
@@ -433,7 +429,7 @@ def preparar_notificaciones_actuaciones(
         for cliente, proceso in clientes_notificables_para_radicado(radicado):
             for actuacion in nuevas:
                 push_targets.setdefault((cliente.id, actuacion["id"]), (cliente, proceso, radicado, actuacion))
-            if not canales_habilitados(cliente, "ACTUACIONES", emisor=proceso.abogado, db=db):
+            if not canales_habilitados(cliente, "ACTUACIONES", db=db):
                 omitida = _cuerpo_novedades([{
                     "proceso": proceso.nombre,
                     "radicado": radicado.numero,
@@ -447,7 +443,6 @@ def preparar_notificaciones_actuaciones(
                     f"ACTUACIONES:{ejecucion.id}:{radicado.id}:{proceso.id}",
                     "Novedades judiciales",
                     omitida,
-                    emisor=proceso.abogado,
                     iniciar_workflow=False,
                     actuacion_ids=[actuacion["id"] for actuacion in nuevas],
                     plantilla_clave="ACTUACIONES_DIGEST",
@@ -457,7 +452,6 @@ def preparar_notificaciones_actuaciones(
                 _agregar_actuaciones_a_grupo(
                     grupos,
                     cliente,
-                    proceso.abogado,
                     radicado,
                     proceso,
                     nuevas,
@@ -735,7 +729,6 @@ def preparar_recordatorio_workflow(
         f"RECORDATORIO:{recordatorio.id}:V{recordatorio.version}",
         "Recordatorio de tarea",
         mensaje,
-        emisor=usuario,
         iniciar_workflow=False,
         recordatorio_id=recordatorio.id,
         recordatorio_version=recordatorio.version,
@@ -905,14 +898,7 @@ def reclamar_barrido(
         actor = db.query(models.Usuario).filter_by(id=datos.solicitada_por_id).first()
         if not radicado or not consulta or not actor:
             raise HTTPException(status_code=404, detail="Consulta o radicado no disponible.")
-        if actor.rol == models.RolUsuario.ABOGADO:
-            autorizado = (
-                radicado.ambito_key == f"SAAS:{actor.id}"
-                and actor.estado == models.EstadoUsuario.ACTIVO
-                and actor.plan is not None
-                and actor.plan.precio_mensual > 0
-            )
-        elif actor.rol == models.RolUsuario.ABOGADO_ADMIN:
+        if actor.rol in (models.RolUsuario.ABOGADO, models.RolUsuario.ABOGADO_ADMIN):
             autorizado = (
                 radicado.ambito_key == "FIRMA"
                 and actor.estado == models.EstadoUsuario.ACTIVO
@@ -964,10 +950,7 @@ def reclamar_barrido(
             "ejecucion": _serializar_ejecucion(activa),
         }
 
-    radicados_query = db.query(models.Radicado.id).filter(
-        (models.Radicado.ambito_key == "FIRMA")
-        | models.Radicado.ambito_key.like("SAAS:%")
-    )
+    radicados_query = db.query(models.Radicado.id).filter(models.Radicado.ambito_key == "FIRMA")
     if datos.radicado_id is not None:
         radicados_query = radicados_query.filter(models.Radicado.id == datos.radicado_id)
     elif radicado_ids:
@@ -1047,8 +1030,7 @@ def listar_radicados_barrido(
     radicados = (
         db.query(models.Radicado.id, models.Radicado.numero)
         .filter(
-            (models.Radicado.ambito_key == "FIRMA")
-            | models.Radicado.ambito_key.like("SAAS:%"),
+            models.Radicado.ambito_key == "FIRMA",
             models.Radicado.id > despues_de,
         )
         .order_by(models.Radicado.id.asc())
@@ -1081,10 +1063,7 @@ def ejecutar_consulta_barrido_radicado(
     if not ejecucion or ejecucion.estado != "EN_PROCESO":
         raise HTTPException(status_code=409, detail="La ejecución no está activa.")
     radicado = db.query(models.Radicado).filter_by(id=radicado_id).first()
-    if not radicado or not (
-        radicado.ambito_key == "FIRMA"
-        or (radicado.ambito_key or "").startswith("SAAS:")
-    ):
+    if not radicado or radicado.ambito_key != "FIRMA":
         raise HTTPException(status_code=404, detail="Radicado fuera de un ámbito consultable.")
 
     resultado_radicado = db.query(models.EjecucionRadicado).filter_by(

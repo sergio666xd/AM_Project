@@ -97,7 +97,7 @@ def ponerse_al_dia(db: Session, usuario: models.Usuario, actor: models.Usuario) 
         try:
             emitir_notificacion_workflow(
                 db, usuario, "TAREAS", f"REACTIVACION:{usuario.id}:TAREA:{task.id}:{marca_reactivacion}",
-                "Tarea pendiente tras reactivar tu cuenta", "", emisor=actor, incluir_email=True,
+                "Tarea pendiente tras reactivar tu cuenta", "", incluir_email=True,
                 plantilla_clave="REACTIVACION_TAREA",
                 variables={"nombre": usuario.nombre_completo, "tarea": task.titulo, "proceso": process,
                            "estado": task.estado.value, "fecha_limite": format_colombia_datetime(task.fecha_limite) if task.fecha_limite else "Sin fecha límite"},
@@ -123,7 +123,7 @@ def ponerse_al_dia(db: Session, usuario: models.Usuario, actor: models.Usuario) 
         try:
             emitir_notificacion_workflow(
                 db, usuario, "RESUMENES", f"REACTIVACION:{usuario.id}:EVENTO:{event.id}:{marca_reactivacion}",
-                "Actividad próxima tras reactivar tu cuenta", "", emisor=actor, incluir_email=True,
+                "Actividad próxima tras reactivar tu cuenta", "", incluir_email=True,
                 plantilla_clave="REACTIVACION_EVENTO",
                 variables={"nombre": usuario.nombre_completo, "actividad": event.titulo, "proceso": process.nombre,
                            "tipo": event.tipo, "fecha": format_colombia_datetime(event.fecha_inicio),
@@ -153,7 +153,7 @@ def ponerse_al_dia(db: Session, usuario: models.Usuario, actor: models.Usuario) 
         try:
             emitir_notificacion_workflow(
                 db, usuario, "RESUMENES", f"REACTIVACION:{usuario.id}:COMUNICACION:{communication.id}:{marca_reactivacion}",
-                f"Comunicación pendiente: {communication.asunto}", "", emisor=actor, incluir_email=True,
+                f"Comunicación pendiente: {communication.asunto}", "", incluir_email=True,
                 plantilla_clave="REACTIVACION_COMUNICACION",
                 variables={"nombre": usuario.nombre_completo, "proceso": process.nombre,
                            "asunto": communication.asunto, "fecha": format_colombia_datetime(communication.created_at),

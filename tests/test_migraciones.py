@@ -43,14 +43,14 @@ def test_database_created_before_alembic_is_stamped_and_upgraded(tmp_path):
     engine = create_engine(f"sqlite:///{tmp_path / 'heredada.db'}")
     models.Base.metadata.create_all(engine)
     with engine.begin() as conexion:
-        conexion.execute(models.Plan.__table__.insert().values(nombre="Básico", limite_radicados=10, precio_mensual=0))
+        conexion.execute(models.ConfiguracionConsultas.__table__.insert().values(id=1, activa=True, dias_habilitados=[0, 2]))
 
     aplicar_migraciones(engine)
     aplicar_migraciones(engine)  # Repetirlo no cambia nada.
 
     assert _version(engine) == _head()
     with engine.connect() as conexion:
-        assert conexion.execute(text("SELECT COUNT(*) FROM planes")).scalar() == 1
+        assert conexion.execute(text("SELECT COUNT(*) FROM configuracion_consultas")).scalar() == 1
 
 
 def test_unrelated_tables_do_not_count_as_an_existing_schema(tmp_path):
@@ -79,11 +79,11 @@ def test_pending_revisions_are_applied_to_a_versioned_database(tmp_path, monkeyp
     (raiz / "alembic_migrations" / "versions" / "9999_columna_prueba.py").write_text(
         f'revision = "9999"\ndown_revision = "{_head()}"\nbranch_labels = None\ndepends_on = None\n\n'
         "from alembic import op\nimport sqlalchemy as sa\n\n\n"
-        "def upgrade():\n    op.add_column('planes', sa.Column('columna_prueba', sa.Integer(), nullable=True))\n\n\n"
-        "def downgrade():\n    op.drop_column('planes', 'columna_prueba')\n",
+        "def upgrade():\n    op.add_column('configuracion_consultas', sa.Column('columna_prueba', sa.Integer(), nullable=True))\n\n\n"
+        "def downgrade():\n    op.drop_column('configuracion_consultas', 'columna_prueba')\n",
         encoding="utf-8",
     )
     aplicar_migraciones(engine)
 
     assert _version(engine) == "9999"
-    assert "columna_prueba" in {col["name"] for col in inspect(engine).get_columns("planes")}
+    assert "columna_prueba" in {col["name"] for col in inspect(engine).get_columns("configuracion_consultas")}

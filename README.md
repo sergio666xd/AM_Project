@@ -13,7 +13,7 @@ Aplicación interna de una sola firma. Reúne el sitio público, el portal donde
 | --- | --- |
 | `ADMIN` | Administra la firma: usuarios, operación, integraciones, sitio público, finanzas y auditoría. Entra por su propio dominio y puede abrir cualquier expediente. |
 | `ABOGADO_ADMIN` | Abogado de la firma: lleva sus procesos y los que colabora, con clientes, tareas, agenda, documentos, contratos y cobros. |
-| `ABOGADO` | Abogado asociado: entra al mismo panel de la firma. Todavía conserva el alcance aislado del antiguo SaaS en radicados y planes, por eso la administración aún no crea cuentas nuevas con este perfil (ver "Pendiente"). |
+| `ABOGADO` | Abogado asociado: entra al mismo panel de la firma con sus propios procesos, sin equipo, cobros ni contratos. Sus radicados son de la firma. Hoy no hay cuentas con este perfil y la administración todavía no lo ofrece al crear cuentas. |
 | `CLIENTE` | Ve solo sus procesos, en lenguaje claro: en qué va cada uno, lo que la firma le pide, sus pagos y los mensajes. |
 
 La firma es una sola organización. `abogado_id` identifica al responsable del expediente, no a un inquilino. Los clientes ven únicamente los procesos a los que están vinculados.
@@ -151,7 +151,7 @@ alembic upgrade head
 alembic revision --autogenerate -m "describe el cambio"
 ```
 
-Revisa el archivo antes de confirmarlo: el autogenerado no detecta renombres y puede proponer borrar columnas. `actualizar_esquema_planes()` (en `app/esquema.py`) y `migrations/*.sql` son esquema heredado; no se les agregan sentencias.
+Revisa el archivo antes de confirmarlo: el autogenerado no detecta renombres y puede proponer borrar columnas. `actualizar_esquema_heredado()` (en `app/esquema.py`) y `migrations/*.sql` son esquema heredado; no se les agregan sentencias.
 
 `python -m app.migrate_radicados_canonicos` es la herramienta de la migración de radicados canónicos de octubre de 2026. Sin argumentos solo muestra conteos. `--apply --backup-confirmed` aplica la migración, y solo debe usarse con un backup verificado.
 
@@ -166,6 +166,6 @@ cd frontend-saas && npm run lint && npx tsc --noEmit && npm run build
 
 CI (`.github/workflows/ci.yml`) corre el backend con ruff y pytest, las pruebas v2 y las migraciones sobre PostgreSQL, la verificación de que los tipos del frontend coinciden con el contrato, y ESLint, TypeScript y la compilación del frontend.
 
-## Pendiente
+## Retiro del antiguo SaaS
 
-- Las tablas y columnas del antiguo SaaS (planes, solicitudes de registro, intereses, sector y alcance por propietario) siguen en la base. Se retiran en un cambio aparte, con confirmación explícita, junto con el alcance aislado que todavía arrastra el perfil `ABOGADO`.
+La revisión `0016` borró lo que quedaba del portal SaaS: las tablas `planes`, `configuracion_saas`, `intereses_saas` y `solicitudes_registro`, la columna `usuarios.plan_id` y las cuentas `ABOGADO` de abogados externos con sus procesos, radicados, actuaciones, tareas y los clientes que solo eran suyos. Al aplicarla, el registro de la API anota cuántas filas borró por tabla. No se puede deshacer; `downgrade` solo vuelve a crear las tablas vacías.

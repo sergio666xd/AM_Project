@@ -275,7 +275,7 @@ class ServicioDocumentos:
                 self._db, cliente,
                 asunto=f"Documento revisado: {solicitud.titulo}",
                 cuerpo=f"{usuario.nombre_completo} revisó {documento.nombre_archivo}. Estado: {estado}. Comentario: {comentario}",
-                tipo="DOCUMENTOS", origen=f"REVISION_DOCUMENTO:{documento.id}:{documento.estado_revision}", emisor=usuario,
+                tipo="DOCUMENTOS", origen=f"REVISION_DOCUMENTO:{documento.id}:{documento.estado_revision}",
                 plantilla_clave="DOCUMENTO_REVISION",
                 variables={"nombre": cliente.nombre_completo, "actor": usuario.nombre_completo, "documento": pedido,
                            "archivo": documento.nombre_archivo, "solicitud": solicitud.titulo,
@@ -377,7 +377,7 @@ class ServicioDocumentos:
                 self._db, cliente,
                 asunto=f"Documentos solicitados: {solicitud.titulo}",
                 cuerpo=f"{usuario.nombre_completo} solicitó documentos para el proceso {proceso.nombre}:\n{documentos}",
-                tipo="DOCUMENTOS", origen=f"SOLICITUD_DOCUMENTO:{solicitud.id}", emisor=usuario,
+                tipo="DOCUMENTOS", origen=f"SOLICITUD_DOCUMENTO:{solicitud.id}",
                 plantilla_clave="SOLICITUD_DOCUMENTO",
                 variables={"nombre": cliente.nombre_completo, "actor": usuario.nombre_completo, "proceso": proceso.nombre,
                            "solicitud": solicitud.titulo, "documentos": documentos,
@@ -409,7 +409,7 @@ class ServicioDocumentos:
         if not vista.puede_recordar:
             raise Conflicto("Ya se le recordó en las últimas 12 horas.", codigo="recordatorio_reciente")
         try:
-            self._enviar_recordatorio(solicitud, usuario)
+            self._enviar_recordatorio(solicitud)
             registrar_evento_auditoria(self._db, usuario, "documento.recordar", "solicitud_documento", solicitud.id)
             self._db.commit()
         except Exception as exc:
@@ -418,7 +418,7 @@ class ServicioDocumentos:
             raise ErrorDominio("No se pudo enviar el recordatorio. Intenta de nuevo.", codigo="aviso_fallido") from exc
         return self._una(solicitud, procesos)
 
-    def _enviar_recordatorio(self, solicitud: SolicitudDocumento, emisor: Usuario | None) -> None:
+    def _enviar_recordatorio(self, solicitud: SolicitudDocumento) -> None:
         """Agrega el aviso y marca la solicitud; quien llama confirma la transacción."""
         cliente, proceso = solicitud.cliente, solicitud.proceso
         hoy = a_colombia(utc_ahora()).date()
@@ -438,7 +438,7 @@ class ServicioDocumentos:
             self._db, cliente,
             asunto=f"Recordatorio: {solicitud.titulo}",
             cuerpo=f"La solicitud {solicitud.titulo} {cuando}. Falta por entregar:\n{pendientes}",
-            tipo="DOCUMENTOS", origen=f"RECORDATORIO_DOCUMENTO:{solicitud.id}:{hoy.isoformat()}", emisor=emisor,
+            tipo="DOCUMENTOS", origen=f"RECORDATORIO_DOCUMENTO:{solicitud.id}:{hoy.isoformat()}",
             plantilla_clave="RECORDATORIO_DOCUMENTO",
             variables={"nombre": cliente.nombre_completo, "proceso": proceso.nombre, "solicitud": solicitud.titulo,
                        "cuando": cuando, "pendientes": pendientes,
@@ -479,7 +479,7 @@ class ServicioDocumentos:
             if not (previo or vencida):
                 continue
             try:
-                self._enviar_recordatorio(solicitud, solicitud.proceso.abogado)
+                self._enviar_recordatorio(solicitud)
                 self._db.commit()
                 enviados.append(solicitud.id)
             except Exception:

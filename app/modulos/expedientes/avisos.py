@@ -35,7 +35,7 @@ def notificar_clientes(
     for destinatario in [cliente] if cliente else clientes_activos(proceso):
         emitir_notificacion_workflow(
             db, destinatario, tipo, f"ACCION_PROCESO:{proceso.id}:{uuid4().hex}", asunto, "",
-            emisor=actor, incluir_email=True,
+            incluir_email=True,
             plantilla_clave="PROCESO_ACTUALIZACION",
             variables={"nombre": destinatario.nombre_completo, "actor": actor.nombre_completo,
                        "accion": accion, "proceso": proceso.nombre,
@@ -63,7 +63,7 @@ def avisar_miembro_agregado(
     emitir_notificacion_workflow(
         db, abogado, "RESUMENES", f"COLABORACION_PROCESO:{proceso.id}:{abogado.id}:{uuid4().hex}",
         f"Lo agregaron al proceso {proceso.nombre}", cuerpo,
-        emisor=actor, incluir_email=True,
+        incluir_email=True,
         plantilla_clave="COLABORADOR_AGREGADO",
         variables={"nombre": abogado.nombre_completo, "actor": actor.nombre_completo, "permiso": permiso,
                    "proceso": proceso.nombre, "responsable": proceso.abogado.nombre_completo},

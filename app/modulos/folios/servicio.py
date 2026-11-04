@@ -212,7 +212,7 @@ class ServicioFolios:
             )
             notification_service.emitir_notificacion_workflow(
                 self._db, cliente, "ACTUACIONES", f"NOTIFICACION_ACTUACION:{actuacion.id}:{cliente.id}", asunto, cuerpo,
-                emisor=usuario, incluir_email=True, plantilla_clave="ACTUACION_NOTIFICADA",
+                incluir_email=True, plantilla_clave="ACTUACION_NOTIFICADA",
                 variables={"nombre": cliente.nombre_completo, "actor": usuario.nombre_completo, "proceso": proceso.nombre,
                            "radicado": radicado, "fecha": actuacion.fecha_actuacion or "No informada",
                            "actuacion": actuacion.actuacion, "anotacion": actuacion.anotacion or "Sin anotación",
