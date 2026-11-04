@@ -16,15 +16,12 @@ from app.migraciones import aplicar_migraciones, huella_versiones
 RUTA_MIGRACION_PLANTILLAS = Path(__file__).resolve().parents[1] / "migrations" / "2026_10_10_mensajes_configurables.sql"
 
 
-def actualizar_esquema_planes() -> None:
+def actualizar_esquema_heredado() -> None:
     """Aplica columnas nuevas a instalaciones PostgreSQL ya existentes."""
     with engine.begin() as conexion:
         conexion.execute(text("ALTER TYPE rolusuario ADD VALUE IF NOT EXISTS 'ABOGADO_ADMIN'"))
         conexion.execute(text("ALTER TYPE rolusuario ADD VALUE IF NOT EXISTS 'CLIENTE'"))
         conexion.execute(text("ALTER TYPE estadousuario ADD VALUE IF NOT EXISTS 'SUSPENDIDO'"))
-        conexion.execute(text("ALTER TABLE planes ADD COLUMN IF NOT EXISTS limite_ultimas_actuaciones INTEGER DEFAULT 5"))
-        conexion.execute(text("ALTER TABLE planes ADD COLUMN IF NOT EXISTS notificaciones_whatsapp_procesos BOOLEAN NOT NULL DEFAULT FALSE"))
-        conexion.execute(text("ALTER TABLE planes ADD COLUMN IF NOT EXISTS notificaciones_whatsapp_tareas BOOLEAN NOT NULL DEFAULT FALSE"))
         conexion.execute(text("ALTER TABLE usuarios ADD COLUMN IF NOT EXISTS creado_por_abogado_id INTEGER"))
         conexion.execute(text("ALTER TABLE usuarios ADD COLUMN IF NOT EXISTS debe_cambiar_password BOOLEAN NOT NULL DEFAULT FALSE"))
         conexion.execute(text("ALTER TABLE usuarios ADD COLUMN IF NOT EXISTS notificaciones_email BOOLEAN NOT NULL DEFAULT TRUE"))
@@ -107,7 +104,7 @@ def huella_esquema() -> str:
         huella.update(tabla.name.encode())
         for columna in tabla.columns:
             huella.update(f"{columna.name}:{columna.type!r}:{columna.nullable}".encode())
-    huella.update(inspect.getsource(actualizar_esquema_planes).encode())
+    huella.update(inspect.getsource(actualizar_esquema_heredado).encode())
     if RUTA_MIGRACION_PLANTILLAS.is_file():
         huella.update(RUTA_MIGRACION_PLANTILLAS.read_bytes())
     huella.update(huella_versiones())
@@ -129,7 +126,7 @@ def preparar_esquema() -> None:
     exclusivos; la huella guardada permite omitirlas cuando ya están aplicadas.
 
     Los cambios de esquema nuevos van como revisiones de Alembic
-    (alembic_migrations/versions); actualizar_esquema_planes() y la migración de
+    (alembic_migrations/versions); actualizar_esquema_heredado() y la migración de
     plantillas quedan como el esquema heredado y no deben crecer.
     """
     if engine.dialect.name != "postgresql":
@@ -150,7 +147,7 @@ def preparar_esquema() -> None:
         migraciones_ok = False
         logging.getLogger(__name__).exception("No se pudieron aplicar las migraciones de Alembic.")
     models.Base.metadata.create_all(bind=engine)
-    actualizar_esquema_planes()
+    actualizar_esquema_heredado()
     try:
         if not RUTA_MIGRACION_PLANTILLAS.is_file():
             raise FileNotFoundError(f"No se encontró la migración de plantillas: {RUTA_MIGRACION_PLANTILLAS}")
@@ -181,19 +178,10 @@ def preparar_esquema() -> None:
 
 
 def crear_datos_iniciales():
-    """Aplica compatibilidad y siembra planes SaaS solo si aún no existen."""
+    """Prepara el esquema y siembra la configuración inicial y la primera cuenta ADMIN."""
     preparar_esquema()
     db = next(get_db())
     try:
-        if not db.query(models.Plan).first():
-            db.add_all([
-                models.Plan(nombre="Básico", limite_radicados=10, precio_mensual=0, limite_ultimas_actuaciones=5),
-                models.Plan(nombre="Pro", limite_radicados=50, precio_mensual=50000, limite_ultimas_actuaciones=None, notificaciones_whatsapp_procesos=True, notificaciones_whatsapp_tareas=True),
-            ])
-            db.commit()
-        if not db.query(models.ConfiguracionSaas).filter_by(id=1).first():
-            db.add(models.ConfiguracionSaas(id=1, mostrar_planes=True))
-            db.commit()
         if not db.query(models.ConfiguracionConsultas).filter_by(id=1).first():
             db.add(models.ConfiguracionConsultas(id=1, activa=False, dias_habilitados=[0, 1, 2, 3, 4]))
             db.commit()

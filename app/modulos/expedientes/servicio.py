@@ -81,7 +81,7 @@ def _datos_resumen(proceso: Proceso, usuario: Usuario) -> dict:
 
 
 def _admite_equipo(proceso: Proceso) -> bool:
-    """Los procesos de la firma (responsable ABOGADO_ADMIN) admiten colaboradores; los SaaS individuales no."""
+    """Los procesos de la firma (responsable ABOGADO_ADMIN) admiten colaboradores; los de un abogado asociado (ABOGADO) no."""
     return proceso.abogado is not None and politicas._rol(proceso.abogado) == RolUsuario.ABOGADO_ADMIN
 
 

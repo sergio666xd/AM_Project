@@ -708,12 +708,12 @@ def avisar_mensaje(db: Session, conversation: models.ChatConversacion, message: 
         if not (_supports_firm_panel_presence(user) and _supports_firm_panel_presence(recipient)):
             staff_sender = _role(user) != "CLIENTE"
             template = "COMUNICACION_ABOGADO_CLIENTE" if staff_sender else "COMUNICACION_CLIENTE_ABOGADO"
-            whatsapp_enabled = "WHATSAPP" in canales_habilitados(recipient, "RESUMENES", emisor=user, db=db)
+            whatsapp_enabled = "WHATSAPP" in canales_habilitados(recipient, "RESUMENES", db=db)
             if not push_delivered or whatsapp_enabled:
                 emitir_notificacion_workflow(
                     db, recipient, "RESUMENES", f"CHAT:{message.id}:{recipient.id}",
                     f"Nuevo mensaje de {user.nombre_completo}", f"{user.nombre_completo}: {content}",
-                    emisor=user, plantilla_clave=template,
+                    plantilla_clave=template,
                     variables={"nombre": recipient.nombre_completo, "actor": user.nombre_completo,
                                "proceso": process_name, "asunto": "Nuevo mensaje", "mensaje": content},
                     enlace_texto="Abrir conversacion", enlace_url=link,
@@ -730,7 +730,7 @@ def avisar_mensaje(db: Session, conversation: models.ChatConversacion, message: 
         if is_panel_active:
             continue
 
-        whatsapp_enabled = "WHATSAPP" in canales_habilitados(recipient, "RESUMENES", emisor=user, db=db)
+        whatsapp_enabled = "WHATSAPP" in canales_habilitados(recipient, "RESUMENES", db=db)
         should_send_workflow = not push_delivered or whatsapp_enabled
         if not should_send_workflow:
             continue
@@ -762,7 +762,7 @@ def avisar_mensaje(db: Session, conversation: models.ChatConversacion, message: 
                 db, recipient, "RESUMENES", f"CHAT_AVISO:{user.id}:{recipient.id}:{int(now.timestamp())}",
                 f"Nuevos mensajes de {user.nombre_completo}",
                 f"{user.nombre_completo} te esta enviando mensajes.",
-                emisor=user, plantilla_clave="CHAT_MENSAJE",
+                plantilla_clave="CHAT_MENSAJE",
                 variables={"nombre": recipient.nombre_completo, "actor": user.nombre_completo},
                 enlace_texto="Abrir chat", enlace_url=link,
                 excluir_canales=("EMAIL",) if push_delivered else (),

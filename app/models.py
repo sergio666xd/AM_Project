@@ -45,30 +45,6 @@ class RolUsuario(str, enum.Enum):
     ADMIN = "ADMIN"
 
 
-class Plan(Base):
-    __tablename__ = "planes"
-
-    id = Column(Integer, primary_key=True)
-    nombre = Column(String, nullable=False)
-    limite_radicados = Column(Integer, nullable=False)
-    precio_mensual = Column(Integer, nullable=False)
-    activo = Column(Boolean, nullable=False, default=True)
-    # NULL significa que el plan puede consultar y conservar todo el historial.
-    limite_ultimas_actuaciones = Column(Integer, nullable=True, default=5)
-    notificaciones_whatsapp_procesos = Column(Boolean, nullable=False, default=False)
-    notificaciones_whatsapp_tareas = Column(Boolean, nullable=False, default=False)
-
-    users = relationship("Usuario", back_populates="plan")
-
-
-class ConfiguracionSaas(Base):
-    """Configuración global de la comercialización del SaaS (registro único)."""
-    __tablename__ = "configuracion_saas"
-
-    id = Column(Integer, primary_key=True, default=1)
-    mostrar_planes = Column(Boolean, nullable=False, default=False)
-
-
 class ConfiguracionFirma(Base):
     __tablename__ = "configuracion_firma"
 
@@ -228,8 +204,7 @@ class Usuario(Base):
     tarjeta_profesional = Column(String(40), nullable=True)
     rol = Column(Enum(RolUsuario), default=RolUsuario.ABOGADO, nullable=False)
     estado = Column(Enum(EstadoUsuario), default=EstadoUsuario.PENDIENTE_APROBACION, nullable=False)
-    
-    plan_id = Column(Integer, ForeignKey("planes.id"), nullable=True)
+
     creado_por_abogado_id = Column(Integer, ForeignKey("usuarios.id"), nullable=True, index=True)
     debe_cambiar_password = Column(Boolean, nullable=False, default=False)
     notificaciones_email = Column(Boolean, nullable=False, default=True)
@@ -255,8 +230,6 @@ class Usuario(Base):
         foreign_keys="Tarea.usuario_id",
         cascade="all, delete-orphan",
     )
-    plan = relationship("Plan", back_populates="users")
-    solicitud_registro = relationship("SolicitudRegistro", back_populates="usuario", uselist=False)
     radicados = relationship(
         "Radicado",
         secondary=radicados_usuarios,
@@ -287,18 +260,6 @@ class CodigoSeguridadUsuario(Base):
     creado_en = Column(DateTime, nullable=False, default=utc_ahora)
 
 
-class SolicitudRegistro(Base):
-    __tablename__ = "solicitudes_registro"
-
-    id = Column(Integer, primary_key=True, index=True)
-    usuario_id = Column(Integer, ForeignKey("usuarios.id"), unique=True, nullable=False)
-    ruta_tarjeta_profesional = Column(String(255), nullable=True)
-    notas_admin = Column(Text, nullable=True)
-    fecha_solicitud = Column(DateTime, default=utc_ahora)
-
-    usuario = relationship("Usuario", back_populates="solicitud_registro")
-
-
 class SolicitudEdicionPerfilCliente(Base):
     __tablename__ = "solicitudes_edicion_perfil_cliente"
 
@@ -319,15 +280,6 @@ class SolicitudEdicionPerfilCliente(Base):
 
     cliente = relationship("Usuario", foreign_keys=[cliente_id])
     revisada_por = relationship("Usuario", foreign_keys=[revisada_por_id])
-
-
-class InteresSaas(Base):
-    """Contacto que solicita novedades sobre la plataforma SaaS."""
-    __tablename__ = "intereses_saas"
-
-    id = Column(Integer, primary_key=True, index=True)
-    email = Column(String(120), unique=True, index=True, nullable=False)
-    created_at = Column(DateTime, nullable=False, default=utc_ahora)
 
 
 class Radicado(Base):
@@ -394,9 +346,7 @@ def establecer_identidad_radicado(mapper, connection, radicado: Radicado) -> Non
         select(Usuario.rol).where(Usuario.id == radicado.creado_por_id)
     ).scalar_one()
     role_name = role.value if hasattr(role, "value") else str(role)
-    if role_name == RolUsuario.ABOGADO.value:
-        radicado.ambito_key = f"SAAS:{radicado.creado_por_id}"
-    elif role_name in (RolUsuario.ABOGADO_ADMIN.value, RolUsuario.ADMIN.value):
+    if role_name in (RolUsuario.ABOGADO.value, RolUsuario.ABOGADO_ADMIN.value, RolUsuario.ADMIN.value):
         radicado.ambito_key = "FIRMA"
     else:
         raise ValueError("Solo abogados y administradores pueden crear radicados.")

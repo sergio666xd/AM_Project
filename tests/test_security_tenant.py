@@ -45,7 +45,6 @@ from app.migrate_radicados_canonicos import (
 from app.notification_policy import (
     abogados_notificables_para_radicado,
     canales_habilitados,
-    plan_whatsapp_habilitado,
     whatsapp_habilitado,
 )
 from app.radicados import (
@@ -122,21 +121,15 @@ def test_workflow_sweep_claim_is_idempotent_and_prevents_parallel_runs():
             rol=models.RolUsuario.ADMIN,
             estado=models.EstadoUsuario.ACTIVO,
         )
-        free_plan = models.Plan(
-            nombre="Básico",
-            limite_radicados=10,
-            precio_mensual=0,
-        )
-        saas_owner = models.Usuario(
-            email="sweep-saas-owner@example.test",
+        associate = models.Usuario(
+            email="sweep-associate@example.test",
             password_hash="hash",
-            nombre_completo="SaaS owner",
+            nombre_completo="Associate",
             whatsapp_numero="0000000007",
             rol=models.RolUsuario.ABOGADO,
             estado=models.EstadoUsuario.ACTIVO,
-            plan=free_plan,
         )
-        db.add_all([owner, admin, saas_owner])
+        db.add_all([owner, admin, associate])
         db.flush()
         db.add(
             models.Radicado(
@@ -147,7 +140,7 @@ def test_workflow_sweep_claim_is_idempotent_and_prevents_parallel_runs():
         db.add(
             models.Radicado(
                 numero="12345678901234567890124",
-                creado_por_id=saas_owner.id,
+                creado_por_id=associate.id,
             )
         )
         db.add(
@@ -480,7 +473,7 @@ def test_sweep_counters_apply_deltas_after_stale_parallel_reads(tmp_path):
         second_session.close()
 
 
-def test_canonical_radicado_is_shared_in_firm_but_isolated_per_saas_owner():
+def test_canonical_radicado_is_shared_across_the_whole_firm():
     engine = create_engine("sqlite:///:memory:")
     models.Base.metadata.create_all(engine)
 
@@ -501,50 +494,40 @@ def test_canonical_radicado_is_shared_in_firm_but_isolated_per_saas_owner():
             rol=models.RolUsuario.ABOGADO_ADMIN,
             estado=models.EstadoUsuario.ACTIVO,
         )
-        saas_owner = models.Usuario(
-            email="canonical-saas-owner@example.test",
+        associate = models.Usuario(
+            email="canonical-associate@example.test",
             password_hash="hash",
-            nombre_completo="SaaS owner",
+            nombre_completo="Associate",
             whatsapp_numero="0000000113",
             rol=models.RolUsuario.ABOGADO,
             estado=models.EstadoUsuario.ACTIVO,
         )
-        other_saas_owner = models.Usuario(
-            email="canonical-other-saas-owner@example.test",
-            password_hash="hash",
-            nombre_completo="Other SaaS owner",
-            whatsapp_numero="0000000114",
-            rol=models.RolUsuario.ABOGADO,
-            estado=models.EstadoUsuario.ACTIVO,
-        )
-        db.add_all([firm_owner, firm_colleague, saas_owner, other_saas_owner])
+        db.add_all([firm_owner, firm_colleague, associate])
         db.flush()
 
         number = "12345678901234567890123"
         firm_radicado = models.Radicado(numero=number, usuario_id=firm_owner.id)
-        saas_radicado = models.Radicado(numero=number, usuario_id=saas_owner.id)
-        other_saas_radicado = models.Radicado(numero=number, usuario_id=other_saas_owner.id)
-        db.add_all([firm_radicado, saas_radicado, other_saas_radicado])
+        associate_radicado = models.Radicado(numero="12345678901234567890124", usuario_id=associate.id)
+        db.add_all([firm_radicado, associate_radicado])
         db.flush()
 
         firm_radicado.usuarios_vinculados.append(firm_colleague)
         db.flush()
 
         assert firm_radicado.ambito_key == "FIRMA"
+        assert associate_radicado.ambito_key == "FIRMA"
         assert firm_radicado.numero_normalizado == number
         assert {user.id for user in firm_radicado.usuarios_vinculados} == {
             firm_owner.id,
             firm_colleague.id,
         }
-        assert saas_radicado.ambito_key == f"SAAS:{saas_owner.id}"
-        assert other_saas_radicado.ambito_key == f"SAAS:{other_saas_owner.id}"
 
-        db.add(models.Radicado(numero=number, usuario_id=saas_owner.id))
+        db.add(models.Radicado(numero=number, usuario_id=associate.id))
         with pytest.raises(IntegrityError):
             db.flush()
 
 
-def test_obtener_o_vincular_radicado_reuses_only_within_scope():
+def test_obtener_o_vincular_radicado_reuses_the_firm_radicado():
     engine = create_engine("sqlite:///:memory:")
     models.Base.metadata.create_all(engine)
 
@@ -565,15 +548,15 @@ def test_obtener_o_vincular_radicado_reuses_only_within_scope():
             rol=models.RolUsuario.ABOGADO_ADMIN,
             estado=models.EstadoUsuario.ACTIVO,
         )
-        saas_owner = models.Usuario(
-            email="linked-saas-owner@example.test",
+        associate = models.Usuario(
+            email="linked-associate@example.test",
             password_hash="hash",
-            nombre_completo="SaaS owner",
+            nombre_completo="Associate",
             whatsapp_numero="0000000123",
             rol=models.RolUsuario.ABOGADO,
             estado=models.EstadoUsuario.ACTIVO,
         )
-        db.add_all([firm_owner, firm_colleague, saas_owner])
+        db.add_all([firm_owner, firm_colleague, associate])
         db.flush()
 
         number = "12345678901234567890123"
@@ -583,17 +566,17 @@ def test_obtener_o_vincular_radicado_reuses_only_within_scope():
         same_firm_radicado, created_again = obtener_o_vincular_radicado(
             db, firm_colleague, number
         )
-        saas_radicado, created_saas = obtener_o_vincular_radicado(db, saas_owner, number)
+        associate_radicado, created_by_associate = obtener_o_vincular_radicado(db, associate, number)
         db.commit()
 
         assert created is True
         assert created_again is False
-        assert same_firm_radicado.id == firm_radicado.id
-        assert created_saas is True
-        assert saas_radicado.id != firm_radicado.id
+        assert created_by_associate is False
+        assert same_firm_radicado.id == firm_radicado.id == associate_radicado.id
         assert {user.id for user in firm_radicado.usuarios_vinculados} == {
             firm_owner.id,
             firm_colleague.id,
+            associate.id,
         }
 
 
@@ -632,82 +615,7 @@ def test_new_radicado_records_automatic_new_consultation_for_workflow():
         assert consulta.task_id is None
 
 
-def test_free_plan_new_radicado_skips_immediate_consultation():
-    engine = create_engine("sqlite:///:memory:")
-    models.Base.metadata.create_all(engine)
-
-    with Session(engine) as db:
-        free_plan = models.Plan(
-            nombre="Básico",
-            limite_radicados=10,
-            precio_mensual=0,
-        )
-        owner = models.Usuario(
-            email="free-new-radicado-owner@example.test",
-            password_hash="hash",
-            nombre_completo="Free owner",
-            whatsapp_numero="0000000145",
-            rol=models.RolUsuario.ABOGADO,
-            estado=models.EstadoUsuario.ACTIVO,
-            plan=free_plan,
-        )
-        db.add(owner)
-        db.flush()
-        radicado, _ = obtener_o_vincular_radicado(
-            db,
-            owner,
-            "12345678901234567890123",
-        )
-        db.commit()
-
-        message, consulta_id = iniciar_consulta_nuevo_radicado(db, owner, radicado)
-
-        assert "plan gratuito" in message
-        assert "desactivada" in message
-        assert consulta_id is None
-        assert db.query(models.ConsultaRadicado).filter_by(radicado_id=radicado.id).count() == 0
-
-
-def test_free_plan_message_uses_active_consultation_schedule():
-    engine = create_engine("sqlite:///:memory:")
-    models.Base.metadata.create_all(engine)
-
-    with Session(engine) as db:
-        free_plan = models.Plan(nombre="Básico", limite_radicados=10, precio_mensual=0)
-        owner = models.Usuario(
-            email="free-schedule-message@example.test",
-            password_hash="hash",
-            nombre_completo="Free owner",
-            whatsapp_numero="0000000148",
-            rol=models.RolUsuario.ABOGADO,
-            estado=models.EstadoUsuario.ACTIVO,
-            plan=free_plan,
-        )
-        db.add_all([
-            owner,
-            models.ConfiguracionConsultas(
-                id=1,
-                activa=True,
-                dias_habilitados=[0, 2, 4],
-            ),
-        ])
-        db.flush()
-        radicado, _ = obtener_o_vincular_radicado(
-            db,
-            owner,
-            "12345678901234567890123",
-        )
-        db.commit()
-
-        message, consulta_id = iniciar_consulta_nuevo_radicado(db, owner, radicado)
-
-        assert "12:00 y 17:00" in message
-        assert "lunes, miércoles, viernes" in message
-        assert consulta_id is None
-        assert db.query(models.ConsultaRadicado).filter_by(radicado_id=radicado.id).count() == 0
-
-
-def test_actuation_notification_recipients_are_limited_to_active_lawyers_in_scope():
+def test_actuation_notification_recipients_are_the_active_firm_lawyers_linked_to_it():
     engine = create_engine("sqlite:///:memory:")
     models.Base.metadata.create_all(engine)
 
@@ -735,36 +643,31 @@ def test_actuation_notification_recipients_are_limited_to_active_lawyers_in_scop
             nombre_completo="Inactive lawyer",
             whatsapp_numero="0000000142",
             rol=models.RolUsuario.ABOGADO_ADMIN,
-            estado=models.EstadoUsuario.PENDIENTE_APROBACION,
+            estado=models.EstadoUsuario.SUSPENDIDO,
         )
-        saas_owner = models.Usuario(
-            email="notification-saas-owner@example.test",
+        associate = models.Usuario(
+            email="notification-associate@example.test",
             password_hash="hash",
-            nombre_completo="SaaS owner",
+            nombre_completo="Associate",
             whatsapp_numero="0000000143",
             rol=models.RolUsuario.ABOGADO,
             estado=models.EstadoUsuario.ACTIVO,
         )
-        db.add_all([firm_owner, firm_colleague, firm_inactive, saas_owner])
+        db.add_all([firm_owner, firm_colleague, firm_inactive, associate])
         db.flush()
 
         firm_radicado = models.Radicado(numero="12345678901234567890123", usuario_id=firm_owner.id)
-        firm_radicado.usuarios_vinculados.extend(
-            [firm_colleague, firm_inactive, saas_owner]
-        )
-        saas_radicado = models.Radicado(numero="12345678901234567890124", usuario_id=saas_owner.id)
-        saas_radicado.usuarios_vinculados.append(firm_colleague)
-        db.add_all([firm_radicado, saas_radicado])
+        firm_radicado.usuarios_vinculados.extend([firm_colleague, firm_inactive])
+        associate_radicado = models.Radicado(numero="12345678901234567890124", usuario_id=associate.id)
+        associate_radicado.usuarios_vinculados.append(firm_colleague)
+        db.add_all([firm_radicado, associate_radicado])
         db.commit()
 
         firm_recipients = abogados_notificables_para_radicado(firm_radicado)
-        saas_recipients = abogados_notificables_para_radicado(saas_radicado)
+        associate_recipients = abogados_notificables_para_radicado(associate_radicado)
 
-        assert {user.id for user in firm_recipients} == {
-            firm_owner.id,
-            firm_colleague.id,
-        }
-        assert [user.id for user in saas_recipients] == [saas_owner.id]
+        assert {user.id for user in firm_recipients} == {firm_owner.id, firm_colleague.id}
+        assert {user.id for user in associate_recipients} == {associate.id, firm_colleague.id}
         assert not whatsapp_habilitado(firm_owner)
         assert whatsapp_habilitado(firm_colleague)
 
@@ -1197,7 +1100,7 @@ def test_initial_rama_lookup_persists_process_id(monkeypatch):
         monkeypatch.setattr(
             rama_judicial_api,
             "_obtener_actuaciones",
-            lambda id_proceso, limite=None, claves_conocidas=None: [],
+            lambda id_proceso, claves_conocidas=None: [],
         )
 
         result = rama_judicial_api.ejecutar_consulta_api_radicado(db, radicado)
@@ -1248,8 +1151,8 @@ def test_full_rama_reconciliation_replaces_the_saved_history(monkeypatch):
 
         fetch_options = []
 
-        def fetch_full_history(id_proceso, limite=None, claves_conocidas=None):
-            fetch_options.append((limite, claves_conocidas))
+        def fetch_full_history(id_proceso, claves_conocidas=None):
+            fetch_options.append(claves_conocidas)
             return [
                 {
                     "fechaActuacion": "2026-10-01T00:00:00Z",
@@ -1285,7 +1188,7 @@ def test_full_rama_reconciliation_replaces_the_saved_history(monkeypatch):
         )
         assert result["estado"] == "ok"
         assert result["reconciliacion_completa"] is True
-        assert fetch_options == [(None, None)]
+        assert fetch_options == [None]
         assert [act.actuacion for act in historial] == [
             "Texto corregido por Rama",
             "Actuación antigua agregada",
@@ -1377,7 +1280,7 @@ def test_known_rama_process_skips_lookup_and_merges_only_new_actions(monkeypatch
 
         fetched_process_ids = []
 
-        def fetch_actuaciones(id_proceso, limite=None, claves_conocidas=None):
+        def fetch_actuaciones(id_proceso, claves_conocidas=None):
             fetched_process_ids.append(id_proceso)
             return [
                 {
@@ -1550,32 +1453,25 @@ def test_vercel_auth_protection_json_is_classified_separately_from_token_failure
     assert workflow_401_reason(ProtectedDeploymentResponse()) == "VERCEL_DEPLOYMENT_PROTECTED"
 
 
-def test_saas_notification_features_require_plan_but_internal_staff_do_not():
-    class Plan:
-        notificaciones_whatsapp_tareas = True
-        notificaciones_whatsapp_procesos = False
-
+def test_whatsapp_depends_only_on_each_person_preferences():
     class User:
-        def __init__(self, role, plan=None):
-            self.rol = role
-            self.plan = plan
-            self.estado = models.EstadoUsuario.ACTIVO
-            self.email = "notification@example.test"
-            self.notificaciones_email = False
-            self.notificaciones_whatsapp = True
-            self.whatsapp_numero = "573000000000"
-            self.canal_notificacion_cliente = "WHATSAPP" if role == models.RolUsuario.CLIENTE else None
+        estado = models.EstadoUsuario.ACTIVO
+        email = ""
+        notificaciones_email = False
+        notificaciones_whatsapp = True
+        whatsapp_numero = "573001112233"
+        preferencias_notificacion = {}
+        avisos_por_tipo = False
 
-    external_lawyer = User(models.RolUsuario.ABOGADO, Plan())
-    firm_lawyer = User(models.RolUsuario.ABOGADO_ADMIN)
+        def __init__(self, role):
+            self.rol = role
+
+    associate = User(models.RolUsuario.ABOGADO)
     client = User(models.RolUsuario.CLIENTE)
 
-    assert whatsapp_habilitado(external_lawyer)
-    assert plan_whatsapp_habilitado(external_lawyer, "notificaciones_whatsapp_tareas")
-    assert not plan_whatsapp_habilitado(external_lawyer, "notificaciones_whatsapp_procesos")
-    assert plan_whatsapp_habilitado(firm_lawyer, "notificaciones_whatsapp_tareas")
-    assert whatsapp_habilitado(client)
-    assert canales_habilitados(client, "ACTUACIONES", emisor=external_lawyer) == ("WHATSAPP",)
+    assert whatsapp_habilitado(associate)
+    assert canales_habilitados(associate, "ACTUACIONES") == ("WHATSAPP",)
+    assert canales_habilitados(client, "ACTUACIONES") == ("WHATSAPP",)
 
 
 def test_audit_event_contains_actor_action_and_resource_without_extra_data():

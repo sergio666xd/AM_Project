@@ -131,7 +131,6 @@ def _clave_actuacion_api(actuacion: dict) -> tuple:
 
 def _obtener_actuaciones(
     id_proceso: int,
-    limite: int | None = None,
     claves_conocidas: set[tuple] | None = None,
 ) -> list[dict]:
     """Fetch recent pages and stop at the first known action when syncing incrementally."""
@@ -140,19 +139,12 @@ def _obtener_actuaciones(
 
     while True:
         respuesta = _obtener_json(f"/Proceso/Actuaciones/{id_proceso}", {"pagina": pagina})
-        limite_alcanzado = False
+        # Rama devuelve primero las más recientes: la primera actuación conocida
+        # es un límite seguro para la sincronización incremental.
         for actuacion in respuesta.get("actuaciones") or []:
             actuaciones.append(actuacion)
             if claves_conocidas and _clave_actuacion_api(actuacion) in claves_conocidas:
                 return actuaciones
-            if limite is not None and len(actuaciones) >= limite:
-                limite_alcanzado = True
-                break
-
-        # Rama currently returns recent actions first, so the first known action
-        # is a safe pagination boundary for normal incremental synchronization.
-        if limite_alcanzado:
-            return actuaciones[:limite]
 
         paginacion = respuesta.get("paginacion") or {}
         total_paginas = paginacion.get("cantidadPaginas") or 1
@@ -219,17 +211,6 @@ def ejecutar_consulta_api_radicado(
         else:
             id_proceso = radicado_obj.id_proceso_rama
 
-        usuario_propietario = radicado_obj.creador
-        if usuario_propietario and usuario_propietario.rol == models.RolUsuario.ABOGADO:
-            limite_actuaciones = (
-                usuario_propietario.plan.limite_ultimas_actuaciones
-                if usuario_propietario.plan
-                else 5
-            )
-        else:
-            limite_actuaciones = None
-        if reconciliar_historial:
-            limite_actuaciones = None
         actuaciones_conocidas = (
             db.query(models.Actuacion)
             .filter(models.Actuacion.radicado_id == radicado_obj.id)
@@ -251,8 +232,7 @@ def ejecutar_consulta_api_radicado(
         claves_capturadas = Counter()
         for actuacion in _obtener_actuaciones(
             int(id_proceso),
-            limite_actuaciones if consulta_inicial else None,
-            None if consulta_inicial or reconciliar_historial else set(claves_conocidas),
+            claves_conocidas=None if consulta_inicial or reconciliar_historial else set(claves_conocidas),
         ):
             actuacion_texto = (actuacion.get("actuacion") or "").strip()
             actuacion_capturada = {
@@ -339,8 +319,6 @@ def ejecutar_consulta_api_radicado(
                 }
             )
 
-    if limite_actuaciones is not None and not reconciliar_historial:
-        historial_actualizado = historial_actualizado[:limite_actuaciones]
     claves_existentes_ordenadas = [
         (
             act.fecha_actuacion, act.actuacion, act.anotacion,

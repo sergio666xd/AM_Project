@@ -32,7 +32,7 @@ def notificar_evento(
             db, destinatario, "RESUMENES",
             f"EVENTO_AGENDA:{evento.id}:{accion.upper()}:{evento.fecha_inicio.isoformat()}",
             f"{accion.capitalize()} actividad: {evento.titulo}", "",
-            emisor=actor, incluir_email=True,
+            incluir_email=True,
             plantilla_clave="EVENTO_AGENDA",
             variables={"nombre": destinatario.nombre_completo, "actor": actor.nombre_completo,
                        "accion": accion, "proceso": proceso.nombre, "actividad": evento.titulo,

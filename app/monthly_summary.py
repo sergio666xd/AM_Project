@@ -69,7 +69,6 @@ def enviar_resumen_mensual():
                 f"RESUMEN:{usuario.id}:{hoy.year:04d}-{hoy.month:02d}",
                 f"Resumen de sus procesos de {mes_actual}",
                 mensaje,
-                emisor=usuario,
                 plantilla_clave="RESUMEN_MENSUAL",
                 variables={"nombre": usuario.nombre_completo, "mes": mes_actual, "resumen": mensaje},
             )

@@ -94,7 +94,7 @@ def _portal_origin(role: object) -> str:
         configured = "http://localhost:3000"
 
     if not setting:
-        # The SaaS lawyer portal keeps its existing origin and route scheme.
+        # El portal de clientes y abogados conserva su origen y su esquema de rutas.
         return configured.rstrip("/") if configured else public_site_url()
     configured = configured or default
     if not configured.startswith(("http://", "https://")):

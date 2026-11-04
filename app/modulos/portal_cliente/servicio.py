@@ -496,7 +496,7 @@ class ServicioPortalCliente:
                 cuerpo=(f"Hola {abogado.nombre_completo},\n\n{usuario.nombre_completo} cargó un archivo para la solicitud "
                         f"{solicitud.titulo}.\n\nDocumento solicitado: {pedido}\nArchivo recibido: {documento.nombre_archivo}\n"
                         f"Proceso: {proceso.nombre}\nFecha de carga: {recibido}\n\nAbrir enlace: Revisar documentos | {enlace}"),
-                tipo="DOCUMENTOS", origen=f"DOCUMENTO_RECIBIDO:{documento.id}", emisor=usuario,
+                tipo="DOCUMENTOS", origen=f"DOCUMENTO_RECIBIDO:{documento.id}",
                 plantilla_clave="DOCUMENTO_RECIBIDO",
                 variables={"nombre": abogado.nombre_completo, "actor": usuario.nombre_completo, "proceso": proceso.nombre,
                            "documento": pedido, "archivo": documento.nombre_archivo, "solicitud": solicitud.titulo,

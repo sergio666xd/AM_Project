@@ -244,13 +244,6 @@ def alertas_admin(db: Session) -> list[dict]:
             "estado": "ACTIVA", "descartable": descartable,
         })
 
-    solicitudes = db.query(models.SolicitudRegistro, models.Usuario.nombre_completo).join(
-        models.Usuario, models.Usuario.id == models.SolicitudRegistro.usuario_id
-    ).filter(models.Usuario.estado == models.EstadoUsuario.PENDIENTE_APROBACION).all()
-    for solicitud, nombre in solicitudes:
-        agregar(f"registro:{solicitud.usuario_id}", "Pendiente", "Media", solicitud.fecha_solicitud,
-                f"Solicitud de registro de {nombre}", nombre, "/gestion-procesos/admin/solicitudes", "Revisar solicitud")
-
     perfiles = db.query(models.SolicitudEdicionPerfilCliente).filter(
         models.SolicitudEdicionPerfilCliente.estado == "PENDIENTE"
     ).all()
