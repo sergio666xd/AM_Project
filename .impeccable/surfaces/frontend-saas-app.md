@@ -13,7 +13,7 @@ Audience and job: lawyer on desktop at the office reviewing new court actuacione
 
 Constraints: logo mark fixed (layout may change), Georgia is the logo face, navy/gold stay in the logo's range. Standard web controls and navigation.
 
-Unresolved: public site direction; billing rules (plan.md).
+Unresolved: public site direction; billing rules (docs/historico/plan-contratos-y-finanzas.md).
 
 ## Direction contract
 

@@ -1,321 +1,171 @@
-# Gestión de Procesos Judiciales
+# Alejandra Muñoz | Abogada y Asociados: sistema de la firma
 
-Plataforma web para gestionar radicados judiciales, actuaciones, procesos, clientes, tareas y notificaciones. El proyecto tiene un backend en FastAPI y un frontend en Next.js. La interfaz y las reglas de acceso están separadas por tipo de usuario.
+Aplicación interna de una sola firma. Reúne el sitio público, el portal donde cada cliente sigue sus procesos, el panel donde el equipo lleva los expedientes y la consola de administración. Backend en FastAPI, frontend en Next.js y despliegue en Vercel.
 
-## Alcance objetivo vigente
+- [`PRODUCT.md`](PRODUCT.md): quién usa la app, para qué y con qué tono.
+- [`DESIGN.md`](DESIGN.md): tokens, tipografía, componentes y reglas visuales ("expediente foliado").
+- [`diseno/`](diseno/): contrato de dirección visual y prototipo.
+- [`docs/historico/`](docs/historico/): planes y auditorías anteriores a la reconstrucción, solo como referencia.
 
-El producto objetivo es una aplicación interna para una sola firma: **Alejandra Muñoz | Abogada y Asociados**. Este README también señala piezas SaaS heredadas que todavía existen en el código; el registro externo, los planes comerciales y la administración de varias firmas quedan fuera del alcance. El roadmap está en `plan.md`.
+## Perfiles
 
-Este documento describe el estado funcional actual del repositorio. No pretende describir funcionalidades planeadas que todavía no estén implementadas.
-
-## Perfiles y acceso
-
-| Perfil | Alcance actual |
+| Perfil | Qué hace |
 | --- | --- |
-| `ADMIN` | Administración completa de Alejandra Muñoz \| Abogada y Asociados. No es administrador global de otras firmas. |
-| `ABOGADO_ADMIN` | Dirección/socio: acceso operativo a los expedientes y recursos de la firma. |
-| `ABOGADO` | Abogado asociado: acceso a procesos propios o explícitamente asignados. |
-| `CLIENTE` | Acceso limitado a procesos asignados, tareas asignadas y carga de documentos solicitados. |
+| `ADMIN` | Administra la firma: usuarios, operación, integraciones, sitio público, finanzas y auditoría. Entra por su propio dominio y puede abrir cualquier expediente. |
+| `ABOGADO_ADMIN` | Abogado de la firma: lleva sus procesos y los que colabora, con clientes, tareas, agenda, documentos, contratos y cobros. |
+| `ABOGADO` | Abogado asociado: entra al mismo panel de la firma. Todavía conserva el alcance aislado del antiguo SaaS en radicados y planes, por eso la administración aún no crea cuentas nuevas con este perfil (ver "Pendiente"). |
+| `CLIENTE` | Ve solo sus procesos, en lenguaje claro: en qué va cada uno, lo que la firma le pide, sus pagos y los mensajes. |
 
-La organización es única. `abogado_id` identifica al responsable del expediente, no a un tenant. Los clientes conservan aislamiento por asignación explícita.
+La firma es una sola organización. `abogado_id` identifica al responsable del expediente, no a un inquilino. Los clientes ven únicamente los procesos a los que están vinculados.
 
-Todos los paneles usan el `AppShell` compartido, navegación móvil, modo oscuro persistente y control de rutas según el rol. Los accesos creados por administración o por un abogado pueden exigir cambio de contraseña en el primer inicio de sesión.
+Las cuentas las crea la firma; no hay registro público. Quien recibe una contraseña temporal debe cambiarla al primer ingreso. El portal del cliente y la administración tratan de "usted"; el panel del abogado, de "tú".
 
-## Funcionalidades generales
+## Dónde vive cada parte
 
-- El registro público y la captación de interés SaaS están deshabilitados (`410 Gone`).
-- Las cuentas internas y clientes son habilitados por administración de la firma.
-- Inicio de sesión JWT.
-- El alta pública de abogados está cerrada; los usuarios internos y clientes se habilitan por administración de la firma.
-- Cambio obligatorio de contraseña cuando la cuenta fue creada con contraseña temporal.
-- Perfil personal: nombre completo y número de WhatsApp.
-- Configuración personal: preferencias de correo electrónico y WhatsApp.
-- Tema claro/oscuro desde el menú de cuenta.
-- Tareas, subtareas y recordatorios mediante Workflows durables.
+| Dominio | Qué sirve | Rutas en `frontend-saas/app` |
+| --- | --- | --- |
+| `alejandramunozabogada.com` | Sitio público: inicio, áreas de práctica, quiénes somos, contacto y textos legales (editables desde administración). | `page.tsx`, `areas-de-practica/`, `contacto/`, … |
+| `panel.alejandramunozabogada.com` | Ingreso y portal de clientes y abogados. | `gestion-procesos/auth`, `gestion-procesos/cliente`, `gestion-procesos/abogado` |
+| `admin.alejandramunozabogada.com` | Consola de administración. Reutiliza las páginas del abogado para los expedientes. | `gestion-procesos/admin` |
 
-## Administración de firma
+`frontend-saas/proxy.ts` decide qué área corresponde a cada dominio y rol. En local, `localhost:3000` sirve el portal y `admin.localhost:3000` la administración.
 
-Ruta principal: `/gestion-procesos/admin`.
+## Arquitectura
 
-### Usuarios
+### Backend (`app/`)
 
-La administración puede consultar las cuentas de la firma, con búsqueda por nombre, correo o WhatsApp; filtros por perfil y estado; selección múltiple; activación/suspensión masiva e individual; y ficha individual.
+```
+app/api/v2/          rutas de la aplicación (delgadas: validan, llaman al servicio, devuelven el esquema)
+app/api/internos/    API que llaman los flujos programados (/api/internal/workflows/*)
+app/modulos/<m>/     servicio.py (casos de uso, transacción y auditoría)
+                     repositorio.py (consultas), politicas.py (quién ve y cambia qué), esquemas.py
+app/nucleo/          sesión, errores, base de datos, zona horaria y ajustes compartidos
+app/models.py        modelos SQLAlchemy; cada módulo los reexporta en su modelos.py
+alembic_migrations/  revisiones del esquema
+```
 
-La ruta `/gestion-procesos/admin/usuarios/nuevo` permite crear abogados y clientes de la firma. No debe usarse para habilitar despachos externos.
+Módulos: `administracion` (resumen, usuarios, alertas e integraciones), `agenda`, `avisos` (la campana de cada rol), `bandeja` (lo urgente del día), `busqueda`, `clientes`, `contratos`, `cuenta` (datos propios y cambios con código), `documentos`, `etapas` (plantillas de etapas por tipo de proceso), `expedientes`, `finanzas` (cobros, pagos y estado de cuenta), `folios` (el expediente foliado), `glosario` (lenguaje claro), `identidad` (sesión y contraseñas), `judicial`, `mensajes`, `operacion` (consultas a la Rama Judicial), `portal_cliente`, `push`, `radicados`, `sistema` (actividad y auditoría), `sitio` (sitio público y formulario de contacto) y `tareas`.
 
-- Un abogado administrador (`ABOGADO_ADMIN`).
-- Un abogado asociado (`ABOGADO`).
-- Un cliente (`CLIENTE`) que se vincula a procesos con asignación explícita.
-Las cuentas creadas se activan y reciben una contraseña temporal que debe cambiarse en el primer acceso.
+### Frontend (`frontend-saas/`)
 
-### Solicitudes pendientes heredadas
+Next.js con Tailwind v4. Los componentes por área están en `components/` y el cliente de la API en `lib/api-v2/cliente.ts`. `lib/api-v2/esquema.ts` se genera del contrato del backend; no se edita a mano.
 
-- Lista de solicitudes pendientes.
-- Búsqueda y selección múltiple.
-- Aprobación o rechazo individual y masivo.
-- Las solicitudes previas al cierre del registro se conservan para revisión; no se aceptan nuevas solicitudes públicas.
-- Visor integrado de la tarjeta profesional en la misma página; sirve para imágenes y PDF.
+El navegador siempre llama a `/api` en el mismo origen: en Vercel lo reescribe `vercel.json` hacia el servicio del backend y en `next dev` lo reescribe `next.config.ts` hacia `BACKEND_DEV_URL`. La sesión viaja en la cookie httpOnly `am_sesion` y el frontend no guarda ningún token.
 
-### Planes SaaS heredados
+### Flujos programados
 
-La tabla y el panel de planes se conservan temporalmente para migrar datos existentes. La firma no comercializa suscripciones ni debe aplicar límites de planes a sus abogados.
+No hay Celery, Redis ni colas propias. Los procesos largos o diferidos corren como Vercel Workflow (`frontend-saas/workflows/`), que llaman a la API interna con `WORKFLOW_SERVICE_TOKEN`:
 
-### Visión global e inventarios
+| Qué | Cuándo |
+| --- | --- |
+| Consulta de radicados en la Rama Judicial | Cron `/cron/consultas/12` (12:00) y `/cron/consultas/17` (17:00, hora de Colombia); los días habilitados se eligen en Operación. |
+| Recordatorios de documentos pendientes | Cron diario `/cron/recordatorios-documentos` (8:00). |
+| Resumen mensual | Cron diario `/cron/resumen-mensual` (17:00); solo actúa el último día del mes. |
+| Recordatorios de tareas | Un workflow por recordatorio, que despierta a la hora programada. Al editar, completar o cancelar la tarea, la versión del recordatorio invalida las ejecuciones anteriores. |
 
-El dashboard administrativo consume una vista agregada de usuarios, procesos, radicados, actuaciones, tareas, documentos, consultas y estado de operación.
+Los avisos salen por correo, WhatsApp o notificación del navegador según las preferencias de cada persona. Las plantillas se editan desde Administración.
 
-En `/gestion-procesos/admin/operacion`, ADMIN puede consultar todos los radicados o una selección, revisar ejecuciones y reintentar solo los radicados fallidos. El diagnóstico separa conectividad/configuración de los envíos reales; estos últimos requieren destinatario explícito, confirmación y quedan auditados. La agenda `/gestion-procesos/admin/agenda` es de solo lectura y muestra únicamente tareas asociadas a abogados internos `ABOGADO_ADMIN`, con filtros por mes, responsable y estado; excluye tareas/procesos SaaS.
+## API
 
-Procesos, radicados, tareas y documentos tienen inventarios globales con búsqueda, filtro por estado cuando el recurso lo ofrece, selección, exportación CSV de la vista o selección, y copia de identificador.
+### `/api/v2`
 
-Los recordatorios, las notificaciones y el resumen mensual se ejecutan como Workflows durables. La versión del recordatorio invalida ejecuciones anteriores al editarlo, desactivarlo, cambiar el vencimiento o completar/cancelar la tarea. Los canales salen de las preferencias `RECORDATORIOS` y pueden ser email o WhatsApp. Cada Workflow de recordatorio que despierta reintenta los lanzamientos pendientes de otros recordatorios (`POST /api/internal/workflows/recordatorios/reconciliar`), por lo que no se necesita un scheduler por minuto.
-
-El resumen mensual se ejecuta desde el Cron diario `0 22 * * *` (17:00 Colombia) en `/cron/resumen-mensual`, que solo actúa el último día del mes.
-
-No se usa Celery, Redis ni QStash: fueron retirados del código, las dependencias y la configuración local.
-
-### Workflows de consultas judiciales
-
-- El servicio frontend llama al backend por el binding privado `BACKEND_SERVICE_URL` definido en `vercel.json`; no configures ese URL manualmente en Vercel.
-- El backend inicia Flows en el frontend mediante `VERCEL_URL`, que apunta al deployment público de frontend. Puedes fijar `WORKFLOW_FRONTEND_URL` como override si usas otro dominio. Si Preview tiene Deployment Protection, habilita `VERCEL_AUTOMATION_BYPASS_SECRET` para las llamadas de servicio; el código lo envía solo como header y nunca lo registra.
-- Configura `WORKFLOW_SERVICE_TOKEN` en los entornos runtime de frontend y backend con el mismo valor aleatorio. FastAPI lo usa para proteger `/api/internal/workflows/*`.
-- Configura `CRON_SECRET` en el frontend de Production. Vercel lo envía como `Authorization: Bearer ...` a los Cron de consultas y al resumen mensual. Los Cron solo corren en Production; cada uno invoca una vez al día y la DB filtra los días seleccionados.
-- Para ejecutar workflows con `next dev`, configura `WORKFLOW_BACKEND_URL=http://localhost:8000` en `frontend-saas/.env.local` y el mismo `WORKFLOW_SERVICE_TOKEN` en el backend local. No reutilices un token real de producción en desarrollo.
-- No guardes valores reales de estos secretos en Git ni los pegues en conversaciones o logs.
-
-Para activar los recordatorios en producción basta con la configuración de Workflows indicada arriba: cada recordatorio inicia su propio Workflow al crearse y el propio motor los despierta a la hora programada.
-
-## Panel del abogado administrador
-
-Ruta principal: `/gestion-procesos/abogado`.
-
-El resumen muestra conteos reales de procesos, clientes y tareas accesibles por el abogado asociado actual.
-
-### Clientes
-
-Ruta: `/gestion-procesos/abogado/clientes`.
-
-- Listado y búsqueda de clientes creados por el abogado.
-- Creación de cliente con correo, WhatsApp y contraseña temporal.
-- Notificación de acceso según las preferencias del cliente.
-- Cambio obligatorio de contraseña en el primer ingreso del cliente.
-
-### Procesos
-
-Ruta: `/gestion-procesos/abogado/procesos`.
-
-- Crear procesos con nombre y descripción.
-- Buscar procesos.
-- Cada proceso muestra cantidad de radicados y actuaciones.
-- El botón **Abrir ficha del proceso** dirige a `/gestion-procesos/abogado/procesos/[id]`.
-
-#### Ficha de proceso
-
-La ficha centraliza las relaciones del expediente:
-
-- Editar nombre y descripción del proceso.
-- Asociar y retirar clientes.
-- Asociar y retirar radicados existentes.
-- Crear un radicado desde el proceso y asociarlo en la misma transacción; se valida que tenga 23 dígitos y que no exista en el despacho.
-- Ver cantidad de actuaciones por radicado asociado.
-- Crear tareas directamente vinculadas al proceso.
-- Ver tareas ya vinculadas al proceso.
-
-El backend también proporciona en el detalle del proceso las solicitudes documentales, documentos entregados y actuaciones necesarias para notificar; estos datos están disponibles en la API para extender la interfaz.
-
-### Radicados y actuaciones
-
-Ruta: `/gestion-procesos/abogado/radicados`.
-
-- Crear radicados directamente con número de 23 dígitos.
-- Ver todos los radicados del abogado, estén o no asociados a un proceso.
-- Buscar por número, despacho o texto de actuación.
-- Desplegar un radicado para ver sus actuaciones, fecha y anotación.
-- Crear una tarea desde el radicado completo.
-- Crear una tarea desde una actuación específica; la tarea conserva `radicado_id` y `actuacion_id`.
-
-El backend permite solicitar manualmente la consulta de un radicado para actualizar actuaciones. La sincronización guarda novedades sin duplicar actuaciones; la consulta ya no trunca el historial por plan SaaS.
-
-### Tareas
-
-Ruta: `/gestion-procesos/abogado/tareas`.
-
-Actualmente permite crear tareas generales o ligadas a proceso, radicado, actuación y cliente; seleccionar prioridad y fecha límite; y listar tareas del despacho.
-
-La API de tareas además implementa:
-
-- Consultar, editar, completar y eliminar tareas.
-- Subtareas, incluidas subtareas asignables a clientes.
-- Recordatorios de tarea por WhatsApp.
-- Control para que un cliente solo complete las tareas o subtareas que le fueron asignadas.
-- Notificación al cliente cuando recibe una tarea o subtarea, por correo y opcionalmente WhatsApp según sus preferencias.
-
-### Notificaciones y documentos
-
-Desde la API del expediente el abogado puede:
-
-- Notificar una actuación de un proceso a un cliente asignado.
-- Incluir comentarios del abogado.
-- Generar el mensaje con el nombre del abogado, proceso, número de radicado y actuación.
-- Solicitar documentos a un cliente vinculado al proceso.
-- Permitir que el cliente cargue documentos únicamente en respuesta a una solicitud pendiente.
-
-La entrega se almacena como documento del proceso y conserva cliente, solicitud, tipo MIME y fecha.
-
-## Panel del cliente
-
-El modelo y las rutas de servidor restringen al cliente a sus procesos asignados, sus tareas asignadas y las solicitudes de documentos destinadas a él. No puede crear tareas, consultar procesos ajenos ni cargar documentos sin una solicitud activa.
-
-## API relevante
-
-### API v2 (`/api/v2`)
-
-La reconstrucción migra cada panel a la API v2; la v1 sigue viva hasta que su panel migre.
-
-- **Capas:** `app/api/v2` (routers delgados) → `app/modulos/<módulo>/servicio.py` (casos de uso, transacción y auditoría) → `repositorio.py` (único lugar con consultas) y `politicas.py` (quién ve y cambia qué). Lo compartido vive en `app/nucleo`.
-- **Sesión:** `POST /api/v2/sesion` deja el token en la cookie httpOnly `am_sesion` (`SameSite=Lax`). Los cambios autenticados con cookie llevan el encabezado `X-AM-Solicitud: 1`. También se acepta `Authorization: Bearer`. `DELETE /api/v2/sesion/todas` invalida las sesiones de todos los dispositivos, también las de la v1.
-- **Errores:** `{"codigo", "mensaje", "campos"}`; `codigo` es estable y `mensaje` se puede mostrar tal cual.
-- **Listados:** `{"items", "total", "siguiente"}`; se pide la página siguiente con `?cursor=<siguiente>`.
+- **Sesión:** `POST /api/v2/sesion` deja el token en la cookie `am_sesion` (`SameSite=Lax`). Los cambios autenticados con la cookie llevan el encabezado `X-AM-Solicitud: 1`. También se acepta `Authorization: Bearer`. `DELETE /api/v2/sesion/todas` cierra la sesión en todos los dispositivos. La recuperación de contraseña es `POST /sesion/recuperacion` y `POST /sesion/restablecimiento`, y el cambio de la temporal, `POST /sesion/contrasena`.
+- **Errores:** `{"codigo", "mensaje", "campos"}`. `codigo` es estable y `mensaje` se puede mostrar tal cual.
+- **Listados:** `{"items", "total", "siguiente"}`; la página siguiente se pide con `?cursor=<siguiente>`.
 - **Fechas:** ISO 8601 con la zona de Bogotá (`-05:00`).
-- **Tipos del frontend:** `frontend-saas/lib/api-v2/esquema.ts` se genera del contrato; tras cambiar una ruta v2 ejecuta `python scripts/exportar_openapi.py` y `npm run api:tipos` en `frontend-saas`. CI falla si quedan desactualizados. El cliente está en `frontend-saas/lib/api-v2/cliente.ts`.
-- **Pruebas:** `pytest tests/v2` usa SQLite; con `PRUEBAS_DATABASE_URL=postgresql://…` corre sobre PostgreSQL, como en CI.
+- **Documentación:** `/docs` y `/openapi.json`.
 
-Rutas actuales: sesión (`/sesion`, `/sesion/renovar`, `/sesion/todas`) y procesos (`GET /procesos` con búsqueda por nombre, radicado o cliente; `GET /procesos/{id}`; `POST /procesos/{id}/archivar` y `/reabrir`).
+Después de cambiar una ruta v2, regenera el contrato y los tipos; CI falla si quedan desactualizados:
 
-### API v1
-
-Todas las rutas protegidas usan `Authorization: Bearer <token>`.
-
-### Autenticación
-
-- `POST /api/auth/registro` es una ruta heredada cerrada; responde `410 Gone`.
-- `POST /api/auth/login`
-- `POST /api/auth/cambiar-password`
-- `GET /api/auth/me`
-- `PATCH /api/auth/perfil`
-- `PATCH /api/auth/preferencias-notificaciones`
-
-### Administración
-
-- `GET`, `POST /api/admin/usuarios`
-- `PATCH /api/admin/usuarios/{usuario_id}`
-- `PATCH /api/admin/usuarios/estado-masivo`
-- `GET /api/admin/vision-global`
-- `GET /api/admin/inventario/{recurso}`
-- `GET /api/admin/solicitudes`
-- `POST /api/admin/solicitudes/accion-masiva`
-- `GET /api/admin/solicitudes/{solicitud_id}/tarjeta`
-- `GET`, `POST /api/admin/planes`
-- `PUT`, `DELETE /api/admin/planes/{plan_id}`
-- `PATCH /api/admin/planes/estado-masivo`
-- `GET`, `PUT /api/admin/configuracion`
-
-### Expedientes y despacho
-
-- `GET`, `POST /api/expedientes/procesos`
-- `GET`, `PUT`, `DELETE /api/expedientes/procesos/{proceso_id}`
-- `POST /api/expedientes/procesos/{proceso_id}/radicados` para crear y asociar un radicado.
-- `POST`, `DELETE /api/expedientes/procesos/{proceso_id}/radicados/{radicado_id}` para asociar o retirar uno existente.
-- `POST`, `DELETE /api/expedientes/procesos/{proceso_id}/clientes/{cliente_id}`.
-- `POST /api/expedientes/procesos/{proceso_id}/actuaciones/{actuacion_id}/notificar`.
-- `POST /api/expedientes/procesos/{proceso_id}/solicitudes-documento`.
-- `POST /api/expedientes/solicitudes-documento/{solicitud_id}/archivo`.
-- `GET`, `POST /api/expedientes/clientes`.
-- `GET`, `POST /api/radicados`.
-- `POST /api/radicados/{radicado_id}/consultar`.
-- `GET`, `POST /api/tareas` y operaciones de actualización, completado, subtareas y recordatorios bajo `/api/tareas`.
-
-## Ejecución local
-
-### Requisitos
-
-- Python 3.11 o compatible.
-- Node.js 20 o compatible.
-- PostgreSQL configurado mediante las variables de entorno del backend.
-- Credenciales de almacenamiento compatible con S3/R2 si se probarán cargas de documentos o tarjetas.
-
-### Migración de radicados canónicos
-
-Antes de desplegar el esquema nuevo sobre una base existente, configura `DATABASE_URL` y ejecuta el preflight de solo lectura:
-
-```powershell
-python -m app.migrate_radicados_canonicos
+```bash
+python scripts/exportar_openapi.py
+cd frontend-saas && npm run api:tipos
 ```
 
-Revisa los conteos. `invalid_rows`, `conflict_groups`, `cross_scope_references` y `unhandled_reference_tables` deben ser cero; si no, resuelve los casos antes de migrar. El preflight no modifica datos. La migración debe quedar aplicada antes de reabrir tráfico normal a la versión que consulta el esquema nuevo.
+### `/api/internal/workflows`
 
-Con un backup verificado, aplica la migración en una transacción:
+Solo la llaman los flujos programados, con `Authorization: Bearer $WORKFLOW_SERVICE_TOKEN`. Conserva el formato de error `{"detail": ...}` de FastAPI.
 
-```powershell
-python -m app.migrate_radicados_canonicos --apply --backup-confirmed
-```
+## Variables de entorno
 
-La migración renombra `radicados.usuario_id` a `creado_por_id`, crea los vínculos usuario-radicado, fusiona duplicados solo dentro de `FIRMA` o del mismo propietario SaaS y redirige procesos, consultas, actuaciones, tareas y subtareas. Si detecta metadatos incompatibles, referencias no contempladas o números inválidos, aborta. Debe ejecutarse antes de desplegar el backend que usa el esquema nuevo.
+Backend:
 
-#### Ejecución desde Swagger
+| Variable | Para qué |
+| --- | --- |
+| `DATABASE_URL` | PostgreSQL. |
+| `JWT_SECRET_KEY` | Firma de sesiones y enlaces de recuperación. |
+| `ADMIN_EMAIL`, `ADMIN_PASSWORD` | Crean la primera cuenta ADMIN si no existe ninguna. |
+| `INTEGRATION_CREDENTIALS_KEY` | Cifra las credenciales de integraciones guardadas desde Administración. |
+| `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASSWORD`, `SMTP_FROM`, `SMTP_STARTTLS` | Correo. |
+| `WHATSAPP_API_URL`, `WHATSAPP_TOKEN` | WhatsApp. |
+| `WEB_PUSH_VAPID_PUBLIC_KEY`, `WEB_PUSH_VAPID_PRIVATE_KEY`, `WEB_PUSH_VAPID_SUBJECT` | Notificaciones del navegador. |
+| `WORKFLOW_SERVICE_TOKEN` | Protege la API interna; el mismo valor en el frontend. |
+| `WORKFLOW_FRONTEND_URL` | Opcional: dominio para iniciar workflows si no sirve `VERCEL_URL`. |
+| `VERCEL_AUTOMATION_BYPASS_SECRET` | Solo si Preview tiene Deployment Protection; se envía como encabezado y nunca se registra. |
+| `FRONTEND_URL`, `PUBLIC_SITE_URL`, `CORS_ORIGINS` | Enlaces en avisos y orígenes adicionales. |
+| `AM_COOKIE_SEGURA` | Opcional: fuerza la cookie `Secure`; por defecto solo en Vercel. |
 
-El backend también expone estas operaciones ADMIN en `/docs`:
+Frontend:
 
-- `GET /api/admin/migraciones/radicados/preview`: preflight de solo lectura.
-- `POST /api/admin/migraciones/radicados/aplicar`: aplica la migración únicamente si `RADICADO_MIGRATION_API_ENABLED=true` y el body contiene `{"confirmacion":"CONFIRMO_BACKUP_VERIFICADO"}`.
+| Variable | Para qué |
+| --- | --- |
+| `BACKEND_SERVICE_URL` | Lo inyecta el binding de `vercel.json`; no se configura a mano. |
+| `WORKFLOW_SERVICE_TOKEN` | El mismo valor que en el backend. |
+| `CRON_SECRET` | Solo en Production; Vercel lo envía a los cron. |
+| `NEXT_PUBLIC_SITE_URL` | URL pública del sitio. |
+| `BACKEND_DEV_URL`, `WORKFLOW_BACKEND_URL` | Solo en desarrollo: dónde está el backend local (por defecto `http://127.0.0.1:8000`). |
 
-Para producción, confirma primero que existe el backup. Despliega el código con el flag habilitado durante una ventana de mantenimiento, sin reabrir tráfico normal; autorízate como ADMIN en Swagger, revisa el preview, ejecuta el apply y confirma el resultado. Después deshabilita el flag y vuelve a desplegar. Reabre tráfico solo tras verificar el esquema migrado. No mantengas habilitada la ejecución de migraciones desde API.
+No guardes valores reales de secretos en Git ni los pegues en conversaciones o registros.
 
-### Backend
+## Desarrollo local
 
-```powershell
+Requisitos: Python 3.12, Node.js 20 y PostgreSQL.
+
+```bash
 python -m venv venv
-.\venv\Scripts\Activate.ps1
-pip install -r requirements.txt
+source venv/bin/activate            # Windows: .\venv\Scripts\Activate.ps1
+pip install -r requirements-dev.txt
 uvicorn app.main:app --reload
 ```
 
-La aplicación crea tablas y, al iniciar, aplica DDL de compatibilidad para instalaciones PostgreSQL existentes. Ya no crea planes comerciales automáticamente. Solo crea una cuenta ADMIN si `ADMIN_PASSWORD` está configurada y aún no existe ninguna cuenta ADMIN.
-
-### Migraciones de esquema (Alembic)
-
-Los cambios de esquema se versionan con Alembic en `alembic_migrations/versions/`. Al arrancar, la API aplica las revisiones pendientes con un bloqueo de PostgreSQL, así que dos instancias de Vercel no migran a la vez:
-
-- Base vacía: crea las tablas desde los modelos y la marca en la última revisión.
-- Base anterior a Alembic: la marca en la revisión base `0001` (no modifica nada) y aplica las siguientes.
-- Base ya versionada: aplica solo las revisiones nuevas.
-
-Para un cambio de esquema, edita el modelo en `app/models.py` y genera la revisión contra una base local que esté al día:
-
-```powershell
-alembic upgrade head
-alembic revision --autogenerate -m "describe el cambio"
-```
-
-Revisa el archivo generado antes de confirmarlo: el autogenerado no detecta renombres y puede proponer borrar columnas. `alembic upgrade head --sql` muestra el SQL sin ejecutarlo. No agregues sentencias nuevas a `actualizar_esquema_planes()` ni a `migrations/*.sql`; quedan como esquema heredado.
-
-### Frontend
-
-```powershell
+```bash
 cd frontend-saas
 npm install
 npm run dev
 ```
 
-El navegador siempre llama a `/api` en el mismo origen: en Vercel lo reescribe `vercel.json` y en `next dev` lo reescribe `next.config.ts` hacia `BACKEND_DEV_URL` (por defecto `http://127.0.0.1:8000`). Así la cookie de sesión `am_sesion` (httpOnly) viaja sola; el frontend no guarda ningún token.
+Para probar workflows con `next dev`, pon `WORKFLOW_BACKEND_URL=http://localhost:8000` en `frontend-saas/.env.local` y el mismo `WORKFLOW_SERVICE_TOKEN` en los dos lados. No reutilices un token de producción.
 
-## Verificación realizada
+## Esquema y migraciones
 
-La verificación técnica usada en el desarrollo actual es:
+Los cambios de esquema se versionan con Alembic en `alembic_migrations/versions/`. Al arrancar, la API aplica las revisiones pendientes con un bloqueo de PostgreSQL, así que dos instancias no migran a la vez:
 
-```powershell
-cd frontend-saas
-npx.cmd tsc --noEmit
+- Base vacía: crea las tablas desde los modelos y la marca en la última revisión.
+- Base anterior a Alembic: la marca en la revisión base `0001` sin modificarla y aplica las siguientes.
+- Base ya versionada: aplica solo las revisiones nuevas.
+
+Para un cambio, edita `app/models.py` y genera la revisión contra una base local al día:
+
+```bash
+alembic upgrade head
+alembic revision --autogenerate -m "describe el cambio"
 ```
 
-Y para las rutas modificadas del backend:
+Revisa el archivo antes de confirmarlo: el autogenerado no detecta renombres y puede proponer borrar columnas. `actualizar_esquema_planes()` (en `app/esquema.py`) y `migrations/*.sql` son esquema heredado; no se les agregan sentencias.
 
-```powershell
-.\venv\Scripts\python.exe -m py_compile app\main.py app\schemas.py app\routers\admin.py app\routers\expedientes.py app\routers\tareas.py
+`python -m app.migrate_radicados_canonicos` es la herramienta de la migración de radicados canónicos de octubre de 2026. Sin argumentos solo muestra conteos. `--apply --backup-confirmed` aplica la migración, y solo debe usarse con un backup verificado.
+
+## Pruebas y CI
+
+```bash
+ruff check .
+pytest -q                                   # SQLite
+PRUEBAS_DATABASE_URL=postgresql://… pytest -q tests/v2   # PostgreSQL, como en CI
+cd frontend-saas && npm run lint && npx tsc --noEmit && npm run build
 ```
 
-## Límites actuales conocidos
+CI (`.github/workflows/ci.yml`) corre el backend con ruff y pytest, las pruebas v2 y las migraciones sobre PostgreSQL, la verificación de que los tipos del frontend coinciden con el contrato, y ESLint, TypeScript y la compilación del frontend.
 
-- La interfaz de ficha de proceso ya gestiona clientes, radicados y tareas, pero las secciones globales visuales de historial de notificaciones y documentos aún requieren una implementación más completa.
-- La API de tareas tiene más capacidades que la interfaz del abogado actual; edición visual, calendario/kanban, subtareas y recordatorios todavía necesitan una experiencia completa en frontend.
-- La auditoría transversal de cambios y el historial de entregas/envíos aún no se presentan como módulos visuales independientes.
+## Pendiente
+
+- Las tablas y columnas del antiguo SaaS (planes, solicitudes de registro, intereses, sector y alcance por propietario) siguen en la base. Se retiran en un cambio aparte, con confirmación explícita, junto con el alcance aislado que todavía arrastra el perfil `ABOGADO`.
