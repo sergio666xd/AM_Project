@@ -1,11 +1,26 @@
 from urllib.parse import quote
 
-from fastapi import APIRouter, Depends, Query
+from io import BytesIO
+
+from fastapi import APIRouter, Depends, File, Query, Response, UploadFile, status
 from fastapi.responses import StreamingResponse
 
 from app import models
 from app.api.v2.dependencias import servicio_contratos
-from app.modulos.contratos.esquemas import GrupoContratos, ListaContratos, ListaSinContrato
+from app.document_validation import MAX_DOCUMENT_BYTES
+from app.modulos.contratos.esquemas import (
+    CambiosContrato,
+    ContratoCargado,
+    ContratoDetalle,
+    ContratosDelProceso,
+    CitaDeFirma,
+    GrupoContratos,
+    ListaContratos,
+    ListaSinContrato,
+    MotivoContrato,
+    NuevoContrato,
+    PlantillaContrato,
+)
 from app.modulos.contratos.servicio import ServicioContratos
 from app.nucleo.sesion import usuario_actual
 
@@ -29,6 +44,174 @@ def procesos_sin_contrato(
 ):
     """Procesos activos con cliente que no tienen un contrato vigente."""
     return servicio.sin_contrato(usuario)
+
+
+PDF = {200: {"content": {"application/pdf": {}}, "description": "El contrato en PDF."}}
+
+
+def _pdf(contenido: bytes, nombre: str) -> StreamingResponse:
+    return StreamingResponse(BytesIO(contenido), media_type="application/pdf", headers={
+        "Content-Disposition": f'inline; filename="{nombre}"', "Cache-Control": "private, no-store", "X-Content-Type-Options": "nosniff",
+    })
+
+
+# ---- El contrato dentro del expediente -------------------------------------------
+
+
+@router.get("/proceso/{proceso_id}", response_model=ContratosDelProceso, summary="Contratos de un proceso")
+def contratos_del_proceso(
+    proceso_id: int,
+    usuario: models.Usuario = Depends(usuario_actual),
+    servicio: ServicioContratos = Depends(servicio_contratos),
+):
+    """Cada contrato con sus datos, versiones, la cita de firma y el último envío de la copia al cliente."""
+    return servicio.del_proceso(usuario, proceso_id)
+
+
+@router.get("/proceso/{proceso_id}/plantilla", response_model=PlantillaContrato, summary="Datos iniciales de un contrato")
+def plantilla_contrato(
+    proceso_id: int,
+    cliente_id: int | None = Query(None, description="Llena los datos que la cuenta del cliente ya tiene."),
+    usuario: models.Usuario = Depends(usuario_actual),
+    servicio: ServicioContratos = Depends(servicio_contratos),
+):
+    return servicio.plantilla(usuario, proceso_id, cliente_id)
+
+
+@router.post("/proceso/{proceso_id}", response_model=ContratoDetalle, status_code=status.HTTP_201_CREATED,
+             summary="Crear un contrato en borrador")
+def crear_contrato(
+    proceso_id: int,
+    datos: NuevoContrato,
+    usuario: models.Usuario = Depends(usuario_actual),
+    servicio: ServicioContratos = Depends(servicio_contratos),
+):
+    return servicio.crear(usuario, proceso_id, datos)
+
+
+@router.post("/proceso/{proceso_id}/vista-previa", response_class=StreamingResponse, responses=PDF,
+             summary="Vista previa del contrato")
+def vista_previa_contrato(
+    proceso_id: int,
+    datos: NuevoContrato,
+    usuario: models.Usuario = Depends(usuario_actual),
+    servicio: ServicioContratos = Depends(servicio_contratos),
+):
+    """El PDF con los datos del formulario, sin guardarlos. Exige los datos completos."""
+    return _pdf(servicio.vista_previa(usuario, proceso_id, datos), "contrato-vista-previa.pdf")
+
+
+@router.get("/{contrato_id}", response_model=ContratoDetalle, summary="Un contrato")
+def obtener_contrato(
+    contrato_id: int,
+    usuario: models.Usuario = Depends(usuario_actual),
+    servicio: ServicioContratos = Depends(servicio_contratos),
+):
+    return servicio.detalle(usuario, contrato_id)
+
+
+@router.patch("/{contrato_id}", response_model=ContratoDetalle, summary="Cambiar los datos de un borrador")
+def editar_contrato(
+    contrato_id: int,
+    datos: CambiosContrato,
+    usuario: models.Usuario = Depends(usuario_actual),
+    servicio: ServicioContratos = Depends(servicio_contratos),
+):
+    return servicio.editar(usuario, contrato_id, datos)
+
+
+@router.delete("/{contrato_id}", status_code=status.HTTP_204_NO_CONTENT, summary="Eliminar un contrato anulado")
+def eliminar_contrato(
+    contrato_id: int,
+    usuario: models.Usuario = Depends(usuario_actual),
+    servicio: ServicioContratos = Depends(servicio_contratos),
+):
+    """Los archivos subidos y la agenda quedan en el expediente; una cita de firma activa se cancela."""
+    servicio.eliminar(usuario, contrato_id)
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+@router.get("/{contrato_id}/pdf", response_class=StreamingResponse, responses=PDF, summary="PDF para imprimir y firmar")
+def pdf_contrato(
+    contrato_id: int,
+    usuario: models.Usuario = Depends(usuario_actual),
+    servicio: ServicioContratos = Depends(servicio_contratos),
+):
+    return _pdf(servicio.pdf(usuario, contrato_id), f"contrato-{contrato_id}.pdf")
+
+
+@router.post("/{contrato_id}/listo", response_model=ContratoDetalle, summary="Dejar el contrato listo para firmar")
+def contrato_listo(
+    contrato_id: int,
+    usuario: models.Usuario = Depends(usuario_actual),
+    servicio: ServicioContratos = Depends(servicio_contratos),
+):
+    """Exige los datos completos. Desde aquí ya no se edita: se anula y se hace otro."""
+    return servicio.marcar_listo(usuario, contrato_id)
+
+
+@router.post("/{contrato_id}/firma", response_model=ContratoDetalle, status_code=status.HTTP_201_CREATED,
+             summary="Agendar la firma")
+def agendar_firma_contrato(
+    contrato_id: int,
+    datos: CitaDeFirma,
+    usuario: models.Usuario = Depends(usuario_actual),
+    servicio: ServicioContratos = Depends(servicio_contratos),
+):
+    """Crea la cita de firma con el cliente del contrato, le avisa y deja el contrato en firma."""
+    return servicio.agendar_firma(usuario, contrato_id, datos)
+
+
+@router.post("/{contrato_id}/firmado", response_model=ContratoCargado, status_code=status.HTTP_201_CREATED,
+             summary="Subir el contrato firmado")
+def subir_contrato_firmado(
+    contrato_id: int,
+    archivo: UploadFile = File(..., description="El escaneado en PDF, de máximo 15 MB."),
+    usuario: models.Usuario = Depends(usuario_actual),
+    servicio: ServicioContratos = Depends(servicio_contratos),
+):
+    """Deja el contrato firmado, completa la cita de firma y le envía la copia al cliente por correo."""
+    return servicio.subir_firmado(usuario, contrato_id, nombre=archivo.filename or "contrato-firmado.pdf",
+                                  tipo=archivo.content_type, contenido=archivo.file.read(MAX_DOCUMENT_BYTES + 1))
+
+
+@router.post("/{contrato_id}/reenviar-copia", response_model=ContratoDetalle, summary="Reenviar la copia firmada")
+def reenviar_copia_contrato(
+    contrato_id: int,
+    usuario: models.Usuario = Depends(usuario_actual),
+    servicio: ServicioContratos = Depends(servicio_contratos),
+):
+    return servicio.reenviar_copia(usuario, contrato_id)
+
+
+@router.post("/{contrato_id}/reabrir-firma", response_model=ContratoDetalle, summary="Reabrir la firma")
+def reabrir_firma_contrato(
+    contrato_id: int,
+    usuario: models.Usuario = Depends(usuario_actual),
+    servicio: ServicioContratos = Depends(servicio_contratos),
+):
+    """Vuelve a en firma para subir otro escaneado; la cita queda programada otra vez."""
+    return servicio.reabrir_firma(usuario, contrato_id)
+
+
+@router.post("/{contrato_id}/anular", response_model=ContratoDetalle, summary="Anular un contrato sin firmar")
+def anular_contrato(
+    contrato_id: int,
+    datos: MotivoContrato,
+    usuario: models.Usuario = Depends(usuario_actual),
+    servicio: ServicioContratos = Depends(servicio_contratos),
+):
+    return servicio.anular(usuario, contrato_id, datos)
+
+
+@router.post("/{contrato_id}/terminar", response_model=ContratoDetalle, summary="Terminar un contrato firmado")
+def terminar_contrato(
+    contrato_id: int,
+    datos: MotivoContrato,
+    usuario: models.Usuario = Depends(usuario_actual),
+    servicio: ServicioContratos = Depends(servicio_contratos),
+):
+    return servicio.terminar(usuario, contrato_id, datos)
 
 
 @router.get(
