@@ -88,9 +88,9 @@ export function SolicitarDocumentosModal({ open, onClose, onCreada, procesoInici
     evento.preventDefault();
     const pedidos = documentos.map((d) => d.trim()).filter(Boolean);
     const faltan: Record<string, string> = {};
-    if (!procesoId) faltan.proceso_id = "Elige el proceso.";
-    else if (!clienteElegido) faltan.cliente_id = proceso?.clientes.length ? "Elige a quién se lo pides." : "El proceso no tiene clientes vinculados.";
-    if (!pedidos.length) faltan.documentos = "Escribe al menos un documento.";
+    if (!procesoId) faltan.proceso_id = "Falta el proceso.";
+    else if (!clienteElegido) faltan.cliente_id = proceso?.clientes.length ? "Falta a quién se le piden." : "El proceso no tiene clientes vinculados.";
+    if (!pedidos.length) faltan.documentos = "Falta al menos un documento.";
     if (Object.keys(faltan).length) {
       setErrores(faltan);
       return;
@@ -136,7 +136,7 @@ export function SolicitarDocumentosModal({ open, onClose, onCreada, procesoInici
               aria-invalid={errores.proceso_id ? true : undefined}
               className={CAMPO}
             >
-              <option value="">{procesos ? "Elige un proceso" : "Cargando procesos…"}</option>
+              <option value="">{procesos ? "Elegir un proceso" : "Cargando procesos…"}</option>
               {procesos?.map((p) => <option key={p.id} value={p.id}>{p.nombre}</option>)}
             </select>
             {errores.proceso_id && <p className="mt-1.5 text-[13px] text-bad">{errores.proceso_id}</p>}
@@ -151,7 +151,7 @@ export function SolicitarDocumentosModal({ open, onClose, onCreada, procesoInici
               aria-invalid={errores.cliente_id ? true : undefined}
               className={CAMPO}
             >
-              <option value="">{!proceso ? "Elige primero el proceso" : proceso.clientes.length === 0 ? "Sin clientes vinculados" : "Elige un cliente"}</option>
+              <option value="">{!proceso ? "Primero, el proceso" : proceso.clientes.length === 0 ? "Sin clientes vinculados" : "Elegir un cliente"}</option>
               {proceso?.clientes.map((c) => <option key={c.id} value={c.id}>{c.nombre}</option>)}
             </select>
             {errores.cliente_id && <p className="mt-1.5 text-[13px] text-bad">{errores.cliente_id}</p>}
@@ -159,7 +159,7 @@ export function SolicitarDocumentosModal({ open, onClose, onCreada, procesoInici
         </div>
 
         <fieldset className="mt-4">
-          <legend className={ETIQUETA}>Qué documentos necesitas</legend>
+          <legend className={ETIQUETA}>Qué documentos se necesitan</legend>
           <ol ref={lista} className="space-y-2">
             {documentos.map((documento, indice) => (
               <li key={indice} className="flex items-center gap-2">
@@ -229,7 +229,7 @@ export function SolicitarDocumentosModal({ open, onClose, onCreada, procesoInici
           <p className="mt-1.5 text-[13px] text-ink-3">
             {errores.fecha_limite
               ? <span className="text-bad">{errores.fecha_limite}</span>
-              : fecha ? `Le recordamos dos días antes y al día siguiente si no ha entregado.` : "Sin fecha, solo le recuerdas tú."}
+              : fecha ? `Le recordamos dos días antes y al día siguiente si no ha entregado.` : "Sin fecha, no le enviamos recordatorios."}
           </p>
         </fieldset>
 

@@ -13,6 +13,7 @@ import { Button } from "@/components/ui/Button";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { DataTable, type DataTableColumn, type RowAction } from "@/components/ui/DataTable";
 import { PageHeader } from "@/components/ui/PageHeader";
+import { useSession } from "@/context/SessionContext";
 import { SegmentedControl } from "@/components/ui/SegmentedControl";
 import { SummaryStrip } from "@/components/ui/SummaryStrip";
 import { Tag } from "@/components/ui/Tag";
@@ -41,6 +42,8 @@ export default function TareasPage() {
   const [vista, setVista] = useState<Vista>("lista");
   const [grupo, setGrupo] = useState<Grupo>("abiertas");
   const [soloMias, setSoloMias] = useState(false);
+  // En la consola de administración nadie tiene tareas propias.
+  const consola = useSession().user?.rol === "ADMIN";
   const [busqueda, setBusqueda] = useState("");
   const [lista, setLista] = useState<Esquemas["ListaTareas"] | null>(null);
   const [cargando, setCargando] = useState(true);
@@ -217,10 +220,12 @@ export default function TareasPage() {
           <Search aria-hidden="true" size={16} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-ink-3" />
           <input type="search" value={busqueda} onChange={(e) => setBusqueda(e.target.value)} placeholder="Buscar por tarea, proceso o cliente" aria-label="Buscar tareas" className={CAMPO_BUSQUEDA} />
         </div>
-        <label className="inline-flex min-h-10 cursor-pointer items-center gap-2 text-[14px] text-ink-2">
-          <input type="checkbox" checked={soloMias} onChange={(e) => setSoloMias(e.target.checked)} className="size-4 accent-[var(--navy)]" />
-          Solo las mías
-        </label>
+        {!consola && (
+          <label className="inline-flex min-h-10 cursor-pointer items-center gap-2 text-[14px] text-ink-2">
+            <input type="checkbox" checked={soloMias} onChange={(e) => setSoloMias(e.target.checked)} className="size-4 accent-[var(--navy)]" />
+            Solo las mías
+          </label>
+        )}
         <Link href="/gestion-procesos/abogado/tareas/plantillas" className="inline-flex min-h-10 items-center gap-1.5 text-[14px] font-semibold text-navy-ink underline-offset-2 hover:underline">
           <LayoutTemplate aria-hidden="true" size={16} />
           Plantillas
@@ -258,7 +263,7 @@ export default function TareasPage() {
             storageKey="abogado-tareas-v2"
             loading={cargando && !lista}
             emptyTitle={grupo === "abiertas" && !busqueda ? "No hay tareas abiertas" : "Ninguna tarea coincide"}
-            emptyDescription={grupo === "abiertas" && !busqueda ? "Crea una tarea o usa una plantilla cuando llegue una actuación." : "Prueba con otra búsqueda o grupo."}
+            emptyDescription={grupo === "abiertas" && !busqueda ? "Las tareas se crean a mano o con una plantilla cuando llega una actuación." : "Prueba con otra búsqueda o grupo."}
             emptyAction={grupo === "abiertas" && !busqueda ? <Button icon={<Plus size={16} />} onClick={() => setNueva(true)}>Nueva tarea</Button> : undefined}
           />
         )}
@@ -297,7 +302,7 @@ function SinTareas({ onNueva }: { onNueva: () => void }) {
   return (
     <div className="rounded-[var(--radius-lg)] bg-sheet px-6 py-12 text-center shadow-[0_0_0_1px_var(--line)]">
       <p className="font-display text-[19px] text-ink">No hay tareas</p>
-      <p className="mx-auto mt-1 max-w-sm text-[14px] text-ink-3">Crea una tarea o usa una plantilla cuando llegue una actuación.</p>
+      <p className="mx-auto mt-1 max-w-sm text-[14px] text-ink-3">Las tareas se crean a mano o con una plantilla cuando llega una actuación.</p>
       <Button className="mt-4" icon={<Plus size={16} />} onClick={onNueva}>Nueva tarea</Button>
     </div>
   );

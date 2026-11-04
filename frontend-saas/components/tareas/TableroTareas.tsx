@@ -12,8 +12,8 @@ import { RUTA_TAREA, nombreEstado, prioridad, type EstadoTarea, type Tarea } fro
 
 const COLUMNAS: { estado: EstadoTarea; vacio: string }[] = [
   { estado: "PENDIENTE", vacio: "Nada pendiente." },
-  { estado: "EN_CURSO", vacio: "Arrastra aquí lo que estás haciendo." },
-  { estado: "COMPLETADA", vacio: "Lo que completes en los últimos 14 días aparece aquí." },
+  { estado: "EN_CURSO", vacio: "Aquí va lo que está en curso." },
+  { estado: "COMPLETADA", vacio: "Lo completado en los últimos 14 días aparece aquí." },
 ];
 
 /**

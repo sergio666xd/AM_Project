@@ -10,6 +10,7 @@ import { CalendarioMes, type ElementoCalendario } from "@/components/calendario/
 import { Button } from "@/components/ui/Button";
 import { LoadingState } from "@/components/ui/LoadingState";
 import { PageHeader } from "@/components/ui/PageHeader";
+import { useSession } from "@/context/SessionContext";
 import { SegmentedControl } from "@/components/ui/SegmentedControl";
 import { Tag, type TonoTag } from "@/components/ui/Tag";
 import { api, mensajeDeError, type Esquemas } from "@/lib/api-v2/cliente";
@@ -42,6 +43,8 @@ function rango(vista: Vista, ancla: string): [string, string] {
 }
 
 export default function AgendaPage() {
+  const { user } = useSession();
+  const consola = user?.rol === "ADMIN";
   const [vista, setVista] = useState<Vista>("semana");
   const [ancla, setAncla] = useState(hoyISO());
   const [conTareas, setConTareas] = useState(true);
@@ -92,10 +95,10 @@ export default function AgendaPage() {
     <div>
       <PageHeader
         title="Agenda"
-        description="Audiencias, reuniones y vencimientos de los procesos que llevas."
+        description={consola ? "Audiencias, reuniones y vencimientos de todos los procesos de la firma." : "Audiencias, reuniones y vencimientos de los procesos que llevas."}
         action={
           <div className="flex flex-wrap gap-2">
-            <Button variant="secondary" icon={<CalendarSync size={16} />} onClick={() => setSuscripcion(true)}>Ver en mi calendario</Button>
+            {!consola && <Button variant="secondary" icon={<CalendarSync size={16} />} onClick={() => setSuscripcion(true)}>Ver en mi calendario</Button>}
             <Button icon={<CalendarPlus size={16} />} onClick={() => setNuevo(true)}>Agendar evento</Button>
           </div>
         }
@@ -161,7 +164,7 @@ export default function AgendaPage() {
         ) : elementos.length === 0 ? (
           <div className="rounded-[var(--radius-lg)] bg-sheet px-6 py-12 text-center shadow-[0_0_0_1px_var(--line)]">
             <p className="font-display text-[19px] text-ink">Nada en los próximos 30 días</p>
-            <p className="mx-auto mt-1 max-w-sm text-[14px] text-ink-3">Cuando agendes una audiencia o una tarea tenga fecha límite, aparecerá aquí.</p>
+            <p className="mx-auto mt-1 max-w-sm text-[14px] text-ink-3">Las audiencias, citas y tareas con fecha límite aparecen aquí.</p>
           </div>
         ) : (
           <ol className="space-y-5">

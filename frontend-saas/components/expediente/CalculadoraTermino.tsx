@@ -44,7 +44,7 @@ export function CalculadoraTermino({
   async function calcular() {
     const n = Number(dias);
     if (!notificacion || !Number.isInteger(n) || n < 1 || n > 365) {
-      setError("Escribe la fecha de notificación y un término de 1 a 365 días hábiles.");
+      setError("Faltan la fecha de notificación y un término de 1 a 365 días hábiles.");
       return;
     }
     setCalculando(true);

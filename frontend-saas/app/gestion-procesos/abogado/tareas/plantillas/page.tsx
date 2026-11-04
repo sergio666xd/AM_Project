@@ -54,7 +54,7 @@ export default function PlantillasPage() {
         <div className="rounded-[var(--radius-lg)] bg-sheet px-6 py-12 text-center shadow-[0_0_0_1px_var(--line)]">
           <LayoutTemplate aria-hidden="true" className="mx-auto size-7 text-ink-3" />
           <p className="mt-3 font-display text-[19px] text-ink">Sin plantillas todavía</p>
-          <p className="mx-auto mt-1 max-w-sm text-[14px] text-ink-3">Crea la primera con los pasos que repites ante un traslado, un auto de pruebas o una audiencia.</p>
+          <p className="mx-auto mt-1 max-w-sm text-[14px] text-ink-3">Una plantilla guarda los pasos que se repiten ante un traslado, un auto de pruebas o una audiencia.</p>
           <Button className="mt-4" icon={<Plus size={16} />} onClick={() => setEditando("nueva")}>Nueva plantilla</Button>
         </div>
       ) : (

@@ -102,7 +102,7 @@ export function AplicarPlantillaModal({
     evento.preventDefault();
     if (!elegida) return;
     if (!proceso) {
-      setErrores({ proceso_id: "Elige el proceso." });
+      setErrores({ proceso_id: "Falta el proceso." });
       return;
     }
     setGuardando(true);
@@ -130,7 +130,7 @@ export function AplicarPlantillaModal({
           <p className="text-[14px] text-ink-3">{errores.general ?? "Cargando plantillas…"}</p>
         ) : plantillas.length === 0 ? (
           <p className="rounded-lg bg-manila px-3.5 py-3 text-[14px] text-ink-2">
-            Todavía no hay plantillas. <Link href="/gestion-procesos/abogado/tareas/plantillas" className="font-semibold text-navy-ink underline">Crea la primera</Link>.
+            Todavía no hay plantillas. <Link href="/gestion-procesos/abogado/tareas/plantillas" className="font-semibold text-navy-ink underline">Crear la primera</Link>.
           </p>
         ) : (
           <>
@@ -162,7 +162,7 @@ export function AplicarPlantillaModal({
                 <div>
                   <label htmlFor={`${id}-proceso`} className={ETIQUETA}>Proceso</label>
                   <select id={`${id}-proceso`} value={proceso} onChange={(e) => setProceso(e.target.value)} className={CAMPO} aria-invalid={errores.proceso_id ? true : undefined}>
-                    <option value="">{procesos ? "Elige un proceso" : "Cargando…"}</option>
+                    <option value="">{procesos ? "Elegir un proceso" : "Cargando…"}</option>
                     {procesos?.map((p) => <option key={p.id} value={p.id}>{p.nombre}</option>)}
                   </select>
                   {errores.proceso_id && <p className="mt-1.5 text-[13px] text-bad">{errores.proceso_id}</p>}

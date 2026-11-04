@@ -82,11 +82,11 @@ export function AvisarClienteModal({
     evento.preventDefault();
     if (!folio) return;
     if (!comentarios.trim()) {
-      setError("Escribe qué significa la actuación para el cliente.");
+      setError("Falta qué significa la actuación para el cliente.");
       return;
     }
     if (clientes && elegidos.size === 0) {
-      setError("Elige al menos un cliente.");
+      setError("Falta elegir al menos un cliente.");
       return;
     }
     setEnviando(true);
@@ -219,7 +219,7 @@ export function TareaFolioModal({
     evento.preventDefault();
     if (!folio) return;
     if (!titulo.trim()) {
-      setErrores({ titulo: "Escribe qué hay que hacer." });
+      setErrores({ titulo: "Falta qué hay que hacer." });
       return;
     }
     setGuardando(true);

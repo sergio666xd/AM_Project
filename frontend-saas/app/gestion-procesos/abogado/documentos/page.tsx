@@ -37,14 +37,14 @@ const GRUPOS_SOLICITUDES: { value: GrupoSolicitudes; label: string }[] = [
   { value: "todas", label: "Todas" },
 ];
 const VACIOS: Record<GrupoArchivos | GrupoSolicitudes, [string, string]> = {
-  por_revisar: ["Nada por revisar", "Cuando un cliente entregue un documento, aparece aquí para que lo apruebes o lo devuelvas."],
-  por_corregir: ["Nada devuelto", "Los documentos que devuelvas para corregir esperan aquí la nueva versión del cliente."],
-  aprobados: ["Aún no hay documentos aprobados", "Lo que apruebes queda aquí, con sus versiones anteriores."],
-  todos: ["No hay documentos", "Pide documentos a un cliente para empezar."],
-  abiertas: ["No hay solicitudes abiertas", "Pide documentos a un cliente; le avisamos y le recordamos antes de la fecha límite."],
+  por_revisar: ["Nada por revisar", "Cuando un cliente entrega un documento, aparece aquí para aprobarlo o devolverlo."],
+  por_corregir: ["Nada devuelto", "Los documentos devueltos para corregir esperan aquí la nueva versión del cliente."],
+  aprobados: ["Aún no hay documentos aprobados", "Lo aprobado queda aquí, con sus versiones anteriores."],
+  todos: ["No hay documentos", "Aquí aparece lo que se les pide a los clientes."],
+  abiertas: ["No hay solicitudes abiertas", "Al pedirle documentos a un cliente, le avisamos y le recordamos antes de la fecha límite."],
   vencidas: ["Ninguna solicitud vencida", "Todas las solicitudes con fecha están al día."],
-  completas: ["Ninguna solicitud completa", "Cuando apruebes todo lo pedido en una solicitud, aparece aquí."],
-  todas: ["No hay solicitudes", "Pide documentos a un cliente para empezar."],
+  completas: ["Ninguna solicitud completa", "Cuando se aprueba todo lo pedido en una solicitud, aparece aquí."],
+  todas: ["No hay solicitudes", "Aquí aparece lo que se les pide a los clientes."],
 };
 const CAMPO_FILTRO =
   "h-10 rounded-lg bg-sheet px-3 text-[14px] text-ink shadow-[0_0_0_1px_var(--line-strong)] focus:outline-none focus:shadow-[0_0_0_2px_var(--navy)]";
@@ -213,7 +213,7 @@ export default function DocumentosPage() {
     <div>
       <PageHeader
         title="Documentos"
-        description="Lo que entregan tus clientes, lo que les falta y sus versiones."
+        description="Lo que entregan los clientes, lo que les falta y sus versiones."
         action={<Button icon={<Send size={16} />} onClick={() => setPidiendo(true)}>Pedir documentos</Button>}
       />
 

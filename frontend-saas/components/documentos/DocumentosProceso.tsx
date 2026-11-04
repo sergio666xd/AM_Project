@@ -85,7 +85,7 @@ export function DocumentosProceso({ procesoId, hayClientes, onCambio }: {
                 <ListaSolicitudes solicitudes={solicitudes} conProceso={false} onVer={setViendo} onCambio={recargar} />
               ) : (
                 <p className="rounded-[var(--radius-lg)] px-4 py-6 text-center text-[14px] text-ink-3 shadow-[inset_0_0_0_1px_var(--line)]">
-                  {hayClientes ? "Aún no le has pedido documentos al cliente." : "Vincula un cliente al proceso para pedirle documentos."}
+                  {hayClientes ? "Aún no se le han pedido documentos al cliente." : "Vincula un cliente al proceso para pedirle documentos."}
                 </p>
               )}
             </section>

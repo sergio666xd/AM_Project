@@ -82,9 +82,9 @@ export function ClienteFormModal({ open, clienteId, onClose, onGuardado }: {
   async function enviar(evento: FormEvent) {
     evento.preventDefault();
     const faltan: Record<string, string> = {};
-    if (form.nombre.trim().length < 3) faltan.nombre = "Escribe el nombre completo.";
-    if (!editando && !/^\S+@\S+\.\S+$/.test(form.email.trim())) faltan.email = "Escribe un correo válido.";
-    if (!editando && form.canal === "WHATSAPP" && !form.whatsapp.trim()) faltan.whatsapp = "Escribe el WhatsApp para enviarle el acceso por ese canal.";
+    if (form.nombre.trim().length < 3) faltan.nombre = "Falta el nombre completo.";
+    if (!editando && !/^\S+@\S+\.\S+$/.test(form.email.trim())) faltan.email = "Falta un correo válido.";
+    if (!editando && form.canal === "WHATSAPP" && !form.whatsapp.trim()) faltan.whatsapp = "Falta el WhatsApp para enviarle el acceso por ese canal.";
     if (Object.keys(faltan).length) {
       setErrores(faltan);
       return;

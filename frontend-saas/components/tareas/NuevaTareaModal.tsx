@@ -60,7 +60,7 @@ export function NuevaTareaModal({ open, onClose, onCreada, procesoInicial }: {
   async function guardar(evento: FormEvent) {
     evento.preventDefault();
     if (!titulo.trim()) {
-      setErrores({ titulo: "Escribe qué hay que hacer." });
+      setErrores({ titulo: "Falta qué hay que hacer." });
       return;
     }
     setGuardando(true);
@@ -113,7 +113,7 @@ export function NuevaTareaModal({ open, onClose, onCreada, procesoInicial }: {
           <div>
             <label htmlFor={`${id}-cliente`} className={ETIQUETA}>Asignar al cliente <span className="font-normal text-ink-3">(opcional)</span></label>
             <select id={`${id}-cliente`} value={clienteId} onChange={(e) => setClienteId(e.target.value)} className={CAMPO} disabled={!proceso || proceso.clientes.length === 0}>
-              <option value="">{!proceso ? "Elige primero un proceso" : proceso.clientes.length === 0 ? "El proceso no tiene clientes" : "No, es del equipo"}</option>
+              <option value="">{!proceso ? "Primero, el proceso" : proceso.clientes.length === 0 ? "El proceso no tiene clientes" : "No, es del equipo"}</option>
               {proceso?.clientes.map((c) => <option key={c.id} value={c.id}>{c.nombre}</option>)}
             </select>
           </div>
