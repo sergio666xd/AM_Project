@@ -9,6 +9,7 @@ from app.modulos.administracion.usuarios import ServicioUsuariosAdmin
 from app.modulos.agenda.repositorio import RepositorioAgenda
 from app.modulos.agenda.servicio import ServicioAgenda
 from app.modulos.avisos.servicio import ServicioAvisos
+from app.modulos.push.servicio import ServicioPush
 from app.modulos.bandeja.repositorio import RepositorioBandeja
 from app.modulos.bandeja.servicio import ServicioBandeja
 from app.modulos.busqueda.servicio import ServicioBusqueda
@@ -65,6 +66,10 @@ def servicio_procesos(db: Session = Depends(obtener_bd)) -> ServicioProcesos:
 
 def servicio_avisos(db: Session = Depends(obtener_bd)) -> ServicioAvisos:
     return ServicioAvisos(db)
+
+
+def servicio_push(db: Session = Depends(obtener_bd)) -> ServicioPush:
+    return ServicioPush(db)
 
 
 def servicio_busqueda(db: Session = Depends(obtener_bd)) -> ServicioBusqueda:

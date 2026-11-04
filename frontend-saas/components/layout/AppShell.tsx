@@ -3,10 +3,10 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import type { CSSProperties, ReactNode } from "react";
-import ChatFloatingButton from "@/components/chat/ChatFloatingButton";
-import ChatPresenceHeartbeat from "@/components/chat/ChatPresenceHeartbeat";
-import PushNotificationPrompt from "@/components/chat/PushNotificationPrompt";
-import { useChatViewport } from "@/components/chat/useChatViewport";
+import { MensajesFlotante } from "@/components/mensajes/MensajesFlotante";
+import { useChatViewport } from "@/components/mensajes/useChatViewport";
+import { AvisoNotificaciones } from "@/components/push/AvisoNotificaciones";
+import { PresenciaPanel } from "@/components/push/PresenciaPanel";
 import { Logo } from "@/components/ui/Logo";
 import { useSession } from "@/context/SessionContext";
 import { cx } from "@/lib/cx";
@@ -43,8 +43,8 @@ export default function AppShell({ children, variant = "saas" }: AppShellProps) 
 
   const comunes = (
     <>
-      <ChatPresenceHeartbeat />
-      {variant !== "saas" && <PushNotificationPrompt />}
+      <PresenciaPanel />
+      {variant !== "saas" && <AvisoNotificaciones />}
     </>
   );
 
@@ -78,7 +78,7 @@ export default function AppShell({ children, variant = "saas" }: AppShellProps) 
         {children}
       </main>
       {!conversacionAbierta && <MobileTabBar pestanas={nav.pestanas} resto={nav.resto} inicio={nav.inicio} />}
-      {!enChat && <ChatFloatingButton />}
+      {!enChat && <MensajesFlotante />}
       <BusquedaGlobal area="abogado" />
     </div>
   );

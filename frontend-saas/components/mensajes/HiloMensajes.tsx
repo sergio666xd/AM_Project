@@ -50,8 +50,10 @@ function fusionar(actuales: MensajeChat[], nuevos: MensajeChat[]): MensajeChat[]
 }
 
 /** Una conversación: mensajes por día, estado de entrega, folio de cada mensaje y el redactor. */
-export function HiloMensajes({ conversacion, onVolver, onActividad, variante = "firma" }: {
+export function HiloMensajes({ conversacion, onVolver, onActividad, variante = "firma", volverSiempre = false }: {
   conversacion: Conversacion;
+  /** En el chat flotante el botón de volver se ve también en escritorio. */
+  volverSiempre?: boolean;
   onVolver: () => void;
   /** Se envió o se leyó algo: la lista se refresca. */
   onActividad: (cambio: { leido?: boolean }) => void;
@@ -261,7 +263,7 @@ export function HiloMensajes({ conversacion, onVolver, onActividad, variante = "
   return (
     <section aria-label={`Conversación con ${conversacion.titulo}`} className="flex min-h-0 min-w-0 flex-1 flex-col">
       <header className="flex min-h-16 shrink-0 items-center gap-3 border-b border-line px-3 py-2 sm:px-4">
-        <button type="button" onClick={onVolver} aria-label="Volver a las conversaciones" className="-ml-1 grid size-10 shrink-0 place-items-center rounded-lg text-ink-2 hover:bg-manila hover:text-ink md:hidden">
+        <button type="button" onClick={onVolver} aria-label="Volver a las conversaciones" className={cx("-ml-1 grid size-10 shrink-0 place-items-center rounded-lg text-ink-2 hover:bg-manila hover:text-ink", !volverSiempre && "md:hidden")}>
           <ArrowLeft aria-hidden="true" size={20} />
         </button>
         {deGrupo
@@ -307,7 +309,7 @@ export function HiloMensajes({ conversacion, onVolver, onActividad, variante = "
                   </>
                 ) : (
                   <>
-                    <p className="font-display text-[19px] text-ink">Escribe el primer mensaje</p>
+                    <p className="font-display text-[19px] text-ink">Aún no hay mensajes</p>
                     <p className="mt-1.5 text-[13.5px] text-ink-3">
                       {conversacion.proceso ? "Cada mensaje queda en el expediente como un folio." : "Solo lo ven ustedes dos."}
                     </p>
