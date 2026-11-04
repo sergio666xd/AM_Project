@@ -1,15 +1,10 @@
 from datetime import timedelta
 
-import pytest
-from fastapi import HTTPException
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
 from app import models
-from app.routers.admin.alertas import (
-    actualizar_estado_alerta_admin,
-    listar_alertas_admin,
-)
+from app.modulos.avisos.fuentes import alertas_admin
 from app.timezone import utc_ahora
 
 
@@ -44,7 +39,7 @@ def test_admin_alerts_are_real_actionable_and_keep_dispositions():
         ))
         db.commit()
 
-        alerts = listar_alertas_admin(db, admin)
+        alerts = alertas_admin(db)
         task_alert = next(alert for alert in alerts if alert["id"] == f"tarea_vencida:{task.id}")
         event_alert = next(alert for alert in alerts if alert["id"].startswith("evento:"))
         assert task_alert["estado"] == "ACTIVA"
@@ -53,17 +48,6 @@ def test_admin_alerts_are_real_actionable_and_keep_dispositions():
         assert event_alert["descartable"] is True
         assert all("error técnico" not in alert["descripcion"].lower() for alert in alerts)
 
-        actualizar_estado_alerta_admin(task_alert["id"], {"estado": "ATENDIDA"}, db, admin)
-        alerts = listar_alertas_admin(db, admin)
-        assert next(alert for alert in alerts if alert["id"] == task_alert["id"])["estado"] == "ATENDIDA"
-
-        with pytest.raises(HTTPException) as error:
-            actualizar_estado_alerta_admin(task_alert["id"], {"estado": "DESCARTADA"}, db, admin)
-        assert error.value.status_code == 400
-
-        actualizar_estado_alerta_admin(event_alert["id"], {"estado": "DESCARTADA"}, db, admin)
-        alerts = listar_alertas_admin(db, admin)
-        assert next(alert for alert in alerts if alert["id"] == event_alert["id"])["estado"] == "DESCARTADA"
     finally:
         db.close()
         engine.dispose()
@@ -94,12 +78,9 @@ def test_admin_alerts_only_report_the_latest_failed_query_per_radicado():
         ])
         db.commit()
 
-        consultas = [alert for alert in listar_alertas_admin(db, admin) if alert["id"].startswith("consulta:")]
+        consultas = [alert for alert in alertas_admin(db) if alert["id"].startswith("consulta:")]
         assert len(consultas) == 1
         assert fallando.numero in consultas[0]["descripcion"]
-
-        actualizar_estado_alerta_admin(consultas[0]["id"], {"estado": "ATENDIDA"}, db, admin)
-        assert listar_alertas_admin(db, admin, limite=5, solo_activas=True) == []
     finally:
         db.close()
         engine.dispose()

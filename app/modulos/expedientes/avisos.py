@@ -1,5 +1,5 @@
 """Avisos que salen del expediente: a los clientes cuando cambia algo de su proceso y
-al abogado que entra al equipo. Usan las plantillas de la API v1, que siguen vigentes."""
+al abogado que entra al equipo. Usan las plantillas de mensaje que se editan desde Administración."""
 
 from uuid import uuid4
 

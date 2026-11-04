@@ -9,10 +9,8 @@ from app.timezone import utc_ahora
 
 def ruta_detalle_radicado(usuario: models.Usuario, radicado_id: int) -> str:
     """Ruta del detalle del radicado según el portal del usuario."""
-    if usuario.rol == models.RolUsuario.ABOGADO:
-        return f"/gestion-procesos/dashboard/radicados/{radicado_id}"
     if usuario.rol == models.RolUsuario.ADMIN:
-        return f"/gestion-procesos/admin/radicados?detalle={radicado_id}"
+        return f"/gestion-procesos/admin/radicados/{radicado_id}"
     return f"/gestion-procesos/abogado/radicados/{radicado_id}"
 
 
@@ -40,20 +38,6 @@ def registrar_novedades_radicado(db: Session, radicado: models.Radicado, cantida
             novedad.actualizado_en = ahora
         usuario_ids.append(abogado.id)
     return usuario_ids
-
-
-def marcar_radicado_revisado(db: Session, usuario: models.Usuario, radicado_id: int) -> int:
-    """Quita el estado de novedades del usuario y devuelve cuántas actuaciones tenía pendientes."""
-    novedad = db.query(models.NovedadRadicadoUsuario).filter_by(
-        usuario_id=usuario.id,
-        radicado_id=radicado_id,
-    ).first()
-    if novedad is None:
-        return 0
-    pendientes = novedad.actuaciones_nuevas
-    db.delete(novedad)
-    db.commit()
-    return pendientes
 
 
 def novedades_pendientes(db: Session, usuario: models.Usuario) -> list[models.NovedadRadicadoUsuario]:

@@ -3,8 +3,9 @@ from datetime import timedelta
 from sqlalchemy import create_engine
 from sqlalchemy.orm import Session
 
-from app import models, schemas
-from app.routers.workflows import preparar_recordatorio_workflow
+from app import models
+from app.api.internos import esquemas as schemas
+from app.api.internos.workflows import preparar_recordatorio_workflow
 from app.timezone import utc_ahora
 
 

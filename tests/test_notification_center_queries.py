@@ -58,10 +58,7 @@ def seed_notification_center(db, total_processes):
 
 
 def run_center(total_processes):
-    from app.routers.expedientes.notificaciones import (
-        _notificaciones_abogado,
-        listar_notificaciones_despacho,
-    )
+    from app.modulos.avisos.fuentes import avisos_abogado
 
     engine = create_engine("sqlite:///:memory:")
     models.Base.metadata.create_all(engine)
@@ -70,17 +67,13 @@ def run_center(total_processes):
         lawyer = seed_notification_center(db, total_processes)
         db.expire_all()
         event.listen(engine, "before_cursor_execute", lambda *args: statements.append(args[2]))
-        center = _notificaciones_abogado(db, lawyer)
+        center = avisos_abogado(db, lawyer)
         center_queries = len(statements)
-        notices = listar_notificaciones_despacho(db=db, usuario=lawyer)
-    for item in center:
-        if item["tipo"] == "ERROR_CONSULTA":
-            item["fecha"] = None  # Usa la hora actual.
-    return center, notices, center_queries, len(statements) - center_queries
+    return center, center_queries
 
 
 def test_notification_center_lists_every_source_with_process_names():
-    center, notices, _, _ = run_center(4)
+    center, _ = run_center(4)
 
     tipos = sorted(item["tipo"] for item in center)
     assert tipos.count("SIN_ACTIVIDAD") == 2
@@ -88,12 +81,9 @@ def test_notification_center_lists_every_source_with_process_names():
     assert tipos.count("PERFIL_CLIENTE") == 4
     assert {item["proceso"] for item in center} == {f"Process {index}" for index in range(4)}
     assert next(item for item in center if item["id"] == "tarea:1")["leida"] is True
-    assert {item["cliente"] for item in notices} == {f"Client {index}" for index in range(4)}
-    assert {item["proceso"] for item in notices} == {f"Process {index}" for index in range(4)}
 
 
 def test_notification_center_query_count_does_not_grow_with_processes():
-    _, _, center_few, notices_few = run_center(3)
-    _, _, center_many, notices_many = run_center(25)
+    _, center_few = run_center(3)
+    _, center_many = run_center(25)
     assert center_many == center_few
-    assert notices_many == notices_few

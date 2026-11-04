@@ -1,6 +1,6 @@
 """API v2: `/api/v2`.
 
-Convive con la API v1 hasta que cada panel migre. Todas las rutas comparten el
+Es la API de la aplicación. Todas las rutas comparten el
 formato de error de `app.nucleo.errores` y la protección CSRF de la sesión.
 """
 

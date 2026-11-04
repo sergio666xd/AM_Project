@@ -6,7 +6,7 @@ API comparten dominio en Vercel (`/api` se reescribe al backend), así que la
 cookie va sola en cada petición sin CORS con credenciales.
 
 También se acepta `Authorization: Bearer <token>` para clientes que no son
-navegador y para la convivencia con la API v1.
+navegador.
 
 CSRF: la cookie es `SameSite=Lax` y, además, toda petición que cambia datos y
 se autentica con la cookie debe traer el encabezado `X-AM-Solicitud: 1`. Un
@@ -25,10 +25,8 @@ from app.nucleo.errores import NoAutenticado, SinPermiso
 ENCABEZADO_CSRF = "X-AM-Solicitud"
 METODOS_SEGUROS = {"GET", "HEAD", "OPTIONS"}
 
-# Mientras se reescriben las pantallas v1, el frontend todavía arma
-# `Authorization: Bearer ${token}` con este marcador en lugar de un JWT (el
-# token real ya no es legible desde JavaScript). Se trata como "sin token" y
-# manda la cookie.
+# Un `Authorization: Bearer` vacío o con estos valores se trata como "sin
+# token" y manda la cookie.
 MARCADORES_SIN_TOKEN = {"", "cookie", "null", "undefined"}
 
 
@@ -68,18 +66,18 @@ def borrar_cookie_sesion(response: Response) -> None:
 
 def _usuario_de_token(token: str | None, db: Session) -> tuple[models.Usuario, dict]:
     if not token:
-        raise NoAutenticado("Inicia sesión para continuar.")
+        raise NoAutenticado("Hace falta iniciar sesión para continuar.")
     payload = security.decode_token_payload(token)
     # Los tokens con `purpose` (recuperación de contraseña) no son sesiones.
     if not payload or payload.get("purpose"):
-        raise NoAutenticado("Tu sesión expiró. Inicia sesión de nuevo.", codigo="sesion_expirada")
+        raise NoAutenticado("La sesión expiró. Hace falta ingresar de nuevo.", codigo="sesion_expirada")
     try:
         usuario_id = int(payload.get("sub"))
     except (TypeError, ValueError) as exc:
-        raise NoAutenticado("Tu sesión expiró. Inicia sesión de nuevo.", codigo="sesion_expirada") from exc
+        raise NoAutenticado("La sesión expiró. Hace falta ingresar de nuevo.", codigo="sesion_expirada") from exc
     usuario = db.get(models.Usuario, usuario_id)
     if usuario is None or not security.token_vigente(payload, usuario):
-        raise NoAutenticado("Tu sesión expiró. Inicia sesión de nuevo.", codigo="sesion_expirada")
+        raise NoAutenticado("La sesión expiró. Hace falta ingresar de nuevo.", codigo="sesion_expirada")
     if usuario.estado != models.EstadoUsuario.ACTIVO:
         raise SinPermiso("La cuenta no está activa.", codigo="cuenta_inactiva")
     return usuario, payload
@@ -101,34 +99,25 @@ def usuario_actual(usuario: models.Usuario = Depends(usuario_en_sesion)) -> mode
     """Usuario de la sesión listo para trabajar."""
     if usuario.debe_cambiar_password:
         raise SinPermiso(
-            "Debes cambiar la contraseña temporal antes de continuar.",
+            "Antes de continuar hay que cambiar la contraseña temporal.",
             codigo="cambio_password_requerido",
         )
     return usuario
 
 
-def _sin_encabezado_csrf(request: Request, *, acepta_autorizacion: bool) -> bool:
+def _sin_encabezado_csrf(request: Request) -> bool:
     """Si es un cambio autenticado con la cookie que no trae un encabezado propio."""
     if request.method in METODOS_SEGUROS:
         return False
     _token, origen = token_de_solicitud(request)
     if origen != "cookie" or not request.cookies.get(ajustes().cookie_sesion):
         return False
-    if request.headers.get(ENCABEZADO_CSRF) == "1":
-        return False
-    # Cualquier `Authorization` también obliga al navegador a pedir permiso
-    # CORS antes de enviar la petición; la API v1 lo acepta por las pantallas
-    # que todavía mandan el marcador.
-    return not (acepta_autorizacion and "authorization" in request.headers)
+    return request.headers.get(ENCABEZADO_CSRF) != "1"
 
 
-MENSAJE_CSRF = "La solicitud se rechazó por seguridad. Recarga la página e inténtalo de nuevo."
+MENSAJE_CSRF = "La solicitud se rechazó por seguridad. Recargue la página y vuelva a intentarlo."
 
 
 def proteger_csrf(request: Request) -> None:
-    if _sin_encabezado_csrf(request, acepta_autorizacion=False):
+    if _sin_encabezado_csrf(request):
         raise SinPermiso(MENSAJE_CSRF, codigo="csrf")
-
-
-def falta_encabezado_csrf_v1(request: Request) -> bool:
-    return _sin_encabezado_csrf(request, acepta_autorizacion=True)

@@ -58,3 +58,12 @@ class Presencia(BaseModel):
 class EstadoPresencia(BaseModel):
     activo: bool
     expira_en_segundos: int | None = None
+
+
+class ConfirmacionEntrega(BaseModel):
+    """Lo que envía el service worker al mostrar la notificación de un mensaje."""
+
+    usuario_id: int = Field(gt=0)
+    mensaje_id: int = Field(gt=0)
+    firma: str = Field(min_length=64, max_length=64)
+

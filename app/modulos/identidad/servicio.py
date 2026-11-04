@@ -9,7 +9,7 @@ from app.nucleo.zona_horaria import ahora_utc, utc_ahora
 from app.password_reset import password_reset_url
 from app.rate_limit import VENTANA_INTENTOS, VENTANA_LOGIN, clave_intento, limite_excedido, registrar_intentos
 
-# Mismos topes que el inicio de sesión de la API v1, y comparten contador.
+# Topes del inicio de sesión; la recuperación de contraseña usa los suyos.
 MAX_INTENTOS_POR_CORREO = 10
 MAX_INTENTOS_POR_IP = 50
 

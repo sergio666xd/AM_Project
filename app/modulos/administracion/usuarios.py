@@ -57,10 +57,10 @@ NOMBRE_FIRMA = "Alejandra Muñoz Abogada y Asociados"
 
 
 def notificar(db: Session, destinatario: Usuario, **datos) -> None:
-    """Avisos con las plantillas de la API v1 (las pruebas lo sustituyen)."""
-    from app.routers.expedientes.comun import _notificar
+    """Avisos a la persona (las pruebas lo sustituyen)."""
+    from app.notification_service import notificar as emitir
 
-    _notificar(db, destinatario, **datos)
+    emitir(db, destinatario, **datos)
 
 
 def enviar_enlace_contrasena(email: str, enlace: str) -> None:
@@ -274,10 +274,10 @@ class ServicioUsuariosAdmin:
         return reactivada
 
     def _ponerse_al_dia(self, admin: Usuario, cuenta: Usuario) -> None:
-        """Al reactivar una cuenta le llegan los avisos de agenda que se perdió (como en la API v1)."""
-        from app.routers.admin.agenda import _notificar_agenda_tras_reactivacion
+        """Al reactivar una cuenta le llegan los avisos de agenda que se perdió."""
+        from app.modulos.administracion.reactivacion import ponerse_al_dia
 
-        _notificar_agenda_tras_reactivacion(self._db, cuenta, admin)
+        ponerse_al_dia(self._db, cuenta, admin)
 
     def cambiar_estado(self, admin: Usuario, usuario_id: int, datos: CambioEstado) -> FichaUsuario:
         exigir_admin(admin)

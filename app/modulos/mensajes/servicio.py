@@ -2,8 +2,7 @@
 
 Las conversaciones existen por proceso (abogado responsable o colaborador
 visible con cada cliente; el equipo del proceso entre sí) y entre integrantes
-de la firma. Las reglas de quién participa son las de la API v1 (ver
-`mensajes.legado`). Cada mensaje de una conversación de proceso queda como un
+de la firma. Las reglas de quién participa están en `mensajes.reglas`. Cada mensaje de una conversación de proceso queda como un
 folio del expediente.
 """
 
@@ -14,7 +13,7 @@ from app.modulos.bandeja.esquemas import ProcesoBreve
 from app.modulos.expedientes.politicas import _rol, es_cliente
 from app.modulos.folios.servicio import ServicioFolios
 from app.modulos.identidad.modelos import RolUsuario
-from app.modulos.mensajes import legado
+from app.modulos.mensajes import reglas
 from app.modulos.mensajes.esquemas import (
     Autor,
     Contacto,
@@ -62,9 +61,9 @@ class ServicioMensajes:
 
     def listar(self, usuario: models.Usuario, *, sincronizar: bool) -> ListaConversaciones:
         if sincronizar:
-            legado.sincronizar(self._db, usuario)
+            reglas.sincronizar(self._db, usuario)
         conversaciones = self._mensajes.conversaciones_de(usuario.id)
-        accesibles = legado.procesos_accesibles(
+        accesibles = reglas.procesos_accesibles(
             self._db, usuario, {c.proceso_id for c in conversaciones if c.proceso_id is not None})
         visibles = [c for c in conversaciones if c.proceso_id is None or c.proceso_id in accesibles]
         items = sorted(self._vistas(usuario, visibles), key=lambda c: (c.actualizada_en, c.id), reverse=True)
@@ -77,11 +76,11 @@ class ServicioMensajes:
         )
 
     def resolver(self, usuario: models.Usuario, clave: str) -> Conversacion:
-        conversacion = legado.resolver(self._db, clave, usuario)
+        conversacion = reglas.resolver(self._db, clave, usuario)
         return self._vistas(usuario, [conversacion])[0]
 
     def hilo(self, usuario: models.Usuario, conversacion_id: int, *, despues_de: int, antes_de: int, limite: int) -> Hilo:
-        conversacion = legado.conversacion(self._db, conversacion_id, usuario)
+        conversacion = reglas.conversacion(self._db, conversacion_id, usuario)
         mensajes, hay_mas = self._mensajes.mensajes(conversacion.id, despues_de=despues_de, antes_de=antes_de, limite=limite)
         propio = self._participante(conversacion, usuario)
         if propio and mensajes and not antes_de:
@@ -102,16 +101,16 @@ class ServicioMensajes:
     def enviar(self, usuario: models.Usuario, conversacion_id: int, datos: NuevoMensaje) -> Mensaje:
         if not datos.texto:
             raise DatosInvalidos("Escribe un mensaje antes de enviarlo.", campos={"texto": "Escribe un mensaje."})
-        conversacion = legado.conversacion(self._db, conversacion_id, usuario)
+        conversacion = reglas.conversacion(self._db, conversacion_id, usuario)
         referencia = (datos.referencia.tipo, datos.referencia.id) if datos.referencia else None
-        mensaje = legado.enviar(self._db, conversacion, usuario, datos.texto, referencia)
-        legado.avisar(self._db, conversacion, mensaje, usuario)
-        conversacion = legado.conversacion(self._db, conversacion_id, usuario)
+        mensaje = reglas.enviar(self._db, conversacion, usuario, datos.texto, referencia)
+        reglas.avisar(self._db, conversacion, mensaje, usuario)
+        conversacion = reglas.conversacion(self._db, conversacion_id, usuario)
         mensaje = self._mensajes.mensaje(conversacion.id, mensaje.id)
         return self._mensaje(mensaje, conversacion, usuario, self._folios_de(conversacion, [mensaje]))
 
     def leer(self, usuario: models.Usuario, conversacion_id: int, hasta: int) -> None:
-        conversacion = legado.conversacion(self._db, conversacion_id, usuario)
+        conversacion = reglas.conversacion(self._db, conversacion_id, usuario)
         mensaje = self._mensajes.mensaje(conversacion.id, hasta)
         propio = self._participante(conversacion, usuario)
         if not mensaje or not propio:
@@ -124,13 +123,13 @@ class ServicioMensajes:
     def referencias(self, usuario: models.Usuario, conversacion_id: int) -> list[OpcionReferencia]:
         if es_cliente(usuario):
             raise SinPermiso("Solo el equipo de la firma adjunta referencias.")
-        conversacion = legado.conversacion(self._db, conversacion_id, usuario)
+        conversacion = reglas.conversacion(self._db, conversacion_id, usuario)
         return [
             OpcionReferencia(
                 tipo=r["tipo"], id=r["id"], titulo=r["titulo"], grupo=r.get("grupo"),
                 radicado=r.get("radicado_numero") or None, padre_id=r.get("parent_id"), solicitud_id=r.get("request_id"),
             )
-            for r in legado.referencias(self._db, conversacion, usuario)
+            for r in reglas.referencias(self._db, conversacion, usuario)
         ]
 
     # --- Vistas ---------------------------------------------------------------
@@ -162,7 +161,7 @@ class ServicioMensajes:
             entrega=entrega_de(mensaje, conversacion.participantes) if es_mio else None,
             referencia=Referencia(
                 tipo=mensaje.referencia_tipo, id=mensaje.referencia_id, titulo=mensaje.referencia_titulo or "",
-                enlace=legado.enlace_referencia(self._db, mensaje, conversacion, usuario),
+                enlace=reglas.enlace_referencia(self._db, mensaje, conversacion, usuario),
             ) if mensaje.referencia_tipo else None,
             folio=folios.get(mensaje.id),
         )
@@ -172,7 +171,7 @@ class ServicioMensajes:
         ultimos = self._mensajes.ultimos(ids)
         sin_leer = self._mensajes.sin_leer(ids, usuario.id)
         otros = {p.usuario_id for c in conversaciones for p in c.participantes if p.usuario_id != usuario.id}
-        en_linea = self._mensajes.en_linea(otros, utc_ahora() - legado.ttl_presencia())
+        en_linea = self._mensajes.en_linea(otros, utc_ahora() - reglas.ttl_presencia())
         return [self._vista(c, usuario, ultimos.get(c.id), sin_leer.get(c.id, (0, None)), en_linea) for c in conversaciones]
 
     @staticmethod

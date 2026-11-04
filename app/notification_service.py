@@ -218,3 +218,19 @@ def emitir_notificacion_workflow(
         )
         _iniciar_workflow([row.id for row in dispatchable])
     return entrega_ids
+
+
+def notificar(
+    db: Session,
+    destinatario: models.Usuario,
+    *,
+    asunto: str,
+    cuerpo: str,
+    tipo: str,
+    origen: str,
+    incluir_email: bool = True,
+    **opciones,
+) -> None:
+    """Aviso a una persona por los canales que eligió; con correo salvo que se diga lo contrario."""
+    emitir_notificacion_workflow(db, destinatario, tipo, origen, asunto, cuerpo, incluir_email=incluir_email, **opciones)
+

@@ -53,10 +53,10 @@ ALFABETO_CLAVE = "abcdefghijkmnpqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ23456789"
 
 
 def notificar(db: Session, destinatario: Usuario, **datos) -> None:
-    """Avisos con las plantillas de la API v1 (las pruebas lo sustituyen)."""
-    from app.routers.expedientes.comun import _notificar
+    """Avisos a la persona (las pruebas lo sustituyen)."""
+    from app.notification_service import notificar as emitir
 
-    _notificar(db, destinatario, **datos)
+    emitir(db, destinatario, **datos)
 
 
 def clave_temporal() -> str:

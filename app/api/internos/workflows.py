@@ -12,7 +12,8 @@ from sqlalchemy import and_, case, or_
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
-from app import models, schemas
+from app import models
+from app.api.internos import esquemas
 from app.database import get_db
 from app.email_service import enviar_correo
 from app.notification_policy import (
@@ -124,105 +125,6 @@ def verificar_token_workflow(authorization: str | None = Header(default=None)) -
     supplied = authorization.removeprefix("Bearer ") if authorization else ""
     if not hmac.compare_digest(supplied, expected):
         raise HTTPException(status_code=401, detail="Credencial interna inválida.")
-
-
-@router.post("/consultas/manual/preparar")
-def preparar_consulta_manual_workflow(
-    datos: schemas.WorkflowConsultaManualCreate,
-    _: None = Depends(verificar_token_workflow),
-    db: Session = Depends(get_db),
-):
-    actor = db.query(models.Usuario).filter_by(
-        id=datos.actor_id,
-        rol=models.RolUsuario.ADMIN,
-        estado=models.EstadoUsuario.ACTIVO,
-    ).first()
-    if not actor:
-        raise HTTPException(status_code=403, detail="Se requiere ADMIN activo.")
-    radicado = db.query(models.Radicado).filter_by(id=datos.radicado_id).first()
-    if not radicado:
-        raise HTTPException(status_code=404, detail="Radicado no encontrado.")
-    consulta = models.ConsultaRadicado(
-        radicado_id=radicado.id,
-        tipo="MANUAL",
-        estado="ENCOLADA",
-        inicio=utc_ahora(),
-    )
-    db.add(consulta)
-    db.commit()
-    db.refresh(consulta)
-    return {"consulta_id": consulta.id}
-
-
-@router.post("/consultas/nuevo/{consulta_id}/procesar")
-def procesar_consulta_nuevo_workflow(
-    consulta_id: int,
-    datos: schemas.WorkflowConsultaRadicado,
-    _: None = Depends(verificar_token_workflow),
-    db: Session = Depends(get_db),
-):
-    consulta = db.query(models.ConsultaRadicado).filter_by(id=consulta_id).with_for_update().first()
-    if not consulta or consulta.tipo not in {"AUTOMATICA_NUEVO", "MANUAL"}:
-        raise HTTPException(status_code=404, detail="Consulta Workflow no encontrada.")
-    if consulta.estado == "COMPLETADA":
-        return {
-            "estado": "COMPLETADA",
-            "actuaciones_nuevas": consulta.actuaciones_nuevas,
-            "repetida": True,
-        }
-
-    actor = db.query(models.Usuario).filter_by(id=datos.actor_id).first()
-    radicado = db.query(models.Radicado).filter_by(id=consulta.radicado_id).first()
-    if not actor or not radicado or actor.estado != models.EstadoUsuario.ACTIVO:
-        raise HTTPException(status_code=403, detail="Actor o radicado no disponible.")
-    if consulta.tipo == "MANUAL":
-        autorizado = actor.rol == models.RolUsuario.ADMIN
-    elif actor.rol == models.RolUsuario.ADMIN:
-        autorizado = True
-    elif actor.rol == models.RolUsuario.ABOGADO_ADMIN:
-        autorizado = (
-            radicado.ambito_key == "FIRMA"
-            and any(link.id == actor.id for link in radicado.usuarios_vinculados)
-        )
-    else:
-        autorizado = (
-            actor.rol == models.RolUsuario.ABOGADO
-            and radicado.ambito_key == f"SAAS:{actor.id}"
-            and actor.plan is not None
-            and actor.plan.precio_mensual > 0
-        )
-    if not autorizado:
-        raise HTTPException(status_code=403, detail="No puedes consultar este radicado.")
-    if consulta.estado == "EN_PROCESO" and consulta.task_id != datos.launch_token:
-        raise HTTPException(status_code=409, detail="La consulta ya está siendo procesada.")
-
-    consulta.estado = "EN_PROCESO"
-    consulta.task_id = datos.launch_token
-    consulta.error = None
-    consulta.inicio = utc_ahora()
-    db.commit()
-
-    resultado = ejecutar_consulta_api_radicado(db, radicado)
-    estado_api = str(resultado.get("estado", ""))
-    ahora = utc_ahora()
-    if estado_api.startswith("error"):
-        consulta.estado = "ERROR"
-        consulta.error = estado_api
-        consulta.finalizacion = ahora
-        db.commit()
-        raise HTTPException(status_code=503, detail="La consulta del radicado falló; el Workflow la reintentará.")
-
-    consulta.estado = "COMPLETADA"
-    consulta.error = None
-    consulta.finalizacion = ahora
-    consulta.actuaciones_nuevas = len(resultado.get("actuaciones_nuevas", []))
-    consulta.detalle = estado_api
-    db.commit()
-    return {
-        "estado": "COMPLETADA",
-        "actuaciones_nuevas": consulta.actuaciones_nuevas,
-        "resultado": resultado,
-    }
 
 
 def _configuracion(db: Session, bloquear: bool = False) -> models.ConfiguracionConsultas:
@@ -435,7 +337,7 @@ def _enviar_push_actuacion(
 @router.post("/consultas/{ejecucion_id}/notificaciones/preparar")
 def preparar_notificaciones_actuaciones(
     ejecucion_id: str,
-    datos: schemas.WorkflowNovedadesPreparar,
+    datos: esquemas.WorkflowNovedadesPreparar,
     _: None = Depends(verificar_token_workflow),
     db: Session = Depends(get_db),
 ):
@@ -755,7 +657,7 @@ def recordar_documentos_pendientes(
 @router.post("/recordatorios/{recordatorio_id}/preparar")
 def preparar_recordatorio_workflow(
     recordatorio_id: int,
-    datos: schemas.WorkflowRecordatorioPreparar,
+    datos: esquemas.WorkflowRecordatorioPreparar,
     _: None = Depends(verificar_token_workflow),
     db: Session = Depends(get_db),
 ):
@@ -801,12 +703,10 @@ def preparar_recordatorio_workflow(
             "programado_para": momento.replace(tzinfo=timezone.utc).isoformat(),
         }
 
-    if usuario.rol == models.RolUsuario.ABOGADO:
-        tarea_path = f"/gestion-procesos/dashboard/tareas/{tarea.id}"
-    elif usuario.rol == models.RolUsuario.CLIENTE:
+    if usuario.rol == models.RolUsuario.CLIENTE:
         tarea_path = f"/gestion-procesos/cliente/tareas?tarea={tarea.id}#tarea-{tarea.id}"
     elif usuario.rol == models.RolUsuario.ADMIN:
-        tarea_path = f"/gestion-procesos/admin/tareas?detalle={tarea.id}"
+        tarea_path = f"/gestion-procesos/admin/tareas/{tarea.id}"
     else:
         tarea_path = f"/gestion-procesos/abogado/tareas/{tarea.id}"
     mensaje = f"Recordatorio de tarea: {tarea.titulo}"
@@ -967,7 +867,7 @@ def enviar_entrega_notificacion_workflow(
 
 @router.post("/consultas/claim")
 def reclamar_barrido(
-    datos: schemas.WorkflowClaimConsulta,
+    datos: esquemas.WorkflowClaimConsulta,
     _: None = Depends(verificar_token_workflow),
     db: Session = Depends(get_db),
 ):

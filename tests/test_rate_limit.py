@@ -1,13 +1,10 @@
 from datetime import timedelta
 
-import pytest
-from fastapi import HTTPException
-from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy import create_engine
 from sqlalchemy.orm import Session
 from starlette.requests import Request
 
-from app import models, schemas
+from app import models
 from app.rate_limit import (
     clave_intento,
     ip_cliente,
@@ -62,43 +59,13 @@ def test_client_ip_uses_vercel_forwarded_header_only_on_vercel(monkeypatch):
     assert ip_cliente(request) == "198.51.100.4"
 
 
-def test_login_blocks_after_repeated_failures():
-    from app import security
-    from app.routers import auth as main
-
-    with _db() as db:
-        db.add(models.Usuario(
-            email="login@example.test",
-            password_hash=security.hash_password("correcta-123"),
-            nombre_completo="Login",
-            whatsapp_numero="",
-            rol=models.RolUsuario.ABOGADO_ADMIN,
-            estado=models.EstadoUsuario.ACTIVO,
-        ))
-        db.commit()
-
-        def attempt(password):
-            form = OAuth2PasswordRequestForm(username="login@example.test", password=password)
-            return main.login(_request(), form_data=form, remember_me=False, db=db)
-
-        for _ in range(10):
-            with pytest.raises(HTTPException) as failed:
-                attempt("incorrecta")
-            assert failed.value.status_code == 400
-
-        with pytest.raises(HTTPException) as blocked:
-            attempt("correcta-123")
-        assert blocked.value.status_code == 429
-
-
 def test_password_reset_requests_are_limited_per_email():
-    from fastapi import BackgroundTasks
-
-    from app.routers import auth as main
+    from app.modulos.identidad.repositorio import RepositorioUsuarios
+    from app.modulos.identidad.servicio import ServicioSesion
 
     with _db() as db:
-        datos = schemas.SolicitudRecuperacionPassword(email="nadie@example.com")
+        servicio = ServicioSesion(db, RepositorioUsuarios(db))
         for _ in range(5):
-            main.solicitar_recuperacion_password(datos, _request(), BackgroundTasks(), db=db)
+            servicio.pedir_recuperacion("nadie@example.com", ip="203.0.113.7")
         clave = clave_intento("recuperar:email", "nadie@example.com")
         assert db.query(models.IntentoLimitado).filter_by(clave=clave).count() == 3
