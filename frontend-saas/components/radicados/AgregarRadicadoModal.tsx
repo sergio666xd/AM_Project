@@ -60,7 +60,7 @@ export function AgregarRadicadoModal({ procesoId, onClose, onListo }: {
     let aviso = data.mensaje;
     if (data.consulta_id) {
       try {
-        await iniciarWorkflowConsultaRadicado(null, { tipo: "AUTOMATICA_NUEVO", radicado_id: data.radicado_id, consulta_id: data.consulta_id });
+        await iniciarWorkflowConsultaRadicado({ tipo: "AUTOMATICA_NUEVO", radicado_id: data.radicado_id, consulta_id: data.consulta_id });
         aviso = "Lo estamos consultando en la Rama Judicial; las actuaciones aparecen en unos minutos.";
       } catch {
         aviso = "No se pudo iniciar la consulta en la Rama Judicial. La consulta programada lo revisará.";

@@ -1,227 +1,72 @@
 "use client";
 
-import { type FormEvent, Suspense, useState, useMemo } from "react";
-import { Eye, EyeOff, KeyRound } from "lucide-react";
+import { type FormEvent, Suspense, useState } from "react";
 import { useSearchParams } from "next/navigation";
+
+import { AuthShell, AvisoAcceso, CampoContrasena, TituloAcceso } from "@/components/auth/AuthShell";
+import { Button } from "@/components/ui/Button";
 import { useSession } from "@/context/SessionContext";
-import { API_URL } from "@/lib/api";
+import { api, mensajeDeError } from "@/lib/api-v2/cliente";
 import { safeInternalRedirect } from "@/lib/authRedirect";
 import { homePathForRole, portalHrefForRole } from "@/lib/portalHosts";
 
-function PasswordField({
-  id,
-  name,
-  label,
-  value,
-  onChange,
-  autoComplete,
-}: {
-  id: string;
-  name: string;
-  label: string;
-  value: string;
-  onChange: (value: string) => void;
-  autoComplete: string;
-}) {
-  const [visible, setVisible] = useState(false);
-  return (
-    <label htmlFor={id} className="block">
-      <span className="mb-2 block text-sm font-semibold">{label}</span>
-      <span className="relative block">
-        <input
-          id={id}
-          name={name}
-          required
-          minLength={8}
-          type={visible ? "text" : "password"}
-          autoComplete={autoComplete}
-          value={value}
-          onChange={(event) => onChange(event.target.value)}
-          className="min-h-11 w-full rounded-lg border border-[#ccb56b]/70 bg-white px-4 py-3 pr-14 text-sm outline-none focus:border-[#002060] focus:ring-2 focus:ring-[#002060]/30"
-        />
-        <button
-          type="button"
-          onClick={() => setVisible((state) => !state)}
-          aria-label={visible ? `Ocultar ${label.toLowerCase()}` : `Mostrar ${label.toLowerCase()}`}
-          aria-pressed={visible}
-          className="absolute right-1 top-1 grid min-h-11 min-w-11 place-items-center rounded text-[#002060]/75 hover:bg-[#fff7df] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#002060]"
-        >
-          {visible ? <EyeOff size={19} aria-hidden="true" /> : <Eye size={19} aria-hidden="true" />}
-        </button>
-      </span>
-    </label>
-  );
+function leerCorreoPendiente(): string {
+  try {
+    return localStorage.getItem("pending_user_email") || "";
+  } catch {
+    return "";
+  }
 }
 
-function CambiarPasswordForm() {
-  const { user, refreshUser } = useSession();
-  const searchParams = useSearchParams();
+function PrimeraContrasena() {
+  const { user } = useSession();
+  const params = useSearchParams();
   const [actual, setActual] = useState("");
   const [nueva, setNueva] = useState("");
   const [confirmacion, setConfirmacion] = useState("");
   const [error, setError] = useState("");
-  const [sending, setSending] = useState(false);
+  const [guardando, setGuardando] = useState(false);
+  const correo = user?.email || params.get("email") || (typeof window !== "undefined" ? leerCorreoPendiente() : "");
 
-  // Obtener el correo del usuario para el gestor de contraseñas del navegador
-  const emailParam = searchParams.get("email") || "";
-  const userEmail = useMemo(() => {
-    if (user?.email) return user.email;
-    if (emailParam) return emailParam;
-    if (typeof window !== "undefined") {
-      return localStorage.getItem("pending_user_email") || "";
-    }
-    return "";
-  }, [user?.email, emailParam]);
-
-  async function submit(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
+  async function guardar(e: FormEvent<HTMLFormElement>) {
+    e.preventDefault();
     setError("");
-    if (nueva.length < 8) {
-      return setError("La nueva contraseña debe tener al menos 8 caracteres.");
+    if (nueva !== confirmacion) return setError("Las dos contraseñas nuevas no coinciden.");
+    setGuardando(true);
+    const { data, error: fallo, response } = await api.POST("/api/v2/sesion/contrasena", { body: { contrasena_actual: actual, contrasena_nueva: nueva } });
+    if (!data) {
+      setGuardando(false);
+      return setError(response?.status === 401 ? "Su sesión venció. Vuelva a ingresar con la contraseña temporal." : mensajeDeError(fallo));
     }
-    if (nueva !== confirmacion) {
-      return setError("Las contraseñas no coinciden.");
-    }
-    setSending(true);
     try {
-      // La sesión va en la cookie; la respuesta trae una cookie renovada.
-      const response = await fetch(`${API_URL}/api/auth/cambiar-password`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json", "X-AM-Solicitud": "1" },
-        body: JSON.stringify({ password_actual: actual, password_nueva: nueva }),
-      });
-      const data: {
-        rol?: string;
-        email?: string;
-        detail?: string;
-      } = await response.json().catch(() => ({}));
-
-      if (response.status === 401) {
-        throw new Error("No se encontró una sesión activa. Vuelve a iniciar sesión para continuar.");
-      }
-      if (!response.ok) {
-        throw new Error(data.detail || "No fue posible cambiar la contraseña.");
-      }
-
-      if (typeof window !== "undefined") {
-        localStorage.removeItem("pending_user_email");
-      }
-
-      // Actualizar la sesión inmediatamente
-      await refreshUser();
-
-      // Redirigir directamente al panel correspondiente ya autenticado
-      const redirect = safeInternalRedirect(searchParams.get("redirect"));
-      const userRole = data.rol || user?.rol || "CLIENTE";
-      const destination = portalHrefForRole(
-        userRole,
-        redirect || homePathForRole(userRole)
-      );
-
-      // Usar window.location.assign para que el navegador procese el submit
-      // y dispare la alerta de guardar/actualizar contraseña
-      window.location.assign(destination);
-    } catch (reason) {
-      setError(reason instanceof Error ? reason.message : "No fue posible cambiar la contraseña.");
-    } finally {
-      setSending(false);
+      localStorage.removeItem("pending_user_email");
+    } catch {
+      // Sin almacenamiento: no hay nada que limpiar.
     }
+    const destino = safeInternalRedirect(params.get("redirect"));
+    // Navegación completa para que el navegador ofrezca guardar la contraseña nueva.
+    window.location.assign(portalHrefForRole(data.rol, destino || homePathForRole(data.rol)));
   }
 
   return (
-    <main className="grid min-h-screen place-items-center bg-[#f7f3e8] px-5 py-10 text-[#002060]">
-      <form
-        onSubmit={submit}
-        className="w-full max-w-md rounded-2xl border border-[#ccb56b]/45 bg-white p-6 shadow-sm sm:p-8"
-        aria-describedby={error ? "password-change-error" : "password-guidance"}
-      >
-        {/* Campo oculto con el correo del usuario para que el gestor de contraseñas
-            del navegador reconozca la cuenta y ofrezca guardar/actualizar la contraseña */}
-        <input
-          type="email"
-          name="username"
-          autoComplete="username"
-          value={userEmail}
-          readOnly
-          tabIndex={-1}
-          aria-hidden="true"
-          className="sr-only pointer-events-none absolute -left-[9999px]"
-        />
-
-        <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-[.2em] text-[#765d19]">
-          <KeyRound size={16} aria-hidden="true" />
-          <span>Primer ingreso</span>
-        </div>
-
-        <h1 className="mt-3 text-3xl font-semibold">Crea tu contraseña</h1>
-
-        <p id="password-guidance" className="mt-2 text-sm leading-6 text-[#002060]/80">
-          {userEmail ? (
-            <>Configura la contraseña definitiva para <strong>{userEmail}</strong>. Usa al menos 8 caracteres.</>
-          ) : (
-            <>Reemplaza la contraseña temporal para continuar. Usa al menos 8 caracteres.</>
-          )}
-        </p>
-
-        {error && (
-          <p
-            id="password-change-error"
-            role="alert"
-            className="mt-4 rounded-lg border border-red-300 bg-red-50 p-3 text-sm text-red-900"
-          >
-            {error}
-          </p>
-        )}
-
-        <div className="mt-6 space-y-4">
-          <PasswordField
-            id="current-password"
-            name="current-password"
-            label="Contraseña temporal"
-            value={actual}
-            onChange={setActual}
-            autoComplete="current-password"
-          />
-          <PasswordField
-            id="new-password"
-            name="new-password"
-            label="Nueva contraseña"
-            value={nueva}
-            onChange={setNueva}
-            autoComplete="new-password"
-          />
-          <PasswordField
-            id="confirm-password"
-            name="confirm-password"
-            label="Confirma la nueva contraseña"
-            value={confirmacion}
-            onChange={setConfirmacion}
-            autoComplete="new-password"
-          />
-        </div>
-
-        <button
-          type="submit"
-          disabled={sending}
-          className="mt-6 inline-flex min-h-11 w-full items-center justify-center rounded-lg bg-[#002060] px-4 py-3 font-semibold !text-white outline-none hover:bg-[#003387] focus-visible:ring-2 focus-visible:ring-[#92792e] focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60"
-        >
-          {sending ? "Guardando e ingresando…" : "Guardar contraseña e ingresar"}
-        </button>
+    <AuthShell lema="Le damos la bienvenida al portal de la firma." detalle="Antes de empezar, cambie la contraseña temporal que le enviamos por una que solo usted conozca.">
+      <TituloAcceso
+        titulo="Cree su contraseña"
+        texto={correo ? <>Es la que usará para entrar con <strong className="font-semibold text-ink">{correo}</strong>.</> : "Es la que usará para entrar al portal."}
+      />
+      <form onSubmit={guardar} className="mt-7 space-y-5">
+        {/* El gestor de contraseñas del navegador necesita saber a qué cuenta pertenece. */}
+        <input type="email" name="username" autoComplete="username" value={correo} readOnly tabIndex={-1} aria-hidden="true" className="sr-only" />
+        {error && <AvisoAcceso tono="error">{error}</AvisoAcceso>}
+        <CampoContrasena id="contrasena-temporal" etiqueta="Contraseña temporal" valor={actual} onCambio={setActual} autoComplete="current-password" ayuda="La que llegó en el correo o WhatsApp de bienvenida." />
+        <CampoContrasena id="contrasena-nueva" etiqueta="Contraseña nueva" valor={nueva} onCambio={setNueva} autoComplete="new-password" ayuda="Al menos 8 caracteres." />
+        <CampoContrasena id="contrasena-confirmacion" etiqueta="Repita la contraseña nueva" valor={confirmacion} onCambio={setConfirmacion} autoComplete="new-password" invalido={Boolean(confirmacion) && confirmacion !== nueva} />
+        <Button type="submit" size="lg" loading={guardando} className="w-full">Guardar e ingresar</Button>
       </form>
-    </main>
+    </AuthShell>
   );
 }
 
 export default function CambiarPasswordPage() {
-  return (
-    <Suspense
-      fallback={
-        <main className="grid min-h-screen place-items-center bg-[#f7f3e8] text-sm text-[#002060]/80">
-          Cargando…
-        </main>
-      }
-    >
-      <CambiarPasswordForm />
-    </Suspense>
-  );
+  return <Suspense fallback={<main aria-busy="true" className="min-h-dvh bg-ground" />}><PrimeraContrasena /></Suspense>;
 }

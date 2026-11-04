@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { ADMIN_PORTAL_HOST, PUBLIC_SITE_HOST, USER_PORTAL_HOST, isLocalPortalHost, isPreviewHost } from "@/lib/portalHosts";
+import { ADMIN_PORTAL_HOST, USER_PORTAL_HOST, isLocalPortalHost, isPreviewHost } from "@/lib/portalHosts";
 
 const PUBLIC_HOSTS = new Set(["alejandramunozabogada.com", "www.alejandramunozabogada.com"]);
 const ADMIN_LOGIN_PATH = "/gestion-procesos/auth/admin";
@@ -111,7 +111,7 @@ export function proxy(request: NextRequest) {
   if (userHost) {
     if (pathname === "/") {
       if (role === "ADMIN") return redirectToHost(request, local ? "admin.localhost" : ADMIN_PORTAL_HOST, "/");
-      const area = role === "ABOGADO_ADMIN" ? "abogado" : role === "ABOGADO" ? "dashboard" : "cliente";
+      const area = role === "ABOGADO_ADMIN" || role === "ABOGADO" ? "abogado" : "cliente";
       return rewrite(request, role ? `/gestion-procesos/${area}` : CLIENT_LOGIN_PATH);
     }
     if (pathname === "/login") return rewrite(request, CLIENT_LOGIN_PATH);
@@ -128,16 +128,15 @@ export function proxy(request: NextRequest) {
     if (pathname === "/gestion-procesos/cliente" || pathname.startsWith("/gestion-procesos/cliente/")) {
       return redirectToPath(request, stripPrefix(pathname, "/gestion-procesos/cliente"));
     }
-    if ((pathname === "/gestion-procesos/abogado" || pathname.startsWith("/gestion-procesos/abogado/")) && role !== "ABOGADO") {
+    if (pathname === "/gestion-procesos/abogado" || pathname.startsWith("/gestion-procesos/abogado/")) {
       return redirectToPath(request, stripPrefix(pathname, "/gestion-procesos/abogado"));
     }
-    if (!local && pathname === "/gestion-procesos/auth/registro") return redirectToHost(request, PUBLIC_SITE_HOST, pathname);
 
     if (pathname.startsWith("/gestion-procesos/")) return NextResponse.next();
     const lawyerRoute = /^\/procesos\/\d+(?:\/(?:resumen|folios|agenda|documentos|radicados|tareas|relaciones|actividad))?$/.test(pathname)
       || /^\/(?:tareas|radicados|documentos)(?:\/|$)/.test(pathname)
       || pathname === "/agenda";
-    const area = role === "ABOGADO_ADMIN" || (!role && lawyerRoute) ? "abogado" : role === "ABOGADO" ? "dashboard" : "cliente";
+    const area = role === "ABOGADO_ADMIN" || role === "ABOGADO" || (!role && lawyerRoute) ? "abogado" : "cliente";
     return rewrite(request, internalRoute(area, pathname));
   }
 

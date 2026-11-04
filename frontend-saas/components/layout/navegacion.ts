@@ -8,7 +8,6 @@ import {
   Hash,
   Home,
   Inbox,
-  LayoutDashboard,
   ListChecks,
   MessageSquare,
   UserCheck,
@@ -18,7 +17,7 @@ import {
   type LucideIcon,
 } from "lucide-react";
 
-export type Variante = "saas" | "platform-admin" | "lawyer" | "client";
+export type Variante = "platform-admin" | "lawyer" | "client";
 export type ItemNav = {
   id: string;
   label: string;
@@ -43,7 +42,6 @@ export type GrupoNav = {
 
 const A = "/gestion-procesos/abogado";
 const C = "/gestion-procesos/cliente";
-const D = "/gestion-procesos/dashboard";
 
 /** Navegación del abogado. Contratos, Cobros y Métricas son de la administración de la firma. */
 export function gruposAbogado(esAdminFirma: boolean): GrupoNav[] {
@@ -98,26 +96,14 @@ export const gruposCliente: GrupoNav[] = [
   },
 ];
 
-const gruposSaas: GrupoNav[] = [
-  {
-    titulo: null,
-    items: [
-      { id: "resumen", label: "Resumen", href: D, icon: LayoutDashboard },
-      { id: "radicados", label: "Radicados", href: `${D}/radicados`, icon: Hash },
-      { id: "tareas", label: "Tareas", href: `${D}/tareas`, icon: ListChecks },
-    ],
-  },
-];
-
 /** Las cuatro pestañas de la barra inferior en celular; el resto va en "Más". */
 const PESTANAS: Record<Exclude<Variante, "platform-admin">, string[]> = {
   lawyer: ["hoy", "procesos", "tareas", "mensajes"],
   client: ["inicio", "procesos", "pendientes", "mensajes"],
-  saas: ["resumen", "radicados", "tareas"],
 };
 
 export function navegacion(variante: Exclude<Variante, "platform-admin">, esAdminFirma: boolean) {
-  const grupos = variante === "client" ? gruposCliente : variante === "lawyer" ? gruposAbogado(esAdminFirma) : gruposSaas;
+  const grupos = variante === "client" ? gruposCliente : gruposAbogado(esAdminFirma);
   const todos = grupos.flatMap((grupo) => grupo.items);
   const pestanas = PESTANAS[variante].map((id) => todos.find((item) => item.id === id)).filter((item): item is ItemNav => Boolean(item));
   const resto = todos.filter((item) => !PESTANAS[variante].includes(item.id));

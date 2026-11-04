@@ -35,3 +35,26 @@ class UsuarioSesion(BaseModel):
     @classmethod
     def valor_del_rol(cls, valor):
         return getattr(valor, "value", valor)
+
+
+class CambioContrasenaTemporal(BaseModel):
+    contrasena_actual: str = Field(min_length=1, max_length=200)
+    contrasena_nueva: str = Field(min_length=8, max_length=200, description="Mínimo 8 caracteres.")
+
+
+class PedidoRecuperacion(BaseModel):
+    email: str = Field(min_length=3, max_length=120)
+
+    @field_validator("email")
+    @classmethod
+    def normalizar_email(cls, valor: str) -> str:
+        return valor.strip().lower()
+
+
+class Restablecimiento(BaseModel):
+    token: str = Field(min_length=10, max_length=2000)
+    contrasena_nueva: str = Field(min_length=8, max_length=200, description="Mínimo 8 caracteres.")
+
+
+class MensajeRecuperacion(BaseModel):
+    mensaje: str

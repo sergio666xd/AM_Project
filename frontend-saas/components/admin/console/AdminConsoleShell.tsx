@@ -4,17 +4,13 @@ import type { CSSProperties, ReactNode } from "react";
 import Link from "next/link";
 import {
   Activity,
-  BookOpenText,
-  CreditCard,
   FileText,
   FolderOpen,
   Globe,
   LayoutDashboard,
-  ListChecks,
   Scale,
   ServerCog,
   Settings,
-  UserCheck,
   UserRound,
   Users,
   Wallet,
@@ -73,19 +69,6 @@ const grupos: GrupoNav[] = [
         rutas: [`${ADMIN}/finanzas`, `${ADMIN}/almacenamiento`, `${ADMIN}/chat/limpiar`],
       },
       { id: "sitio", label: "Sitio público", corto: "Sitio", href: `${ADMIN}/sitio/mensajes`, icon: Globe, rutas: [`${ADMIN}/sitio/contenido`] },
-    ],
-  },
-  {
-    titulo: "Heredado",
-    plegable: true,
-    items: [
-      { id: "solicitudes", label: "Registros pendientes", href: `${ADMIN}/solicitudes`, icon: UserCheck },
-      { id: "planes", label: "Planes", href: `${ADMIN}/planes`, icon: CreditCard },
-      { id: "saas-procesos", label: "Procesos SaaS", href: `${ADMIN}/saas/procesos`, icon: FolderOpen },
-      { id: "saas-radicados", label: "Radicados SaaS", href: `${ADMIN}/saas/radicados`, icon: Scale },
-      { id: "saas-tareas", label: "Tareas SaaS", href: `${ADMIN}/saas/tareas`, icon: ListChecks },
-      { id: "saas-documentos", label: "Documentos SaaS", href: `${ADMIN}/saas/documentos`, icon: BookOpenText },
-      { id: "global-radicados", label: "Radicados globales", href: `${ADMIN}/global/radicados`, icon: Scale },
     ],
   },
 ];

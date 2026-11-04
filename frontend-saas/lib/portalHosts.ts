@@ -7,8 +7,7 @@ const CLIENT_HOME = "/";
 
 export function homePathForRole(role: string) {
   if (role === "ADMIN") return ADMIN_HOME;
-  if (role === "ABOGADO") return "/gestion-procesos/dashboard";
-  if (role === "ABOGADO_ADMIN") return "/";
+  if (role === "ABOGADO" || role === "ABOGADO_ADMIN") return "/";
   if (role === "CLIENTE") return CLIENT_HOME;
   return "/gestion-procesos/auth/login";
 }
@@ -23,7 +22,7 @@ function previewPathForRole(role: string, destination: string) {
   if (destination.startsWith("/gestion-procesos/")) return destination;
   if (destination === "/login") return role === "ADMIN" ? "/gestion-procesos/auth/admin" : "/gestion-procesos/auth/login";
   if (["/cambiar-password", "/recuperar-password", "/restablecer-password"].some((p) => destination.startsWith(p))) return destination;
-  const area = role === "ADMIN" ? "admin" : role === "ABOGADO_ADMIN" ? "abogado" : role === "ABOGADO" ? "dashboard" : role === "CLIENTE" ? "cliente" : "";
+  const area = role === "ADMIN" ? "admin" : role === "ABOGADO_ADMIN" || role === "ABOGADO" ? "abogado" : role === "CLIENTE" ? "cliente" : "";
   if (!area) return "/gestion-procesos/auth/login";
   return destination === "/" ? `/gestion-procesos/${area}` : `/gestion-procesos/${area}${destination}`;
 }

@@ -176,3 +176,45 @@ def test_v1_conserva_su_formato_de_error(cliente_http):
     respuesta = cliente_http.get("/api/auth/me")
     assert respuesta.status_code == 401
     assert "detail" in respuesta.json()
+
+
+def test_cambiar_la_contrasena_temporal(iniciar, crear_usuario, cliente_http):
+    cliente = crear_usuario("CLIENTE", debe_cambiar_password=True)
+    iniciar(cliente)
+    assert cliente_http.get("/api/v2/cliente/inicio").json()["codigo"] == "cambio_password_requerido"
+
+    mala = cliente_http.post("/api/v2/sesion/contrasena", json={"contrasena_actual": "otra", "contrasena_nueva": "Nueva-clave-2026"}, headers=CSRF)
+    assert mala.status_code == 422 and mala.json()["campos"]["contrasena_actual"]
+    igual = cliente_http.post("/api/v2/sesion/contrasena", json={"contrasena_actual": PASSWORD, "contrasena_nueva": PASSWORD}, headers=CSRF)
+    assert igual.status_code == 422
+
+    bien = cliente_http.post("/api/v2/sesion/contrasena", json={"contrasena_actual": PASSWORD, "contrasena_nueva": "Nueva-clave-2026"}, headers=CSRF)
+    assert bien.status_code == 200, bien.text
+    assert bien.json()["debe_cambiar_password"] is False
+    assert f"{COOKIE}=" in _set_cookie(bien)
+    assert cliente_http.get("/api/v2/cliente/inicio").status_code == 200
+
+    # Ya no tiene contraseña temporal: el cambio se hace con código desde su cuenta.
+    otra = cliente_http.post("/api/v2/sesion/contrasena", json={"contrasena_actual": "Nueva-clave-2026", "contrasena_nueva": "Otra-clave-2026"}, headers=CSRF)
+    assert otra.status_code == 403
+
+
+def test_recuperar_y_restablecer_la_contrasena(cliente_http, crear_usuario, sesion_bd, monkeypatch):
+    enviados = []
+    monkeypatch.setattr("app.api.v2.sesion.send_password_reset_email", lambda email, enlace: enviados.append((email, enlace)))
+    usuario = crear_usuario("ABOGADO_ADMIN")
+
+    desconocido = cliente_http.post("/api/v2/sesion/recuperacion", json={"email": "nadie@example.test"})
+    conocido = cliente_http.post("/api/v2/sesion/recuperacion", json={"email": f" {usuario.email.upper()} "})
+    assert desconocido.status_code == conocido.status_code == 202
+    assert desconocido.json() == conocido.json()
+    assert len(enviados) == 1 and enviados[0][0] == usuario.email
+
+    from urllib.parse import parse_qs, urlsplit
+
+    token = parse_qs(urlsplit(enviados[0][1]).query)["token"][0]
+    assert cliente_http.post("/api/v2/sesion/restablecimiento", json={"token": "x" * 20, "contrasena_nueva": "Nueva-clave-2026"}).json()["codigo"] == "enlace_invalido"
+    assert cliente_http.post("/api/v2/sesion/restablecimiento", json={"token": token, "contrasena_nueva": "Nueva-clave-2026"}).status_code == 204
+    # El enlace sirve una sola vez: cambia con la contraseña.
+    assert cliente_http.post("/api/v2/sesion/restablecimiento", json={"token": token, "contrasena_nueva": "Otra-clave-2026"}).status_code == 422
+    assert cliente_http.post("/api/v2/sesion", json={"email": usuario.email, "password": "Nueva-clave-2026"}).status_code == 200

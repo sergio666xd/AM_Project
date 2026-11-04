@@ -1,10 +1,11 @@
 "use client";
 
-import Image from "next/image";
 import Link from "next/link";
-import { Eye, EyeOff, LockKeyhole, Mail, Scale } from "lucide-react";
 import { useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
+
+import { AuthShell, AvisoAcceso, CAMPO_ACCESO, CampoContrasena, TituloAcceso } from "@/components/auth/AuthShell";
+import { Button } from "@/components/ui/Button";
 import { useSession } from "@/context/SessionContext";
 import { api, mensajeDeError } from "@/lib/api-v2/cliente";
 import { safeInternalRedirect } from "@/lib/authRedirect";
@@ -15,100 +16,114 @@ type Portal = "admin" | "users";
 export function PortalLoginForm({ portal }: { portal: Portal }) {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [showPassword, setShowPassword] = useState(false);
-  const [rememberMe, setRememberMe] = useState(true);
+  const [recordarme, setRecordarme] = useState(true);
   const [error, setError] = useState("");
-  const [wrongPortal, setWrongPortal] = useState(false);
-  const [loading, setLoading] = useState(false);
+  const [otroPortal, setOtroPortal] = useState(false);
+  const [entrando, setEntrando] = useState(false);
   const router = useRouter();
   const { refreshUser } = useSession();
-  const isAdminPortal = portal === "admin";
-  const alternatePortalHref = portalHrefForRole(isAdminPortal ? "CLIENTE" : "ADMIN", "/login");
+  const admin = portal === "admin";
+  const enlaceOtroPortal = portalHrefForRole(admin ? "CLIENTE" : "ADMIN", "/login");
 
-  async function handleLogin(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
+  function limpiar() {
     setError("");
-    setWrongPortal(false);
-    setLoading(true);
+    setOtroPortal(false);
+  }
+
+  async function entrar(e: FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    limpiar();
+    setEntrando(true);
     try {
       // La API deja la sesión en una cookie httpOnly; aquí no se guarda ningún token.
       const { data: sesion, error: fallo } = await api.POST("/api/v2/sesion", {
-        body: { email: email.trim(), password, recordarme: rememberMe },
+        body: { email: email.trim(), password, recordarme },
       });
       if (!sesion) throw new Error(mensajeDeError(fallo));
-      const roleMatchesPortal = isAdminPortal ? sesion.rol === "ADMIN" : sesion.rol !== "ADMIN";
-      if (!roleMatchesPortal) {
-        setWrongPortal(true);
-        setError(isAdminPortal
-          ? "Esta cuenta no es administradora. Continúa desde el portal de cliente y abogado."
-          : "El acceso de administración tiene un portal separado. Continúa desde el portal administrativo.");
+      if (admin ? sesion.rol !== "ADMIN" : sesion.rol === "ADMIN") {
+        setOtroPortal(true);
+        setError(admin
+          ? "Esta cuenta no es de administración. Entre por el portal de clientes y abogados."
+          : "Las cuentas de administración entran por su propio portal.");
         // La cookie no debe quedar puesta en el portal equivocado.
         await api.DELETE("/api/v2/sesion");
         return;
       }
-
-      const redirect = safeInternalRedirect(new URLSearchParams(window.location.search).get("redirect"));
+      const destino = safeInternalRedirect(new URLSearchParams(window.location.search).get("redirect"));
       if (sesion.debe_cambiar_password) {
-        localStorage.setItem("pending_user_email", email.trim());
-        const params = new URLSearchParams();
-        params.set("email", email.trim());
-        if (redirect) {
-          params.set("redirect", redirect);
+        try {
+          localStorage.setItem("pending_user_email", email.trim());
+        } catch {
+          // Sin almacenamiento: el correo también va en la dirección.
         }
+        const params = new URLSearchParams({ email: email.trim() });
+        if (destino) params.set("redirect", destino);
         router.replace(`/cambiar-password?${params.toString()}`);
         return;
       }
       await refreshUser();
-      router.replace(portalHrefForRole(sesion.rol, redirect || homePathForRole(sesion.rol)));
-    } catch (loginError) {
-      setWrongPortal(false);
-      setError(loginError instanceof Error ? loginError.message : "No fue posible iniciar sesión.");
+      router.replace(portalHrefForRole(sesion.rol, destino || homePathForRole(sesion.rol)));
+    } catch (causa) {
+      setError(causa instanceof Error ? causa.message : "No fue posible ingresar.");
     } finally {
-      setLoading(false);
+      setEntrando(false);
     }
   }
 
   return (
-    <main className="min-h-screen bg-[#f7f3e8] text-[#002060] lg:grid lg:grid-cols-[.9fr_1.1fr]">
-      <aside className="relative hidden overflow-hidden bg-[#002060] p-12 text-white lg:flex lg:flex-col lg:justify-between">
-        <div className="absolute -right-32 -top-24 h-96 w-96 rounded-full border border-[#ccb56b]/30" aria-hidden="true" />
-        <div className="absolute -bottom-28 -left-24 h-80 w-80 rounded-full border border-[#ccb56b]/20" aria-hidden="true" />
-        <Image src="/AM_logo_Full_White.svg" alt="AM Abogada" width={245} height={82} className="relative h-auto w-48" priority />
-        <div className="relative max-w-md"><p className="text-xs font-bold uppercase tracking-[.24em] text-[#f0d98b]">{isAdminPortal ? "Administración de la plataforma" : "Portal de clientes y abogados"}</p><h1 className="mt-5 text-5xl font-semibold leading-tight">{isAdminPortal ? "Gestione el servicio con seguridad." : "Su práctica jurídica, bajo control."}</h1><p className="mt-6 text-lg leading-8 text-white/85">{isAdminPortal ? "Acceso exclusivo para administrar el sistema y la operación." : "Consulte procesos, actuaciones y tareas desde un solo lugar."}</p></div>
-        <p className="relative flex items-center gap-2 text-sm text-white/85"><Scale size={17} className="text-[#f0d98b]" aria-hidden="true" /> Alejandra Muñoz | Abogada y Asociados</p>
-      </aside>
-      <section className="flex min-h-screen items-center justify-center px-5 py-10 sm:px-8">
-        <div className="w-full max-w-md">
-          <a href="https://www.alejandramunozabogada.com" className="mb-7 inline-flex min-h-11 items-center rounded-lg border border-[#ccb56b]/60 px-3 py-2 text-xs font-bold uppercase tracking-wide outline-none transition hover:border-[#002060] hover:bg-white focus-visible:ring-2 focus-visible:ring-[#002060]">← Ir al sitio público</a>
-          <a href="https://www.alejandramunozabogada.com" aria-label="Alejandra Muñoz, inicio" className="mb-9 inline-block lg:hidden"><Image src="/AM_logo_Full_Black.svg" alt="AM Abogada" width={180} height={60} className="h-auto w-36" /></a>
-          <p className="text-xs font-bold uppercase tracking-[.2em] text-[#765d19]">{isAdminPortal ? "Acceso administrativo" : "Acceso seguro"}</p>
-          <h2 className="mt-3 font-serif text-4xl font-semibold leading-tight">{isAdminPortal ? "Ingresar como administrador" : "Bienvenida de nuevo"}</h2>
-          <p className="mt-3 text-[#002060]/80">{isAdminPortal ? "Esta entrada está separada del portal público." : "Ingresa para consultar y gestionar tus procesos."}</p>
-          {error && <div id="login-error" role="alert" className="mt-6 rounded-lg border border-red-300 bg-red-50 p-4 text-sm text-red-900">
+    <AuthShell
+      lema={admin ? "Administración del sistema de la firma." : "Sus procesos, claros y al día."}
+      detalle={admin ? "Acceso solo para quienes administran la plataforma." : "Consulte en qué va cada proceso, lo que le pedimos y los mensajes con la firma."}
+    >
+      <TituloAcceso
+        titulo={admin ? "Ingreso de administración" : "Ingresar al portal"}
+        texto={admin ? "Esta entrada es independiente del portal de clientes y abogados." : "Con el correo y la contraseña de su cuenta."}
+      />
+      <form onSubmit={entrar} className="mt-7 space-y-5" aria-describedby={error ? "error-ingreso" : undefined}>
+        {error && (
+          <AvisoAcceso tono="error" id="error-ingreso">
             <p>{error}</p>
-            {wrongPortal && <Link href={alternatePortalHref} className="mt-2 inline-flex min-h-11 items-center font-bold underline underline-offset-4 outline-none focus-visible:ring-2 focus-visible:ring-red-800">{isAdminPortal ? "Ir al portal de cliente y abogado" : "Ir al portal administrativo"}</Link>}
-          </div>}
-          <form onSubmit={handleLogin} className="mt-7 space-y-5" aria-describedby={error ? "login-error" : undefined}>
-            <label className="block"><span className="mb-2 block text-sm font-semibold">Correo electrónico</span><span className="relative block"><Mail className="pointer-events-none absolute left-4 top-3.5 text-[#765d19]" size={19} aria-hidden="true" /><input type="email" name="email" autoComplete="username" required value={email} onChange={(event) => { setEmail(event.target.value); setError(""); setWrongPortal(false); }} aria-invalid={Boolean(error && !wrongPortal)} aria-describedby={error ? "login-error" : undefined} className="min-h-11 w-full rounded-lg border border-[#ccb56b]/80 bg-white py-3 pl-11 pr-4 text-sm outline-none transition focus:border-[#002060] focus:ring-2 focus:ring-[#002060]/30" /></span></label>
-            <label className="block"><span className="mb-2 block text-sm font-semibold">Contraseña</span><span className="relative block"><LockKeyhole className="pointer-events-none absolute left-4 top-3.5 text-[#765d19]" size={19} aria-hidden="true" /><input type={showPassword ? "text" : "password"} name="password" autoComplete="current-password" required value={password} onChange={(event) => { setPassword(event.target.value); setError(""); setWrongPortal(false); }} aria-invalid={Boolean(error && !wrongPortal)} aria-describedby={error ? "login-error" : undefined} className="min-h-11 w-full rounded-lg border border-[#ccb56b]/80 bg-white py-3 pl-11 pr-14 text-sm outline-none transition focus:border-[#002060] focus:ring-2 focus:ring-[#002060]/30" /><button type="button" aria-label={showPassword ? "Ocultar contraseña" : "Mostrar contraseña"} aria-pressed={showPassword} onClick={() => setShowPassword((visible) => !visible)} className="absolute right-1 top-1 grid min-h-11 min-w-11 place-items-center rounded text-[#002060]/75 hover:bg-[#fff7df] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#002060]">{showPassword ? <EyeOff size={20} aria-hidden="true" /> : <Eye size={20} aria-hidden="true" />}</button></span></label>
-            <label className="flex items-center gap-2.5 cursor-pointer select-none">
-              <input
-                type="checkbox"
-                checked={rememberMe}
-                onChange={(e) => setRememberMe(e.target.checked)}
-                className="h-4 w-4 rounded border-[#ccb56b] text-[#002060] accent-[#002060] focus:ring-2 focus:ring-[#002060]/30"
-              />
-              <span className="text-sm text-[#002060]/80">Mantener sesión iniciada</span>
-            </label>
-            <button type="submit" disabled={loading} className="inline-flex min-h-11 w-full items-center justify-center rounded-lg bg-[#002060] px-4 py-3 font-semibold !text-white outline-none transition hover:bg-[#003387] focus-visible:ring-2 focus-visible:ring-[#92792e] focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60">{loading ? "Verificando acceso…" : isAdminPortal ? "Ingresar a administración" : "Ingresar al portal"}</button>
-          </form>
-          {!isAdminPortal && <>
-            <p className="mt-4 text-right text-sm"><Link href="/recuperar-password" className="inline-flex min-h-11 items-center font-semibold text-[#002060] underline decoration-[#92792e] underline-offset-4">¿Olvidaste tu contraseña?</Link></p>
-            <p className="mt-7 border-t border-[#ccb56b]/50 pt-5 text-center text-sm text-[#002060]/80">¿Abogado externo? <Link href="/gestion-procesos/auth/registro" className="inline-flex min-h-11 items-center font-bold text-[#002060] underline decoration-[#92792e] decoration-2 underline-offset-4">Solicita tu acceso SaaS</Link></p>
-          </>}
-          {isAdminPortal && <p className="mt-7 border-t border-[#ccb56b]/50 pt-5 text-sm text-[#002060]/80">¿Necesitas recuperar tu cuenta? <Link href="/recuperar-password" className="inline-flex min-h-11 items-center font-bold underline decoration-[#92792e] underline-offset-4">Solicita un enlace de restablecimiento</Link>.</p>}
+            {otroPortal && (
+              <Link href={enlaceOtroPortal} className="mt-1 inline-flex min-h-11 items-center font-semibold underline underline-offset-2">
+                {admin ? "Ir al portal de clientes y abogados" : "Ir al portal de administración"}
+              </Link>
+            )}
+          </AvisoAcceso>
+        )}
+        <label className="block">
+          <span className="mb-1.5 block text-[14px] font-semibold text-ink">Correo electrónico</span>
+          <input
+            type="email"
+            name="email"
+            autoComplete="username"
+            required
+            value={email}
+            onChange={(e) => { setEmail(e.target.value); limpiar(); }}
+            aria-invalid={Boolean(error && !otroPortal) || undefined}
+            className={CAMPO_ACCESO}
+          />
+        </label>
+        <div>
+          <CampoContrasena id="password" etiqueta="Contraseña" valor={password} onCambio={(v) => { setPassword(v); limpiar(); }} autoComplete="current-password" invalido={Boolean(error && !otroPortal)} />
+          <p className="mt-1 text-right">
+            <Link href="/recuperar-password" className="inline-flex min-h-11 items-center text-[14px] font-semibold text-navy-ink underline-offset-2 hover:underline">
+              ¿Olvidó su contraseña?
+            </Link>
+          </p>
         </div>
-      </section>
-    </main>
+        <label className="flex min-h-11 cursor-pointer items-center gap-2.5 text-[14.5px] text-ink-2">
+          <input type="checkbox" checked={recordarme} onChange={(e) => setRecordarme(e.target.checked)} className="size-4 accent-[var(--navy)]" />
+          Mantener la sesión abierta en este dispositivo
+        </label>
+        <Button type="submit" size="lg" loading={entrando} className="w-full">
+          {admin ? "Ingresar a administración" : "Ingresar"}
+        </Button>
+      </form>
+      {!admin && (
+        <p className="mt-8 border-t border-line pt-5 text-[14px] text-ink-2">
+          ¿Aún no tiene cuenta? La firma la crea cuando empieza a llevar su proceso y le envía el acceso.
+        </p>
+      )}
+    </AuthShell>
   );
 }

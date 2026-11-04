@@ -29,7 +29,7 @@ export function MenuCuenta({ areaHref, enlaces, enRiel = false }: { areaHref: st
   const raiz = useRef<HTMLDivElement>(null);
   const boton = useRef<HTMLButtonElement>(null);
   const menuId = useId();
-  const nombre = user?.nombre_completo || "Cuenta";
+  const nombre = user?.nombre || "Cuenta";
   const rol = ROLES[user?.rol ?? ""] ?? "";
   const opciones = enlaces ?? [
     { label: "Mi perfil", href: `${areaHref}/perfil`, icon: UserRound },

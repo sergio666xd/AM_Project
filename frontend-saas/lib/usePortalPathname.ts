@@ -10,8 +10,7 @@ const getHostname = () => window.location.hostname.toLowerCase();
 const getServerHostname = () => "";
 
 function areaForRole(role: string | undefined) {
-  if (role === "ABOGADO_ADMIN") return "abogado";
-  if (role === "ABOGADO") return "dashboard";
+  if (role === "ABOGADO_ADMIN" || role === "ABOGADO") return "abogado";
   return "cliente";
 }
 

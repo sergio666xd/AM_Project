@@ -11,7 +11,7 @@ import { isLocalPortalHost, isPreviewHost, portalHrefForRole } from "@/lib/porta
 type Role = "ADMIN" | "ABOGADO" | "ABOGADO_ADMIN" | "CLIENTE";
 const homeByRole: Record<Role, string> = {
   ADMIN: "/",
-  ABOGADO: "/gestion-procesos/dashboard",
+  ABOGADO: "/",
   ABOGADO_ADMIN: "/",
   CLIENTE: "/",
 };
