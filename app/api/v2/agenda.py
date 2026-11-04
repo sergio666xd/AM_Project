@@ -4,7 +4,15 @@ from fastapi import APIRouter, Depends, Query, Response, status
 
 from app import models
 from app.api.v2.dependencias import servicio_agenda
-from app.modulos.agenda.esquemas import Agenda, EnlaceSuscripcion, Suscripcion
+from app.modulos.agenda.esquemas import (
+    Agenda,
+    CambiosEvento,
+    DatosEvento,
+    EnlaceSuscripcion,
+    EventoDelProceso,
+    EventosDelProceso,
+    Suscripcion,
+)
 from app.modulos.agenda.servicio import ServicioAgenda
 from app.nucleo.sesion import usuario_actual
 
@@ -21,6 +29,48 @@ def agenda(
     """Audiencias, reuniones y demás eventos de los procesos activos que el usuario ve, y los
     vencimientos de las tareas abiertas, entre las dos fechas (hora de Colombia)."""
     return servicio.agenda(usuario, desde, hasta)
+
+
+@router.get("/eventos", response_model=EventosDelProceso, summary="Eventos de un proceso")
+def eventos_del_proceso(
+    proceso_id: int = Query(...),
+    usuario: models.Usuario = Depends(usuario_actual),
+    servicio: ServicioAgenda = Depends(servicio_agenda),
+):
+    """Audiencias, reuniones, firmas y demás eventos del proceso, pasados y por venir."""
+    return servicio.eventos_de_proceso(usuario, proceso_id)
+
+
+@router.post("/eventos", response_model=EventoDelProceso, status_code=status.HTTP_201_CREATED, summary="Agendar un evento")
+def agendar_evento(
+    datos: DatosEvento,
+    usuario: models.Usuario = Depends(usuario_actual),
+    servicio: ServicioAgenda = Depends(servicio_agenda),
+):
+    """El usuario queda como responsable y se avisa al cliente elegido, o a todos los del proceso.
+    Las firmas de contrato se agendan desde el contrato."""
+    return servicio.crear_evento(usuario, datos)
+
+
+@router.patch("/eventos/{evento_id}", response_model=EventoDelProceso, summary="Cambiar un evento")
+def cambiar_evento(
+    evento_id: int,
+    datos: CambiosEvento,
+    usuario: models.Usuario = Depends(usuario_actual),
+    servicio: ServicioAgenda = Depends(servicio_agenda),
+):
+    """Marcarlo como realizado o cancelado también se hace aquí, con `estado`."""
+    return servicio.editar_evento(usuario, evento_id, datos)
+
+
+@router.delete("/eventos/{evento_id}", status_code=status.HTTP_204_NO_CONTENT, summary="Eliminar un evento")
+def eliminar_evento(
+    evento_id: int,
+    usuario: models.Usuario = Depends(usuario_actual),
+    servicio: ServicioAgenda = Depends(servicio_agenda),
+):
+    """Si aún no había pasado, se avisa al cliente de la cancelación."""
+    servicio.eliminar_evento(usuario, evento_id)
 
 
 @router.get("/suscripcion", response_model=Suscripcion, summary="Estado de la suscripción de calendario")

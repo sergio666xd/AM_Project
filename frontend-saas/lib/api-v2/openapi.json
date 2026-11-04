@@ -612,6 +612,106 @@
             "description": "Too Many Requests"
           }
         }
+      },
+      "post": {
+        "tags": [
+          "Procesos"
+        ],
+        "summary": "Crear un proceso",
+        "description": "El usuario queda como responsable. Los clientes, radicados y la etapa se agregan después.",
+        "operationId": "crear_proceso_nuevo",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DatosProceso"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProcesoDetalle"
+                }
+              }
+            }
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Too Many Requests"
+          }
+        }
       }
     },
     "/api/v2/procesos/{proceso_id}": {
@@ -632,6 +732,117 @@
             }
           }
         ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProcesoDetalle"
+                }
+              }
+            }
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Too Many Requests"
+          }
+        }
+      },
+      "patch": {
+        "tags": [
+          "Procesos"
+        ],
+        "summary": "Cambiar el nombre o la descripción",
+        "description": "Del responsable o la administración. Si cambia el nombre, se avisa a los clientes.",
+        "operationId": "editar_proceso",
+        "parameters": [
+          {
+            "name": "proceso_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Proceso Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CambiosProceso"
+              }
+            }
+          }
+        },
         "responses": {
           "200": {
             "description": "Successful Response",
@@ -1060,6 +1271,1000 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/ProcesoDetalle"
+                }
+              }
+            }
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Too Many Requests"
+          }
+        }
+      }
+    },
+    "/api/v2/procesos/{proceso_id}/relaciones": {
+      "get": {
+        "tags": [
+          "Procesos"
+        ],
+        "summary": "Clientes y radicados del proceso",
+        "operationId": "relaciones_del_proceso",
+        "parameters": [
+          {
+            "name": "proceso_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Proceso Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RelacionesProceso"
+                }
+              }
+            }
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Too Many Requests"
+          }
+        }
+      }
+    },
+    "/api/v2/procesos/{proceso_id}/clientes": {
+      "post": {
+        "tags": [
+          "Procesos"
+        ],
+        "summary": "Dar acceso a un cliente",
+        "description": "El cliente ve el proceso en su portal y recibe un aviso.",
+        "operationId": "vincular_cliente_al_proceso",
+        "parameters": [
+          {
+            "name": "proceso_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Proceso Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/VincularCliente"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RelacionesProceso"
+                }
+              }
+            }
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Too Many Requests"
+          }
+        }
+      }
+    },
+    "/api/v2/procesos/{proceso_id}/clientes/{cliente_id}": {
+      "delete": {
+        "tags": [
+          "Procesos"
+        ],
+        "summary": "Quitar el acceso a un cliente",
+        "operationId": "retirar_cliente_del_proceso",
+        "parameters": [
+          {
+            "name": "proceso_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Proceso Id"
+            }
+          },
+          {
+            "name": "cliente_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Cliente Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RelacionesProceso"
+                }
+              }
+            }
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Too Many Requests"
+          }
+        }
+      }
+    },
+    "/api/v2/procesos/{proceso_id}/radicados": {
+      "post": {
+        "tags": [
+          "Procesos"
+        ],
+        "summary": "Agregar un radicado",
+        "description": "Crea el radicado o reutiliza el que la firma ya sigue. Si es nuevo para la firma, deja en cola\nuna consulta a la Rama Judicial (`consulta_id`), que el panel lanza con el Workflow de consultas.",
+        "operationId": "agregar_radicado_al_proceso",
+        "parameters": [
+          {
+            "name": "proceso_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Proceso Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NuevoRadicado"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RadicadoAgregado"
+                }
+              }
+            }
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Too Many Requests"
+          }
+        }
+      }
+    },
+    "/api/v2/procesos/{proceso_id}/radicados/{radicado_id}": {
+      "delete": {
+        "tags": [
+          "Procesos"
+        ],
+        "summary": "Quitar un radicado",
+        "description": "El radicado y sus actuaciones siguen en la firma; solo deja de estar en este proceso.",
+        "operationId": "retirar_radicado_del_proceso",
+        "parameters": [
+          {
+            "name": "proceso_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Proceso Id"
+            }
+          },
+          {
+            "name": "radicado_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Radicado Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RelacionesProceso"
+                }
+              }
+            }
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Too Many Requests"
+          }
+        }
+      }
+    },
+    "/api/v2/procesos/{proceso_id}/equipo": {
+      "get": {
+        "tags": [
+          "Procesos"
+        ],
+        "summary": "Equipo del proceso",
+        "operationId": "equipo_del_proceso",
+        "parameters": [
+          {
+            "name": "proceso_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Proceso Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EquipoProceso"
+                }
+              }
+            }
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Too Many Requests"
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Procesos"
+        ],
+        "summary": "Agregar un abogado al equipo",
+        "description": "El abogado recibe un aviso y ve el proceso desde ese momento.",
+        "operationId": "agregar_al_equipo",
+        "parameters": [
+          {
+            "name": "proceso_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Proceso Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NuevoMiembro"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EquipoProceso"
+                }
+              }
+            }
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Too Many Requests"
+          }
+        }
+      }
+    },
+    "/api/v2/procesos/{proceso_id}/equipo/{abogado_id}": {
+      "patch": {
+        "tags": [
+          "Procesos"
+        ],
+        "summary": "Cambiar si el cliente lo ve",
+        "operationId": "cambiar_miembro_del_equipo",
+        "parameters": [
+          {
+            "name": "proceso_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Proceso Id"
+            }
+          },
+          {
+            "name": "abogado_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Abogado Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CambioMiembro"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EquipoProceso"
+                }
+              }
+            }
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Too Many Requests"
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Procesos"
+        ],
+        "summary": "Retirar a un abogado del equipo",
+        "operationId": "retirar_del_equipo",
+        "parameters": [
+          {
+            "name": "proceso_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Proceso Id"
+            }
+          },
+          {
+            "name": "abogado_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Abogado Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EquipoProceso"
                 }
               }
             }
@@ -4299,6 +5504,416 @@
                 }
               }
             }
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Too Many Requests"
+          }
+        }
+      }
+    },
+    "/api/v2/agenda/eventos": {
+      "get": {
+        "tags": [
+          "Agenda"
+        ],
+        "summary": "Eventos de un proceso",
+        "description": "Audiencias, reuniones, firmas y demás eventos del proceso, pasados y por venir.",
+        "operationId": "eventos_del_proceso",
+        "parameters": [
+          {
+            "name": "proceso_id",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Proceso Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EventosDelProceso"
+                }
+              }
+            }
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Too Many Requests"
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Agenda"
+        ],
+        "summary": "Agendar un evento",
+        "description": "El usuario queda como responsable y se avisa al cliente elegido, o a todos los del proceso.\nLas firmas de contrato se agendan desde el contrato.",
+        "operationId": "agendar_evento",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DatosEvento"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EventoDelProceso"
+                }
+              }
+            }
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Too Many Requests"
+          }
+        }
+      }
+    },
+    "/api/v2/agenda/eventos/{evento_id}": {
+      "patch": {
+        "tags": [
+          "Agenda"
+        ],
+        "summary": "Cambiar un evento",
+        "description": "Marcarlo como realizado o cancelado también se hace aquí, con `estado`.",
+        "operationId": "cambiar_evento",
+        "parameters": [
+          {
+            "name": "evento_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Evento Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CambiosEvento"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EventoDelProceso"
+                }
+              }
+            }
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Too Many Requests"
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Agenda"
+        ],
+        "summary": "Eliminar un evento",
+        "description": "Si aún no había pasado, se avisa al cliente de la cancelación.",
+        "operationId": "eliminar_evento",
+        "parameters": [
+          {
+            "name": "evento_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Evento Id"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
           },
           "400": {
             "content": {
@@ -17451,6 +19066,50 @@
         ],
         "title": "AccesoEnviado"
       },
+      "ActividadProceso": {
+        "properties": {
+          "tareas_abiertas": {
+            "type": "integer",
+            "title": "Tareas Abiertas"
+          },
+          "tareas_vencidas": {
+            "type": "integer",
+            "title": "Tareas Vencidas"
+          },
+          "por_revisar": {
+            "type": "integer",
+            "title": "Por Revisar",
+            "description": "Entregas del cliente sin revisar."
+          },
+          "pendiente_cliente": {
+            "type": "integer",
+            "title": "Pendiente Cliente",
+            "description": "Solicitudes de documentos que el cliente no ha completado."
+          },
+          "proximo_vencimiento": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Proximo Vencimiento",
+            "description": "Día en que vence la próxima tarea abierta."
+          }
+        },
+        "type": "object",
+        "required": [
+          "tareas_abiertas",
+          "tareas_vencidas",
+          "por_revisar",
+          "pendiente_cliente"
+        ],
+        "title": "ActividadProceso",
+        "description": "Lo que el proceso tiene abierto. Solo para el equipo de la firma."
+      },
       "ActuacionBreve": {
         "properties": {
           "id": {
@@ -18659,6 +20318,19 @@
         "type": "object",
         "title": "CambioMensajeSitio"
       },
+      "CambioMiembro": {
+        "properties": {
+          "visible_cliente": {
+            "type": "boolean",
+            "title": "Visible Cliente"
+          }
+        },
+        "type": "object",
+        "required": [
+          "visible_cliente"
+        ],
+        "title": "CambioMiembro"
+      },
       "CambioPaginaSitio": {
         "properties": {
           "contenido": {
@@ -18762,6 +20434,137 @@
           "url"
         ],
         "title": "CambioWhatsapp"
+      },
+      "CambiosEvento": {
+        "properties": {
+          "tipo": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "AUDIENCIA",
+                  "REUNION",
+                  "EVENTO"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tipo"
+          },
+          "titulo": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 255,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Titulo"
+          },
+          "descripcion": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 4000
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Descripcion"
+          },
+          "inicio": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Inicio"
+          },
+          "fin": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fin"
+          },
+          "estado": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "PROGRAMADO",
+                  "COMPLETADO",
+                  "CANCELADO"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Estado"
+          },
+          "cliente_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cliente Id"
+          }
+        },
+        "type": "object",
+        "title": "CambiosEvento",
+        "description": "Solo se cambian los campos enviados."
+      },
+      "CambiosProceso": {
+        "properties": {
+          "nombre": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 255,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Nombre"
+          },
+          "descripcion": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 4000
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Descripcion"
+          }
+        },
+        "type": "object",
+        "title": "CambiosProceso",
+        "description": "Solo se cambian los campos enviados."
       },
       "CambiosRecordatorio": {
         "properties": {
@@ -19197,6 +21000,40 @@
           "atencion"
         ],
         "title": "CifraFirma"
+      },
+      "ClienteDelProceso": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "nombre": {
+            "type": "string",
+            "title": "Nombre"
+          },
+          "email": {
+            "type": "string",
+            "title": "Email"
+          },
+          "whatsapp": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Whatsapp"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "nombre",
+          "email"
+        ],
+        "title": "ClienteDelProceso"
       },
       "ClienteFicha": {
         "properties": {
@@ -20615,6 +22452,79 @@
         ],
         "title": "DatosEtapa"
       },
+      "DatosEvento": {
+        "properties": {
+          "proceso_id": {
+            "type": "integer",
+            "title": "Proceso Id"
+          },
+          "tipo": {
+            "type": "string",
+            "enum": [
+              "AUDIENCIA",
+              "REUNION",
+              "EVENTO"
+            ],
+            "title": "Tipo",
+            "default": "AUDIENCIA"
+          },
+          "titulo": {
+            "type": "string",
+            "maxLength": 255,
+            "minLength": 1,
+            "title": "Titulo"
+          },
+          "descripcion": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 4000
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Descripcion"
+          },
+          "inicio": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Inicio",
+            "description": "Con zona horaria, p. ej. 2026-11-20T09:00:00-05:00."
+          },
+          "fin": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fin"
+          },
+          "cliente_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cliente Id",
+            "description": "Avisar solo a este cliente del proceso. Vacío: a todos."
+          }
+        },
+        "type": "object",
+        "required": [
+          "proceso_id",
+          "titulo",
+          "inicio"
+        ],
+        "title": "DatosEvento"
+      },
       "DatosFirma": {
         "properties": {
           "nombre": {
@@ -20825,6 +22735,33 @@
           "etapas"
         ],
         "title": "DatosPlantillaEtapas"
+      },
+      "DatosProceso": {
+        "properties": {
+          "nombre": {
+            "type": "string",
+            "maxLength": 255,
+            "minLength": 1,
+            "title": "Nombre"
+          },
+          "descripcion": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 4000
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Descripcion"
+          }
+        },
+        "type": "object",
+        "required": [
+          "nombre"
+        ],
+        "title": "DatosProceso"
       },
       "DatosRecordatorio": {
         "properties": {
@@ -22445,6 +24382,47 @@
         ],
         "title": "EnvioPrueba"
       },
+      "EquipoProceso": {
+        "properties": {
+          "admite_equipo": {
+            "type": "boolean",
+            "title": "Admite Equipo",
+            "description": "Solo los procesos de la firma admiten colaboradores."
+          },
+          "puede_gestionar": {
+            "type": "boolean",
+            "title": "Puede Gestionar",
+            "description": "El responsable y la administración cambian el equipo."
+          },
+          "responsable": {
+            "$ref": "#/components/schemas/PersonaBreve"
+          },
+          "miembros": {
+            "items": {
+              "$ref": "#/components/schemas/MiembroEquipo"
+            },
+            "type": "array",
+            "title": "Miembros"
+          },
+          "disponibles": {
+            "items": {
+              "$ref": "#/components/schemas/PersonaBreve"
+            },
+            "type": "array",
+            "title": "Disponibles",
+            "description": "Abogados activos de la firma que aún no están en el equipo."
+          }
+        },
+        "type": "object",
+        "required": [
+          "admite_equipo",
+          "puede_gestionar",
+          "responsable",
+          "miembros",
+          "disponibles"
+        ],
+        "title": "EquipoProceso"
+      },
       "ErrorRespuesta": {
         "properties": {
           "codigo": {
@@ -22784,6 +24762,128 @@
           "fecha"
         ],
         "title": "EventoActividad"
+      },
+      "EventoDelProceso": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "tipo": {
+            "type": "string",
+            "title": "Tipo",
+            "description": "AUDIENCIA, REUNION, EVENTO o FIRMA_CONTRATO."
+          },
+          "etiqueta": {
+            "type": "string",
+            "title": "Etiqueta"
+          },
+          "titulo": {
+            "type": "string",
+            "title": "Titulo"
+          },
+          "descripcion": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Descripcion"
+          },
+          "inicio": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Inicio"
+          },
+          "fin": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fin"
+          },
+          "estado": {
+            "type": "string",
+            "enum": [
+              "PROGRAMADO",
+              "COMPLETADO",
+              "CANCELADO"
+            ],
+            "title": "Estado"
+          },
+          "proceso": {
+            "$ref": "#/components/schemas/ProcesoBreve"
+          },
+          "responsable": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PersonaBreve"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "cliente": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PersonaBreve"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Cliente al que se avisó. Vacío: se avisó a todos los del proceso."
+          },
+          "contrato_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Contrato Id",
+            "description": "Las firmas de contrato se cambian desde el contrato."
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "tipo",
+          "etiqueta",
+          "titulo",
+          "inicio",
+          "estado",
+          "proceso"
+        ],
+        "title": "EventoDelProceso"
+      },
+      "EventosDelProceso": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/EventoDelProceso"
+            },
+            "type": "array",
+            "title": "Items",
+            "description": "Del más próximo al más lejano; los pasados, al final."
+          }
+        },
+        "type": "object",
+        "required": [
+          "items"
+        ],
+        "title": "EventosDelProceso"
       },
       "Explicacion": {
         "properties": {
@@ -24128,6 +26228,30 @@
         ],
         "title": "MensajeSitioRecibido"
       },
+      "MiembroEquipo": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "nombre": {
+            "type": "string",
+            "title": "Nombre"
+          },
+          "visible_cliente": {
+            "type": "boolean",
+            "title": "Visible Cliente",
+            "description": "Abogado participante: el cliente lo ve en su portal."
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "nombre",
+          "visible_cliente"
+        ],
+        "title": "MiembroEquipo"
+      },
       "Motivo": {
         "properties": {
           "motivo": {
@@ -24391,6 +26515,40 @@
           "autorizacion"
         ],
         "title": "NuevoMensajeSitio"
+      },
+      "NuevoMiembro": {
+        "properties": {
+          "abogado_id": {
+            "type": "integer",
+            "title": "Abogado Id"
+          },
+          "visible_cliente": {
+            "type": "boolean",
+            "title": "Visible Cliente",
+            "default": false
+          }
+        },
+        "type": "object",
+        "required": [
+          "abogado_id"
+        ],
+        "title": "NuevoMiembro"
+      },
+      "NuevoRadicado": {
+        "properties": {
+          "numero": {
+            "type": "string",
+            "maxLength": 40,
+            "minLength": 23,
+            "title": "Numero",
+            "description": "Los 23 dígitos, con o sin espacios o guiones."
+          }
+        },
+        "type": "object",
+        "required": [
+          "numero"
+        ],
+        "title": "NuevoRadicado"
       },
       "NuevoUsuario": {
         "properties": {
@@ -26430,6 +28588,17 @@
             "title": "Puede Administrar",
             "description": "Si el usuario puede archivar, reabrir o cambiar el equipo."
           },
+          "actividad": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ActividadProceso"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Solo en el listado y para el equipo de la firma."
+          },
           "colaboradores": {
             "items": {
               "$ref": "#/components/schemas/PersonaBreve"
@@ -26549,6 +28718,17 @@
             "type": "boolean",
             "title": "Puede Administrar",
             "description": "Si el usuario puede archivar, reabrir o cambiar el equipo."
+          },
+          "actividad": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ActividadProceso"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Solo en el listado y para el equipo de la firma."
           }
         },
         "type": "object",
@@ -26636,6 +28816,40 @@
           "destino"
         ],
         "title": "PruebaEnviada"
+      },
+      "RadicadoAgregado": {
+        "properties": {
+          "relaciones": {
+            "$ref": "#/components/schemas/RelacionesProceso"
+          },
+          "radicado_id": {
+            "type": "integer",
+            "title": "Radicado Id"
+          },
+          "consulta_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Consulta Id",
+            "description": "Consulta a la Rama Judicial que quedó en cola para este radicado."
+          },
+          "mensaje": {
+            "type": "string",
+            "title": "Mensaje"
+          }
+        },
+        "type": "object",
+        "required": [
+          "relaciones",
+          "radicado_id",
+          "mensaje"
+        ],
+        "title": "RadicadoAgregado"
       },
       "RadicadoBreve": {
         "properties": {
@@ -26765,6 +28979,50 @@
           "proceso"
         ],
         "title": "RadicadoConsultable"
+      },
+      "RadicadoDelProceso": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "numero": {
+            "type": "string",
+            "title": "Numero"
+          },
+          "estado_consulta": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Estado Consulta",
+            "description": "Cómo terminó la última consulta a la Rama Judicial."
+          },
+          "total_actuaciones": {
+            "type": "integer",
+            "title": "Total Actuaciones"
+          },
+          "actuaciones": {
+            "items": {
+              "$ref": "#/components/schemas/ActuacionBreve"
+            },
+            "type": "array",
+            "title": "Actuaciones",
+            "description": "Las 5 más recientes, de la más nueva a la más antigua."
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "numero",
+          "total_actuaciones",
+          "actuaciones"
+        ],
+        "title": "RadicadoDelProceso"
       },
       "Recordatorio": {
         "properties": {
@@ -27033,6 +29291,37 @@
           "ids"
         ],
         "title": "Reintento"
+      },
+      "RelacionesProceso": {
+        "properties": {
+          "clientes": {
+            "items": {
+              "$ref": "#/components/schemas/ClienteDelProceso"
+            },
+            "type": "array",
+            "title": "Clientes"
+          },
+          "radicados": {
+            "items": {
+              "$ref": "#/components/schemas/RadicadoDelProceso"
+            },
+            "type": "array",
+            "title": "Radicados"
+          },
+          "puede_editar": {
+            "type": "boolean",
+            "title": "Puede Editar",
+            "description": "El cliente nunca edita; el equipo del proceso sí."
+          }
+        },
+        "type": "object",
+        "required": [
+          "clientes",
+          "radicados",
+          "puede_editar"
+        ],
+        "title": "RelacionesProceso",
+        "description": "Clientes con acceso al proceso y radicados que se siguen en él."
       },
       "Resultado": {
         "properties": {
@@ -28827,6 +31116,19 @@
           "recibido_en"
         ],
         "title": "Version"
+      },
+      "VincularCliente": {
+        "properties": {
+          "cliente_id": {
+            "type": "integer",
+            "title": "Cliente Id"
+          }
+        },
+        "type": "object",
+        "required": [
+          "cliente_id"
+        ],
+        "title": "VincularCliente"
       },
       "VinculoArchivo": {
         "properties": {

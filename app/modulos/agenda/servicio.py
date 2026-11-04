@@ -7,19 +7,32 @@ puede leer la agenda (no cambiarla), así que se puede renovar o desactivar.
 
 import hashlib
 import secrets
-from datetime import date, datetime, timedelta
+from datetime import date, datetime, timedelta, timezone
 
 from sqlalchemy.orm import Session
 
 from app.audit import registrar_evento_auditoria
-from app.modulos.agenda.esquemas import Agenda, ElementoAgenda, EnlaceSuscripcion, Suscripcion
+from app import models
+from app.modulos.agenda.avisos import notificar_evento
+from app.modulos.agenda.esquemas import (
+    Agenda,
+    CambiosEvento,
+    DatosEvento,
+    ElementoAgenda,
+    EnlaceSuscripcion,
+    EventoDelProceso,
+    EventosDelProceso,
+    PersonaBreve,
+    Suscripcion,
+)
 from app.modulos.agenda.ics import EventoIcs, calendario
 from app.modulos.agenda.modelos import SuscripcionCalendario
 from app.modulos.agenda.repositorio import RepositorioAgenda
 from app.modulos.bandeja.esquemas import ProcesoBreve
 from app.modulos.expedientes import politicas
 from app.modulos.identidad.modelos import EstadoUsuario, Usuario
-from app.nucleo.errores import DatosInvalidos, NoAutenticado, SinPermiso
+from app.modulos.expedientes.repositorio import RepositorioProcesos
+from app.nucleo.errores import Conflicto, DatosInvalidos, NoAutenticado, NoEncontrado, SinPermiso
 from app.nucleo.zona_horaria import a_colombia, inicio_del_dia_utc
 from app.timezone import utc_ahora
 from app.workflow_service import user_portal_url
@@ -32,6 +45,13 @@ SOLO_FIRMA = "La agenda del equipo es para la firma."
 # El feed cubre lo reciente y lo que viene: los calendarios lo vuelven a leer cada hora.
 FEED_ATRAS = timedelta(days=60)
 FEED_ADELANTE = timedelta(days=365)
+
+
+def _utc(momento: datetime | None) -> datetime | None:
+    """La base guarda la hora en UTC sin zona."""
+    if momento is None:
+        return None
+    return momento.astimezone(timezone.utc).replace(tzinfo=None)
 
 
 def _hash(token: str) -> str:
@@ -82,6 +102,103 @@ class ServicioAgenda:
             ))
         items.sort(key=lambda item: item.inicio)
         return items
+
+    # ---- Eventos de un proceso --------------------------------------------
+
+    def _proceso(self, usuario: Usuario, proceso_id: int, *, para_cambiar: bool = False) -> models.Proceso:
+        if politicas.es_cliente(usuario):
+            raise SinPermiso(SOLO_FIRMA)
+        proceso = RepositorioProcesos(self._db).obtener(proceso_id, politicas.filtro_procesos_visibles(usuario))
+        if proceso is None:
+            raise NoEncontrado("No encontramos el proceso, o no tiene acceso a él.")
+        if para_cambiar and proceso.archivado_en is not None:
+            raise Conflicto("Reabra el proceso para cambiar su agenda.", codigo="proceso_archivado")
+        return proceso
+
+    @staticmethod
+    def _cliente(proceso: models.Proceso, cliente_id: int | None) -> models.Usuario | None:
+        if cliente_id is None:
+            return None
+        cliente = next((v.cliente for v in proceso.clientes if v.cliente_id == cliente_id and v.cliente), None)
+        if cliente is None:
+            raise DatosInvalidos("Elija un cliente del proceso.", campos={"cliente_id": "No está vinculado al proceso."})
+        return cliente
+
+    @staticmethod
+    def _vista(evento: models.EventoAgenda) -> EventoDelProceso:
+        return EventoDelProceso(
+            id=evento.id, tipo=evento.tipo, etiqueta=ETIQUETAS.get(evento.tipo, "Evento"), titulo=evento.titulo,
+            descripcion=evento.descripcion, inicio=evento.fecha_inicio, fin=evento.fecha_fin, estado=evento.estado,
+            proceso=ProcesoBreve(id=evento.proceso.id, nombre=evento.proceso.nombre),
+            responsable=PersonaBreve(id=evento.responsable.id, nombre=evento.responsable.nombre_completo) if evento.responsable else None,
+            cliente=PersonaBreve(id=evento.cliente.id, nombre=evento.cliente.nombre_completo) if evento.cliente else None,
+            contrato_id=evento.contrato_id,
+        )
+
+    def eventos_de_proceso(self, usuario: Usuario, proceso_id: int) -> EventosDelProceso:
+        self._proceso(usuario, proceso_id)
+        ahora = utc_ahora()
+        eventos = self._repo.eventos_de_proceso(proceso_id)
+        proximos = [e for e in eventos if e.fecha_inicio >= ahora]
+        pasados = sorted((e for e in eventos if e.fecha_inicio < ahora), key=lambda e: e.fecha_inicio, reverse=True)
+        return EventosDelProceso(items=[self._vista(e) for e in proximos + pasados])
+
+    def _evento(self, usuario: Usuario, evento_id: int) -> tuple[models.EventoAgenda, models.Proceso]:
+        evento = self._repo.evento(evento_id)
+        if evento is None or evento.proceso_id is None:
+            raise NoEncontrado("No encontramos ese evento.")
+        return evento, self._proceso(usuario, evento.proceso_id, para_cambiar=True)
+
+    def crear_evento(self, usuario: Usuario, datos: DatosEvento) -> EventoDelProceso:
+        proceso = self._proceso(usuario, datos.proceso_id, para_cambiar=True)
+        cliente = self._cliente(proceso, datos.cliente_id)
+        evento = models.EventoAgenda(
+            titulo=datos.titulo, descripcion=datos.descripcion, tipo=datos.tipo, estado="PROGRAMADO",
+            fecha_inicio=_utc(datos.inicio), fecha_fin=_utc(datos.fin), responsable_id=usuario.id,
+            proceso_id=proceso.id, cliente_id=cliente.id if cliente else None, creado_por_id=usuario.id,
+        )
+        self._db.add(evento)
+        self._db.flush()
+        registrar_evento_auditoria(self._db, usuario, "proceso.evento_agenda.crear", "proceso", proceso.id)
+        self._db.commit()
+        self._db.refresh(evento)
+        notificar_evento(self._db, proceso, evento, usuario, "programó", cliente)
+        return self._vista(evento)
+
+    def editar_evento(self, usuario: Usuario, evento_id: int, datos: CambiosEvento) -> EventoDelProceso:
+        evento, proceso = self._evento(usuario, evento_id)
+        cambios = datos.model_dump(exclude_unset=True)
+        firma = evento.tipo == "FIRMA_CONTRATO"
+        if firma and ("tipo" in cambios or "cliente_id" in cambios):
+            raise Conflicto("El tipo y el cliente de una firma se cambian desde el contrato.", codigo="evento_de_firma")
+        cliente_anterior = evento.cliente
+        if "cliente_id" in cambios:
+            cliente = self._cliente(proceso, cambios["cliente_id"])
+            evento.cliente_id = cliente.id if cliente else None
+        inicio = _utc(cambios["inicio"]) if "inicio" in cambios else evento.fecha_inicio
+        fin = _utc(cambios["fin"]) if "fin" in cambios else evento.fecha_fin
+        if fin is not None and fin <= inicio:
+            raise DatosInvalidos("La hora final va después del inicio.", campos={"fin": "Va después del inicio."})
+        evento.fecha_inicio, evento.fecha_fin = inicio, fin
+        for campo in ("tipo", "titulo", "descripcion", "estado"):
+            if campo in cambios:
+                setattr(evento, campo, cambios[campo])
+        registrar_evento_auditoria(self._db, usuario, "proceso.evento_agenda.actualizar", "proceso", proceso.id)
+        self._db.commit()
+        self._db.refresh(evento)
+        accion = "canceló" if cambios.get("estado") == "CANCELADO" else "actualizó"
+        notificar_evento(self._db, proceso, evento, usuario, accion, evento.cliente or cliente_anterior)
+        return self._vista(evento)
+
+    def eliminar_evento(self, usuario: Usuario, evento_id: int) -> None:
+        evento, proceso = self._evento(usuario, evento_id)
+        if evento.contrato_id is not None:
+            raise Conflicto("Las firmas de contrato se cancelan desde el contrato.", codigo="evento_de_firma")
+        if evento.estado == "PROGRAMADO" and evento.fecha_inicio >= utc_ahora():
+            notificar_evento(self._db, proceso, evento, usuario, "canceló", evento.cliente)
+        registrar_evento_auditoria(self._db, usuario, "proceso.evento_agenda.eliminar", "proceso", proceso.id)
+        self._db.delete(evento)
+        self._db.commit()
 
     # ---- Suscripción ----------------------------------------------------
 

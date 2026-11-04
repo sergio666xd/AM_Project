@@ -1,9 +1,10 @@
 "use client";
 
 import { useParams } from "next/navigation";
-import ProcesoDetallePage from "../page";
+
+import { Expediente } from "@/components/expediente/Expediente";
 
 export default function ProcesoSubpagina() {
-  const params = useParams<{ subpagina: string }>();
-  return <ProcesoDetallePage section={params.subpagina} />;
+  const { id, subpagina } = useParams<{ id: string; subpagina: string }>();
+  return <Expediente key={id} procesoId={Number(id)} section={subpagina} />;
 }
