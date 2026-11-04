@@ -3,75 +3,73 @@
 import { useState } from "react";
 import { BellRing, Monitor, Smartphone, Trash2 } from "lucide-react";
 
+import type { Cuenta } from "@/components/cuenta/MiCuenta";
+import type { Trato } from "@/components/cuenta/CambioSeguro";
 import { useDispositivosPush } from "@/components/push/useDispositivosPush";
 import { Button } from "@/components/ui/Button";
+import { Interruptor } from "@/components/ui/Interruptor";
 import { useToast } from "@/components/ui/ToastProvider";
-import { useSession } from "@/context/SessionContext";
-import { apiRequest } from "@/lib/api";
+import { api, mensajeDeError } from "@/lib/api-v2/cliente";
 import { fechaConHora } from "@/lib/fechas";
 
-/** Dispositivos del equipo con avisos del navegador, y si silenciar correo o WhatsApp cuando los hay. */
-export default function PushDeviceManager({ showSilencingOptions = true }: { showSilencingOptions?: boolean }) {
-  const { token, user, refreshUser } = useSession();
+const TEXTOS = {
+  tu: {
+    bloqueados: "Permítelos desde la configuración del navegador para este sitio.",
+    reintentar: "Inténtalo de nuevo en un momento.",
+    ninguno: "Aún no los tienes activos en ningún dispositivo.",
+    mientras: "Mientras tengas avisos al instante activos:",
+    correo: "No enviarme esos avisos por correo",
+    whatsapp: "No enviarme esos avisos por WhatsApp",
+  },
+  usted: {
+    bloqueados: "Permítalos desde la configuración del navegador para este sitio.",
+    reintentar: "Inténtelo de nuevo en un momento.",
+    ninguno: "Aún no los tiene activos en ningún dispositivo.",
+    mientras: "Mientras tenga avisos al instante activos:",
+    correo: "No enviarme esos avisos por correo",
+    whatsapp: "No enviarme esos avisos por WhatsApp",
+  },
+} as const;
+
+/** Dispositivos con avisos del navegador, y si silenciar correo o WhatsApp mientras los haya. */
+export default function PushDeviceManager({ cuenta, onCambio, trato }: { cuenta: Cuenta; onCambio: (c: Cuenta) => void; trato: Trato }) {
+  const t = TEXTOS[trato];
   const { toast } = useToast();
   const { dispositivos, configurado, error, quitando, activando, navegador, quitar, activarAqui } = useDispositivosPush();
-  const [silenciarCorreo, setSilenciarCorreo] = useState(Boolean(user?.silenciar_email_si_push));
-  const [silenciarWhatsapp, setSilenciarWhatsapp] = useState(Boolean(user?.silenciar_whatsapp_si_push));
   const [guardando, setGuardando] = useState(false);
-
-  // Reinicia los interruptores cuando cambian los valores guardados, durante el render.
-  const guardado = user ? `${user.id}:${Boolean(user.silenciar_email_si_push)}:${Boolean(user.silenciar_whatsapp_si_push)}` : null;
-  const [sincronizado, setSincronizado] = useState(guardado);
-  if (guardado !== null && guardado !== sincronizado) {
-    setSincronizado(guardado);
-    setSilenciarCorreo(Boolean(user?.silenciar_email_si_push));
-    setSilenciarWhatsapp(Boolean(user?.silenciar_whatsapp_si_push));
-  }
 
   async function activar() {
     const resultado = await activarAqui();
-    if (resultado === "denied") toast({ title: "Avisos bloqueados", description: "Permítelos desde la configuración del navegador para este sitio.", tone: "warning" });
-    else if (resultado === "error") toast({ title: "No se pudieron activar", description: "Inténtalo de nuevo en un momento.", tone: "error" });
+    if (resultado === "denied") toast({ title: "Avisos bloqueados", description: t.bloqueados, tone: "warning" });
+    else if (resultado === "error") toast({ title: "No se pudieron activar", description: t.reintentar, tone: "error" });
   }
 
-  async function guardarSilencio() {
-    if (!token) return;
+  async function silenciar(canal: "correo" | "whatsapp", valor: boolean) {
+    const campo = canal === "correo" ? "silenciar_correo_si_push" : "silenciar_whatsapp_si_push";
+    const anterior = cuenta;
+    onCambio({ ...cuenta, [campo]: valor });
     setGuardando(true);
-    try {
-      await apiRequest("/api/auth/preferencias-notificaciones", {
-        method: "PATCH",
-        token,
-        body: JSON.stringify({ silenciar_email_si_push: silenciarCorreo, silenciar_whatsapp_si_push: silenciarWhatsapp }),
-      });
-      await refreshUser();
-      toast({ title: "Preferencia guardada", tone: "success" });
-    } catch (causa) {
-      toast({ title: "No se pudo guardar", description: causa instanceof Error ? causa.message : undefined, tone: "error" });
-    } finally {
-      setGuardando(false);
+    const { data, error: fallo } = await api.PUT("/api/v2/cuenta/avisos", { body: { [campo]: valor } });
+    setGuardando(false);
+    if (!data) {
+      onCambio(anterior);
+      toast({ title: "No se guardó el cambio", description: mensajeDeError(fallo), tone: "error" });
+      return;
     }
+    onCambio(data);
   }
 
   const hay = (dispositivos?.length ?? 0) > 0;
 
   return (
-    <section className="space-y-4">
-      <div>
-        <h3 className="flex items-center gap-2 text-[15px] font-semibold text-ink">
-          <BellRing aria-hidden size={17} className="text-ink-2" /> Avisos del navegador
-        </h3>
-        <p className="mt-1 text-pretty text-[14px] text-ink-2">
-          En estos dispositivos ves al instante los mensajes y las actuaciones nuevas, aunque no tengas el panel abierto.
-        </p>
-      </div>
-
+    <div className="space-y-4">
       {error && <p role="alert" className="rounded-lg bg-bad-soft px-3.5 py-2.5 text-[14px] text-bad">{error}</p>}
 
       {dispositivos === null ? (
         <div aria-busy="true" className="skeleton h-14 rounded-lg" />
       ) : !hay ? (
         <p className="rounded-lg bg-sheet-2 px-4 py-3 text-[14px] text-ink-2">
-          {configurado ? "Aún no los tienes activos en ningún dispositivo." : "El servidor aún no tiene configurados los avisos del navegador."}
+          {configurado ? t.ninguno : "El servidor aún no tiene configurados los avisos del navegador."}
         </p>
       ) : (
         <ul className="divide-y divide-line rounded-lg shadow-[0_0_0_1px_var(--line)]">
@@ -106,21 +104,21 @@ export default function PushDeviceManager({ showSilencingOptions = true }: { sho
         </Button>
       )}
 
-      {showSilencingOptions && hay && (
-        <fieldset className="space-y-2.5 rounded-lg bg-sheet-2 px-4 py-3.5">
-          <legend className="sr-only">Silenciar otros canales</legend>
-          <p className="text-[14px] font-semibold text-ink">Mientras tengas avisos del navegador activos:</p>
-          <label className="flex min-h-9 cursor-pointer items-center gap-2.5 text-[14px] text-ink-2">
-            <input type="checkbox" checked={silenciarCorreo} onChange={(e) => setSilenciarCorreo(e.target.checked)} className="size-4 accent-[var(--navy)]" />
-            No enviarme los avisos por correo
-          </label>
-          <label className="flex min-h-9 cursor-pointer items-center gap-2.5 text-[14px] text-ink-2">
-            <input type="checkbox" checked={silenciarWhatsapp} onChange={(e) => setSilenciarWhatsapp(e.target.checked)} className="size-4 accent-[var(--navy)]" />
-            No enviarme los avisos por WhatsApp
-          </label>
-          <Button size="sm" loading={guardando} onClick={() => void guardarSilencio()}>Guardar</Button>
-        </fieldset>
+      {hay && (
+        <div className="rounded-lg bg-sheet-2 px-4 py-3">
+          <p className="text-[14px] font-semibold text-ink">{t.mientras}</p>
+          <div className="mt-1 divide-y divide-line">
+            <div className="flex items-center gap-3 py-1">
+              <span className="flex-1 text-[14px] text-ink-2">{t.correo}</span>
+              <Interruptor activo={cuenta.silenciar_correo_si_push} etiqueta={t.correo} deshabilitado={guardando} onCambio={(v) => void silenciar("correo", v)} />
+            </div>
+            <div className="flex items-center gap-3 py-1">
+              <span className="flex-1 text-[14px] text-ink-2">{t.whatsapp}</span>
+              <Interruptor activo={cuenta.silenciar_whatsapp_si_push} etiqueta={t.whatsapp} deshabilitado={guardando || !cuenta.whatsapp} onCambio={(v) => void silenciar("whatsapp", v)} />
+            </div>
+          </div>
+        </div>
       )}
-    </section>
+    </div>
   );
 }

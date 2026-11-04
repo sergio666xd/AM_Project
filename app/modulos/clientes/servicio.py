@@ -11,6 +11,7 @@ cambie, la firma puede reenviarle el acceso con una contraseña nueva.
 import secrets
 from datetime import date
 
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app import security
@@ -21,16 +22,20 @@ from app.modulos.clientes.esquemas import (
     Acceso,
     AccesoEnviado,
     AvisoAlCliente,
+    CambioPerfil,
+    CambiosPerfil,
     ClienteFicha,
     ClienteResumen,
     ContratoDelCliente,
     DatosCliente,
+    DiferenciaPerfil,
     GrupoClientes,
     ListaClientes,
     NuevoCliente,
     PendienteDelCliente,
     ProcesoDelCliente,
     ResumenClientes,
+    RevisionCambio,
 )
 from app.modulos.clientes.repositorio import RepositorioClientes
 from app.modulos.documentos.modelos import SolicitudDocumento
@@ -290,3 +295,87 @@ class ServicioClientes:
         self._db.commit()
         self._enviar_acceso(usuario, cliente, clave, canal)
         return AccesoEnviado(canal=canal, destino=cliente.whatsapp_numero if canal == "WHATSAPP" else cliente.email)
+
+    # ---- Cambios de datos que piden los clientes ------------------------
+
+    def _diferencias(self, solicitud) -> list[DiferenciaPerfil]:
+        cliente = solicitud.cliente
+        genero = {"MASCULINO": "Masculino", "FEMENINO": "Femenino"}
+        filas = [
+            ("nombre", "Nombre", cliente.nombre_completo, solicitud.nombre_completo_solicitado),
+            ("correo", "Correo", cliente.email, solicitud.email_solicitado),
+            ("whatsapp", "WhatsApp", cliente.whatsapp_numero, solicitud.whatsapp_numero_solicitado),
+            ("documento", "Documento", cliente.numero_documento, solicitud.numero_documento_solicitado),
+            ("genero", "Género", genero.get(cliente.genero or ""), genero.get(solicitud.genero_solicitado or "") if solicitud.genero_solicitado is not None else None),
+            ("domicilio", "Ciudad de domicilio", cliente.domicilio, solicitud.domicilio_solicitado),
+            ("direccion", "Dirección", cliente.direccion, solicitud.direccion_solicitada),
+        ]
+        diferencias = []
+        for campo, etiqueta, antes, despues in filas:
+            if campo in {"documento", "genero", "domicilio", "direccion"} and despues is None:
+                continue  # El cliente no tocó ese dato.
+            antes, despues = (antes or "").strip() or None, (despues or "").strip() or None
+            if antes != despues:
+                diferencias.append(DiferenciaPerfil(campo=campo, etiqueta=etiqueta, antes=antes, despues=despues))
+        return diferencias
+
+    def cambios_perfil(self, usuario: Usuario) -> CambiosPerfil:
+        self._equipo(usuario)
+        solicitudes = self._repo.cambios_pendientes(politicas.filtro_clientes_visibles(usuario))
+        procesos: dict[int, list[ProcesoBreve]] = {}
+        for cliente_id, proceso in self._repo.vinculos([s.cliente_id for s in solicitudes], filtro_procesos_visibles(usuario)):
+            procesos.setdefault(cliente_id, []).append(ProcesoBreve(id=proceso.id, nombre=proceso.nombre))
+        return CambiosPerfil(items=[
+            CambioPerfil(
+                id=s.id,
+                cliente_id=s.cliente_id,
+                cliente=s.cliente.nombre_completo,
+                solicitada_en=s.solicitada_en,
+                procesos=procesos.get(s.cliente_id, []),
+                diferencias=self._diferencias(s),
+            )
+            for s in solicitudes
+        ])
+
+    def _cambio(self, usuario: Usuario, solicitud_id: int):
+        self._equipo(usuario)
+        solicitud = self._repo.cambio_pendiente(solicitud_id, politicas.filtro_clientes_visibles(usuario))
+        if solicitud is None:
+            raise NoEncontrado("Esa solicitud ya fue revisada o no existe.")
+        return solicitud
+
+    def aprobar_cambio(self, usuario: Usuario, solicitud_id: int, datos: RevisionCambio) -> None:
+        solicitud = self._cambio(usuario, solicitud_id)
+        cliente = solicitud.cliente
+        correo = (solicitud.email_solicitado or "").strip().lower()
+        if correo and correo != (cliente.email or "").lower() and self._db.scalar(
+            select(Usuario.id).where(Usuario.email == correo, Usuario.id != cliente.id)
+        ):
+            raise Conflicto("El correo que pidió el cliente ya pertenece a otra cuenta.")
+        cliente.email = correo or cliente.email
+        cliente.nombre_completo = solicitud.nombre_completo_solicitado
+        cliente.whatsapp_numero = solicitud.whatsapp_numero_solicitado or ""
+        if solicitud.genero_solicitado is not None:
+            cliente.genero = solicitud.genero_solicitado or None
+        if solicitud.numero_documento_solicitado is not None:
+            cliente.numero_documento = solicitud.numero_documento_solicitado.replace(".", "") or None
+        if solicitud.domicilio_solicitado is not None:
+            cliente.domicilio = solicitud.domicilio_solicitado or None
+        if solicitud.direccion_solicitada is not None:
+            cliente.direccion = solicitud.direccion_solicitada or None
+        self._cerrar_cambio(usuario, solicitud, "APROBADA", datos.comentario)
+
+    def rechazar_cambio(self, usuario: Usuario, solicitud_id: int, datos: RevisionCambio) -> None:
+        solicitud = self._cambio(usuario, solicitud_id)
+        if not (datos.comentario or "").strip():
+            raise DatosInvalidos("Cuéntele al cliente por qué no se aplica el cambio.", campos={"comentario": "Escriba el motivo."})
+        self._cerrar_cambio(usuario, solicitud, "RECHAZADA", datos.comentario)
+
+    def _cerrar_cambio(self, usuario: Usuario, solicitud, estado: str, comentario: str | None) -> None:
+        solicitud.estado = estado
+        solicitud.revisada_por_id = usuario.id
+        solicitud.revisada_en = utc_ahora()
+        solicitud.comentario_revision = (comentario or "").strip() or None
+        accion = "cliente.solicitud_perfil.aprobar" if estado == "APROBADA" else "cliente.solicitud_perfil.rechazar"
+        registrar_evento_auditoria(self._db, usuario, accion, "solicitud_edicion_perfil", solicitud.id)
+        self._db.commit()

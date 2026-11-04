@@ -107,7 +107,7 @@ const SECCIONES: { titulo: string; pestanas: { label: string; href: string }[] }
     titulo: "Usuarios",
     pestanas: [
       { label: "Cuentas", href: `${ADMIN}/usuarios` },
-      { label: "Solicitudes de perfil", href: `${ADMIN}/solicitudes-perfil` },
+      { label: "Cambios de perfil", href: `${ADMIN}/solicitudes-perfil` },
     ],
   },
   {

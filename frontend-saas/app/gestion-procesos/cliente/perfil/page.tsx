@@ -5,8 +5,8 @@ import { RefreshCw } from "lucide-react";
 
 import { AvisosCliente, DatosCliente, DispositivosCliente } from "@/components/portal-cliente/perfil";
 import { FilasCargando, TituloCliente } from "@/components/portal-cliente/piezas";
-import { SecurityChangeButton } from "@/components/security/SecurityChangeButton";
-import { Button, clasesBoton } from "@/components/ui/Button";
+import { CambioSeguro } from "@/components/cuenta/CambioSeguro";
+import { Button } from "@/components/ui/Button";
 import { Sheet } from "@/components/ui/Sheet";
 import { useSession } from "@/context/SessionContext";
 import { api, mensajeDeError } from "@/lib/api-v2/cliente";
@@ -14,7 +14,7 @@ import type { PerfilCliente } from "@/lib/portalCliente";
 import { useLoadEffect } from "@/lib/useLoadEffect";
 
 export default function PerfilClientePage() {
-  const { token, refreshUser } = useSession();
+  const { refreshUser } = useSession();
   const [perfil, setPerfil] = useState<PerfilCliente | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -35,7 +35,6 @@ export default function PerfilClientePage() {
     await refreshUser();
     await cargar();
   };
-  const boton = clasesBoton("secondary", "lg");
 
   return (
     <div className="mx-auto max-w-3xl">
@@ -59,9 +58,9 @@ export default function PerfilClientePage() {
             onSolicitud={(solicitud) => setPerfil((actual) => actual && { ...actual, solicitud })}
             seguridad={
               <>
-                <SecurityChangeButton action="email" title="Cambiar correo" token={token} whatsappAvailable={Boolean(perfil.whatsapp)} onComplete={alCambiarDato} claseBoton={boton} />
-                <SecurityChangeButton action="whatsapp" title={perfil.whatsapp ? "Cambiar WhatsApp" : "Registrar WhatsApp"} token={token} whatsappAvailable={Boolean(perfil.whatsapp)} onComplete={alCambiarDato} claseBoton={boton} />
-                <SecurityChangeButton action="password" title="Cambiar contraseña" token={token} whatsappAvailable={Boolean(perfil.whatsapp)} onComplete={alCambiarDato} claseBoton={boton} />
+                <CambioSeguro accion="email" titulo="Cambiar correo" trato="usted" grande tieneWhatsapp={Boolean(perfil.whatsapp)} onHecho={alCambiarDato} />
+                <CambioSeguro accion="whatsapp" titulo={perfil.whatsapp ? "Cambiar WhatsApp" : "Registrar WhatsApp"} trato="usted" grande tieneWhatsapp={Boolean(perfil.whatsapp)} onHecho={alCambiarDato} />
+                <CambioSeguro accion="password" titulo="Cambiar contraseña" trato="usted" grande tieneWhatsapp={Boolean(perfil.whatsapp)} onHecho={alCambiarDato} />
               </>
             }
           />

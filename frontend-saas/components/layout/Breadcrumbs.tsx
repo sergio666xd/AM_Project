@@ -28,7 +28,7 @@ const labels: Record<string, string> = {
   contenido: "Contenido",
   usuarios: "Usuarios",
   solicitudes: "Solicitudes",
-  "solicitudes-perfil": "Solicitudes de perfil",
+  "solicitudes-perfil": "Cambios de perfil",
   planes: "Planes",
   saas: "SaaS individual",
   global: "Visión global",

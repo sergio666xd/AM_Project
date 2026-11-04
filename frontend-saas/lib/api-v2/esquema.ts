@@ -721,6 +721,152 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v2/cuenta": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Mi cuenta */
+        get: operations["mi_cuenta"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /**
+         * Cambiar mis datos
+         * @description Nombre y datos para los contratos. Correo, WhatsApp y contraseña se cambian con código.
+         */
+        patch: operations["cambiar_mi_cuenta"];
+        trace?: never;
+    };
+    "/api/v2/cuenta/avisos": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Cambiar mis canales de aviso */
+        put: operations["cambiar_mis_avisos"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v2/cuenta/codigos": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Pedir un código de seguridad
+         * @description Envía un código de seis dígitos por correo o WhatsApp para cambiar el correo, el WhatsApp o la contraseña.
+         */
+        post: operations["pedir_codigo"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v2/cuenta/codigos/activo": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Código vigente para un cambio */
+        get: operations["codigo_activo"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v2/cuenta/codigos/{codigo_id}/reenviar": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Reenviar el código */
+        post: operations["reenviar_codigo"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v2/cuenta/codigos/{codigo_id}/verificar": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Verificar el código */
+        post: operations["verificar_codigo"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v2/cuenta/codigos/{codigo_id}/aplicar": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Aplicar el cambio
+         * @description Cambia el dato después de verificar el código y avisa del cambio al correo y al WhatsApp anteriores y nuevos.
+         */
+        post: operations["aplicar_cambio"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v2/cuenta/codigos/{codigo_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Cancelar el cambio */
+        delete: operations["cancelar_codigo"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v2/busqueda": {
         parameters: {
             query?: never;
@@ -1274,6 +1420,60 @@ export interface paths {
          * @description Genera otra contraseña temporal y se la envía. Solo mientras el cliente no haya entrado (409 si ya entró).
          */
         post: operations["reenviar_acceso"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v2/cambios-perfil": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Cambios de datos por revisar
+         * @description Lo que los clientes pidieron corregir en sus datos, con lo que tienen hoy al lado.
+         */
+        get: operations["cambios_perfil"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v2/cambios-perfil/{solicitud_id}/aprobar": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Aprobar un cambio de datos */
+        post: operations["aprobar_cambio_perfil"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v2/cambios-perfil/{solicitud_id}/rechazar": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Rechazar un cambio de datos */
+        post: operations["rechazar_cambio_perfil"];
         delete?: never;
         options?: never;
         head?: never;
@@ -3642,6 +3842,13 @@ export interface components {
             /** Nota */
             nota?: string | null;
         };
+        /** CambioAplicado */
+        CambioAplicado: {
+            /** Email */
+            email: string;
+            /** Whatsapp */
+            whatsapp: string;
+        };
         /** CambioAvisos */
         CambioAvisos: {
             /**
@@ -3772,10 +3979,40 @@ export interface components {
             /** Nota */
             nota?: string | null;
         };
+        /**
+         * CambioMiCuenta
+         * @description Datos que el equipo cambia sin código. Correo, WhatsApp y contraseña van con código.
+         */
+        CambioMiCuenta: {
+            /** Nombre */
+            nombre?: string | null;
+            /** Genero */
+            genero?: ("MASCULINO" | "FEMENINO" | "") | null;
+            /** Numero Documento */
+            numero_documento?: string | null;
+            /** Domicilio */
+            domicilio?: string | null;
+            /** Tarjeta Profesional */
+            tarjeta_profesional?: string | null;
+        };
         /** CambioMiembro */
         CambioMiembro: {
             /** Visible Cliente */
             visible_cliente: boolean;
+        };
+        /** CambioMisAvisos */
+        CambioMisAvisos: {
+            /**
+             * Tipos
+             * @description Solo el equipo de la firma.
+             */
+            tipos?: {
+                [key: string]: components["schemas"]["CanalesAviso"];
+            } | null;
+            /** Silenciar Correo Si Push */
+            silenciar_correo_si_push?: boolean | null;
+            /** Silenciar Whatsapp Si Push */
+            silenciar_whatsapp_si_push?: boolean | null;
         };
         /** CambioPaginaSitio */
         CambioPaginaSitio: {
@@ -3786,6 +4023,42 @@ export interface components {
             contenido: {
                 [key: string]: unknown;
             };
+        };
+        /**
+         * CambioPerfil
+         * @description Lo que un cliente pidió corregir en sus datos, frente a lo que tiene hoy.
+         */
+        CambioPerfil: {
+            /** Id */
+            id: number;
+            /** Cliente Id */
+            cliente_id: number;
+            /** Cliente */
+            cliente: string;
+            /**
+             * Solicitada En
+             * Format: date-time
+             */
+            solicitada_en: string;
+            /** Procesos */
+            procesos: components["schemas"]["ProcesoBreve"][];
+            /**
+             * Diferencias
+             * @description Solo los datos que cambian.
+             */
+            diferencias: components["schemas"]["DiferenciaPerfil"][];
+        };
+        /** CambioSeguro */
+        CambioSeguro: {
+            /**
+             * Valor
+             * @description El correo o el número nuevo.
+             */
+            valor?: string | null;
+            /** Contrasena Actual */
+            contrasena_actual?: string | null;
+            /** Contrasena Nueva */
+            contrasena_nueva?: string | null;
         };
         /** CambioUsuario */
         CambioUsuario: {
@@ -3839,6 +4112,11 @@ export interface components {
             estado?: ("PROGRAMADO" | "COMPLETADO" | "CANCELADO") | null;
             /** Cliente Id */
             cliente_id?: number | null;
+        };
+        /** CambiosPerfil */
+        CambiosPerfil: {
+            /** Items */
+            items: components["schemas"]["CambioPerfil"][];
         };
         /**
          * CambiosProceso
@@ -3897,6 +4175,13 @@ export interface components {
             actuacion_id?: number | null;
             /** Cliente Id */
             cliente_id?: number | null;
+        };
+        /** CanalesAviso */
+        CanalesAviso: {
+            /** Correo */
+            correo: boolean;
+            /** Whatsapp */
+            whatsapp: boolean;
         };
         /** CargaPersona */
         CargaPersona: {
@@ -4139,6 +4424,43 @@ export interface components {
              * @description Clientes a los que se envió el aviso (id y nombre).
              */
             clientes: components["schemas"]["ProcesoDelFolio"][];
+        };
+        /** CodigoIngresado */
+        CodigoIngresado: {
+            /** Codigo */
+            codigo: string;
+        };
+        /** CodigoSeguridad */
+        CodigoSeguridad: {
+            /** Id */
+            id: string;
+            /**
+             * Accion
+             * @enum {string}
+             */
+            accion: "email" | "whatsapp" | "password";
+            /**
+             * Canal
+             * @enum {string}
+             */
+            canal: "correo" | "whatsapp";
+            /**
+             * Destino
+             * @description Correo o número enmascarado al que llegó el código.
+             */
+            destino: string;
+            /**
+             * Expira En
+             * Format: date-time
+             */
+            expira_en: string;
+            /**
+             * Reenviar Desde
+             * Format: date-time
+             */
+            reenviar_desde: string;
+            /** Verificado */
+            verificado: boolean;
         };
         /** ConfiguracionConsultas */
         ConfiguracionConsultas: {
@@ -5091,6 +5413,20 @@ export interface components {
              * @default
              */
             mensaje_error: string;
+        };
+        /** DiferenciaPerfil */
+        DiferenciaPerfil: {
+            /**
+             * Campo
+             * @enum {string}
+             */
+            campo: "nombre" | "correo" | "whatsapp" | "documento" | "genero" | "domicilio" | "direccion";
+            /** Etiqueta */
+            etiqueta: string;
+            /** Antes */
+            antes: string | null;
+            /** Despues */
+            despues: string | null;
         };
         /** Dispositivo */
         Dispositivo: {
@@ -6294,6 +6630,39 @@ export interface components {
             /** Mensaje */
             mensaje: string;
         };
+        /** MiCuenta */
+        MiCuenta: {
+            /** Id */
+            id: number;
+            /** Nombre */
+            nombre: string;
+            /** Email */
+            email: string;
+            /** Whatsapp */
+            whatsapp: string;
+            /**
+             * Rol
+             * @enum {string}
+             */
+            rol: "ADMIN" | "ABOGADO_ADMIN" | "ABOGADO" | "CLIENTE";
+            /** Genero */
+            genero?: ("FEMENINO" | "MASCULINO") | null;
+            /** Numero Documento */
+            numero_documento?: string | null;
+            /** Domicilio */
+            domicilio?: string | null;
+            /** Tarjeta Profesional */
+            tarjeta_profesional?: string | null;
+            /**
+             * Avisos
+             * @description Canales por tipo de aviso. Vacío para clientes, que los eligen en su perfil.
+             */
+            avisos: components["schemas"]["TipoAviso"][];
+            /** Silenciar Correo Si Push */
+            silenciar_correo_si_push: boolean;
+            /** Silenciar Whatsapp Si Push */
+            silenciar_whatsapp_si_push: boolean;
+        };
         /** MiembroEquipo */
         MiembroEquipo: {
             /** Id */
@@ -6386,6 +6755,19 @@ export interface components {
              * @enum {string}
              */
             canal: "EMAIL" | "WHATSAPP";
+        };
+        /** NuevoCodigo */
+        NuevoCodigo: {
+            /**
+             * Accion
+             * @enum {string}
+             */
+            accion: "email" | "whatsapp" | "password";
+            /**
+             * Canal
+             * @enum {string}
+             */
+            canal: "correo" | "whatsapp";
         };
         /** NuevoContrato */
         NuevoContrato: {
@@ -7504,6 +7886,14 @@ export interface components {
             /** Enviado En */
             enviado_en?: string | null;
         };
+        /** Reenvio */
+        Reenvio: {
+            /**
+             * Canal
+             * @enum {string}
+             */
+            canal: "correo" | "whatsapp";
+        };
         /** Referencia */
         Referencia: {
             /**
@@ -7839,6 +8229,14 @@ export interface components {
              */
             estado: "APROBADO" | "REQUIERE_CORRECCION";
             /** Comentario */
+            comentario?: string | null;
+        };
+        /** RevisionCambio */
+        RevisionCambio: {
+            /**
+             * Comentario
+             * @description Se le muestra al cliente. Obligatorio al rechazar.
+             */
             comentario?: string | null;
         };
         /** Solicitud */
@@ -8182,6 +8580,19 @@ export interface components {
             titulo_push?: string | null;
             /** Cuerpo Push */
             cuerpo_push?: string | null;
+        };
+        /** TipoAviso */
+        TipoAviso: {
+            /** Clave */
+            clave: string;
+            /** Nombre */
+            nombre: string;
+            /** Descripcion */
+            descripcion: string;
+            /** Correo */
+            correo: boolean;
+            /** Whatsapp */
+            whatsapp: boolean;
         };
         /** TotalesEstado */
         TotalesEstado: {
@@ -12086,6 +12497,786 @@ export interface operations {
             };
         };
     };
+    mi_cuenta: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MiCuenta"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+        };
+    };
+    cambiar_mi_cuenta: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CambioMiCuenta"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MiCuenta"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+        };
+    };
+    cambiar_mis_avisos: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CambioMisAvisos"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MiCuenta"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+        };
+    };
+    pedir_codigo: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["NuevoCodigo"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CodigoSeguridad"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+        };
+    };
+    codigo_activo: {
+        parameters: {
+            query: {
+                /** @description email, whatsapp o password. */
+                accion: "email" | "whatsapp" | "password";
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CodigoSeguridad"] | null;
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+        };
+    };
+    reenviar_codigo: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                codigo_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["Reenvio"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CodigoSeguridad"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+        };
+    };
+    verificar_codigo: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                codigo_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CodigoIngresado"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CodigoSeguridad"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+        };
+    };
+    aplicar_cambio: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                codigo_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CambioSeguro"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CambioAplicado"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+        };
+    };
+    cancelar_codigo: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                codigo_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+        };
+    };
     buscar: {
         parameters: {
             query: {
@@ -15652,6 +16843,263 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["AccesoEnviado"];
                 };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+        };
+    };
+    cambios_perfil: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CambiosPerfil"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+        };
+    };
+    aprobar_cambio_perfil: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                solicitud_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RevisionCambio"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+        };
+    };
+    rechazar_cambio_perfil: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                solicitud_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RevisionCambio"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
             /** @description Bad Request */
             400: {

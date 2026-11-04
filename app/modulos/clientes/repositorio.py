@@ -70,3 +70,18 @@ class RepositorioClientes:
         propios = select(Proceso.id).where(Proceso.id.in_(proceso_ids), Proceso.abogado_id == usuario_id)
         colaborando = select(C.proceso_id).where(C.proceso_id.in_(proceso_ids), C.abogado_id == usuario_id, C.visible_cliente.is_(True))
         return set(self._db.scalars(propios.union(colaborando)).all())
+
+    def cambios_pendientes(self, visibles: ColumnElement[bool]) -> list[models.SolicitudEdicionPerfilCliente]:
+        return list(self._db.scalars(
+            select(models.SolicitudEdicionPerfilCliente)
+            .join(Usuario, Usuario.id == models.SolicitudEdicionPerfilCliente.cliente_id)
+            .where(models.SolicitudEdicionPerfilCliente.estado == "PENDIENTE", visibles)
+            .order_by(models.SolicitudEdicionPerfilCliente.solicitada_en.asc())
+        ))
+
+    def cambio_pendiente(self, solicitud_id: int, visibles: ColumnElement[bool]) -> models.SolicitudEdicionPerfilCliente | None:
+        return self._db.scalar(
+            select(models.SolicitudEdicionPerfilCliente)
+            .join(Usuario, Usuario.id == models.SolicitudEdicionPerfilCliente.cliente_id)
+            .where(models.SolicitudEdicionPerfilCliente.id == solicitud_id, models.SolicitudEdicionPerfilCliente.estado == "PENDIENTE", visibles)
+        )

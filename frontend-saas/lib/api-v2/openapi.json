@@ -4528,6 +4528,949 @@
         }
       }
     },
+    "/api/v2/cuenta": {
+      "get": {
+        "tags": [
+          "Mi cuenta"
+        ],
+        "summary": "Mi cuenta",
+        "operationId": "mi_cuenta",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MiCuenta"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too Many Requests",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            }
+          }
+        }
+      },
+      "patch": {
+        "tags": [
+          "Mi cuenta"
+        ],
+        "summary": "Cambiar mis datos",
+        "description": "Nombre y datos para los contratos. Correo, WhatsApp y contraseña se cambian con código.",
+        "operationId": "cambiar_mi_cuenta",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CambioMiCuenta"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MiCuenta"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too Many Requests",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v2/cuenta/avisos": {
+      "put": {
+        "tags": [
+          "Mi cuenta"
+        ],
+        "summary": "Cambiar mis canales de aviso",
+        "operationId": "cambiar_mis_avisos",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CambioMisAvisos"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MiCuenta"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too Many Requests",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v2/cuenta/codigos": {
+      "post": {
+        "tags": [
+          "Mi cuenta"
+        ],
+        "summary": "Pedir un código de seguridad",
+        "description": "Envía un código de seis dígitos por correo o WhatsApp para cambiar el correo, el WhatsApp o la contraseña.",
+        "operationId": "pedir_codigo",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NuevoCodigo"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CodigoSeguridad"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too Many Requests",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v2/cuenta/codigos/activo": {
+      "get": {
+        "tags": [
+          "Mi cuenta"
+        ],
+        "summary": "Código vigente para un cambio",
+        "operationId": "codigo_activo",
+        "parameters": [
+          {
+            "name": "accion",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "enum": [
+                "email",
+                "whatsapp",
+                "password"
+              ],
+              "type": "string",
+              "description": "email, whatsapp o password.",
+              "title": "Accion"
+            },
+            "description": "email, whatsapp o password."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/components/schemas/CodigoSeguridad"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "title": "Response Codigo Activo"
+                }
+              }
+            }
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Too Many Requests"
+          }
+        }
+      }
+    },
+    "/api/v2/cuenta/codigos/{codigo_id}/reenviar": {
+      "post": {
+        "tags": [
+          "Mi cuenta"
+        ],
+        "summary": "Reenviar el código",
+        "operationId": "reenviar_codigo",
+        "parameters": [
+          {
+            "name": "codigo_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Codigo Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Reenvio"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CodigoSeguridad"
+                }
+              }
+            }
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Too Many Requests"
+          }
+        }
+      }
+    },
+    "/api/v2/cuenta/codigos/{codigo_id}/verificar": {
+      "post": {
+        "tags": [
+          "Mi cuenta"
+        ],
+        "summary": "Verificar el código",
+        "operationId": "verificar_codigo",
+        "parameters": [
+          {
+            "name": "codigo_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Codigo Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CodigoIngresado"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CodigoSeguridad"
+                }
+              }
+            }
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Too Many Requests"
+          }
+        }
+      }
+    },
+    "/api/v2/cuenta/codigos/{codigo_id}/aplicar": {
+      "post": {
+        "tags": [
+          "Mi cuenta"
+        ],
+        "summary": "Aplicar el cambio",
+        "description": "Cambia el dato después de verificar el código y avisa del cambio al correo y al WhatsApp anteriores y nuevos.",
+        "operationId": "aplicar_cambio",
+        "parameters": [
+          {
+            "name": "codigo_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Codigo Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CambioSeguro"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CambioAplicado"
+                }
+              }
+            }
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Too Many Requests"
+          }
+        }
+      }
+    },
+    "/api/v2/cuenta/codigos/{codigo_id}": {
+      "delete": {
+        "tags": [
+          "Mi cuenta"
+        ],
+        "summary": "Cancelar el cambio",
+        "operationId": "cancelar_codigo",
+        "parameters": [
+          {
+            "name": "codigo_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Codigo Id"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Too Many Requests"
+          }
+        }
+      }
+    },
     "/api/v2/busqueda": {
       "get": {
         "tags": [
@@ -8933,6 +9876,308 @@
                 }
               }
             }
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Too Many Requests"
+          }
+        }
+      }
+    },
+    "/api/v2/cambios-perfil": {
+      "get": {
+        "tags": [
+          "Clientes"
+        ],
+        "summary": "Cambios de datos por revisar",
+        "description": "Lo que los clientes pidieron corregir en sus datos, con lo que tienen hoy al lado.",
+        "operationId": "cambios_perfil",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CambiosPerfil"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too Many Requests",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v2/cambios-perfil/{solicitud_id}/aprobar": {
+      "post": {
+        "tags": [
+          "Clientes"
+        ],
+        "summary": "Aprobar un cambio de datos",
+        "operationId": "aprobar_cambio_perfil",
+        "parameters": [
+          {
+            "name": "solicitud_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Solicitud Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RevisionCambio"
+              }
+            }
+          }
+        },
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Too Many Requests"
+          }
+        }
+      }
+    },
+    "/api/v2/cambios-perfil/{solicitud_id}/rechazar": {
+      "post": {
+        "tags": [
+          "Clientes"
+        ],
+        "summary": "Rechazar un cambio de datos",
+        "operationId": "rechazar_cambio_perfil",
+        "parameters": [
+          {
+            "name": "solicitud_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Solicitud Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RevisionCambio"
+              }
+            }
+          }
+        },
+        "responses": {
+          "204": {
+            "description": "Successful Response"
           },
           "400": {
             "content": {
@@ -23171,6 +24416,24 @@
         ],
         "title": "CambiarEtapa"
       },
+      "CambioAplicado": {
+        "properties": {
+          "email": {
+            "type": "string",
+            "title": "Email"
+          },
+          "whatsapp": {
+            "type": "string",
+            "title": "Whatsapp"
+          }
+        },
+        "type": "object",
+        "required": [
+          "email",
+          "whatsapp"
+        ],
+        "title": "CambioAplicado"
+      },
       "CambioAvisos": {
         "properties": {
           "clave": {
@@ -23537,6 +24800,77 @@
         "type": "object",
         "title": "CambioMensajeSitio"
       },
+      "CambioMiCuenta": {
+        "properties": {
+          "nombre": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 150
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Nombre"
+          },
+          "genero": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "MASCULINO",
+                  "FEMENINO",
+                  ""
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Genero"
+          },
+          "numero_documento": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 40
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Numero Documento"
+          },
+          "domicilio": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 120
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Domicilio"
+          },
+          "tarjeta_profesional": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 40
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tarjeta Profesional"
+          }
+        },
+        "type": "object",
+        "title": "CambioMiCuenta",
+        "description": "Datos que el equipo cambia sin código. Correo, WhatsApp y contraseña van con código."
+      },
       "CambioMiembro": {
         "properties": {
           "visible_cliente": {
@@ -23549,6 +24883,49 @@
           "visible_cliente"
         ],
         "title": "CambioMiembro"
+      },
+      "CambioMisAvisos": {
+        "properties": {
+          "tipos": {
+            "anyOf": [
+              {
+                "additionalProperties": {
+                  "$ref": "#/components/schemas/CanalesAviso"
+                },
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tipos",
+            "description": "Solo el equipo de la firma."
+          },
+          "silenciar_correo_si_push": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Silenciar Correo Si Push"
+          },
+          "silenciar_whatsapp_si_push": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Silenciar Whatsapp Si Push"
+          }
+        },
+        "type": "object",
+        "title": "CambioMisAvisos"
       },
       "CambioPaginaSitio": {
         "properties": {
@@ -23564,6 +24941,96 @@
           "contenido"
         ],
         "title": "CambioPaginaSitio"
+      },
+      "CambioPerfil": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "cliente_id": {
+            "type": "integer",
+            "title": "Cliente Id"
+          },
+          "cliente": {
+            "type": "string",
+            "title": "Cliente"
+          },
+          "solicitada_en": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Solicitada En"
+          },
+          "procesos": {
+            "items": {
+              "$ref": "#/components/schemas/ProcesoBreve"
+            },
+            "type": "array",
+            "title": "Procesos"
+          },
+          "diferencias": {
+            "items": {
+              "$ref": "#/components/schemas/DiferenciaPerfil"
+            },
+            "type": "array",
+            "title": "Diferencias",
+            "description": "Solo los datos que cambian."
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "cliente_id",
+          "cliente",
+          "solicitada_en",
+          "procesos",
+          "diferencias"
+        ],
+        "title": "CambioPerfil",
+        "description": "Lo que un cliente pidió corregir en sus datos, frente a lo que tiene hoy."
+      },
+      "CambioSeguro": {
+        "properties": {
+          "valor": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 320
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Valor",
+            "description": "El correo o el número nuevo."
+          },
+          "contrasena_actual": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 128
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Contrasena Actual"
+          },
+          "contrasena_nueva": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 72
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Contrasena Nueva"
+          }
+        },
+        "type": "object",
+        "title": "CambioSeguro"
       },
       "CambioUsuario": {
         "properties": {
@@ -23768,6 +25235,22 @@
         "type": "object",
         "title": "CambiosEvento",
         "description": "Solo se cambian los campos enviados."
+      },
+      "CambiosPerfil": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/CambioPerfil"
+            },
+            "type": "array",
+            "title": "Items"
+          }
+        },
+        "type": "object",
+        "required": [
+          "items"
+        ],
+        "title": "CambiosPerfil"
       },
       "CambiosProceso": {
         "properties": {
@@ -24039,6 +25522,24 @@
         "type": "object",
         "title": "CambiosTarea",
         "description": "Solo se cambian los campos enviados. `null` en una relación la quita."
+      },
+      "CanalesAviso": {
+        "properties": {
+          "correo": {
+            "type": "boolean",
+            "title": "Correo"
+          },
+          "whatsapp": {
+            "type": "boolean",
+            "title": "Whatsapp"
+          }
+        },
+        "type": "object",
+        "required": [
+          "correo",
+          "whatsapp"
+        ],
+        "title": "CanalesAviso"
       },
       "CargaPersona": {
         "properties": {
@@ -24658,6 +26159,75 @@
           "clientes"
         ],
         "title": "ClientesAvisados"
+      },
+      "CodigoIngresado": {
+        "properties": {
+          "codigo": {
+            "type": "string",
+            "pattern": "^\\d{6}$",
+            "title": "Codigo"
+          }
+        },
+        "type": "object",
+        "required": [
+          "codigo"
+        ],
+        "title": "CodigoIngresado"
+      },
+      "CodigoSeguridad": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "accion": {
+            "type": "string",
+            "enum": [
+              "email",
+              "whatsapp",
+              "password"
+            ],
+            "title": "Accion"
+          },
+          "canal": {
+            "type": "string",
+            "enum": [
+              "correo",
+              "whatsapp"
+            ],
+            "title": "Canal"
+          },
+          "destino": {
+            "type": "string",
+            "title": "Destino",
+            "description": "Correo o número enmascarado al que llegó el código."
+          },
+          "expira_en": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Expira En"
+          },
+          "reenviar_desde": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Reenviar Desde"
+          },
+          "verificado": {
+            "type": "boolean",
+            "title": "Verificado"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "accion",
+          "canal",
+          "destino",
+          "expira_en",
+          "reenviar_desde",
+          "verificado"
+        ],
+        "title": "CodigoSeguridad"
       },
       "ConfiguracionConsultas": {
         "properties": {
@@ -27184,6 +28754,57 @@
           "etapa"
         ],
         "title": "Diagnostico"
+      },
+      "DiferenciaPerfil": {
+        "properties": {
+          "campo": {
+            "type": "string",
+            "enum": [
+              "nombre",
+              "correo",
+              "whatsapp",
+              "documento",
+              "genero",
+              "domicilio",
+              "direccion"
+            ],
+            "title": "Campo"
+          },
+          "etiqueta": {
+            "type": "string",
+            "title": "Etiqueta"
+          },
+          "antes": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Antes"
+          },
+          "despues": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Despues"
+          }
+        },
+        "type": "object",
+        "required": [
+          "campo",
+          "etiqueta",
+          "antes",
+          "despues"
+        ],
+        "title": "DiferenciaPerfil"
       },
       "Dispositivo": {
         "properties": {
@@ -30093,6 +31714,112 @@
         ],
         "title": "MensajeSitioRecibido"
       },
+      "MiCuenta": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "nombre": {
+            "type": "string",
+            "title": "Nombre"
+          },
+          "email": {
+            "type": "string",
+            "title": "Email"
+          },
+          "whatsapp": {
+            "type": "string",
+            "title": "Whatsapp"
+          },
+          "rol": {
+            "type": "string",
+            "enum": [
+              "ADMIN",
+              "ABOGADO_ADMIN",
+              "ABOGADO",
+              "CLIENTE"
+            ],
+            "title": "Rol"
+          },
+          "genero": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "FEMENINO",
+                  "MASCULINO"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Genero"
+          },
+          "numero_documento": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Numero Documento"
+          },
+          "domicilio": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Domicilio"
+          },
+          "tarjeta_profesional": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tarjeta Profesional"
+          },
+          "avisos": {
+            "items": {
+              "$ref": "#/components/schemas/TipoAviso"
+            },
+            "type": "array",
+            "title": "Avisos",
+            "description": "Canales por tipo de aviso. Vacío para clientes, que los eligen en su perfil."
+          },
+          "silenciar_correo_si_push": {
+            "type": "boolean",
+            "title": "Silenciar Correo Si Push"
+          },
+          "silenciar_whatsapp_si_push": {
+            "type": "boolean",
+            "title": "Silenciar Whatsapp Si Push"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "nombre",
+          "email",
+          "whatsapp",
+          "rol",
+          "avisos",
+          "silenciar_correo_si_push",
+          "silenciar_whatsapp_si_push"
+        ],
+        "title": "MiCuenta"
+      },
       "MiembroEquipo": {
         "properties": {
           "id": {
@@ -30338,6 +32065,33 @@
           "email"
         ],
         "title": "NuevoCliente"
+      },
+      "NuevoCodigo": {
+        "properties": {
+          "accion": {
+            "type": "string",
+            "enum": [
+              "email",
+              "whatsapp",
+              "password"
+            ],
+            "title": "Accion"
+          },
+          "canal": {
+            "type": "string",
+            "enum": [
+              "correo",
+              "whatsapp"
+            ],
+            "title": "Canal"
+          }
+        },
+        "type": "object",
+        "required": [
+          "accion",
+          "canal"
+        ],
+        "title": "NuevoCodigo"
       },
       "NuevoContrato": {
         "properties": {
@@ -33283,6 +35037,23 @@
         ],
         "title": "Recordatorio"
       },
+      "Reenvio": {
+        "properties": {
+          "canal": {
+            "type": "string",
+            "enum": [
+              "correo",
+              "whatsapp"
+            ],
+            "title": "Canal"
+          }
+        },
+        "type": "object",
+        "required": [
+          "canal"
+        ],
+        "title": "Reenvio"
+      },
       "Referencia": {
         "properties": {
           "tipo": {
@@ -34088,6 +35859,25 @@
           "estado"
         ],
         "title": "Revision"
+      },
+      "RevisionCambio": {
+        "properties": {
+          "comentario": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 1000
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Comentario",
+            "description": "Se le muestra al cliente. Obligatorio al rechazar."
+          }
+        },
+        "type": "object",
+        "title": "RevisionCambio"
       },
       "Solicitud": {
         "properties": {
@@ -34976,6 +36766,39 @@
           "cuerpo_whatsapp"
         ],
         "title": "TextosPlantillaAviso"
+      },
+      "TipoAviso": {
+        "properties": {
+          "clave": {
+            "type": "string",
+            "title": "Clave"
+          },
+          "nombre": {
+            "type": "string",
+            "title": "Nombre"
+          },
+          "descripcion": {
+            "type": "string",
+            "title": "Descripcion"
+          },
+          "correo": {
+            "type": "boolean",
+            "title": "Correo"
+          },
+          "whatsapp": {
+            "type": "boolean",
+            "title": "Whatsapp"
+          }
+        },
+        "type": "object",
+        "required": [
+          "clave",
+          "nombre",
+          "descripcion",
+          "correo",
+          "whatsapp"
+        ],
+        "title": "TipoAviso"
       },
       "TotalesEstado": {
         "properties": {

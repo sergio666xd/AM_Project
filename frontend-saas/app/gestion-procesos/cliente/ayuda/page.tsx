@@ -1,75 +1,77 @@
 import Link from "next/link";
-import { BookOpen, FileText, MessageCircle, Bell, FolderOpen } from "lucide-react";
-import { PageHeader } from "@/components/ui/PageHeader";
-import { Button } from "@/components/ui/Button";
+import { ArrowRight, Bell, FileUp, FolderOpen, MessageSquare, ShieldCheck, Wallet } from "lucide-react";
 
-const faqs = [
+import { PageHeader } from "@/components/ui/PageHeader";
+
+const C = "/gestion-procesos/cliente";
+
+const PREGUNTAS = [
   {
-    q: "¿Cómo entrego un documento solicitado?",
-    a: "Abre la sección Documentos, busca la solicitud pendiente en la lista, selecciona el archivo desde tu dispositivo y pulsa Entregar archivo. Se aceptan formatos PDF, JPG, PNG y DOCX de hasta 15 MB.",
-    icon: FileText,
-    href: "/gestion-procesos/cliente/documentos",
+    pregunta: "¿Cómo le envío un documento a la firma?",
+    respuesta: "Entre a Pendientes. Allí está cada documento que le pedimos, con su fecha límite. Toque «Elegir archivo», escoja el documento en su celular o computador y envíelo. Sirven PDF, fotos (JPG o PNG) y Word, de hasta 15 MB.",
+    icono: FileUp,
+    enlace: { texto: "Ver mis pendientes", href: `${C}/pendientes` },
   },
   {
-    q: "¿Cómo consulto el avance de mi proceso judicial?",
-    a: "En Mis procesos selecciona el expediente de tu interés para ver el estado explicado en lenguaje claro, las novedades judiciales de la Rama Judicial, tareas, documentos y fechas clave compartidas por el despacho.",
-    icon: FolderOpen,
-    href: "/gestion-procesos/cliente/procesos",
+    pregunta: "¿Cómo sé en qué va mi proceso?",
+    respuesta: "En Mis procesos abra el proceso que le interesa. Arriba verá en qué etapa está, explicado en palabras sencillas, y debajo las novedades del juzgado con lo que significan para usted.",
+    icono: FolderOpen,
+    enlace: { texto: "Ver mis procesos", href: `${C}/procesos` },
   },
   {
-    q: "¿Dónde encuentro mis avisos y notificaciones?",
-    a: "El centro de notificaciones reúne avisos en tiempo real sobre nuevas actuaciones, solicitudes de documentos, tareas y eventos. Puedes consultarlos y marcarlos como leídos.",
-    icon: Bell,
-    href: "/gestion-procesos/cliente/notificaciones",
+    pregunta: "¿Cómo le escribo a mi abogada o abogado?",
+    respuesta: "En Mensajes puede escribirle a quien lleva su caso. Le responderán por el mismo medio y le avisaremos cuando llegue la respuesta.",
+    icono: MessageSquare,
+    enlace: { texto: "Abrir mensajes", href: `${C}/chat` },
   },
   {
-    q: "¿Cómo contacto a mi abogado responsable?",
-    a: "En el detalle de tu proceso y en la sección Mensajes verás el correo y el botón de WhatsApp directo del abogado asignado. También puedes usar el chat integrado del portal.",
-    icon: MessageCircle,
-    href: "/gestion-procesos/cliente/mensajes",
+    pregunta: "¿Dónde veo lo que he pagado y lo que debo?",
+    respuesta: "En Pagos están las cuentas de cobro, lo que ya pagó y lo que queda pendiente, con sus fechas. Los datos para pagar vienen en el PDF de cada cuenta.",
+    icono: Wallet,
+    enlace: { texto: "Ver mis pagos", href: `${C}/pagos` },
   },
-];
+  {
+    pregunta: "¿Cómo elijo por dónde me llegan los avisos?",
+    respuesta: "En Mi perfil y avisos puede escoger si quiere recibirlos por correo, por WhatsApp o en este dispositivo al instante.",
+    icono: Bell,
+    enlace: { texto: "Elegir mis avisos", href: `${C}/perfil` },
+  },
+  {
+    pregunta: "¿Cómo cambio mi correo, mi WhatsApp o mi contraseña?",
+    respuesta: "En Mi perfil y avisos. Por seguridad, le enviaremos un código de seis números a su correo o a su WhatsApp para confirmar que es usted. No comparta ese código con nadie.",
+    icono: ShieldCheck,
+    enlace: { texto: "Ir a mi perfil", href: `${C}/perfil` },
+  },
+] as const;
 
 export default function AyudaClientePage() {
   return (
-    <section className="motion-swap mx-auto max-w-4xl space-y-6 pb-24">
-      <PageHeader
-        overline="Portal del cliente"
-        title="Centro de ayuda"
-        description="Respuestas y guías rápidas para utilizar tu portal de expedientes."
-      />
+    <div className="max-w-3xl">
+      <PageHeader title="Ayuda" description="Respuestas cortas a lo que más nos preguntan sobre este portal." />
 
-      <div className="grid gap-4">
-        {faqs.map(({ q, a, icon: Icon, href }) => (
-          <article
-            key={q}
-            className="rounded-xl border border-border bg-surface p-5 shadow-xs transition hover:border-brand-500/50"
-          >
-            <div className="flex items-start gap-3">
-              <div className="grid size-10 shrink-0 place-items-center rounded-lg bg-brand-50 text-brand-700 dark:bg-brand-950 dark:text-brand-300">
-                <Icon className="size-5" />
-              </div>
-              <div className="min-w-0 flex-1">
-                <h2 className="font-semibold text-foreground text-base">{q}</h2>
-                <p className="mt-1 text-xs text-muted leading-relaxed">{a}</p>
-                <div className="mt-3">
-                  <Link href={href}>
-                    <Button variant="outline" size="sm" icon={<BookOpen className="size-3.5" />}>
-                      Abrir sección
-                    </Button>
-                  </Link>
-                </div>
-              </div>
+      <ul className="divide-y divide-line overflow-hidden rounded-xl bg-sheet shadow-sheet">
+        {PREGUNTAS.map(({ pregunta, respuesta, icono: Icono, enlace }) => (
+          <li key={pregunta} className="flex gap-4 px-5 py-5 sm:px-6">
+            <Icono aria-hidden size={20} className="mt-0.5 shrink-0 text-ink-2" />
+            <div className="min-w-0 flex-1">
+              <h2 className="text-balance text-[16px] font-semibold text-ink">{pregunta}</h2>
+              <p className="mt-1 max-w-[65ch] text-pretty text-[15px] leading-relaxed text-ink-2">{respuesta}</p>
+              <Link
+                href={enlace.href}
+                className="mt-2 inline-flex min-h-11 items-center gap-1.5 text-[15px] font-semibold text-navy-ink underline-offset-2 hover:underline"
+              >
+                {enlace.texto}
+                <ArrowRight aria-hidden size={16} />
+              </Link>
             </div>
-          </article>
+          </li>
         ))}
-      </div>
+      </ul>
 
-      <div className="rounded-xl border border-border bg-surface-secondary/60 p-4 text-center">
-        <p className="text-xs text-muted">
-          ¿Necesitas asistencia adicional? Comunícate directamente con tu abogado a través del chat del proceso o los canales de contacto de tu expediente.
-        </p>
-      </div>
-    </section>
+      <p className="mt-6 text-pretty text-[14.5px] text-ink-2">
+        ¿No encontró lo que buscaba? Escríbale a quien lleva su caso desde{" "}
+        <Link href={`${C}/chat`} className="font-semibold text-navy-ink underline underline-offset-2">Mensajes</Link>.
+      </p>
+    </div>
   );
 }
