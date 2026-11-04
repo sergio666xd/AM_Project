@@ -1,4 +1,3 @@
-from datetime import timedelta
 from app.timezone import utc_ahora
 
 from fastapi import APIRouter, Depends, HTTPException, status
@@ -17,10 +16,11 @@ from app.firm_access import (
 )
 from app.security import obtener_usuario_actual
 from app.message_templates import fecha_texto, texto_legible
-from app.notification_service import emitir_notificacion_workflow
-from app.notification_policy import plan_whatsapp_habilitado, preferencia_de_cliente
+from app.modulos.tareas import recordatorios
+from app.modulos.tareas.avisos import notificar_cambio, url_tarea
+from app.modulos.tareas.avisos import notificar_subtarea_asignada as _notificar_subtarea
+from app.notification_policy import plan_whatsapp_habilitado
 from app.reminder_workflow import iniciar_workflow_recordatorio, normalizar_utc_naive
-from app.workflow_service import user_portal_url
 from app.timezone import format_colombia_datetime
 
 
@@ -30,152 +30,14 @@ router = APIRouter(
 )
 
 
-def _url_tarea_notificacion(usuario: models.Usuario, tarea_id: int) -> str:
-    if usuario.rol == models.RolUsuario.CLIENTE:
-        ruta = f"/gestion-procesos/cliente/tareas?tarea={tarea_id}#tarea-{tarea_id}"
-    elif usuario.rol == models.RolUsuario.ABOGADO:
-        ruta = f"/gestion-procesos/dashboard/tareas/{tarea_id}"
-    elif usuario.rol == models.RolUsuario.ADMIN:
-        ruta = f"/gestion-procesos/admin/tareas?detalle={tarea_id}"
-    else:
-        ruta = f"/gestion-procesos/abogado/tareas/{tarea_id}"
-    return user_portal_url(usuario, ruta)
-
-
-def _versionar_recordatorios_pendientes(tarea: models.Tarea, incluir_sistema: bool = True) -> list[int]:
-    recordatorio_ids = []
-    for recordatorio in tarea.recordatorios:
-        if recordatorio.interno_sistema and not incluir_sistema:
-            continue
-        if not recordatorio.activo or recordatorio.enviado_en is not None:
-            continue
-        recordatorio.version += 1
-        if recordatorio.anticipacion_minutos is not None and tarea.fecha_limite is None:
-            recordatorio.activo = False
-            continue
-        recordatorio_ids.append(recordatorio.id)
-    return recordatorio_ids
-
-
-def _invalidar_recordatorios_sistema(tarea: models.Tarea) -> None:
-    for recordatorio in tarea.recordatorios:
-        if recordatorio.interno_sistema and recordatorio.activo and recordatorio.enviado_en is None:
-            recordatorio.activo = False
-            recordatorio.version += 1
-
-
-def _descartar_recordatorios_tarea(db: Session, tarea: models.Tarea) -> None:
-    """Remove scheduled reminders and prevent their queued deliveries from sending."""
-    for recordatorio in list(tarea.recordatorios):
-        entregas = db.query(models.EntregaNotificacion).filter(
-            models.EntregaNotificacion.recordatorio_id == recordatorio.id,
-            models.EntregaNotificacion.estado.in_(("PENDIENTE", "ERROR", "ENVIANDO")),
-        ).all()
-        for entrega in entregas:
-            entrega.estado = "DESCARTADA"
-            entrega.error = "La tarea fue completada, cancelada o eliminada."
-            entrega.lease_hasta = None
-        db.delete(recordatorio)
-    db.flush()
-
-
-def _crear_recordatorios_sistema(db: Session, tarea: models.Tarea) -> list[int]:
-    if tarea.fecha_limite is None or tarea.estado in {models.EstadoTarea.COMPLETADA, models.EstadoTarea.CANCELADA}:
-        return []
-    destinatario = tarea.cliente_asignado if tarea.cliente_id else tarea.usuario
-    if destinatario is None or destinatario.estado != models.EstadoUsuario.ACTIVO:
-        return []
-    if destinatario.rol == models.RolUsuario.CLIENTE:
-        email, whatsapp = preferencia_de_cliente(destinatario, "RECORDATORIOS")
-        email = email and bool(destinatario.email)
-        whatsapp = whatsapp and destinatario.notificaciones_whatsapp and bool(destinatario.whatsapp_numero.strip())
-    else:
-        preferencias = (destinatario.preferencias_notificacion or {}).get("RECORDATORIOS", {})
-        email = bool(preferencias.get("email", destinatario.notificaciones_email)) and bool(destinatario.email)
-        whatsapp = bool(preferencias.get("whatsapp", destinatario.notificaciones_whatsapp)) and bool(destinatario.whatsapp_numero.strip())
-    ids = []
-    for anticipacion in (1440, 720):
-        fecha_aviso = tarea.fecha_limite - timedelta(minutes=anticipacion)
-        if fecha_aviso <= utc_ahora():
-            continue
-        reminder = models.RecordatorioTarea(
-            tarea_id=tarea.id,
-            canal=models.CanalRecordatorio.WHATSAPP,
-            notificar_email=email,
-            notificar_whatsapp=whatsapp,
-            activo=True,
-            version=1,
-            workflow_version_lanzada=0,
-            anticipacion_minutos=anticipacion,
-            interno_sistema=True,
-        )
-        db.add(reminder)
-        db.flush()
-        ids.append(reminder.id)
-    return ids
-
-
-def _notificar_cambio_tarea(
-    db: Session,
-    tarea: models.Tarea,
-    actor: models.Usuario,
-    accion: str,
-    detalle: str,
-) -> None:
-    destinatarios = []
-    cliente = tarea.cliente_asignado if tarea.cliente_id else None
-    if cliente and cliente.estado == models.EstadoUsuario.ACTIVO and actor.id != cliente.id:
-        destinatarios.append(cliente)
-    elif actor.rol == models.RolUsuario.CLIENTE and tarea.usuario and tarea.usuario.id != actor.id:
-        destinatarios.append(tarea.usuario)
-    elif tarea.usuario and tarea.usuario.id != actor.id:
-        destinatarios.append(tarea.usuario)
-    if not destinatarios:
-        return
-    due = format_colombia_datetime(tarea.fecha_limite) if tarea.fecha_limite else "Sin fecha límite"
-    process = tarea.proceso.nombre if tarea.proceso else "Tarea general"
-    radicado = tarea.radicado.numero if tarea.radicado else "No asociado"
-    actuacion = tarea.actuacion_rel.actuacion if tarea.actuacion_rel else "No asociada"
-    for destinatario in destinatarios:
-        url_tarea = _url_tarea_notificacion(destinatario, tarea.id)
-        if accion == "eliminó la tarea":
-            if destinatario.rol == models.RolUsuario.CLIENTE:
-                url_tarea = user_portal_url(destinatario, "/gestion-procesos/cliente/tareas")
-            elif destinatario.rol == models.RolUsuario.ABOGADO:
-                url_tarea = user_portal_url(destinatario, "/gestion-procesos/dashboard/tareas")
-            elif destinatario.rol == models.RolUsuario.ADMIN:
-                url_tarea = user_portal_url(destinatario, "/gestion-procesos/admin/tareas")
-            else:
-                url_tarea = user_portal_url(destinatario, "/gestion-procesos/abogado/tareas")
-        cuerpo = (
-            f"Hola {destinatario.nombre_completo},\n\n{actor.nombre_completo} {accion}.\n\n"
-            f"Tarea: {tarea.titulo}\nDetalle: {detalle}\nEstado: {tarea.estado.value}\n"
-            f"Prioridad: {tarea.prioridad.value}\nFecha límite: {due}\nProceso: {process}\n"
-            f"Radicado: {radicado}\nActuación: {actuacion}\n\n"
-            f"Abrir enlace: Ver tareas | {url_tarea}"
-        )
-        emitir_notificacion_workflow(
-            db, destinatario, "TAREAS", f"TAREA_ACCION:{tarea.id}:{utc_ahora().timestamp()}",
-            f"{accion.capitalize()}: {tarea.titulo}", cuerpo, emisor=actor, incluir_email=True,
-            plantilla_clave="TAREA_ACCION",
-            variables={"nombre": destinatario.nombre_completo, "actor": actor.nombre_completo,
-                       "accion": accion, "tarea": tarea.titulo, "detalle": detalle,
-                       "estado": tarea.estado.value, "prioridad": tarea.prioridad.value,
-                       "fecha_limite": due, "proceso": process, "radicado": radicado,
-                       "actuacion": actuacion},
-            enlace_texto="Ver tareas", enlace_url=url_tarea,
-        )
-
-
-def _lanzar_recordatorios_pendientes(
-    db: Session,
-    tarea: models.Tarea,
-    recordatorio_ids: list[int],
-) -> None:
-    if tarea.estado in {models.EstadoTarea.COMPLETADA, models.EstadoTarea.CANCELADA}:
-        return
-    for recordatorio_id in recordatorio_ids:
-        iniciar_workflow_recordatorio(db, recordatorio_id)
+# Los recordatorios y avisos viven en el módulo de tareas; la API v1 los usa con sus nombres de siempre.
+_url_tarea_notificacion = url_tarea
+_versionar_recordatorios_pendientes = recordatorios.versionar_pendientes
+_invalidar_recordatorios_sistema = recordatorios.invalidar_sistema
+_descartar_recordatorios_tarea = recordatorios.descartar
+_crear_recordatorios_sistema = recordatorios.crear_sistema
+_lanzar_recordatorios_pendientes = recordatorios.lanzar
+_notificar_cambio_tarea = notificar_cambio
 
 
 def filtrar_tareas_por_firma(query, db: Session):
@@ -458,35 +320,8 @@ def validar_asignacion_subtarea(
     }
 
 
-def notificar_subtarea_asignada(
-    subtarea: models.Subtarea,
-    usuario: models.Usuario,
-    db: Session,
-) -> None:
-    if not subtarea.asignada_cliente or subtarea.cliente_id is None:
-        return
-    cliente = db.query(models.Usuario).filter_by(id=subtarea.cliente_id).first()
-    if cliente is None:
-        return
-    tarea = db.query(models.Tarea).filter_by(id=subtarea.tarea_id).first()
-    tarea_id = tarea.id if tarea else subtarea.tarea_id
-    mensaje = (
-        f"{usuario.nombre_completo} le ha asignado la subtarea: {subtarea.titulo}.\n"
-        f"Abrir tarea: {_url_tarea_notificacion(cliente, tarea_id)}"
-    )
-    emitir_notificacion_workflow(
-        db,
-        cliente,
-        "SUBTAREAS",
-        f"SUBTAREA:{subtarea.id}:{cliente.id}",
-        "Nueva subtarea asignada",
-        mensaje,
-        emisor=usuario,
-        plantilla_clave="SUBTAREA_ASIGNADA",
-        variables={"nombre": cliente.nombre_completo, "actor": usuario.nombre_completo,
-                   "subtarea": subtarea.titulo, "tarea": tarea.titulo if tarea else ""},
-        enlace_texto="Ver tarea", enlace_url=_url_tarea_notificacion(cliente, tarea_id),
-    )
+def notificar_subtarea_asignada(subtarea: models.Subtarea, usuario: models.Usuario, db: Session) -> None:
+    _notificar_subtarea(db, subtarea, usuario)
 
 
 @router.get("", response_model=list[schemas.TareaOut])

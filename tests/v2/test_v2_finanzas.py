@@ -1,11 +1,12 @@
 import importlib.util
-from datetime import date, timedelta
+from datetime import timedelta
 from pathlib import Path
 
 import pytest
 
 from app import models
 from app.modulos.finanzas import correo
+from app.modulos.finanzas.servicio import _hoy
 from app.timezone import utc_ahora
 
 H = {"X-AM-Solicitud": "1"}
@@ -66,7 +67,7 @@ def test_borrador_emitir_y_lo_que_ve_el_cliente(iniciar, crear_usuario, crear_pr
     assert (borrador["estado"], borrador["numero"], borrador["total"], borrador["saldo"]) == ("borrador", None, 650_000, 0)
     assert correos == []
 
-    vence = date.today() + timedelta(days=10)
+    vence = _hoy() + timedelta(days=10)
     editado = cliente_http.put(f"/api/v2/cuentas-cobro/{borrador['id']}", headers=H, json={
         "proceso_id": e["sucesion"].id, "concepto": "Honorarios de la sucesión",
         "lineas": [{"descripcion": "Primera cuota", "valor_unitario": 600_000}], "vence_el": vence.isoformat(),
@@ -147,12 +148,12 @@ def test_quien_puede_cobrar(iniciar, crear_usuario, crear_proceso, cliente_http,
 def test_pagos_abonos_reversion_y_estado_de_cuenta(iniciar, crear_usuario, crear_proceso, cliente_http, correos, sesion_bd):
     e = _escenario(crear_usuario, crear_proceso)
     iniciar(e["abogada"])
-    primera = _cuenta(cliente_http, e["gloria"], e["sucesion"], valor=1_000_000, vence=date.today() - timedelta(days=3))
+    primera = _cuenta(cliente_http, e["gloria"], e["sucesion"], valor=1_000_000, vence=_hoy() - timedelta(days=3))
     segunda = _cuenta(cliente_http, e["gloria"], e["sucesion"], valor=400_000, concepto="Gastos")
     assert cliente_http.get(f"/api/v2/cuentas-cobro/{primera['id']}").json()["vencida"] is True
 
     pago = {"cliente_id": e["gloria"].id, "proceso_id": e["sucesion"].id, "importe": 1_500_000, "metodo": "transferencia",
-            "referencia": "Comprobante 778", "pagado_el": date.today().isoformat(), "clave": "pago-gloria-0001",
+            "referencia": "Comprobante 778", "pagado_el": _hoy().isoformat(), "clave": "pago-gloria-0001",
             "aplicaciones": [{"cuenta_id": primera["id"], "importe": 1_000_000}, {"cuenta_id": segunda["id"], "importe": 300_000}]}
     registrado = cliente_http.post("/api/v2/pagos", headers=H, json=pago)
     assert registrado.status_code == 201, registrado.text
@@ -222,6 +223,6 @@ def test_pago_sin_correo_queda_registrado(iniciar, crear_usuario, crear_proceso,
     # La fecha del pago no puede ser futura.
     futuro = cliente_http.post("/api/v2/pagos", headers=H, json={
         "cliente_id": e["gloria"].id, "importe": 1000, "metodo": "efectivo",
-        "pagado_el": (date.today() + timedelta(days=2)).isoformat(), "clave": "pago-futuro-1"})
+        "pagado_el": (_hoy() + timedelta(days=2)).isoformat(), "clave": "pago-futuro-1"})
     assert futuro.status_code == 422
     assert sesion_bd.query(models.CuentaCobro).filter_by(id=cuenta["id"]).one().fecha_emision <= utc_ahora()

@@ -18,8 +18,8 @@ def _tarea(sesion_bd, responsable, proceso, titulo, vence_en=None, estado="PENDI
 
 def _sin_avisos(monkeypatch):
     enviados = []
-    monkeypatch.setattr("app.routers.tareas.emitir_notificacion_workflow", lambda *a, **k: enviados.append(k))
-    monkeypatch.setattr("app.routers.tareas.iniciar_workflow_recordatorio", lambda *a, **k: None)
+    monkeypatch.setattr("app.modulos.tareas.avisos.emitir_notificacion_workflow", lambda *a, **k: enviados.append(k))
+    monkeypatch.setattr("app.modulos.tareas.recordatorios.iniciar_workflow_recordatorio", lambda *a, **k: None)
     return enviados
 
 

@@ -46,6 +46,8 @@ from app.modulos.portal_cliente.esquemas import (
     ResumenProcesoCliente,
 )
 from app.modulos.portal_cliente.repositorio import RepositorioPortal
+from app.modulos.tareas import recordatorios
+from app.modulos.tareas.avisos import notificar_cambio
 from app.nucleo.errores import Conflicto, DatosInvalidos, ErrorDominio, NoEncontrado, SinPermiso
 from app.nucleo.paginacion import ParametrosPagina, codificar_cursor
 from app.nucleo.zona_horaria import a_colombia
@@ -228,8 +230,6 @@ class ServicioPortalCliente:
         return self._pedidos(estado_de(solicitud), pedido_id)[0]
 
     def marcar_tarea_hecha(self, usuario: Usuario, tarea_id: int) -> None:
-        from app.routers.tareas import _descartar_recordatorios_tarea, _notificar_cambio_tarea
-
         self._exigir_cliente(usuario)
         tarea = self._repo.tarea(usuario.id, tarea_id, [p.id for p in self._repo.procesos(usuario.id)])
         if tarea is None:
@@ -240,18 +240,16 @@ class ServicioPortalCliente:
             raise Conflicto("La firma canceló esta tarea; ya no hace falta.", codigo="tarea_cancelada")
         tarea.estado = models.EstadoTarea.COMPLETADA
         tarea.completada_en = utc_ahora()
-        _descartar_recordatorios_tarea(self._db, tarea)
+        recordatorios.descartar(self._db, tarea)
         registrar_evento_auditoria(self._db, usuario, "tarea.completar", "tarea", tarea.id)
         self._db.commit()
         try:
-            _notificar_cambio_tarea(self._db, tarea, usuario, "marcó como hecha la tarea", "El cliente la marcó desde su portal.")
+            notificar_cambio(self._db, tarea, usuario, "marcó como hecha la tarea", "El cliente la marcó desde su portal.")
         except Exception:
             self._db.rollback()
             logger.exception("No se pudo avisar que el cliente completó la tarea %s.", tarea.id)
 
     def marcar_subtarea_hecha(self, usuario: Usuario, subtarea_id: int) -> None:
-        from app.routers.tareas import _notificar_cambio_tarea
-
         self._exigir_cliente(usuario)
         fila = self._repo.subtarea(usuario.id, subtarea_id, [p.id for p in self._repo.procesos(usuario.id)])
         if fila is None:
@@ -266,7 +264,7 @@ class ServicioPortalCliente:
         registrar_evento_auditoria(self._db, usuario, "subtarea.actualizar", "subtarea", subtarea.id)
         self._db.commit()
         try:
-            _notificar_cambio_tarea(self._db, tarea, usuario, f"completó «{subtarea.titulo}»",
+            notificar_cambio(self._db, tarea, usuario, f"completó «{subtarea.titulo}»",
                                     "Una parte de la tarea que le tocaba al cliente.")
         except Exception:
             self._db.rollback()

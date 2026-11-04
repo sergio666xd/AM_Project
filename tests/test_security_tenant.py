@@ -3493,10 +3493,8 @@ def test_reminder_versions_follow_schedule_and_task_mutations(monkeypatch):
     engine = create_engine("sqlite:///:memory:")
     models.Base.metadata.create_all(engine)
     launches = []
-    monkeypatch.setattr(
-        "app.routers.tareas.iniciar_workflow_recordatorio",
-        lambda db, reminder_id: launches.append(reminder_id) or True,
-    )
+    for ruta in ("app.routers.tareas.iniciar_workflow_recordatorio", "app.modulos.tareas.recordatorios.iniciar_workflow_recordatorio"):
+        monkeypatch.setattr(ruta, lambda db, reminder_id: launches.append(reminder_id) or True)
 
     with Session(engine) as db:
         lawyer = models.Usuario(
@@ -3517,7 +3515,7 @@ def test_reminder_versions_follow_schedule_and_task_mutations(monkeypatch):
         reminder = crear_recordatorio(
             task.id,
             schemas.RecordatorioTareaCreate(
-                fecha_hora=datetime(2026, 11, 1, 12, 0, tzinfo=timezone.utc),
+                fecha_hora=datetime(2099, 11, 1, 12, 0, tzinfo=timezone.utc),
                 notificar_email=True,
                 notificar_whatsapp=False,
             ),
@@ -3525,14 +3523,14 @@ def test_reminder_versions_follow_schedule_and_task_mutations(monkeypatch):
             usuario_actual=lawyer,
         )
         assert reminder.version == 1
-        assert reminder.fecha_hora == datetime(2026, 11, 1, 12, 0)
+        assert reminder.fecha_hora == datetime(2099, 11, 1, 12, 0)
         assert launches == [reminder.id]
 
         reminder = actualizar_recordatorio(
             task.id,
             reminder.id,
             schemas.RecordatorioTareaUpdate(
-                fecha_hora=datetime(2026, 11, 1, 13, 0, tzinfo=timezone.utc),
+                fecha_hora=datetime(2099, 11, 1, 13, 0, tzinfo=timezone.utc),
             ),
             db=db,
             usuario_actual=lawyer,
@@ -3562,7 +3560,7 @@ def test_reminder_versions_follow_schedule_and_task_mutations(monkeypatch):
 
         actualizar_tarea(
             task.id,
-            schemas.TareaUpdate(fecha_limite=datetime(2026, 11, 2, 12, 0)),
+            schemas.TareaUpdate(fecha_limite=datetime(2099, 11, 2, 12, 0)),
             db=db,
             usuario_actual=lawyer,
         )
@@ -3582,7 +3580,7 @@ def test_reminder_versions_follow_schedule_and_task_mutations(monkeypatch):
         anticipation_task = models.Tarea(
             usuario_id=lawyer.id,
             titulo="Anticipation task",
-            fecha_limite=datetime(2026, 12, 1, 12, 0),
+            fecha_limite=datetime(2099, 12, 1, 12, 0),
         )
         db.add(anticipation_task)
         db.commit()
@@ -3593,7 +3591,7 @@ def test_reminder_versions_follow_schedule_and_task_mutations(monkeypatch):
             db=db,
             usuario_actual=lawyer,
         )
-        assert momento_programado(anticipation_reminder, anticipation_task) == datetime(2026, 12, 1, 11, 0)
+        assert momento_programado(anticipation_reminder, anticipation_task) == datetime(2099, 12, 1, 11, 0)
         assert launches[launches_before_anticipation:] == [anticipation_reminder.id]
 
         deleted_id = anticipation_reminder.id
@@ -3675,7 +3673,7 @@ def test_subtask_inherits_scope_and_configures_client_notifications(monkeypatch)
     models.Base.metadata.create_all(engine)
     notifications = []
     monkeypatch.setattr(
-        "app.routers.tareas.emitir_notificacion_workflow",
+        "app.modulos.tareas.avisos.emitir_notificacion_workflow",
         lambda *args, **kwargs: notifications.append((args, kwargs)) or ["delivery"],
     )
 

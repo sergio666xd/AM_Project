@@ -5,12 +5,19 @@ from app.api.v2.dependencias import servicio_tareas
 from app.modulos.tareas.esquemas import (
     AplicarPlantilla,
     CambioEnLote,
+    CambiosRecordatorio,
+    CambiosSubtarea,
+    CambiosTarea,
+    DatosRecordatorio,
+    DatosSubtarea,
+    DatosTarea,
     DatosPlantilla,
     Grupo,
     ListaPlantillas,
     ListaTareas,
     Plantilla,
     ResultadoLote,
+    TareaDetalle,
     TareasCreadas,
 )
 from app.modulos.tareas.servicio import ServicioTareas
@@ -91,3 +98,115 @@ def aplicar_plantilla(
     """Crea una tarea por paso en el proceso. Cada fecha límite se cuenta en días hábiles
     desde la notificación, con la misma calculadora de términos."""
     return servicio.aplicar_plantilla(usuario, plantilla_id, datos)
+
+
+# Las rutas con id van después de /lote y /plantillas para que no las tapen.
+
+
+@router.post("", response_model=TareaDetalle, status_code=status.HTTP_201_CREATED, summary="Crear una tarea")
+def crear_tarea_nueva(
+    datos: DatosTarea,
+    usuario: models.Usuario = Depends(usuario_actual),
+    servicio: ServicioTareas = Depends(servicio_tareas),
+):
+    """General o de un proceso. Si se asigna a un cliente, le llega a su portal y la plataforma
+    le recuerda 24 y 12 horas antes del vencimiento; si no, se le recuerda al responsable."""
+    return servicio.crear(usuario, datos)
+
+
+@router.get("/{tarea_id}", response_model=TareaDetalle, summary="Ver una tarea")
+def obtener_tarea(
+    tarea_id: int,
+    usuario: models.Usuario = Depends(usuario_actual),
+    servicio: ServicioTareas = Depends(servicio_tareas),
+):
+    return servicio.obtener(usuario, tarea_id)
+
+
+@router.patch("/{tarea_id}", response_model=TareaDetalle, summary="Cambiar una tarea")
+def editar_tarea(
+    tarea_id: int,
+    datos: CambiosTarea,
+    usuario: models.Usuario = Depends(usuario_actual),
+    servicio: ServicioTareas = Depends(servicio_tareas),
+):
+    """Cambia solo lo enviado. Cerrarla descarta sus recordatorios; reabrirla o moverle la fecha
+    los vuelve a programar. A la otra parte (cliente asignado o responsable) se le avisa el cambio."""
+    return servicio.editar(usuario, tarea_id, datos)
+
+
+@router.delete("/{tarea_id}", status_code=status.HTTP_204_NO_CONTENT, summary="Eliminar una tarea")
+def eliminar_tarea(
+    tarea_id: int,
+    usuario: models.Usuario = Depends(usuario_actual),
+    servicio: ServicioTareas = Depends(servicio_tareas),
+):
+    servicio.eliminar(usuario, tarea_id)
+
+
+@router.post("/{tarea_id}/subtareas", response_model=TareaDetalle, status_code=status.HTTP_201_CREATED,
+             summary="Agregar una subtarea")
+def crear_subtarea(
+    tarea_id: int,
+    datos: DatosSubtarea,
+    usuario: models.Usuario = Depends(usuario_actual),
+    servicio: ServicioTareas = Depends(servicio_tareas),
+):
+    """Con `cliente_id`, se le pide a un cliente del proceso: la ve en su portal y se le avisa."""
+    return servicio.crear_subtarea(usuario, tarea_id, datos)
+
+
+@router.patch("/{tarea_id}/subtareas/{subtarea_id}", response_model=TareaDetalle, summary="Cambiar una subtarea")
+def editar_subtarea(
+    tarea_id: int,
+    subtarea_id: int,
+    datos: CambiosSubtarea,
+    usuario: models.Usuario = Depends(usuario_actual),
+    servicio: ServicioTareas = Depends(servicio_tareas),
+):
+    return servicio.editar_subtarea(usuario, tarea_id, subtarea_id, datos)
+
+
+@router.delete("/{tarea_id}/subtareas/{subtarea_id}", response_model=TareaDetalle, summary="Quitar una subtarea")
+def eliminar_subtarea(
+    tarea_id: int,
+    subtarea_id: int,
+    usuario: models.Usuario = Depends(usuario_actual),
+    servicio: ServicioTareas = Depends(servicio_tareas),
+):
+    return servicio.eliminar_subtarea(usuario, tarea_id, subtarea_id)
+
+
+@router.post("/{tarea_id}/recordatorios", response_model=TareaDetalle, status_code=status.HTTP_201_CREATED,
+             summary="Programar un recordatorio")
+def crear_recordatorio(
+    tarea_id: int,
+    datos: DatosRecordatorio,
+    usuario: models.Usuario = Depends(usuario_actual),
+    servicio: ServicioTareas = Depends(servicio_tareas),
+):
+    """Le llega al responsable de la tarea, en un momento exacto o con anticipación al vencimiento."""
+    return servicio.crear_recordatorio(usuario, tarea_id, datos)
+
+
+@router.patch("/{tarea_id}/recordatorios/{recordatorio_id}", response_model=TareaDetalle,
+              summary="Cambiar o pausar un recordatorio")
+def editar_recordatorio(
+    tarea_id: int,
+    recordatorio_id: int,
+    datos: CambiosRecordatorio,
+    usuario: models.Usuario = Depends(usuario_actual),
+    servicio: ServicioTareas = Depends(servicio_tareas),
+):
+    return servicio.editar_recordatorio(usuario, tarea_id, recordatorio_id, datos)
+
+
+@router.delete("/{tarea_id}/recordatorios/{recordatorio_id}", response_model=TareaDetalle,
+               summary="Quitar un recordatorio")
+def eliminar_recordatorio(
+    tarea_id: int,
+    recordatorio_id: int,
+    usuario: models.Usuario = Depends(usuario_actual),
+    servicio: ServicioTareas = Depends(servicio_tareas),
+):
+    return servicio.eliminar_recordatorio(usuario, tarea_id, recordatorio_id)

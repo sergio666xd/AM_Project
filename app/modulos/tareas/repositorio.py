@@ -50,6 +50,22 @@ class RepositorioTareas:
             select(Tarea).where(visibles, Tarea.id.in_(ids)).options(selectinload(Tarea.recordatorios))
         ).all())
 
+    def tarea(self, visibles: ColumnElement[bool], tarea_id: int) -> Tarea | None:
+        return self._db.scalar(
+            select(Tarea).where(visibles, Tarea.id == tarea_id).options(
+                selectinload(Tarea.usuario), selectinload(Tarea.cliente_asignado), selectinload(Tarea.radicado),
+                selectinload(Tarea.actuacion_rel), selectinload(Tarea.subtareas), selectinload(Tarea.recordatorios),
+            )
+        )
+
+    def radicados_de(self, proceso_id: int) -> set[int]:
+        PR = models.ProcesoRadicado
+        return set(self._db.scalars(select(PR.radicado_id).where(PR.proceso_id == proceso_id)).all())
+
+    def clientes_de(self, proceso_id: int) -> set[int]:
+        PC = models.ProcesoCliente
+        return set(self._db.scalars(select(PC.cliente_id).where(PC.proceso_id == proceso_id)).all())
+
     def plantillas(self) -> list[PlantillaTarea]:
         return list(self._db.scalars(select(PlantillaTarea).order_by(PlantillaTarea.nombre)).all())
 

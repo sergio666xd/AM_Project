@@ -716,6 +716,109 @@
         }
       }
     },
+    "/api/v2/procesos/{proceso_id}/vinculos": {
+      "get": {
+        "tags": [
+          "Procesos"
+        ],
+        "summary": "Clientes, radicados y actuaciones del proceso",
+        "description": "Para relacionar una tarea, un evento o un aviso con algo del proceso.",
+        "operationId": "vinculos_del_proceso",
+        "parameters": [
+          {
+            "name": "proceso_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Proceso Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VinculosProceso"
+                }
+              }
+            }
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Too Many Requests"
+          }
+        }
+      }
+    },
     "/api/v2/procesos/{proceso_id}/archivar": {
       "post": {
         "tags": [
@@ -2429,6 +2532,106 @@
             "description": "Too Many Requests"
           }
         }
+      },
+      "post": {
+        "tags": [
+          "Tareas"
+        ],
+        "summary": "Crear una tarea",
+        "description": "General o de un proceso. Si se asigna a un cliente, le llega a su portal y la plataforma\nle recuerda 24 y 12 horas antes del vencimiento; si no, se le recuerda al responsable.",
+        "operationId": "crear_tarea_nueva",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DatosTarea"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TareaDetalle"
+                }
+              }
+            }
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Too Many Requests"
+          }
+        }
       }
     },
     "/api/v2/tareas/lote": {
@@ -2985,6 +3188,998 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/TareasCreadas"
+                }
+              }
+            }
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Too Many Requests"
+          }
+        }
+      }
+    },
+    "/api/v2/tareas/{tarea_id}": {
+      "get": {
+        "tags": [
+          "Tareas"
+        ],
+        "summary": "Ver una tarea",
+        "operationId": "obtener_tarea",
+        "parameters": [
+          {
+            "name": "tarea_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Tarea Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TareaDetalle"
+                }
+              }
+            }
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Too Many Requests"
+          }
+        }
+      },
+      "patch": {
+        "tags": [
+          "Tareas"
+        ],
+        "summary": "Cambiar una tarea",
+        "description": "Cambia solo lo enviado. Cerrarla descarta sus recordatorios; reabrirla o moverle la fecha\nlos vuelve a programar. A la otra parte (cliente asignado o responsable) se le avisa el cambio.",
+        "operationId": "editar_tarea",
+        "parameters": [
+          {
+            "name": "tarea_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Tarea Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CambiosTarea"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TareaDetalle"
+                }
+              }
+            }
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Too Many Requests"
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Tareas"
+        ],
+        "summary": "Eliminar una tarea",
+        "operationId": "eliminar_tarea",
+        "parameters": [
+          {
+            "name": "tarea_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Tarea Id"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Too Many Requests"
+          }
+        }
+      }
+    },
+    "/api/v2/tareas/{tarea_id}/subtareas": {
+      "post": {
+        "tags": [
+          "Tareas"
+        ],
+        "summary": "Agregar una subtarea",
+        "description": "Con `cliente_id`, se le pide a un cliente del proceso: la ve en su portal y se le avisa.",
+        "operationId": "crear_subtarea",
+        "parameters": [
+          {
+            "name": "tarea_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Tarea Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DatosSubtarea"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TareaDetalle"
+                }
+              }
+            }
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Too Many Requests"
+          }
+        }
+      }
+    },
+    "/api/v2/tareas/{tarea_id}/subtareas/{subtarea_id}": {
+      "patch": {
+        "tags": [
+          "Tareas"
+        ],
+        "summary": "Cambiar una subtarea",
+        "operationId": "editar_subtarea",
+        "parameters": [
+          {
+            "name": "tarea_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Tarea Id"
+            }
+          },
+          {
+            "name": "subtarea_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Subtarea Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CambiosSubtarea"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TareaDetalle"
+                }
+              }
+            }
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Too Many Requests"
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Tareas"
+        ],
+        "summary": "Quitar una subtarea",
+        "operationId": "eliminar_subtarea",
+        "parameters": [
+          {
+            "name": "tarea_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Tarea Id"
+            }
+          },
+          {
+            "name": "subtarea_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Subtarea Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TareaDetalle"
+                }
+              }
+            }
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Too Many Requests"
+          }
+        }
+      }
+    },
+    "/api/v2/tareas/{tarea_id}/recordatorios": {
+      "post": {
+        "tags": [
+          "Tareas"
+        ],
+        "summary": "Programar un recordatorio",
+        "description": "Le llega al responsable de la tarea, en un momento exacto o con anticipación al vencimiento.",
+        "operationId": "crear_recordatorio",
+        "parameters": [
+          {
+            "name": "tarea_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Tarea Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DatosRecordatorio"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TareaDetalle"
+                }
+              }
+            }
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Too Many Requests"
+          }
+        }
+      }
+    },
+    "/api/v2/tareas/{tarea_id}/recordatorios/{recordatorio_id}": {
+      "patch": {
+        "tags": [
+          "Tareas"
+        ],
+        "summary": "Cambiar o pausar un recordatorio",
+        "operationId": "editar_recordatorio",
+        "parameters": [
+          {
+            "name": "tarea_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Tarea Id"
+            }
+          },
+          {
+            "name": "recordatorio_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Recordatorio Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CambiosRecordatorio"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TareaDetalle"
+                }
+              }
+            }
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Too Many Requests"
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Tareas"
+        ],
+        "summary": "Quitar un recordatorio",
+        "operationId": "eliminar_recordatorio",
+        "parameters": [
+          {
+            "name": "tarea_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Tarea Id"
+            }
+          },
+          {
+            "name": "recordatorio_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Recordatorio Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TareaDetalle"
                 }
               }
             }
@@ -16256,6 +17451,36 @@
         ],
         "title": "AccesoEnviado"
       },
+      "ActuacionBreve": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "texto": {
+            "type": "string",
+            "title": "Texto"
+          },
+          "fecha": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fecha"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "texto"
+        ],
+        "title": "ActuacionBreve"
+      },
       "Agenda": {
         "properties": {
           "desde": {
@@ -17537,6 +18762,245 @@
           "url"
         ],
         "title": "CambioWhatsapp"
+      },
+      "CambiosRecordatorio": {
+        "properties": {
+          "activo": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Activo"
+          },
+          "fecha_hora": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fecha Hora"
+          },
+          "anticipacion_minutos": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "maximum": 43200.0,
+                "minimum": 5.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Anticipacion Minutos"
+          }
+        },
+        "type": "object",
+        "title": "CambiosRecordatorio"
+      },
+      "CambiosSubtarea": {
+        "properties": {
+          "titulo": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 255,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Titulo"
+          },
+          "completada": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Completada"
+          },
+          "orden": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Orden"
+          },
+          "cliente_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cliente Id"
+          },
+          "avisar_correo": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Avisar Correo"
+          },
+          "avisar_whatsapp": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Avisar Whatsapp"
+          }
+        },
+        "type": "object",
+        "title": "CambiosSubtarea"
+      },
+      "CambiosTarea": {
+        "properties": {
+          "titulo": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 255,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Titulo"
+          },
+          "descripcion": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 4000
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Descripcion"
+          },
+          "estado": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "PENDIENTE",
+                  "EN_CURSO",
+                  "COMPLETADA",
+                  "CANCELADA"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Estado"
+          },
+          "prioridad": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "BAJA",
+                  "MEDIA",
+                  "ALTA",
+                  "URGENTE"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Prioridad"
+          },
+          "fecha_limite": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fecha Limite"
+          },
+          "proceso_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Proceso Id"
+          },
+          "radicado_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Radicado Id"
+          },
+          "actuacion_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Actuacion Id"
+          },
+          "cliente_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cliente Id"
+          }
+        },
+        "type": "object",
+        "title": "CambiosTarea",
+        "description": "Solo se cambian los campos enviados. `null` en una relación la quita."
       },
       "CargaPersona": {
         "properties": {
@@ -19361,6 +20825,185 @@
           "etapas"
         ],
         "title": "DatosPlantillaEtapas"
+      },
+      "DatosRecordatorio": {
+        "properties": {
+          "fecha_hora": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fecha Hora",
+            "description": "Un momento exacto, en el futuro."
+          },
+          "anticipacion_minutos": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "maximum": 43200.0,
+                "minimum": 5.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Anticipacion Minutos",
+            "description": "O minutos antes del vencimiento."
+          },
+          "correo": {
+            "type": "boolean",
+            "title": "Correo",
+            "default": true
+          },
+          "whatsapp": {
+            "type": "boolean",
+            "title": "Whatsapp",
+            "default": false
+          }
+        },
+        "type": "object",
+        "title": "DatosRecordatorio"
+      },
+      "DatosSubtarea": {
+        "properties": {
+          "titulo": {
+            "type": "string",
+            "maxLength": 255,
+            "minLength": 1,
+            "title": "Titulo"
+          },
+          "cliente_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cliente Id",
+            "description": "Pedírsela a un cliente del proceso."
+          },
+          "avisar_correo": {
+            "type": "boolean",
+            "title": "Avisar Correo",
+            "default": true
+          },
+          "avisar_whatsapp": {
+            "type": "boolean",
+            "title": "Avisar Whatsapp",
+            "default": true
+          }
+        },
+        "type": "object",
+        "required": [
+          "titulo"
+        ],
+        "title": "DatosSubtarea"
+      },
+      "DatosTarea": {
+        "properties": {
+          "titulo": {
+            "type": "string",
+            "maxLength": 255,
+            "minLength": 1,
+            "title": "Titulo"
+          },
+          "descripcion": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 4000
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Descripcion"
+          },
+          "prioridad": {
+            "type": "string",
+            "enum": [
+              "BAJA",
+              "MEDIA",
+              "ALTA",
+              "URGENTE"
+            ],
+            "title": "Prioridad",
+            "default": "MEDIA"
+          },
+          "fecha_limite": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fecha Limite",
+            "description": "Vence al final de ese día, hora de Colombia."
+          },
+          "proceso_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Proceso Id",
+            "description": "Sin proceso es una tarea general, sin radicado ni cliente."
+          },
+          "radicado_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Radicado Id",
+            "description": "Un radicado del proceso."
+          },
+          "actuacion_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Actuacion Id",
+            "description": "Una actuación de ese radicado."
+          },
+          "cliente_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cliente Id",
+            "description": "Un cliente del proceso; la tarea le llega a su portal."
+          }
+        },
+        "type": "object",
+        "required": [
+          "titulo"
+        ],
+        "title": "DatosTarea"
       },
       "DatosTermino": {
         "properties": {
@@ -24994,6 +26637,51 @@
         ],
         "title": "PruebaEnviada"
       },
+      "RadicadoBreve": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "numero": {
+            "type": "string",
+            "title": "Numero"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "numero"
+        ],
+        "title": "RadicadoBreve"
+      },
+      "RadicadoConActuaciones": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "numero": {
+            "type": "string",
+            "title": "Numero"
+          },
+          "actuaciones": {
+            "items": {
+              "$ref": "#/components/schemas/ActuacionBreve"
+            },
+            "type": "array",
+            "title": "Actuaciones",
+            "description": "Las 40 más recientes, de la más nueva a la más antigua."
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "numero",
+          "actuaciones"
+        ],
+        "title": "RadicadoConActuaciones"
+      },
       "RadicadoConError": {
         "properties": {
           "radicado_id": {
@@ -25077,6 +26765,84 @@
           "proceso"
         ],
         "title": "RadicadoConsultable"
+      },
+      "Recordatorio": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "fecha_hora": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fecha Hora",
+            "description": "Momento exacto, si se programó así."
+          },
+          "anticipacion_minutos": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Anticipacion Minutos",
+            "description": "Minutos antes del vencimiento, si se programó así."
+          },
+          "cuando": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cuando",
+            "description": "Cuándo sale; vacío si depende de una fecha límite que ya no hay."
+          },
+          "correo": {
+            "type": "boolean",
+            "title": "Correo"
+          },
+          "whatsapp": {
+            "type": "boolean",
+            "title": "Whatsapp"
+          },
+          "activo": {
+            "type": "boolean",
+            "title": "Activo"
+          },
+          "enviado_en": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Enviado En"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "correo",
+          "whatsapp",
+          "activo"
+        ],
+        "title": "Recordatorio"
       },
       "Referencia": {
         "properties": {
@@ -26000,6 +27766,62 @@
         "title": "SolicitudCambio",
         "description": "El último pedido del cliente para corregir sus datos, que la firma aprueba."
       },
+      "SubtareaDetalle": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "titulo": {
+            "type": "string",
+            "title": "Titulo"
+          },
+          "completada": {
+            "type": "boolean",
+            "title": "Completada"
+          },
+          "completada_en": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Completada En"
+          },
+          "cliente": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PersonaBreve"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Cliente al que se le pidió; la ve en su portal."
+          },
+          "avisar_correo": {
+            "type": "boolean",
+            "title": "Avisar Correo"
+          },
+          "avisar_whatsapp": {
+            "type": "boolean",
+            "title": "Avisar Whatsapp"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "titulo",
+          "completada",
+          "avisar_correo",
+          "avisar_whatsapp"
+        ],
+        "title": "SubtareaDetalle"
+      },
       "Suscripcion": {
         "properties": {
           "activa": {
@@ -26119,6 +27941,170 @@
           "titulo"
         ],
         "title": "TareaDesdeFolio"
+      },
+      "TareaDetalle": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "titulo": {
+            "type": "string",
+            "title": "Titulo"
+          },
+          "descripcion": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Descripcion"
+          },
+          "estado": {
+            "type": "string",
+            "enum": [
+              "PENDIENTE",
+              "EN_CURSO",
+              "COMPLETADA",
+              "CANCELADA"
+            ],
+            "title": "Estado"
+          },
+          "prioridad": {
+            "type": "string",
+            "enum": [
+              "BAJA",
+              "MEDIA",
+              "ALTA",
+              "URGENTE"
+            ],
+            "title": "Prioridad"
+          },
+          "fecha_limite": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fecha Limite"
+          },
+          "completada_en": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Completada En"
+          },
+          "vencida": {
+            "type": "boolean",
+            "title": "Vencida"
+          },
+          "creada_en": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Creada En"
+          },
+          "actualizada_en": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Actualizada En"
+          },
+          "responsable": {
+            "$ref": "#/components/schemas/PersonaBreve"
+          },
+          "proceso": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ProcesoBreve"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "radicado": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/RadicadoBreve"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "actuacion": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ActuacionBreve"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "cliente": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PersonaBreve"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Cliente al que se le asignó la tarea."
+          },
+          "subtareas": {
+            "items": {
+              "$ref": "#/components/schemas/SubtareaDetalle"
+            },
+            "type": "array",
+            "title": "Subtareas"
+          },
+          "recordatorios": {
+            "items": {
+              "$ref": "#/components/schemas/Recordatorio"
+            },
+            "type": "array",
+            "title": "Recordatorios",
+            "description": "Los que programó el equipo, en orden de salida."
+          },
+          "avisos_automaticos": {
+            "items": {
+              "type": "string",
+              "format": "date-time"
+            },
+            "type": "array",
+            "title": "Avisos Automaticos",
+            "description": "Avisos que la plataforma manda sola antes del vencimiento a quien debe hacer la tarea."
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "titulo",
+          "estado",
+          "prioridad",
+          "vencida",
+          "creada_en",
+          "actualizada_en",
+          "responsable",
+          "subtareas",
+          "recordatorios",
+          "avisos_automaticos"
+        ],
+        "title": "TareaDetalle"
       },
       "TareaResumen": {
         "properties": {
@@ -26876,6 +28862,31 @@
           "enlace"
         ],
         "title": "VinculoArchivo"
+      },
+      "VinculosProceso": {
+        "properties": {
+          "clientes": {
+            "items": {
+              "$ref": "#/components/schemas/PersonaBreve"
+            },
+            "type": "array",
+            "title": "Clientes"
+          },
+          "radicados": {
+            "items": {
+              "$ref": "#/components/schemas/RadicadoConActuaciones"
+            },
+            "type": "array",
+            "title": "Radicados"
+          }
+        },
+        "type": "object",
+        "required": [
+          "clientes",
+          "radicados"
+        ],
+        "title": "VinculosProceso",
+        "description": "Con qué se puede relacionar algo del proceso: sus clientes, radicados y actuaciones."
       },
       "VistaPrevia": {
         "properties": {
