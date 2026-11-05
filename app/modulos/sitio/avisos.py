@@ -14,6 +14,7 @@ from sqlalchemy.orm import Session
 from app import models
 from app.message_templates import fecha_legible, render_direct_message
 from app.modulos.sitio.esquemas import AREAS
+from app.nucleo.telefono import digitos_whatsapp, telefono_legible
 from app.nucleo.zona_horaria import a_colombia
 from app.workflow_service import user_portal_url
 
@@ -24,23 +25,6 @@ def enviar_correo(destinatario: str, asunto: str, cuerpo: str, *, reply_to: str 
     from app.email_service import enviar_correo as enviar
 
     return enviar(destinatario, asunto, cuerpo, reply_to=reply_to)
-
-
-def digitos_whatsapp(telefono: str | None) -> str:
-    """'315 222 3344' o '+57 315…' → número internacional para wa.me; vacío si no sirve."""
-    digitos = "".join(c for c in telefono or "" if c.isdigit())
-    if len(digitos) == 10 and digitos.startswith("3"):
-        return f"57{digitos}"
-    return digitos if len(digitos) >= 11 else ""
-
-
-def telefono_legible(telefono: str | None) -> str:
-    digitos = "".join(c for c in telefono or "" if c.isdigit())
-    if len(digitos) == 12 and digitos.startswith("57"):
-        digitos = digitos[2:]
-    if len(digitos) == 10:
-        return f"{digitos[:3]} {digitos[3:6]} {digitos[6:]}"
-    return (telefono or "").strip()
 
 
 def whatsapp_url(solicitud: models.SolicitudContacto, firma: str) -> str | None:

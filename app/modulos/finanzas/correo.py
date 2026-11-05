@@ -15,8 +15,9 @@ from app.email_service import enviar_correo
 from app.message_templates import render_direct_message
 from app.modulos.finanzas import pdf
 from app.modulos.finanzas.esquemas import DetalleCuenta, EstadoDeCuenta, PagoVista
-from app.modulos.finanzas.formato import ESTADOS, METODOS, dia_largo, pesos
+from app.modulos.finanzas.formato import ESTADOS, METODOS, dia_largo, pesos, suma
 from app.modulos.finanzas.modelos import ConfiguracionCorreoFinanciero, CuentaCobro, EntregaCorreoFinanciero, PagoFinanciero
+from app.nucleo.telefono import telefono_legible
 from app.nucleo.zona_horaria import a_colombia, utc_ahora
 from app.workflow_service import user_portal_url
 
@@ -37,11 +38,31 @@ def _documento(valor: str | None, prefijo: str = "C.C.") -> str:
     return f"{prefijo} {valor}" if valor else ""
 
 
+def _cliente(db: Session, instantanea: dict | None, cliente_id: int | None) -> dict:
+    """Datos del cliente guardados con el documento.
+
+    Los documentos anteriores a que se guardara el teléfono (o emitidos cuando el
+    cliente aún no tenía documento registrado) toman esos datos de su ficha actual.
+    """
+    cliente = dict(instantanea or {})
+    if (not cliente.get("documento") or not cliente.get("telefono")) and cliente_id:
+        usuario = db.get(models.Usuario, cliente_id)
+        if usuario is not None:
+            cliente["documento"] = cliente.get("documento") or usuario.numero_documento
+            cliente["telefono"] = cliente.get("telefono") or usuario.whatsapp_numero
+    return cliente
+
+
+def _telefono(valor: str | None) -> str:
+    legible = telefono_legible(valor)
+    return f"Tel. {legible}" if legible else ""
+
+
 def pdf_cuenta(db: Session, cuenta: CuentaCobro, detalle: DetalleCuenta, config: ConfiguracionCorreoFinanciero | None) -> bytes:
-    cliente = cuenta.cliente_snapshot or {}
+    cliente = _cliente(db, cuenta.cliente_snapshot, cuenta.cliente_id)
     abogado = cuenta.abogado_snapshot or {}
     secciones: list = [
-        pdf.Bloque("Concepto", detalle.concepto),
+        pdf.Bloque("Cobramos", f"La suma de {suma(detalle.total + detalle.ajustes)} por concepto de: {detalle.concepto.rstrip('.')}."),
         pdf.TablaDetalle(
             columnas=["Descripción", "Cant.", "Valor unitario", "Total"],
             filas=[[l.descripcion, str(l.cantidad), pesos(l.valor_unitario), pesos(l.total)] for l in detalle.lineas],
@@ -65,7 +86,7 @@ def pdf_cuenta(db: Session, cuenta: CuentaCobro, detalle: DetalleCuenta, config:
         partes=[
             ("De", [abogado.get("nombre", ""), _documento(abogado.get("documento")),
                     _documento(abogado.get("tarjeta_profesional"), "T.P."), abogado.get("email", "")]),
-            ("Para", [cliente.get("nombre", ""), _documento(cliente.get("documento")),
+            ("Para", [cliente.get("nombre", ""), _documento(cliente.get("documento")), _telefono(cliente.get("telefono")),
                       ", ".join(v for v in (cliente.get("direccion"), cliente.get("domicilio")) if v), cliente.get("email", "")]),
         ],
         datos=[
@@ -82,10 +103,10 @@ def pdf_cuenta(db: Session, cuenta: CuentaCobro, detalle: DetalleCuenta, config:
 
 
 def pdf_recibo(db: Session, vista: PagoVista, pago: PagoFinanciero, config: ConfiguracionCorreoFinanciero | None) -> bytes:
-    cliente = pago.cliente_snapshot or {}
+    cliente = _cliente(db, pago.cliente_snapshot, pago.cliente_id)
     abogado = pago.abogado_snapshot or {}
     secciones: list = [
-        pdf.Bloque("Recibimos", f"La suma de {pesos(vista.importe)} de {cliente.get('nombre', 'el cliente')}."),
+        pdf.Bloque("Recibimos", f"La suma de {suma(vista.importe)} de {cliente.get('nombre', 'el cliente')}."),
         pdf.TablaDetalle(
             columnas=["Abonado a la cuenta", "Concepto", "Valor"],
             filas=[[a.numero or "", a.concepto, pesos(a.importe)] for a in vista.aplicaciones],
@@ -101,7 +122,7 @@ def pdf_recibo(db: Session, vista: PagoVista, pago: PagoFinanciero, config: Conf
         firma=_firma(db),
         partes=[
             ("Recibió", [abogado.get("nombre", ""), _documento(abogado.get("documento"))]),
-            ("Pagó", [cliente.get("nombre", ""), _documento(cliente.get("documento"))]),
+            ("Pagó", [cliente.get("nombre", ""), _documento(cliente.get("documento")), _telefono(cliente.get("telefono"))]),
         ],
         datos=[
             pdf.Fila("Fecha del pago", pdf.fecha(vista.pagado_el)),

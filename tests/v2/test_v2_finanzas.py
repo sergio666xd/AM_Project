@@ -226,3 +226,36 @@ def test_pago_sin_correo_queda_registrado(iniciar, crear_usuario, crear_proceso,
         "pagado_el": (_hoy() + timedelta(days=2)).isoformat(), "clave": "pago-futuro-1"})
     assert futuro.status_code == 422
     assert sesion_bd.query(models.CuentaCobro).filter_by(id=cuenta["id"]).one().fecha_emision <= utc_ahora()
+
+
+def _texto_pdf(contenido: bytes) -> str:
+    from io import BytesIO
+
+    from pypdf import PdfReader
+    return " ".join(" ".join((pagina.extract_text() or "").split()) for pagina in PdfReader(BytesIO(contenido)).pages)
+
+
+def test_recibo_y_cuenta_llevan_documento_telefono_y_valor_en_letras(iniciar, crear_usuario, crear_proceso, cliente_http, correos, sesion_bd):
+    e = _escenario(crear_usuario, crear_proceso)
+    e["gloria"].numero_documento = "43123456"
+    e["gloria"].whatsapp_numero = "3151234567"
+    sesion_bd.commit()
+    iniciar(e["abogada"])
+    cuenta = _cuenta(cliente_http, e["gloria"], e["sucesion"], valor=1_250_000, concepto="Honorarios de la sucesión.")
+    texto = _texto_pdf(cliente_http.get(f"/api/v2/cuentas-cobro/{cuenta['id']}/pdf").content)
+    assert "C.C. 43123456" in texto and "Tel. 315 123 4567" in texto
+    assert "La suma de $1.250.000 (UN MILLÓN DOSCIENTOS CINCUENTA MIL PESOS) por concepto de: Honorarios de la sucesión." in texto
+
+    pago = cliente_http.post("/api/v2/pagos", headers=H, json={
+        "cliente_id": e["gloria"].id, "proceso_id": e["sucesion"].id, "importe": 100_000, "metodo": "efectivo",
+        "pagado_el": _hoy().isoformat(), "clave": "pago-gloria-letras", "aplicaciones": [{"cuenta_id": cuenta["id"], "importe": 100_000}],
+    }).json()
+    texto = _texto_pdf(cliente_http.get(f"/api/v2/pagos/{pago['id']}/recibo").content)
+    assert "C.C. 43123456" in texto and "Tel. 315 123 4567" in texto
+    assert "La suma de $100.000 (CIEN MIL PESOS) de GLORIA INÉS RESTREPO." in texto
+
+    # Un recibo emitido antes de que se guardara el teléfono lo toma de la ficha del cliente.
+    registro = sesion_bd.get(models.PagoFinanciero, pago["id"])
+    registro.cliente_snapshot = {k: v for k, v in registro.cliente_snapshot.items() if k != "telefono"}
+    sesion_bd.commit()
+    assert "Tel. 315 123 4567" in _texto_pdf(cliente_http.get(f"/api/v2/pagos/{pago['id']}/recibo").content)
