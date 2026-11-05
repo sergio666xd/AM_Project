@@ -89,6 +89,8 @@ export function proxy(request: NextRequest) {
   const userHost = host === USER_PORTAL_HOST || host === "panel.localhost" || ((host === "localhost" || host === "127.0.0.1") && !adminHost);
 
   if (adminHost) {
+    // Las apps instaladas con el manifiesto anterior abren en /gestion-procesos.
+    if (pathname === "/gestion-procesos") return redirectToPath(request, "/");
     if (pathname === "/") return rewrite(request, role === "ADMIN" ? "/gestion-procesos/admin" : ADMIN_LOGIN_PATH);
     if (pathname === "/login") return rewrite(request, ADMIN_LOGIN_PATH);
     if (pathname === "/recuperar-password" || pathname === "/restablecer-password" || pathname === "/cambiar-password") {
@@ -109,6 +111,7 @@ export function proxy(request: NextRequest) {
   }
 
   if (userHost) {
+    if (pathname === "/gestion-procesos") return redirectToPath(request, "/");
     if (pathname === "/") {
       if (role === "ADMIN") return redirectToHost(request, local ? "admin.localhost" : ADMIN_PORTAL_HOST, "/");
       const area = role === "ABOGADO_ADMIN" || role === "ABOGADO" ? "abogado" : "cliente";
