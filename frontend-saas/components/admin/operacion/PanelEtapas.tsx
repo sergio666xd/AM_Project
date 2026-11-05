@@ -1,14 +1,14 @@
 "use client";
 
 import { useCallback, useId, useState, type FormEvent } from "react";
-import { ArrowDown, ArrowUp, ChevronRight, Plus, RefreshCw, RotateCcw, Trash2 } from "lucide-react";
+import { ChevronRight, Plus, RefreshCw, RotateCcw } from "lucide-react";
 
 import { Campo } from "@/components/clientes/ClienteFormModal";
+import { erroresDeEtapas, filaDeEtapa, ListaEtapas, nuevaFilaEtapa, type FilaEtapa } from "@/components/etapas/ListaEtapas";
 import { CAMPO, ETIQUETA } from "@/components/expediente/CalculadoraTermino";
 import { Button } from "@/components/ui/Button";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { Drawer } from "@/components/ui/Drawer";
-import { IconButton } from "@/components/ui/IconButton";
 import { LoadingState } from "@/components/ui/LoadingState";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { RowActionsMenu } from "@/components/ui/RowActionsMenu";
@@ -20,10 +20,6 @@ import { cx } from "@/lib/cx";
 import type { PlantillaEtapas } from "@/lib/etapas";
 import { useLoadEffect } from "@/lib/useLoadEffect";
 
-type Fila = { clave: string; id: number | null; nombre: string; explicacion: string; activa: boolean; procesos: number };
-
-let siguiente = 0;
-const nuevaFila = (): Fila => ({ clave: `n${++siguiente}`, id: null, nombre: "", explicacion: "", activa: true, procesos: 0 });
 const procesosTexto = (n: number) => (n === 1 ? "1 proceso" : `${n} procesos`);
 
 function EditorPlantilla({ plantilla, abierto, onCerrar, onGuardada }: {
@@ -37,10 +33,8 @@ function EditorPlantilla({ plantilla, abierto, onCerrar, onGuardada }: {
   const [descripcion, setDescripcion] = useState(plantilla?.descripcion ?? "");
   const [predeterminada, setPredeterminada] = useState(plantilla?.predeterminada ?? false);
   const [activa, setActiva] = useState(plantilla?.activa ?? true);
-  const [filas, setFilas] = useState<Fila[]>(() =>
-    plantilla?.etapas.length
-      ? plantilla.etapas.map((e) => ({ clave: `e${e.id}`, id: e.id, nombre: e.nombre, explicacion: e.explicacion ?? "", activa: e.activa, procesos: e.procesos }))
-      : [nuevaFila(), nuevaFila()],
+  const [filas, setFilas] = useState<FilaEtapa[]>(() =>
+    plantilla?.etapas.length ? plantilla.etapas.map(filaDeEtapa) : [nuevaFilaEtapa(), nuevaFilaEtapa()],
   );
   const [errores, setErrores] = useState<Record<string, string>>({});
   const [guardando, setGuardando] = useState(false);
@@ -49,34 +43,11 @@ function EditorPlantilla({ plantilla, abierto, onCerrar, onGuardada }: {
   const guardadas = filas.filter((f) => !f.activa);
   const eraPredeterminada = plantilla?.predeterminada ?? false;
 
-  function cambiar(clave: string, cambio: Partial<Fila>) {
-    setFilas((fs) => fs.map((f) => (f.clave === clave ? { ...f, ...cambio } : f)));
-  }
-  function mover(clave: string, paso: -1 | 1) {
-    setFilas((fs) => {
-      const activas = fs.filter((f) => f.activa);
-      const i = activas.findIndex((f) => f.clave === clave);
-      const j = i + paso;
-      if (j < 0 || j >= activas.length) return fs;
-      [activas[i], activas[j]] = [activas[j], activas[i]];
-      return [...activas, ...fs.filter((f) => !f.activa)];
-    });
-  }
-  function quitar(fila: Fila) {
-    // Una etapa que ya existía queda guardada como «ya no se usa»; el servidor la borra si nadie la usó.
-    if (fila.id === null) setFilas((fs) => fs.filter((f) => f.clave !== fila.clave));
-    else cambiar(fila.clave, { activa: false });
-  }
-
   async function guardar(e: FormEvent) {
     e.preventDefault();
-    const vacia = enUso.find((f) => !f.nombre.trim());
-    if (!nombre.trim() || vacia || !enUso.length) {
-      setErrores({
-        ...(nombre.trim() ? {} : { nombre: "Escriba el nombre de la plantilla." }),
-        ...(vacia ? { [vacia.clave]: "Escriba el nombre de la etapa o quítela." } : {}),
-        ...(!enUso.length ? { etapas: "Deje al menos una etapa." } : {}),
-      });
+    const faltan = { ...(nombre.trim() ? {} : { nombre: "Escriba el nombre de la plantilla." }), ...erroresDeEtapas(filas) };
+    if (Object.keys(faltan).length) {
+      setErrores(faltan);
       return;
     }
     setGuardando(true);
@@ -123,46 +94,13 @@ function EditorPlantilla({ plantilla, abierto, onCerrar, onGuardada }: {
         <fieldset className="min-w-0">
           <legend className={ETIQUETA}>Etapas, en orden</legend>
           <p className="-mt-0.5 mb-3 text-[13px] text-ink-3">La explicación la lee el cliente en su portal cuando su proceso está en esa etapa. Escríbala de usted y sin términos técnicos.</p>
-          <ol className="space-y-3">
-            {enUso.map((f, i) => (
-              <li key={f.clave} className="rounded-lg bg-sheet-2 p-3 shadow-[inset_0_0_0_1px_var(--line)]">
-                <div className="flex items-center gap-2">
-                  <span className="w-6 shrink-0 font-display text-[16px] tabular-nums text-ink-2">{i + 1}.</span>
-                  <label htmlFor={`${id}-${f.clave}-n`} className="sr-only">Nombre de la etapa {i + 1}</label>
-                  <input
-                    id={`${id}-${f.clave}-n`}
-                    value={f.nombre}
-                    onChange={(e) => cambiar(f.clave, { nombre: e.target.value })}
-                    maxLength={80}
-                    placeholder="Nombre de la etapa"
-                    aria-invalid={Boolean(errores[f.clave]) || undefined}
-                    className={cx(CAMPO, "flex-1 font-semibold", errores[f.clave] && "border-bad")}
-                  />
-                  <span className="flex shrink-0">
-                    <IconButton icon={ArrowUp} label={`Subir la etapa ${i + 1}`} disabled={i === 0} onClick={() => mover(f.clave, -1)} className="disabled:opacity-30" />
-                    <IconButton icon={ArrowDown} label={`Bajar la etapa ${i + 1}`} disabled={i === enUso.length - 1} onClick={() => mover(f.clave, 1)} className="disabled:opacity-30" />
-                    <IconButton icon={Trash2} label={`Quitar la etapa ${i + 1}`} onClick={() => quitar(f)} className="hover:bg-bad-soft hover:text-bad" />
-                  </span>
-                </div>
-                {errores[f.clave] && <p className="ml-8 mt-1.5 text-[13px] text-bad">{errores[f.clave]}</p>}
-                <label htmlFor={`${id}-${f.clave}-e`} className="sr-only">Explicación para el cliente de la etapa {i + 1}</label>
-                <textarea
-                  id={`${id}-${f.clave}-e`}
-                  value={f.explicacion}
-                  onChange={(e) => cambiar(f.clave, { explicacion: e.target.value })}
-                  rows={2}
-                  maxLength={600}
-                  placeholder="Qué pasa en esta etapa, en palabras sencillas"
-                  className={cx(CAMPO, "mt-2 h-auto py-2.5 leading-[1.5] [field-sizing:content] sm:ml-8 sm:w-[calc(100%-2rem)]")}
-                />
-                {f.procesos > 0 && <p className="mt-1.5 text-[12.5px] text-ink-3 sm:ml-8">Hoy hay {procesosTexto(f.procesos)} en esta etapa.</p>}
-              </li>
-            ))}
-          </ol>
-          {errores.etapas && <p className="mt-2 text-[13px] text-bad">{errores.etapas}</p>}
-          <Button size="sm" variant="secondary" icon={<Plus size={14} />} className="mt-3" onClick={() => setFilas((fs) => [...fs.filter((f) => f.activa), nuevaFila(), ...fs.filter((f) => !f.activa)])}>
-            Agregar etapa
-          </Button>
+          <ListaEtapas
+            idBase={id}
+            filas={filas}
+            setFilas={setFilas}
+            errores={errores}
+            detalle={(f) => (f.procesos > 0 ? `Hoy hay ${procesosTexto(f.procesos)} en esta etapa.` : null)}
+          />
         </fieldset>
 
         {guardadas.length > 0 && (
@@ -256,7 +194,7 @@ export function PanelEtapas() {
     <div>
       <PageHeader
         title="Etapas de los procesos"
-        description="Las etapas por las que pasa cada tipo de proceso. El cliente ve en su portal la línea de su proceso y qué significa la etapa en que va."
+        description="Las etapas por las que pasa cada tipo de proceso. El cliente ve en su portal la línea de su proceso y qué significa la etapa en que va. Cada expediente puede ajustar además sus propias etapas sin cambiar la plantilla."
         action={<Button icon={<Plus size={16} />} onClick={() => setEditando("nueva")}>Nueva plantilla</Button>}
       />
       {error ? (
