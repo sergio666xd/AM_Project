@@ -1,3 +1,4 @@
+import { ArrowRight, House } from "lucide-react";
 import Link from "next/link";
 import { clasesBoton } from "@/components/ui/Button";
 import { Carpeta, Entrada, RELLENO, TituloPagina } from "@/components/sitio/Caratula";
@@ -15,8 +16,8 @@ export default function PaginaNoEncontrada() {
         }
       >
         <div className={`${RELLENO} flex flex-col gap-3 sm:flex-row`}>
-          <Link href="/" className={clasesBoton("primary", "lg")}>Volver al inicio</Link>
-          <Link href="/servicios" className={clasesBoton("secondary", "lg")}>Ver servicios</Link>
+          <Link href="/" className={clasesBoton("primary", "lg")}><House aria-hidden="true" size={18} strokeWidth={2} />Volver al inicio</Link>
+          <Link href="/servicios" className={clasesBoton("secondary", "lg")}>Ver servicios<ArrowRight aria-hidden="true" size={18} strokeWidth={2} /></Link>
         </div>
       </Carpeta>
     </MarcoSitio>

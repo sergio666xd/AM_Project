@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ArrowRight } from "lucide-react";
+import { ArrowRight, MessageSquareText } from "lucide-react";
 import { clasesBoton } from "@/components/ui/Button";
 import { areaDeIcono } from "@/components/sitio/areas";
 import { Carpeta, Entrada, RELLENO, TituloHoja, TituloPagina } from "@/components/sitio/Caratula";
@@ -50,6 +50,7 @@ export default async function Servicios() {
                   <TituloHoja id={`${area.ancla}-titulo`}>{area.title}</TituloHoja>
                   <p className="max-w-[46ch] text-[17px] leading-[1.6] text-ink-2">{enLinea(area.description)}</p>
                   <Link href={`/contacto?area=${area.area}#consulta`} className={`${clasesBoton("secondary", "lg")} mt-2`}>
+                    <MessageSquareText aria-hidden="true" size={18} strokeWidth={2} />
                     Consultar sobre este tema
                   </Link>
                 </div>
@@ -74,6 +75,7 @@ export default async function Servicios() {
             <p className="max-w-[60ch] text-[17px] leading-[1.6] text-ink-2">{enLinea(contenido.closingDescription)}</p>
           </div>
           <Link href="/contacto#consulta" className={`${clasesBoton("primary", "lg")} shrink-0`}>
+            <MessageSquareText aria-hidden="true" size={18} strokeWidth={2} />
             {contenido.closingCta}
           </Link>
         </div>

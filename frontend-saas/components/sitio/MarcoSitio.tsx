@@ -1,3 +1,4 @@
+import { LogIn, MessageSquareText } from "lucide-react";
 import Link from "next/link";
 import type { ReactNode } from "react";
 import { clasesBoton } from "@/components/ui/Button";
@@ -40,17 +41,19 @@ export async function MarcoSitio({ children }: { children: ReactNode }) {
       </a>
       {/* El menú va arriba desde el primer momento: en computador en línea, en celular detrás de la hamburguesa. */}
       <header className="sticky top-0 z-30 border-b border-line bg-sheet/95 backdrop-blur supports-[backdrop-filter]:bg-sheet/85">
-        <Columna className="flex min-h-[72px] items-center justify-between gap-4 py-3 lg:min-h-20">
-          <Link href="/" aria-label="Inicio" className="-m-1 shrink-0 rounded-md p-1">
-            <Logo className="h-10 w-auto sm:h-12" />
+        <Columna className="flex min-h-[72px] items-center justify-between gap-3 py-3 sm:gap-4 lg:min-h-20">
+          <Link href="/" aria-label="Inicio" className="-m-1 min-w-0 shrink rounded-md p-1">
+            <Logo className="h-9 w-auto max-w-full min-[400px]:h-10 sm:h-12" />
           </Link>
           <NavSitio />
           <div className="flex items-center gap-2 sm:gap-3">
             {/* Los visitantes nuevos van a la consulta; el portal es para quien ya es cliente. */}
             <EnlacePortal className={clasesBoton("ghost", "md") + " max-xl:hidden"}>
+              <LogIn aria-hidden="true" size={16} strokeWidth={2} />
               Portal de clientes
             </EnlacePortal>
-            <Link href="/#consulta" className={clasesBoton("primary", "md")}>
+            <Link href="/#consulta" className={`${clasesBoton("primary", "md")} max-sm:px-3`}>
+              <MessageSquareText aria-hidden="true" size={16} strokeWidth={2} className="max-sm:hidden" />
               Recibir asesoría
             </Link>
             <MenuMovil />

@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useId, useRef, useState, type FormEvent } from "react";
-import { Check, CircleAlert } from "lucide-react";
+import { Check, CircleAlert, PenLine, Send } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { api } from "@/lib/api-v2/cliente";
 import { cx } from "@/lib/cx";
@@ -154,7 +154,7 @@ export function FormularioConsulta({
           <p>Ya le llegó al equipo, que lo lee y le responde {enviado.medio} en máximo 2 días hábiles.</p>
           <p>No tiene que hacer nada más.{whatsapp ? ` Si quiere agregar algo, escríbanos por WhatsApp al ${telefonoLegible(whatsapp)}.` : ""}</p>
         </div>
-        <Button variant="secondary" size="lg" onClick={() => {
+        <Button variant="secondary" size="lg" icon={<PenLine size={18} strokeWidth={2} aria-hidden="true" />} onClick={() => {
           setEnviado(null);
           setNombre(""); setContacto(""); setMensaje(""); setAutorizacion(false); setArea(areaInicial ?? null);
         }}>
@@ -276,7 +276,7 @@ export function FormularioConsulta({
       )}
 
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:gap-6">
-        <Button type="submit" size="lg" loading={enviando} className="w-full sm:w-auto">
+        <Button type="submit" size="lg" loading={enviando} icon={<Send size={18} strokeWidth={2} aria-hidden="true" />} className="w-full sm:w-auto">
           Enviar mi consulta
         </Button>
         {whatsapp && (

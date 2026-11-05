@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ArrowRight } from "lucide-react";
+import { ArrowRight, MessageSquareText } from "lucide-react";
 import { clasesBoton } from "@/components/ui/Button";
 import { areaDeIcono } from "@/components/sitio/areas";
 import { Carpeta, Entrada, RELLENO, TituloHoja, TituloPagina } from "@/components/sitio/Caratula";
@@ -32,9 +32,13 @@ export default async function Inicio() {
             <Entrada>{enLinea(inicio.heroDescription)}</Entrada>
             {/* Invitar a escribir no es pedir los datos: el formulario queda al final, después del contexto. */}
             <div className="mt-8 flex flex-col gap-3 sm:flex-row">
-              <a href="#consulta" className={`${clasesBoton("gold", "lg")} boton-destello`}>{inicio.heroCta}</a>
+              <a href="#consulta" className={`${clasesBoton("gold", "lg")} boton-destello`}>
+                <MessageSquareText aria-hidden="true" size={18} strokeWidth={2} />
+                {inicio.heroCta}
+              </a>
               <Link href="/servicios" className={`${clasesBoton("ghost", "lg")} text-ink shadow-[inset_0_0_0_1px_var(--cover-line)] hover:bg-[var(--cover-chip)] hover:text-ink`}>
                 {inicio.heroSecondaryCta}
+                <ArrowRight aria-hidden="true" size={18} strokeWidth={2} />
               </Link>
             </div>
           </div>

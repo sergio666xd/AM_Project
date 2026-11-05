@@ -1,3 +1,4 @@
+import { MessageCircle, MessageSquareText } from "lucide-react";
 import Link from "next/link";
 import { clasesBoton } from "@/components/ui/Button";
 import { Carpeta, Entrada, RELLENO, TituloHoja, TituloPagina } from "@/components/sitio/Caratula";
@@ -63,10 +64,12 @@ export default async function PolizaJuridica() {
           </div>
           <div className="flex shrink-0 flex-col gap-3 sm:flex-row lg:flex-col xl:flex-row">
             <Link href="/contacto?area=poliza#consulta" className={clasesBoton("primary", "lg")}>
+              <MessageSquareText aria-hidden="true" size={18} strokeWidth={2} />
               {contenido.closingCta}
             </Link>
             {whatsapp && (
               <a href={enlaceWhatsapp(whatsapp, "Hola, quiero información sobre la póliza jurídica.")} target="_blank" rel="noreferrer" className={clasesBoton("secondary", "lg")}>
+                <MessageCircle aria-hidden="true" size={18} strokeWidth={2} />
                 Escribir por WhatsApp
               </a>
             )}
