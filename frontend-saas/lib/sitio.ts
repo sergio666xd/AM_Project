@@ -7,7 +7,9 @@ export type EstadoMensajeSitio = MensajeSitio["estado"];
 /** Lo que la persona eligió en el formulario, como lo lee la firma. */
 export const AREA_CONSULTA: Record<AreaConsulta, string> = {
   familia: "Familia o herencias",
-  empresas: "Empresas o contratos",
+  civil: "Contratos, inmuebles o deudas",
+  laboral: "Laboral",
+  empresas: "Empresas o sociedades",
   propiedad_horizontal: "Propiedad horizontal",
   publico: "Entidad pública",
   poliza: "Póliza jurídica",

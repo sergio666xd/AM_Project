@@ -5,13 +5,15 @@ from pydantic import BaseModel, EmailStr, Field, field_validator
 from app.nucleo.paginacion import Pagina
 from app.nucleo.zona_horaria import FechaHora
 
-AreaConsulta = Literal["familia", "empresas", "propiedad_horizontal", "publico", "poliza", "otro"]
+AreaConsulta = Literal["familia", "civil", "laboral", "empresas", "propiedad_horizontal", "publico", "poliza", "otro"]
 EstadoSolicitud = Literal["nueva", "atendida", "descartada"]
 AvisoFirma = Literal["pendiente", "enviado", "fallido"]
 
 AREAS: dict[str, str] = {
     "familia": "familia o herencias",
-    "empresas": "empresas o contratos",
+    "civil": "contratos, inmuebles o deudas",
+    "laboral": "un asunto laboral",
+    "empresas": "empresas o sociedades",
     "propiedad_horizontal": "propiedad horizontal",
     "publico": "un asunto con una entidad pública",
     "poliza": "la póliza jurídica",
@@ -120,10 +122,13 @@ class PaginaSitio(BaseModel):
     editada: bool = Field(description="False mientras la página use su texto base.")
     actualizada_en: FechaHora | None
     actualizada_por: str | None
+    con_borrador: bool = Field(False, description="True si hay cambios guardados sin publicar.")
+    borrador_en: FechaHora | None = None
 
 
 class PaginaSitioDetalle(PaginaSitio):
-    contenido: dict[str, Any] | None = Field(description="Lo guardado por la administración; null si usa el texto base.")
+    contenido: dict[str, Any] | None = Field(description="Lo publicado por la administración; null si usa el texto base.")
+    borrador: dict[str, Any] | None = Field(None, description="Cambios guardados sin publicar; null si no hay.")
 
 
 class CambioPaginaSitio(BaseModel):

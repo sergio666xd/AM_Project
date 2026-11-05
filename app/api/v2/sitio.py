@@ -108,8 +108,28 @@ def guardar_pagina_sitio(
     usuario: models.Usuario = Depends(usuario_actual),
     servicio: ServicioSitio = Depends(servicio_sitio),
 ):
-    """La dirección de cada página es fija; `route` se ignora si llega."""
+    """Publica la página y cierra el borrador. La dirección de cada página es fija; `route` se ignora si llega."""
     return servicio.guardar_pagina(usuario, slug, datos)
+
+
+@router.put("/admin/sitio/paginas/{slug}/borrador", response_model=PaginaSitioDetalle, summary="Guardar cambios de una página sin publicarlos")
+def guardar_borrador_sitio(
+    slug: str,
+    datos: CambioPaginaSitio,
+    usuario: models.Usuario = Depends(usuario_actual),
+    servicio: ServicioSitio = Depends(servicio_sitio),
+):
+    """El sitio sigue mostrando lo publicado hasta que se guarde la página con el PUT de la página."""
+    return servicio.guardar_borrador(usuario, slug, datos)
+
+
+@router.delete("/admin/sitio/paginas/{slug}/borrador", response_model=PaginaSitioDetalle, summary="Descartar el borrador de una página")
+def descartar_borrador_sitio(
+    slug: str,
+    usuario: models.Usuario = Depends(usuario_actual),
+    servicio: ServicioSitio = Depends(servicio_sitio),
+):
+    return servicio.descartar_borrador(usuario, slug)
 
 
 @router.delete("/admin/sitio/paginas/{slug}", response_model=PaginaSitioDetalle, summary="Volver al texto base de una página")

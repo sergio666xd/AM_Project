@@ -1,3 +1,4 @@
+import { LogIn, MessageSquareText } from "lucide-react";
 import Link from "next/link";
 import type { ReactNode } from "react";
 import { clasesBoton } from "@/components/ui/Button";
@@ -8,9 +9,10 @@ import { cargarContacto } from "@/lib/sitioPublico";
 import { enlaceWhatsapp } from "@/lib/whatsapp";
 import { Columna } from "./Caratula";
 import { EnlacePortal } from "./EnlacePortal";
+import { MenuMovil, NavSitio } from "./NavSitio";
 
 const ENLACES_PIE = [
-  { href: "/areas-de-practica", label: "Áreas de práctica" },
+  { href: "/servicios", label: "Servicios" },
   { href: "/poliza-juridica", label: "Póliza jurídica" },
   { href: "/quienes-somos", label: "Quiénes somos" },
   { href: "/filosofia", label: "Nuestra filosofía" },
@@ -24,7 +26,7 @@ const ENLACES_LEGALES = [
 
 /**
  * Marco de todas las páginas públicas: encabezado blanco con el logo y el
- * acceso al portal de clientes, el escritorio manila y el pie azul.
+ * acceso al portal de clientes, el fondo gris azulado y el pie azul.
  * La administración tiene su propia dirección y no se enlaza desde aquí.
  */
 export async function MarcoSitio({ children }: { children: ReactNode }) {
@@ -32,19 +34,30 @@ export async function MarcoSitio({ children }: { children: ReactNode }) {
   const visible = contacto.mostrar_contacto;
 
   return (
-    <div data-app className="flex min-h-dvh flex-col bg-ground text-ink lectura">
+    <div data-app className="sitio-publico flex min-h-dvh flex-col bg-ground text-ink lectura">
       <JsonLd />
       <a href="#contenido" className="sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-4 focus:z-50 focus:rounded-md focus:bg-sheet focus:px-3 focus:py-2 focus:shadow-pop">
         Ir al contenido
       </a>
-      <header className="border-b border-line bg-sheet">
-        <Columna className="flex min-h-[72px] items-center justify-between gap-4 py-3 sm:min-h-20">
-          <Link href="/" aria-label="Inicio" className="-m-1 rounded-md p-1">
-            <Logo className="h-10 w-auto sm:h-12" />
+      {/* El menú va arriba desde el primer momento: en computador en línea, en celular detrás de la hamburguesa. */}
+      <header className="sticky top-0 z-30 border-b border-line bg-sheet/95 backdrop-blur supports-[backdrop-filter]:bg-sheet/85">
+        <Columna className="flex min-h-[72px] items-center justify-between gap-3 py-3 sm:gap-4 lg:min-h-20">
+          <Link href="/" aria-label="Inicio" className="-m-1 min-w-0 shrink rounded-md p-1">
+            <Logo className="h-9 w-auto max-w-full min-[400px]:h-10 sm:h-12" />
           </Link>
-          <EnlacePortal className={clasesBoton("secondary", "md")}>
-            Portal de clientes
-          </EnlacePortal>
+          <NavSitio />
+          <div className="flex items-center gap-2 sm:gap-3">
+            {/* Los visitantes nuevos van a la consulta; el portal es para quien ya es cliente. */}
+            <EnlacePortal className={clasesBoton("ghost", "md") + " max-xl:hidden"}>
+              <LogIn aria-hidden="true" size={16} strokeWidth={2} />
+              Portal de clientes
+            </EnlacePortal>
+            <Link href="/#consulta" className={`${clasesBoton("primary", "md")} max-sm:px-3`}>
+              <MessageSquareText aria-hidden="true" size={16} strokeWidth={2} className="max-sm:hidden" />
+              Recibir asesoría
+            </Link>
+            <MenuMovil />
+          </div>
         </Columna>
       </header>
 

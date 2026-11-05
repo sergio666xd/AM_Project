@@ -15,6 +15,7 @@ import { useToast } from "@/components/ui/ToastProvider";
 import { api, mensajeDeError, type Esquemas } from "@/lib/api-v2/cliente";
 import { cx } from "@/lib/cx";
 import { fechaConHora } from "@/lib/fechas";
+import { contenidoVigente, ESQUEMA_SITIO } from "@/lib/esquemaSitio";
 import { mezclarContenido } from "@/lib/mezclarContenido";
 import { urlSitioPublico } from "@/lib/portalHosts";
 import { SITE_PAGE_DEFAULTS, SITE_PAGE_LABELS, type PublicPageSlug } from "@/lib/sitePageDefaults";
@@ -28,9 +29,12 @@ type PaginaSitio = Esquemas["PaginaSitio"];
 const SLUGS = Object.keys(SITE_PAGE_DEFAULTS) as PublicPageSlug[];
 const esSlug = (valor: string): valor is PublicPageSlug => (SLUGS as string[]).includes(valor);
 
-/** El contenido tal como lo ve el formulario: texto base con lo guardado encima. */
+/**
+ * El contenido tal como lo ve el formulario: texto base con lo guardado encima.
+ * Lo guardado con una estructura anterior no se mezcla (ver esquemaSitio).
+ */
 function contenidoDe(slug: PublicPageSlug, guardado: unknown): Objeto {
-  return prepararContenido(slug, mezclarContenido(SITE_PAGE_DEFAULTS[slug] as unknown as Objeto, guardado ?? null));
+  return prepararContenido(slug, mezclarContenido(SITE_PAGE_DEFAULTS[slug] as unknown as Objeto, contenidoVigente(guardado)));
 }
 
 /** Quita líneas vacías de las listas de una línea por elemento antes de guardar. */
@@ -247,9 +251,12 @@ export function PanelContenidoSitio() {
   const [slug, setSlug] = useState<PublicPageSlug>("inicio");
   const [cargada, setCargada] = useState<PublicPageSlug | null>(null);
   const [errorPagina, setErrorPagina] = useState<string | null>(null);
+  // `base` es lo último guardado (el borrador si hay, si no lo publicado) y `edicion` lo que hay en el formulario.
   const [base, setBase] = useState<Objeto>(() => contenidoDe("inicio", null));
-  const [borrador, setBorrador] = useState<Objeto>(base);
-  const [guardando, setGuardando] = useState(false);
+  const [edicion, setEdicion] = useState<Objeto>(base);
+  const [detalle, setDetalle] = useState<Esquemas["PaginaSitioDetalle"] | null>(null);
+  const [guardando, setGuardando] = useState<"borrador" | "publicar" | null>(null);
+  const [descartarBorrador, setDescartarBorrador] = useState(false);
   const [faltante, setFaltante] = useState<string | null>(null);
   const [pendiente, setPendiente] = useState<PublicPageSlug | null>(null);
   const [restaurar, setRestaurar] = useState(false);
@@ -257,7 +264,8 @@ export function PanelContenidoSitio() {
   const [nuevos] = useState(() => new Set<string>());
   const pedida = useRef(0);
 
-  const sucio = cargada === slug && JSON.stringify(borrador) !== JSON.stringify(base);
+  const sucio = cargada === slug && JSON.stringify(edicion) !== JSON.stringify(base);
+  const conBorrador = cargada === slug && Boolean(detalle?.borrador);
   const pagina = paginas?.find((p) => p.slug === slug);
 
   const cargarLista = useCallback(async () => {
@@ -267,6 +275,14 @@ export function PanelContenidoSitio() {
     else setPaginas(data);
   }, []);
   useLoadEffect(cargarLista);
+
+  /** Deja el formulario en lo último guardado: el borrador si hay, si no lo publicado. */
+  const aplicar = useCallback((cual: PublicPageSlug, datos: Esquemas["PaginaSitioDetalle"]) => {
+    const contenido = contenidoDe(cual, datos.borrador ?? datos.contenido);
+    setDetalle(datos);
+    setBase(contenido);
+    setEdicion(contenido);
+  }, []);
 
   const cargarPagina = useCallback(async (cual: PublicPageSlug) => {
     const esta = ++pedida.current;
@@ -278,13 +294,11 @@ export function PanelContenidoSitio() {
       setErrorPagina(mensajeDeError(error));
       return;
     }
-    const contenido = contenidoDe(cual, data.contenido);
     nuevos.clear();
-    setBase(contenido);
-    setBorrador(contenido);
+    aplicar(cual, data);
     setFaltante(null);
     setCargada(cual);
-  }, [nuevos]);
+  }, [nuevos, aplicar]);
   useLoadEffect(useCallback(() => cargarPagina(slug), [slug, cargarPagina]));
 
   // ?pagina=contacto llega desde la actividad.
@@ -303,14 +317,16 @@ export function PanelContenidoSitio() {
     else setSlug(cual);
   }
 
-  function actualizarLista(detalle: Esquemas["PaginaSitioDetalle"]) {
-    const { contenido: _contenido, ...resumen } = detalle;
+  function actualizarLista(datos: Esquemas["PaginaSitioDetalle"]) {
+    const { contenido: _contenido, borrador: _borrador, ...resumen } = datos;
     void _contenido;
-    setPaginas((ps) => ps?.map((p) => (p.slug === detalle.slug ? resumen : p)) ?? ps);
+    void _borrador;
+    setPaginas((ps) => ps?.map((p) => (p.slug === datos.slug ? resumen : p)) ?? ps);
   }
 
-  async function guardar() {
-    const limpio = limpiarPagina(slug, borrador);
+  /** `borrador` guarda sin publicar; si no, publica (y cierra el borrador). */
+  async function guardar(modo: "borrador" | "publicar") {
+    const limpio = limpiarPagina(slug, edicion);
     const falta = primerFaltante(GRUPOS[slug], limpio);
     if (falta) {
       setFaltante(falta.ruta);
@@ -322,27 +338,37 @@ export function PanelContenidoSitio() {
       return;
     }
     setFaltante(null);
-    setGuardando(true);
-    const { data, error } = await api.PUT("/api/v2/admin/sitio/paginas/{slug}", { params: { path: { slug } }, body: { contenido: limpio } });
-    setGuardando(false);
+    setGuardando(modo);
+    const cuerpo = { params: { path: { slug } }, body: { contenido: { ...limpio, esquema: ESQUEMA_SITIO } } };
+    const { data, error } = modo === "borrador"
+      ? await api.PUT("/api/v2/admin/sitio/paginas/{slug}/borrador", cuerpo)
+      : await api.PUT("/api/v2/admin/sitio/paginas/{slug}", cuerpo);
+    setGuardando(null);
     if (error || !data) {
       toast({ title: "No se pudo guardar", description: mensajeDeError(error), tone: "error" });
       return;
     }
-    const contenido = contenidoDe(slug, data.contenido);
-    setBase(contenido);
-    setBorrador(contenido);
+    aplicar(slug, data);
     actualizarLista(data);
-    toast({ title: "Página publicada", description: "Los cambios ya se ven en el sitio.", tone: "success" });
+    toast(modo === "borrador"
+      ? { title: "Borrador guardado", description: "El sitio sigue igual hasta que publique.", tone: "success" }
+      : { title: "Página publicada", description: "Los cambios ya se ven en el sitio.", tone: "success" });
+  }
+
+  async function quitarBorrador() {
+    const { data, error } = await api.DELETE("/api/v2/admin/sitio/paginas/{slug}/borrador", { params: { path: { slug } } });
+    if (error || !data) throw new Error(mensajeDeError(error));
+    nuevos.clear();
+    aplicar(slug, data);
+    actualizarLista(data);
+    toast({ title: "Borrador descartado", description: "El formulario volvió a lo publicado.", tone: "success" });
   }
 
   async function volverAlBase() {
     const { data, error } = await api.DELETE("/api/v2/admin/sitio/paginas/{slug}", { params: { path: { slug } } });
     if (error || !data) throw new Error(mensajeDeError(error));
-    const contenido = contenidoDe(slug, null);
     nuevos.clear();
-    setBase(contenido);
-    setBorrador(contenido);
+    aplicar(slug, data);
     actualizarLista(data);
     toast({ title: "La página volvió a su texto base", tone: "success" });
   }
@@ -352,7 +378,7 @@ export function PanelContenidoSitio() {
   return (
     // El espacio al final deja libre el último campo del botón de chat.
     <div className="pb-20">
-      <PageHeader title="Contenido del sitio" description="Los textos de cada página del sitio web. Lo que guarde se publica de inmediato." />
+      <PageHeader title="Contenido del sitio" description="Los textos de cada página del sitio web. Puede guardarlos como borrador y publicarlos cuando estén listos." />
 
       {errorLista ? (
         <div role="alert" className="flex flex-wrap items-center gap-3 rounded-xl bg-bad-soft px-4 py-3 text-bad">
@@ -384,7 +410,9 @@ export function PanelContenidoSitio() {
                       )}
                     >
                       <span className={cx("text-[14px]", actual ? "font-semibold text-ink" : "text-ink")}>{p?.nombre ?? SITE_PAGE_LABELS[s]}</span>
-                      <span className="text-[12.5px] text-ink-3">{!p ? " " : p.editada ? "Con cambios propios" : "Texto base"}</span>
+                      <span className="text-[12.5px] text-ink-3">
+                        {!p ? " " : p.con_borrador ? "Borrador sin publicar" : p.editada ? "Con cambios propios" : "Texto base"}
+                      </span>
                     </button>
                   </li>
                 );
@@ -396,6 +424,10 @@ export function PanelContenidoSitio() {
             <div className="flex flex-wrap items-end justify-between gap-3">
               <div className="min-w-0">
                 <h2 className="font-display text-[22px] leading-tight text-ink">{nombre}</h2>
+                {cargada === slug && detalle?.contenido && !contenidoVigente(detalle.contenido) && (
+                  // Lo publicado antes de la estructura actual no se mezcla con el texto base (ver esquemaSitio).
+                  <p className="mt-1 text-[13px] text-warn">Lo publicado antes del rediseño ya no se usa: el sitio muestra el texto base hasta que vuelva a publicar.</p>
+                )}
                 <p className="mt-1 text-[13px] text-ink-3">
                   {!pagina ? " " : pagina.editada && pagina.actualizada_en
                     ? `Guardada el ${fechaConHora(pagina.actualizada_en)}${pagina.actualizada_por ? ` por ${pagina.actualizada_por}` : ""}`
@@ -423,9 +455,9 @@ export function PanelContenidoSitio() {
               <>
                 <AyudaFormato />
                 {GRUPOS[slug].map((grupo) => {
-                  const valores = grupo.dentroDe ? ((borrador[grupo.dentroDe] as Objeto) ?? {}) : borrador;
+                  const valores = grupo.dentroDe ? ((edicion[grupo.dentroDe] as Objeto) ?? {}) : edicion;
                   const cambiar = (clave: string, v: unknown) =>
-                    setBorrador((b) => (grupo.dentroDe ? { ...b, [grupo.dentroDe]: { ...((b[grupo.dentroDe] as Objeto) ?? {}), [clave]: v } } : { ...b, [clave]: v }));
+                    setEdicion((b) => (grupo.dentroDe ? { ...b, [grupo.dentroDe]: { ...((b[grupo.dentroDe] as Objeto) ?? {}), [clave]: v } } : { ...b, [clave]: v }));
                   return (
                     <Sheet key={grupo.titulo} aria-label={grupo.titulo}>
                       <SheetHeader title={grupo.titulo} />
@@ -452,12 +484,28 @@ export function PanelContenidoSitio() {
               </>
             )}
 
-            {sucio && (
+            {(sucio || conBorrador) && (
               <div className="sticky bottom-[calc(5rem+env(safe-area-inset-bottom))] z-10 mr-[60px] flex lg:bottom-4 lg:mr-16 flex-wrap items-center justify-between gap-3 rounded-xl bg-sheet px-4 py-3 shadow-[0_0_0_1px_var(--line-strong),0_8px_24px_rgb(24_32_58/0.14)]">
-                <p className="text-[14px] font-semibold text-ink">Hay cambios sin publicar en {nombre}</p>
-                <div className="flex gap-2">
-                  <Button variant="ghost" disabled={guardando} onClick={() => { setBorrador(base); setFaltante(null); }}>Descartar</Button>
-                  <Button loading={guardando} onClick={() => void guardar()}>Guardar y publicar</Button>
+                <div className="min-w-0">
+                  <p className="text-[14px] font-semibold text-ink">
+                    {sucio ? `Hay cambios sin guardar en ${nombre}` : `${nombre} tiene un borrador sin publicar`}
+                  </p>
+                  {!sucio && detalle?.borrador_en && (
+                    <p className="text-[12.5px] text-ink-3">Guardado el {fechaConHora(detalle.borrador_en)} · el sitio sigue mostrando lo publicado</p>
+                  )}
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  {sucio ? (
+                    <Button variant="ghost" disabled={guardando !== null} onClick={() => { setEdicion(base); setFaltante(null); }}>Descartar cambios</Button>
+                  ) : (
+                    <Button variant="ghost" onClick={() => setDescartarBorrador(true)}>Descartar borrador</Button>
+                  )}
+                  {sucio && (
+                    <Button variant="secondary" loading={guardando === "borrador"} disabled={guardando === "publicar"} onClick={() => void guardar("borrador")}>
+                      Guardar borrador
+                    </Button>
+                  )}
+                  <Button loading={guardando === "publicar"} disabled={guardando === "borrador"} onClick={() => void guardar("publicar")}>Publicar</Button>
                 </div>
               </div>
             )}
@@ -469,8 +517,8 @@ export function PanelContenidoSitio() {
         open={pendiente !== null}
         onClose={() => setPendiente(null)}
         onConfirm={() => { if (pendiente) setSlug(pendiente); }}
-        title="¿Dejar los cambios sin publicar?"
-        description={`Los cambios en ${nombre} se pierden si cambia de página sin guardarlos.`}
+        title="¿Dejar los cambios sin guardar?"
+        description={`Los cambios en ${nombre} se pierden si cambia de página sin guardarlos. Puede guardarlos como borrador.`}
         confirmLabel="Cambiar de página"
         cancelLabel="Seguir editando"
         destructive
@@ -480,8 +528,17 @@ export function PanelContenidoSitio() {
         onClose={() => setRestaurar(false)}
         onConfirm={volverAlBase}
         title="¿Volver al texto base?"
-        description={`Se borran los cambios guardados en ${nombre} y vuelve el texto con que se creó el sitio. Esto no se puede deshacer.`}
+        description={`Se borran los cambios publicados en ${nombre} y vuelve el texto con que se creó el sitio. Esto no se puede deshacer.`}
         confirmLabel="Volver al texto base"
+        destructive
+      />
+      <ConfirmDialog
+        open={descartarBorrador}
+        onClose={() => setDescartarBorrador(false)}
+        onConfirm={quitarBorrador}
+        title="¿Descartar el borrador?"
+        description={`Se borran los cambios guardados sin publicar en ${nombre}. Lo publicado no cambia. Esto no se puede deshacer.`}
+        confirmLabel="Descartar borrador"
         destructive
       />
     </div>

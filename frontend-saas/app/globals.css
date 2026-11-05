@@ -274,6 +274,149 @@
   --shadow-pop: 0 2px 6px rgb(0 0 0 / 0.35), 0 16px 40px -12px rgb(0 0 0 / 0.6);
 }
 
+/* ── Sitio público: carátula azul ──
+   El sitio lleva el azul del logo en la carátula de cada página. Dentro de
+   ella los tokens de tinta pasan a claros, así los componentes que ya usan
+   text-ink, text-ink-2 o text-navy se leen sobre el azul sin cambiarlos. */
+:root {
+  --cover: #002060;
+  --cover-2: #0d3279;
+  --on-cover: #f6f3ea;
+  --on-cover-2: #c6cfe5;
+  --cover-line: rgb(255 255 255 / 0.18);
+  --cover-chip: rgb(255 255 255 / 0.1);
+  --cover-accent: #e3d29a;
+}
+
+.dark {
+  --cover: #11204a;
+  --cover-2: #1b2f63;
+  --on-cover: #ece8dc;
+  --on-cover-2: #b3bdd8;
+  --cover-line: rgb(255 255 255 / 0.14);
+  --cover-chip: rgb(255 255 255 / 0.08);
+  --cover-accent: #dcc78a;
+}
+
+/* El fondo del sitio toma un gris azulado en lugar del manila de la app. */
+:root:not(.dark) .sitio-publico {
+  --ground: #eaeef6;
+  --manila: #e1e7f2;
+  --line: #dde3ee;
+  --line-strong: #c3ccdc;
+  --sheet-2: #f6f8fc;
+}
+
+.caratula-azul {
+  color: var(--on-cover);
+  --ink: var(--on-cover);
+  --ink-2: var(--on-cover-2);
+  --ink-3: var(--on-cover-2);
+  --manila-line: var(--cover-line);
+  --navy: var(--cover-accent);
+}
+
+/* Una hoja blanca puesta sobre la carátula (el formulario de Contacto)
+   vuelve a la tinta oscura de la hoja. */
+.caratula-azul .hoja-clara {
+  --ink: #18203a;
+  --ink-2: #454d63;
+  --ink-3: #636b80;
+  --navy: #002060;
+  --manila-line: #d8caa6;
+  color: var(--ink);
+}
+.dark .caratula-azul .hoja-clara {
+  --ink: #ece8dc;
+  --ink-2: #bdbccb;
+  --ink-3: #9a9db0;
+  --navy: #8fa8de;
+  --manila-line: #2e3449;
+}
+
+/* ── Sitio público: movimiento ──
+   La carátula entra al cargar y su luz se desplaza despacio; las secciones y
+   las listas aparecen al bajar (solo donde el navegador anima con el scroll,
+   en los demás se ven quietas); filas, tarjetas y botones responden al pasar
+   el cursor. Quien pide menos movimiento en su sistema ve el sitio quieto. */
+@keyframes sitio-subir {
+  from { opacity: 0; translate: 0 18px; }
+}
+@keyframes sitio-luz {
+  from { background-position: 100% 0%, 0 0; }
+  to { background-position: 40% 70%, 0 0; }
+}
+@keyframes sitio-brillo {
+  from { translate: -120% 0; }
+  to { translate: 220% 0; }
+}
+
+.caratula-azul {
+  position: relative;
+  background:
+    radial-gradient(60% 90% at 50% 50%, rgb(70 110 200 / 0.38), transparent 70%) 100% 0% / 160% 200% no-repeat,
+    var(--cover);
+}
+
+:root {
+  interpolate-size: allow-keywords;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .caratula-azul {
+    animation: sitio-luz 14s ease-in-out infinite alternate;
+  }
+
+  /* Lo que trae la carátula entra escalonado: etiquetas, título, entrada, botones. */
+  .caratula-entrada > * > *,
+  .caratula-entrada > * > * > * {
+    animation: sitio-subir 0.8s var(--ease-out-expo) both;
+  }
+  .caratula-entrada > * > *:nth-child(2),
+  .caratula-entrada > * > * > *:nth-child(2) { animation-delay: 0.08s; }
+  .caratula-entrada > * > *:nth-child(3),
+  .caratula-entrada > * > * > *:nth-child(3) { animation-delay: 0.16s; }
+  .caratula-entrada > * > *:nth-child(n + 4),
+  .caratula-entrada > * > * > *:nth-child(n + 4) { animation-delay: 0.24s; }
+
+  @supports (animation-timeline: view()) {
+    .sitio-publico main section,
+    .revelar-lista > li {
+      animation: sitio-subir linear both;
+      animation-timeline: view();
+      animation-range: entry 0px entry 220px;
+    }
+  }
+
+  /* El botón dorado de la portada lleva un destello al pasar el cursor. */
+  .boton-destello {
+    position: relative;
+    overflow: hidden;
+  }
+  .boton-destello::after {
+    content: "";
+    position: absolute;
+    inset: 0 auto 0 0;
+    width: 40%;
+    background: linear-gradient(100deg, transparent, rgb(255 255 255 / 0.55), transparent);
+    translate: -120% 0;
+    pointer-events: none;
+  }
+  .boton-destello:hover::after {
+    animation: sitio-brillo 0.9s var(--ease-out-expo);
+  }
+
+  /* Las tarjetas del equipo se abren deslizando, no de golpe. */
+  .sitio-publico details::details-content {
+    block-size: 0;
+    overflow: clip;
+    transition: block-size 0.35s var(--ease-out-expo), content-visibility 0.35s allow-discrete;
+  }
+  .sitio-publico details[open]::details-content {
+    block-size: auto;
+  }
+}
+
 /* Las pantallas de la app (todo lo que cuelga de /gestion-procesos marca
    [data-app] en su layout) toman el expediente foliado también en los tokens
    heredados, así las ~95 pantallas cambian de una vez. El sitio público

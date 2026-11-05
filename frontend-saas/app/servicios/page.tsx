@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ArrowRight } from "lucide-react";
+import { ArrowRight, MessageSquareText } from "lucide-react";
 import { clasesBoton } from "@/components/ui/Button";
 import { areaDeIcono } from "@/components/sitio/areas";
 import { Carpeta, Entrada, RELLENO, TituloHoja, TituloPagina } from "@/components/sitio/Caratula";
@@ -10,24 +10,23 @@ import { SITE_PAGE_DEFAULTS } from "@/lib/sitePageDefaults";
 import { cargarPagina } from "@/lib/sitioPublico";
 
 export function generateMetadata() {
-  return generatePublicPageMetadata("areas-de-practica", SITE_PAGE_DEFAULTS["areas-de-practica"], "/areas-de-practica");
+  return generatePublicPageMetadata("areas-de-practica", SITE_PAGE_DEFAULTS["areas-de-practica"], "/servicios");
 }
 
-export default async function AreasDePractica() {
+export default async function Servicios() {
   const contenido = await cargarPagina("areas-de-practica", SITE_PAGE_DEFAULTS["areas-de-practica"]);
   const areas = contenido.areas.map((area, i) => ({ ...area, ...areaDeIcono(area.icon, i) }));
 
   return (
     <MarcoSitio>
       <Carpeta
-        actual="areas"
         caratula={
           <div className="grid grid-cols-[minmax(0,1fr)] gap-9 lg:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)] lg:gap-14">
             <div>
               <TituloPagina>{enLinea(contenido.title)}</TituloPagina>
               <Entrada>{enLinea(contenido.description)}</Entrada>
             </div>
-            <nav aria-label="Áreas en esta página">
+            <nav aria-label="Servicios en esta página" className="max-lg:hidden">
               <h2 className="mb-3 text-[14px] font-semibold text-ink-2">En esta página</h2>
               <ol className="divide-y divide-manila-line border-y border-manila-line">
                 {areas.map((area) => (
@@ -51,6 +50,7 @@ export default async function AreasDePractica() {
                   <TituloHoja id={`${area.ancla}-titulo`}>{area.title}</TituloHoja>
                   <p className="max-w-[46ch] text-[17px] leading-[1.6] text-ink-2">{enLinea(area.description)}</p>
                   <Link href={`/contacto?area=${area.area}#consulta`} className={`${clasesBoton("secondary", "lg")} mt-2`}>
+                    <MessageSquareText aria-hidden="true" size={18} strokeWidth={2} />
                     Consultar sobre este tema
                   </Link>
                 </div>
@@ -75,6 +75,7 @@ export default async function AreasDePractica() {
             <p className="max-w-[60ch] text-[17px] leading-[1.6] text-ink-2">{enLinea(contenido.closingDescription)}</p>
           </div>
           <Link href="/contacto#consulta" className={`${clasesBoton("primary", "lg")} shrink-0`}>
+            <MessageSquareText aria-hidden="true" size={18} strokeWidth={2} />
             {contenido.closingCta}
           </Link>
         </div>

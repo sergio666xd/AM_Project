@@ -1,3 +1,4 @@
+import { MessageCircle, MessageSquareText } from "lucide-react";
 import Link from "next/link";
 import { clasesBoton } from "@/components/ui/Button";
 import { Carpeta, Entrada, RELLENO, TituloHoja, TituloPagina } from "@/components/sitio/Caratula";
@@ -22,20 +23,24 @@ export default async function PolizaJuridica() {
   return (
     <MarcoSitio>
       <Carpeta
-        actual="poliza"
         caratula={
           <div className="grid grid-cols-[minmax(0,1fr)] gap-9 lg:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)] lg:gap-14">
             <div>
               <TituloPagina>{enLinea(contenido.title)}</TituloPagina>
               <Entrada>{enLinea(contenido.intro)}</Entrada>
             </div>
-            <div className="self-end rounded-lg bg-[color-mix(in_srgb,var(--sheet)_55%,transparent)] p-5 sm:p-6">
+            {/* En celular este recuadro baja a la hoja, para que la carátula tenga el mismo alto que las demás. */}
+            <div className="self-end rounded-lg bg-[var(--cover-chip)] shadow-[inset_0_0_0_1px_var(--cover-line)] p-5 max-sm:hidden sm:p-6">
               <h2 className="font-display text-[22px] leading-[1.3] text-ink">{enLinea(contenido.asideTitle)}</h2>
               <p className="mt-2 text-[16px] leading-[1.6] text-ink-2">{enLinea(contenido.asideDescription)}</p>
             </div>
           </div>
         }
       >
+        <div className={`${RELLENO} bg-navy-soft sm:hidden`}>
+          <h2 className="font-display text-[22px] leading-[1.3] text-navy">{enLinea(contenido.asideTitle)}</h2>
+          <p className="mt-2 text-[16px] leading-[1.6] text-ink-2">{enLinea(contenido.asideDescription)}</p>
+        </div>
         <div className={RELLENO}>
           <TituloHoja>{enLinea(contenido.coverageTitle)}</TituloHoja>
           <p className="mt-3 max-w-[60ch] text-[17px] leading-[1.6] text-ink-2">{enLinea(contenido.coverageDescription)}</p>
@@ -59,10 +64,12 @@ export default async function PolizaJuridica() {
           </div>
           <div className="flex shrink-0 flex-col gap-3 sm:flex-row lg:flex-col xl:flex-row">
             <Link href="/contacto?area=poliza#consulta" className={clasesBoton("primary", "lg")}>
+              <MessageSquareText aria-hidden="true" size={18} strokeWidth={2} />
               {contenido.closingCta}
             </Link>
             {whatsapp && (
               <a href={enlaceWhatsapp(whatsapp, "Hola, quiero información sobre la póliza jurídica.")} target="_blank" rel="noreferrer" className={clasesBoton("secondary", "lg")}>
+                <MessageCircle aria-hidden="true" size={18} strokeWidth={2} />
                 Escribir por WhatsApp
               </a>
             )}

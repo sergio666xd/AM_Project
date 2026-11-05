@@ -1,6 +1,6 @@
 import Link from "next/link";
-import { ArrowRight } from "lucide-react";
-import { Carpeta, Ficha, RELLENO, TituloHoja, TituloPagina } from "@/components/sitio/Caratula";
+import { ArrowRight, ChevronDown } from "lucide-react";
+import { Carpeta, Columna, Ficha, RELLENO, TituloHoja, TituloPagina } from "@/components/sitio/Caratula";
 import { MarcoSitio } from "@/components/sitio/MarcoSitio";
 import { Texto, enLinea } from "@/components/sitio/Texto";
 import { generatePublicPageMetadata } from "@/lib/pageSeo";
@@ -24,7 +24,6 @@ export default async function QuienesSomos() {
   return (
     <MarcoSitio>
       <Carpeta
-        actual="firma"
         caratula={
           <div className="grid grid-cols-[minmax(0,1fr)] gap-9 lg:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)] lg:items-end lg:gap-14">
             <div>
@@ -36,7 +35,7 @@ export default async function QuienesSomos() {
             </div>
             <Ficha
               filas={[
-                { etiqueta: "Abogada titular", valor: "Alejandra Muñoz Marín" },
+                { etiqueta: "Equipo", valor: "Abogados con más de 10 años de experiencia" },
                 ...(contacto.ciudad ? [{ etiqueta: "Sede", valor: contacto.ciudad }] : []),
               ]}
             />
@@ -59,6 +58,82 @@ export default async function QuienesSomos() {
           ))}
         </div>
       </Carpeta>
+
+      {/* El equipo va en su propio bloque, fuera de la hoja: solo el título y las tarjetas. */}
+      {contenido.team.length > 0 && (
+        <Columna className="mt-10 sm:mt-14">
+          <section aria-labelledby="equipo">
+            <TituloHoja id="equipo">{enLinea(contenido.teamTitle)}</TituloHoja>
+            <ul className="revelar-lista mt-6 grid grid-cols-[minmax(0,1fr)] items-start gap-5 min-[480px]:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
+              {contenido.team.map((persona) => <TarjetaEquipo key={persona.name} persona={persona} />)}
+            </ul>
+          </section>
+        </Columna>
+      )}
     </MarcoSitio>
+  );
+}
+
+type Persona = { name: string; role: string; license: string; photo: string; profile: string; experience: string };
+
+/**
+ * Tarjeta de una persona del equipo. Cerrada muestra la foto, el nombre y el
+ * título; al abrirla, el perfil, la trayectoria y la tarjeta profesional.
+ * Lo que la administración deja vacío no se muestra.
+ */
+function TarjetaEquipo({ persona }: { persona: Persona }) {
+  const iniciales = persona.name.split(/\s+/).filter(Boolean).slice(0, 2).map((p) => p[0]).join("");
+  const hayDetalle = Boolean(persona.profile || persona.experience || persona.license);
+  const cabeza = (
+    <>
+      <div className="caratula-azul relative aspect-[4/5] w-full max-w-full overflow-hidden">
+        {/^(https:\/\/|\/(?!\/))/.test(persona.photo) ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={persona.photo} alt="" className="absolute inset-0 size-full object-cover transition-transform duration-500 group-hover/tarjeta:scale-[1.04]" />
+        ) : (
+          <span aria-hidden="true" className="absolute inset-0 flex items-center justify-center font-display text-[48px] text-[var(--on-cover-2)] transition-transform duration-500 group-hover/tarjeta:scale-110">{iniciales}</span>
+        )}
+      </div>
+      <div className="flex flex-col gap-2 px-4 py-4">
+        <div className="min-w-0">
+          <h3 className="font-display text-[19px] leading-[1.25] text-ink">{persona.name}</h3>
+          {persona.role && <p className="mt-1 text-[15px] font-semibold text-navy">{persona.role}</p>}
+        </div>
+        {hayDetalle && (
+          <span className="flex shrink-0 items-center gap-1 text-[14px] font-semibold text-ink-2">
+            <span className="group-open:hidden">Ver perfil</span>
+            <span className="hidden group-open:inline">Cerrar</span>
+            <ChevronDown aria-hidden="true" size={18} strokeWidth={2} className="transition-transform duration-200 group-open:rotate-180" />
+          </span>
+        )}
+      </div>
+    </>
+  );
+
+  return (
+    <li className="group/tarjeta w-full max-w-[320px] overflow-hidden rounded-xl bg-sheet shadow-sheet transition-[translate,box-shadow] duration-300 hover:-translate-y-1 hover:shadow-pop">
+      {hayDetalle ? (
+        <details className="group">
+          <summary className="cursor-pointer list-none [&::-webkit-details-marker]:hidden">{cabeza}</summary>
+          <div className="space-y-4 border-t border-line px-4 pt-4 pb-5">
+            {persona.profile && (
+              <div>
+                <h4 className="text-[14px] font-semibold text-ink-2">Perfil profesional</h4>
+                <p className="mt-1.5 text-[16px] leading-[1.6] text-ink">{enLinea(persona.profile)}</p>
+              </div>
+            )}
+            {persona.experience && (
+              <div>
+                <h4 className="text-[14px] font-semibold text-ink-2">Trayectoria</h4>
+                <Texto valor={persona.experience} className="mt-1.5 text-[16px]" />
+              </div>
+            )}
+            {persona.license && <p className="folio-num text-[15px] text-ink-2">{persona.license}</p>}
+          </div>
+        </details>
+      ) : (
+        cabeza
+      )}
+    </li>
   );
 }

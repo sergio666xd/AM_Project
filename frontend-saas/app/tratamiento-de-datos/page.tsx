@@ -1,7 +1,8 @@
 import { DocumentoLegal } from "@/components/sitio/DocumentoLegal";
 import { generatePublicPageMetadata } from "@/lib/pageSeo";
 import { SITE_PAGE_DEFAULTS } from "@/lib/sitePageDefaults";
-import { cargarPagina } from "@/lib/sitioPublico";
+import { valoresPolitica } from "@/lib/datosResponsable";
+import { cargarContacto, cargarPagina } from "@/lib/sitioPublico";
 
 export function generateMetadata() {
   return generatePublicPageMetadata("tratamiento-de-datos", SITE_PAGE_DEFAULTS["tratamiento-de-datos"], "/tratamiento-de-datos");
@@ -9,12 +10,13 @@ export function generateMetadata() {
 
 // El texto lo edita la administración en Sitio público › Contenido.
 export default async function TratamientoDatos() {
-  const contenido = await cargarPagina("tratamiento-de-datos", SITE_PAGE_DEFAULTS["tratamiento-de-datos"]);
+  const [contenido, contacto] = await Promise.all([cargarPagina("tratamiento-de-datos", SITE_PAGE_DEFAULTS["tratamiento-de-datos"]), cargarContacto()]);
   return (
     <DocumentoLegal
       titulo={contenido.title}
       actualizada={contenido.updatedAt}
       secciones={contenido.sections}
+      valores={valoresPolitica(contacto, { responsable: contenido.responsable, documento: contenido.documento })}
       otro={{ href: "/politica-de-privacidad", label: "Política de privacidad" }}
     />
   );

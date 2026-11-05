@@ -1,8 +1,8 @@
 import Link from "next/link";
-import { Fragment } from "react";
-import { ArrowRight } from "lucide-react";
+import { ArrowRight, MessageSquareText } from "lucide-react";
+import { clasesBoton } from "@/components/ui/Button";
 import { areaDeIcono } from "@/components/sitio/areas";
-import { Carpeta, Entrada, Ficha, RELLENO, TituloHoja, TituloPagina } from "@/components/sitio/Caratula";
+import { Carpeta, Entrada, RELLENO, TituloHoja, TituloPagina } from "@/components/sitio/Caratula";
 import { EtiquetaCaratula } from "@/components/sitio/Etiqueta";
 import { FormularioConsulta } from "@/components/sitio/FormularioConsulta";
 import { MarcoSitio } from "@/components/sitio/MarcoSitio";
@@ -20,70 +20,45 @@ export default async function Inicio() {
   return (
     <MarcoSitio>
       <Carpeta
-        actual="consulta"
-        id="consulta"
         caratula={
-          <div className="grid grid-cols-[minmax(0,1fr)] gap-9 lg:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)] lg:items-start lg:gap-14">
-            <div>
-              <div className="mb-5 flex flex-wrap gap-2">
-                {contacto.ciudad && <EtiquetaCaratula>{contacto.ciudad}</EtiquetaCaratula>}
-                {/* En celular la entrada ya lo dice; así las etiquetas caben en una línea. */}
-                <EtiquetaCaratula className="max-sm:hidden">Atención en toda Colombia</EtiquetaCaratula>
-              </div>
-              <TituloPagina grande>{enLinea(inicio.heroTitle)}</TituloPagina>
-              <Entrada>{enLinea(inicio.heroDescription)}</Entrada>
+          <div className="max-w-[860px] pb-2 sm:pb-4 lg:pt-4">
+            <div className="mb-6 flex flex-wrap gap-2">
+              {contacto.ciudad && <EtiquetaCaratula>{contacto.ciudad}</EtiquetaCaratula>}
+              <EtiquetaCaratula>Más de 10 años de experiencia</EtiquetaCaratula>
+              {/* En celular la entrada ya lo dice; así las etiquetas caben en dos líneas como mucho. */}
+              <EtiquetaCaratula className="max-sm:hidden">Atención en toda Colombia</EtiquetaCaratula>
             </div>
-            <Ficha
-              filas={[
-                { etiqueta: "Atiende", valor: "Alejandra Muñoz Marín, abogada titular" },
-                {
-                  etiqueta: "Asuntos",
-                  // Cada separador queda pegado al área anterior: ninguna línea empieza con "·".
-                  valor: inicio.services.map((s, i, todos) => (
-                    <Fragment key={s.title}>
-                      <span className="whitespace-nowrap">{s.title}{i < todos.length - 1 ? " ·" : ""}</span>
-                      {i < todos.length - 1 ? " " : ""}
-                    </Fragment>
-                  )),
-                },
-                { etiqueta: "Modalidad", valor: "Presencial en Sabaneta con cita previa, o virtual por Teams o Zoom" },
-              ]}
-            />
+            <TituloPagina grande>{enLinea(inicio.heroTitle)}</TituloPagina>
+            <Entrada>{enLinea(inicio.heroDescription)}</Entrada>
+            {/* Invitar a escribir no es pedir los datos: el formulario queda al final, después del contexto. */}
+            <div className="mt-8 flex flex-col gap-3 sm:flex-row">
+              <a href="#consulta" className={`${clasesBoton("gold", "lg")} boton-destello`}>
+                <MessageSquareText aria-hidden="true" size={18} strokeWidth={2} />
+                {inicio.heroCta}
+              </a>
+              <Link href="/servicios" className={`${clasesBoton("ghost", "lg")} text-ink shadow-[inset_0_0_0_1px_var(--cover-line)] hover:bg-[var(--cover-chip)] hover:text-ink`}>
+                {inicio.heroSecondaryCta}
+                <ArrowRight aria-hidden="true" size={18} strokeWidth={2} />
+              </Link>
+            </div>
           </div>
         }
       >
-        <div className={`${RELLENO} grid grid-cols-[minmax(0,1fr)] gap-10 lg:grid-cols-[minmax(0,1fr)_340px] lg:gap-14`}>
-          <FormularioConsulta
-            titulo="¿Qué necesita resolver?"
-            intro="Escríbanos en pocas palabras. La firma lo lee y le responde por el medio que usted elija."
-            whatsapp={contacto.mostrar_contacto ? contacto.whatsapp : null}
-          />
-          <aside className="space-y-6 lg:border-l lg:border-line lg:pl-10">
-            <blockquote className="font-display text-[22px] leading-[1.4] text-ink">{enLinea(inicio.heroAside)}</blockquote>
-            {contacto.mostrar_contacto && contacto.correo_contacto && (
-              <p className="text-[16px] leading-[1.55] text-ink-2">
-                También puede escribirnos a{" "}
-                <a href={`mailto:${contacto.correo_contacto}`} className="text-navy underline underline-offset-4 [overflow-wrap:anywhere]">{contacto.correo_contacto}</a>
-              </p>
-            )}
-          </aside>
-        </div>
-
         <section aria-label={inicio.servicesTitle}>
         <div className={`${RELLENO} grid grid-cols-[minmax(0,1fr)] gap-8 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.9fr)] lg:gap-14`}>
           <div className="space-y-5">
             <TituloHoja>{enLinea(inicio.servicesTitle)}</TituloHoja>
-            <Link href="/areas-de-practica" className="inline-flex items-center gap-1.5 text-[16px] font-semibold text-navy underline-offset-4 hover:underline">
+            <Link href="/servicios" className="inline-flex items-center gap-1.5 text-[16px] font-semibold text-navy underline-offset-4 hover:underline">
               {inicio.servicesLink}
               <ArrowRight aria-hidden="true" size={16} strokeWidth={2} />
             </Link>
           </div>
-          <ul className="divide-y divide-line border-y border-line">
+          <ul className="revelar-lista divide-y divide-line border-y border-line">
             {inicio.services.map((servicio, i) => (
               <li key={servicio.title}>
                 <Link
-                  href={`/areas-de-practica#${areaDeIcono(servicio.icon, i).ancla}`}
-                  className="group grid grid-cols-[minmax(0,1fr)_auto] items-center gap-6 py-5 sm:py-6"
+                  href={`/servicios#${areaDeIcono(servicio.icon, i).ancla}`}
+                  className="group relative -mx-3 grid grid-cols-[minmax(0,1fr)_auto] items-center gap-6 rounded-lg px-3 py-5 transition-colors duration-200 before:absolute before:inset-y-4 before:left-0 before:w-[3px] before:origin-center before:scale-y-0 before:rounded-full before:bg-navy before:transition-transform before:duration-300 hover:bg-navy-soft hover:before:scale-y-100 sm:py-6"
                 >
                   <span>
                     <span className="block font-display text-[22px] leading-[1.25] text-ink group-hover:text-navy">{servicio.title}</span>
@@ -116,6 +91,41 @@ export default async function Inicio() {
               <ArrowRight aria-hidden="true" size={16} strokeWidth={2} />
             </Link>
           </div>
+        </div>
+        </section>
+        <section aria-labelledby="pasos" className={`${RELLENO} bg-navy-soft grid grid-cols-[minmax(0,1fr)] gap-8 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.9fr)] lg:gap-14`}>
+          <TituloHoja id="pasos">{enLinea(inicio.stepsTitle)}</TituloHoja>
+          <ol className="revelar-lista grid grid-cols-[minmax(0,1fr)] gap-x-10 gap-y-7 sm:grid-cols-2">
+            {inicio.steps.map((paso, i) => (
+              <li key={paso.title} className="group grid grid-cols-[40px_minmax(0,1fr)] gap-4">
+                <span className="folio-num flex size-10 items-center justify-center rounded-full bg-sheet text-[18px] text-navy shadow-[0_0_0_1.5px_var(--navy)] transition-colors duration-300 group-hover:bg-navy group-hover:text-on-navy">
+                  {i + 1}
+                </span>
+                <div className="pt-1.5">
+                  <h3 className="text-[18px] font-semibold text-ink">{paso.title}</h3>
+                  <p className="mt-1.5 max-w-[48ch] text-[17px] leading-[1.6] text-ink-2">{enLinea(paso.description)}</p>
+                </div>
+              </li>
+            ))}
+          </ol>
+        </section>
+
+        <section id="consulta" aria-label={inicio.formTitle} className="scroll-mt-6">
+        <div className={`${RELLENO} grid grid-cols-[minmax(0,1fr)] gap-10 lg:grid-cols-[minmax(0,1fr)_340px] lg:gap-14`}>
+          <FormularioConsulta
+            titulo={inicio.formTitle}
+            intro={inicio.formIntro}
+            whatsapp={contacto.mostrar_contacto ? contacto.whatsapp : null}
+          />
+          <aside className="space-y-6 lg:border-l lg:border-line lg:pl-10">
+            <blockquote className="font-display text-[22px] leading-[1.4] text-ink">{enLinea(inicio.heroAside)}</blockquote>
+            {contacto.mostrar_contacto && contacto.correo_contacto && (
+              <p className="text-[16px] leading-[1.55] text-ink-2">
+                También puede escribirnos a{" "}
+                <a href={`mailto:${contacto.correo_contacto}`} className="text-navy underline underline-offset-4 [overflow-wrap:anywhere]">{contacto.correo_contacto}</a>
+              </p>
+            )}
+          </aside>
         </div>
         </section>
       </Carpeta>

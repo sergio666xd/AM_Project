@@ -28,10 +28,12 @@ export type Campo =
 export type Grupo = { titulo: string; descripcion?: string; dentroDe?: string; campos: Campo[] };
 
 export const TEMAS: { valor: string; nombre: string }[] = [
-  { valor: "family", nombre: "Familia y patrimonio" },
-  { valor: "business", nombre: "Empresas" },
+  { valor: "family", nombre: "Familia y sucesiones" },
+  { valor: "civil", nombre: "Civil, contratos e inmuebles" },
+  { valor: "labor", nombre: "Laboral" },
+  { valor: "government", nombre: "Derecho público" },
+  { valor: "business", nombre: "Empresas y sociedades" },
   { valor: "building", nombre: "Propiedad horizontal" },
-  { valor: "government", nombre: "Entidades públicas" },
   { valor: "", nombre: "Otro tema" },
 ];
 
@@ -55,11 +57,20 @@ const BUSCADORES: Grupo = {
 const SECCIONES_LEGALES: Grupo[] = [
   {
     titulo: "Encabezado",
-    campos: [titulo(), texto("updatedAt", "Fecha de actualización", "Como se lee en la página, por ejemplo «27 de septiembre de 2026».")],
+    campos: [titulo(), texto("updatedAt", "Fecha de actualización", "Como se lee en la página, por ejemplo «5 de noviembre de 2026».")],
+  },
+  {
+    titulo: "Responsable de los datos",
+    descripcion: "Quién responde por los datos personales. El correo, la dirección, el teléfono y la ciudad salen de los datos de la firma.",
+    campos: [
+      { tipo: "texto", clave: "responsable", etiqueta: "Nombre del responsable", ayuda: "Persona natural o empresa.", requerido: true },
+      texto("documento", "Cédula o NIT", "Por ejemplo «cédula de ciudadanía 1.234.567» o «NIT 900.123.456-7». Si queda vacío, la frase que lo menciona no aparece."),
+    ],
   },
   {
     titulo: "Secciones",
-    descripcion: "Se numeran solas y forman el índice de la página.",
+    descripcion:
+      "Se numeran solas y forman el índice de la página. En el texto puede escribir {{responsable}}, {{documento}}, {{correo_datos}}, {{direccion}}, {{telefono}} o {{ciudad}} y se reemplazan por el dato. Lo que esté entre [[ y ]] se omite si alguno de sus datos está vacío.",
     campos: [{
       tipo: "lista", clave: "sections", etiqueta: "Secciones", singular: "sección",
       campos: [titulo("Título de la sección"), bloques("body", "Texto")],
@@ -75,21 +86,21 @@ export const GRUPOS: Record<PublicPageSlug, Grupo[]> = {
       campos: [
         { tipo: "texto", clave: "heroTitle", etiqueta: "Título", requerido: true },
         largo("heroDescription", "Texto bajo el título"),
-        largo("heroAside", "Frase junto al formulario"),
+        texto("heroCta", "Botón principal", "Lleva al formulario de la portada."),
+        texto("heroSecondaryCta", "Botón secundario", "Lleva a Servicios."),
       ],
     },
     {
       titulo: "Servicios",
       campos: [
         texto("servicesTitle", "Título de la sección"),
-        texto("servicesLink", "Texto del enlace a Áreas de práctica"),
+        texto("servicesLink", "Texto del enlace a Servicios"),
         {
           tipo: "lista", clave: "services", etiqueta: "Servicios", singular: "servicio",
-          ayuda: "También forman la línea «Asuntos» de la portada.",
           campos: [
             titulo("Nombre"),
             largo("description", "Descripción"),
-            { tipo: "tema", clave: "icon", etiqueta: "Lleva a", ayuda: "Al tocarlo se abre esta área en Áreas de práctica." },
+            { tipo: "tema", clave: "icon", etiqueta: "Lleva a", ayuda: "Al tocarlo se abre esta área en Servicios." },
           ],
           nuevo: () => ({ icon: "", title: "", description: "" }),
         },
@@ -106,6 +117,21 @@ export const GRUPOS: Record<PublicPageSlug, Grupo[]> = {
     {
       titulo: "Presentación de la firma",
       campos: [texto("aboutTitle", "Título"), largo("aboutDescription", "Texto"), texto("aboutLink", "Texto del enlace a Quiénes somos")],
+    },
+    {
+      titulo: "Qué pasa después de escribirnos",
+      campos: [
+        texto("stepsTitle", "Título de la sección"),
+        {
+          tipo: "lista", clave: "steps", etiqueta: "Pasos", singular: "paso", ayuda: "Se numeran solos, en este orden.",
+          campos: [titulo("Nombre del paso"), largo("description", "Descripción")],
+          nuevo: () => ({ title: "", description: "" }),
+        },
+      ],
+    },
+    {
+      titulo: "Formulario",
+      campos: [texto("formTitle", "Título"), largo("formIntro", "Texto bajo el título"), largo("heroAside", "Frase junto al formulario")],
     },
     BUSCADORES,
   ],
@@ -124,6 +150,25 @@ export const GRUPOS: Record<PublicPageSlug, Grupo[]> = {
         campos: [titulo("Título de la sección"), bloques("body", "Texto")],
         nuevo: () => ({ title: "", body: "" }),
       }],
+    },
+    {
+      titulo: "Nuestro equipo",
+      descripcion: "Cada abogado es una tarjeta: cerrada muestra la foto, el nombre y el título; al abrirla, el perfil, la trayectoria y la tarjeta profesional. Lo que quede vacío no se muestra.",
+      campos: [
+        texto("teamTitle", "Título del bloque"),
+        {
+          tipo: "lista", clave: "team", etiqueta: "Abogados", singular: "abogado", ayuda: "Aparecen en este orden.",
+          campos: [
+            { tipo: "texto", clave: "name", etiqueta: "Nombre", requerido: true },
+            texto("role", "Título", "Por ejemplo «Abogada» o «Abogado especialista en derecho laboral»."),
+            texto("license", "Tarjeta profesional", "Por ejemplo «T.P. 375.092»."),
+            texto("photo", "Enlace a la foto", "Foto vertical, tipo retrato. Pegue el enlace de la imagen; sin foto se muestran las iniciales."),
+            largo("profile", "Perfil profesional"),
+            bloques("experience", "Trayectoria", "Admite listas con «- » al inicio de cada línea."),
+          ],
+          nuevo: () => ({ name: "", role: "", license: "", photo: "", profile: "", experience: "" }),
+        },
+      ],
     },
     BUSCADORES,
   ],
@@ -180,8 +225,12 @@ export const GRUPOS: Record<PublicPageSlug, Grupo[]> = {
   contacto: [
     { titulo: "Encabezado", campos: [titulo(), largo("intro", "Texto bajo el título")] },
     {
+      titulo: "Formulario",
+      campos: [texto("formTitle", "Título"), largo("formIntro", "Texto bajo el título")],
+    },
+    {
       titulo: "Datos de atención",
-      descripcion: "Aparecen junto al título. El WhatsApp y el correo salen de los datos de la firma.",
+      descripcion: "Aparecen junto al formulario, cada uno con su enlace: la atención presencial abre el mapa y las demás llevan al formulario. El WhatsApp y el correo salen de los datos de la firma.",
       campos: [{
         tipo: "lista", clave: "contactOptions", etiqueta: "Datos", singular: "dato",
         campos: [titulo("Nombre del dato"), texto("description", "Texto")],

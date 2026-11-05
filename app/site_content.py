@@ -3,7 +3,7 @@
 PUBLIC_CONTENT_PAGES = {
     "inicio": "Inicio",
     "quienes-somos": "Quiénes somos",
-    "areas-de-practica": "Áreas de práctica",
+    "areas-de-practica": "Servicios",
     "filosofia": "Filosofía de trabajo",
     "contacto": "Contacto",
     "poliza-juridica": "Póliza jurídica",
@@ -15,7 +15,7 @@ PUBLIC_CONTENT_PAGES = {
 PUBLIC_PAGE_ROUTES = {
     "inicio": "/",
     "quienes-somos": "/quienes-somos",
-    "areas-de-practica": "/areas-de-practica",
+    "areas-de-practica": "/servicios",
     "filosofia": "/filosofia",
     "contacto": "/contacto",
     "poliza-juridica": "/poliza-juridica",

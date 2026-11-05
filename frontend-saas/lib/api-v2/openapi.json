@@ -24581,7 +24581,7 @@
           "Sitio público"
         ],
         "summary": "Guardar el contenido de una página",
-        "description": "La dirección de cada página es fija; `route` se ignora si llega.",
+        "description": "Publica la página y cierra el borrador. La dirección de cada página es fija; `route` se ignora si llega.",
         "operationId": "guardar_pagina_sitio",
         "parameters": [
           {
@@ -24693,6 +24693,219 @@
         ],
         "summary": "Volver al texto base de una página",
         "operationId": "restaurar_pagina_sitio",
+        "parameters": [
+          {
+            "name": "slug",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Slug"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PaginaSitioDetalle"
+                }
+              }
+            }
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Too Many Requests"
+          }
+        }
+      }
+    },
+    "/api/v2/admin/sitio/paginas/{slug}/borrador": {
+      "put": {
+        "tags": [
+          "Sitio público"
+        ],
+        "summary": "Guardar cambios de una página sin publicarlos",
+        "description": "El sitio sigue mostrando lo publicado hasta que se guarde la página con el PUT de la página.",
+        "operationId": "guardar_borrador_sitio",
+        "parameters": [
+          {
+            "name": "slug",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Slug"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CambioPaginaSitio"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PaginaSitioDetalle"
+                }
+              }
+            }
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Too Many Requests"
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Sitio público"
+        ],
+        "summary": "Descartar el borrador de una página",
+        "operationId": "descartar_borrador_sitio",
         "parameters": [
           {
             "name": "slug",
@@ -33467,6 +33680,8 @@
             "type": "string",
             "enum": [
               "familia",
+              "civil",
+              "laboral",
               "empresas",
               "propiedad_horizontal",
               "publico",
@@ -34094,6 +34309,8 @@
             "type": "string",
             "enum": [
               "familia",
+              "civil",
+              "laboral",
               "empresas",
               "propiedad_horizontal",
               "publico",
@@ -34719,6 +34936,24 @@
               }
             ],
             "title": "Actualizada Por"
+          },
+          "con_borrador": {
+            "type": "boolean",
+            "title": "Con Borrador",
+            "description": "True si hay cambios guardados sin publicar.",
+            "default": false
+          },
+          "borrador_en": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Borrador En"
           }
         },
         "type": "object",
@@ -34774,6 +35009,24 @@
             ],
             "title": "Actualizada Por"
           },
+          "con_borrador": {
+            "type": "boolean",
+            "title": "Con Borrador",
+            "description": "True si hay cambios guardados sin publicar.",
+            "default": false
+          },
+          "borrador_en": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Borrador En"
+          },
           "contenido": {
             "anyOf": [
               {
@@ -34785,7 +35038,20 @@
               }
             ],
             "title": "Contenido",
-            "description": "Lo guardado por la administración; null si usa el texto base."
+            "description": "Lo publicado por la administración; null si usa el texto base."
+          },
+          "borrador": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Borrador",
+            "description": "Cambios guardados sin publicar; null si no hay."
           }
         },
         "type": "object",
