@@ -180,11 +180,17 @@ class EjecucionRadicado(Base):
 
 
 class ContenidoPagina(Base):
-    """Structured public-page content edited by platform administrators."""
+    """Structured public-page content edited by platform administrators.
+
+    `contenido` es lo publicado (null mientras rige el texto base) y `borrador`
+    lo que la administración guardó sin publicar.
+    """
     __tablename__ = "contenido_paginas"
 
     slug = Column(String(80), primary_key=True)
-    contenido = Column(JSON, nullable=False)
+    contenido = Column(JSON, nullable=True)
+    borrador = Column(JSON, nullable=True)
+    borrador_en = Column(DateTime, nullable=True)
     actualizado_por_id = Column(Integer, ForeignKey("usuarios.id", ondelete="SET NULL"), nullable=True)
     updated_at = Column(DateTime, nullable=False, default=utc_ahora, onupdate=utc_ahora)
 

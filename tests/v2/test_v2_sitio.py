@@ -199,3 +199,45 @@ def test_contenido_de_las_paginas(cliente_http, sesion_bd, crear_usuario, inicia
     assert cliente_http.get("/api/v2/sitio/paginas/inicio").json()["contenido"] is None
     acciones = [e.accion for e in sesion_bd.query(models.EventoAuditoria).order_by(models.EventoAuditoria.id)]
     assert acciones[-2:] == ["sitio.pagina.guardada", "sitio.pagina.restaurada"]
+
+
+def test_borradores_de_las_paginas(cliente_http, sesion_bd, crear_usuario, iniciar):
+    iniciar(crear_usuario("ADMIN", nombre="Administración"))
+    publico = lambda: cliente_http.get("/api/v2/sitio/paginas/inicio").json()
+
+    # Un borrador sobre el texto base no cambia el sitio.
+    r = cliente_http.put("/api/v2/admin/sitio/paginas/inicio/borrador", json={"contenido": {"heroTitle": "Borrador"}}, headers=H)
+    assert r.status_code == 200
+    detalle = r.json()
+    assert detalle["con_borrador"] and not detalle["editada"] and detalle["borrador_en"]
+    assert detalle["borrador"] == {"heroTitle": "Borrador", "route": "/"} and detalle["contenido"] is None
+    assert publico() == {"slug": "inicio", "contenido": None, "actualizada_en": None}
+    lista = {p["slug"]: p for p in cliente_http.get("/api/v2/admin/sitio/paginas").json()}
+    assert lista["inicio"]["con_borrador"] and not lista["inicio"]["editada"]
+
+    # Publicar cierra el borrador.
+    publicada = cliente_http.put("/api/v2/admin/sitio/paginas/inicio", json={"contenido": {"heroTitle": "Publicada"}}, headers=H).json()
+    assert publicada["editada"] and not publicada["con_borrador"] and publicada["borrador"] is None
+    assert publico()["contenido"]["heroTitle"] == "Publicada"
+
+    # Un borrador sobre lo publicado tampoco cambia el sitio, y descartarlo deja lo publicado.
+    cliente_http.put("/api/v2/admin/sitio/paginas/inicio/borrador", json={"contenido": {"heroTitle": "Otro"}}, headers=H)
+    assert publico()["contenido"]["heroTitle"] == "Publicada"
+    descartado = cliente_http.delete("/api/v2/admin/sitio/paginas/inicio/borrador", headers=H).json()
+    assert descartado["borrador"] is None and descartado["contenido"]["heroTitle"] == "Publicada"
+
+    # Volver al texto base conserva un borrador pendiente.
+    cliente_http.put("/api/v2/admin/sitio/paginas/inicio/borrador", json={"contenido": {"heroTitle": "Pendiente"}}, headers=H)
+    base = cliente_http.delete("/api/v2/admin/sitio/paginas/inicio", headers=H).json()
+    assert base["contenido"] is None and base["borrador"]["heroTitle"] == "Pendiente"
+    assert publico()["contenido"] is None
+
+    # Descartar el único borrador borra la fila.
+    cliente_http.delete("/api/v2/admin/sitio/paginas/inicio/borrador", headers=H)
+    assert sesion_bd.get(models.ContenidoPagina, "inicio") is None
+
+    largo = cliente_http.put("/api/v2/admin/sitio/paginas/inicio/borrador", json={"contenido": {"heroTitle": "x" * 260_000}}, headers=H)
+    assert largo.status_code == 422
+    assert cliente_http.put("/api/v2/admin/sitio/paginas/no-existe/borrador", json={"contenido": {}}, headers=H).status_code == 404
+    actividad = cliente_http.get("/api/v2/admin/actividad").json()["items"]
+    assert actividad[0]["frase"] == "descartó el borrador de una página del sitio web"

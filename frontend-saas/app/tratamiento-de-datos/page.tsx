@@ -16,7 +16,7 @@ export default async function TratamientoDatos() {
       titulo={contenido.title}
       actualizada={contenido.updatedAt}
       secciones={contenido.sections}
-      valores={valoresPolitica(contacto)}
+      valores={valoresPolitica(contacto, { responsable: contenido.responsable, documento: contenido.documento })}
       otro={{ href: "/politica-de-privacidad", label: "Política de privacidad" }}
     />
   );

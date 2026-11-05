@@ -87,7 +87,7 @@ function TarjetaEquipo({ persona }: { persona: Persona }) {
   const cabeza = (
     <>
       <div className="caratula-azul relative aspect-[4/5] w-full max-w-full overflow-hidden">
-        {persona.photo ? (
+        {/^(https:\/\/|\/(?!\/))/.test(persona.photo) ? (
           // eslint-disable-next-line @next/next/no-img-element
           <img src={persona.photo} alt="" className="absolute inset-0 size-full object-cover transition-transform duration-500 group-hover/tarjeta:scale-[1.04]" />
         ) : (

@@ -3,23 +3,17 @@ import type { ContactoFirma } from "@/lib/sitioPublico";
 /**
  * Responsable del tratamiento de datos que nombran las políticas del sitio.
  * Mientras la firma no tenga personería jurídica responde una persona natural.
- *
- * PROTOTIPO: estos valores aún no se guardan en la base. Cuando se diseñe el
- * almacenamiento pasan a la configuración de la firma y se editan en el admin.
+ * El nombre y el documento se editan en cada política (Contenido del sitio);
+ * el correo, la dirección, el teléfono y la ciudad salen de los datos de la firma.
  */
 export type DatosResponsable = {
   responsable: string;
   documento: string;
 };
 
-export const RESPONSABLE_BASE: DatosResponsable = {
-  responsable: "Yeinny Alejandra Muñoz Marín",
-  documento: "",
-};
-
 type Valores = Record<string, string | null | undefined>;
 
-export function valoresPolitica(contacto: ContactoFirma, datos: DatosResponsable = RESPONSABLE_BASE): Valores {
+export function valoresPolitica(contacto: ContactoFirma, datos: DatosResponsable): Valores {
   return {
     responsable: datos.responsable,
     documento: datos.documento,

@@ -448,6 +448,8 @@ export const SITE_PAGE_DEFAULTS = {
     },
     "title": "Política de privacidad",
     "updatedAt": "5 de noviembre de 2026",
+    "responsable": "Yeinny Alejandra Muñoz Marín",
+    "documento": "",
     "sections": [
       {
         "title": "Quién responde por sus datos",
@@ -506,6 +508,8 @@ export const SITE_PAGE_DEFAULTS = {
     },
     "title": "Política de tratamiento de datos personales",
     "updatedAt": "5 de noviembre de 2026",
+    "responsable": "Yeinny Alejandra Muñoz Marín",
+    "documento": "",
     "sections": [
       {
         "title": "Responsable del tratamiento",

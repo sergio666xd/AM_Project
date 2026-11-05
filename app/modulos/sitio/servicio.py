@@ -81,7 +81,9 @@ class ServicioSitio:
         if slug not in PUBLIC_CONTENT_PAGES:
             raise NoEncontrado("Esa página no existe.", codigo="pagina_no_existe")
         pagina = self._repo.pagina(slug)
-        return PaginaPublica(slug=slug, contenido=_contenido(pagina), actualizada_en=pagina.updated_at if pagina else None)
+        contenido = _contenido(pagina)
+        # Un borrador no se ve en el sitio: sin contenido publicado rige el texto base.
+        return PaginaPublica(slug=slug, contenido=contenido, actualizada_en=pagina.updated_at if pagina and contenido else None)
 
     def recibir(self, datos: NuevoMensajeSitio, *, ip: str) -> tuple[MensajeSitioRecibido, int | None]:
         """Guarda el mensaje y devuelve su id para que los correos salgan en segundo plano."""
@@ -182,57 +184,107 @@ class ServicioSitio:
 
     def pagina_admin(self, usuario: Usuario, slug: str) -> PaginaSitioDetalle:
         exigir_admin(usuario)
-        if slug not in PUBLIC_CONTENT_PAGES:
-            raise NoEncontrado("Esa página no existe.", codigo="pagina_no_existe")
+        self._exigir_slug(slug)
         pagina, nombre = self._repo.paginas_editadas().get(slug, (None, None))
         base = _pagina_sitio(slug, pagina, nombre)
-        return PaginaSitioDetalle(**base.model_dump(), contenido=_contenido(pagina))
+        return PaginaSitioDetalle(
+            **base.model_dump(), contenido=_contenido(pagina),
+            borrador=_json(pagina.borrador) if pagina else None,
+        )
 
     def guardar_pagina(self, usuario: Usuario, slug: str, datos: CambioPaginaSitio) -> PaginaSitioDetalle:
+        """Publica la página. Lo que hubiera en borrador queda publicado y el borrador se cierra."""
         exigir_admin(usuario)
-        if slug not in PUBLIC_CONTENT_PAGES:
-            raise NoEncontrado("Esa página no existe.", codigo="pagina_no_existe")
-        # Las direcciones del sitio son fijas: cada página vive en su archivo de Next.
-        contenido = {**datos.contenido, "route": PUBLIC_PAGE_ROUTES[slug]}
-        if len(json.dumps(contenido, ensure_ascii=False)) > MAX_CONTENIDO:
-            raise DatosInvalidos("La página es demasiado larga para guardarla.",
-                                 campos={"contenido": "Acorte los textos más largos e intente de nuevo."})
-        pagina = self._repo.pagina(slug)
-        if pagina is None:
-            pagina = models.ContenidoPagina(slug=slug, contenido=contenido)
-            self._db.add(pagina)
-        else:
-            pagina.contenido = contenido
-        pagina.actualizado_por_id = usuario.id
+        self._exigir_slug(slug)
+        pagina = self._fila(slug, usuario)
+        pagina.contenido = _preparar(slug, datos)
+        pagina.borrador = None
+        pagina.borrador_en = None
         registrar_evento_auditoria(self._db, usuario, "sitio.pagina.guardada", "pagina_publica", slug)
         self._db.commit()
         return self.pagina_admin(usuario, slug)
 
-    def restaurar_pagina(self, usuario: Usuario, slug: str) -> PaginaSitioDetalle:
+    def guardar_borrador(self, usuario: Usuario, slug: str, datos: CambioPaginaSitio) -> PaginaSitioDetalle:
+        """Guarda los cambios sin publicarlos: el sitio sigue mostrando lo publicado."""
         exigir_admin(usuario)
-        if slug not in PUBLIC_CONTENT_PAGES:
-            raise NoEncontrado("Esa página no existe.", codigo="pagina_no_existe")
+        self._exigir_slug(slug)
+        pagina = self._fila(slug, usuario)
+        pagina.borrador = _preparar(slug, datos)
+        pagina.borrador_en = utc_ahora()
+        registrar_evento_auditoria(self._db, usuario, "sitio.pagina.borrador", "pagina_publica", slug)
+        self._db.commit()
+        return self.pagina_admin(usuario, slug)
+
+    def descartar_borrador(self, usuario: Usuario, slug: str) -> PaginaSitioDetalle:
+        exigir_admin(usuario)
+        self._exigir_slug(slug)
         pagina = self._repo.pagina(slug)
-        if pagina is not None:
-            self._db.delete(pagina)
+        if pagina is not None and pagina.borrador is not None:
+            if pagina.contenido is None:
+                self._db.delete(pagina)
+            else:
+                pagina.borrador = None
+                pagina.borrador_en = None
+            registrar_evento_auditoria(self._db, usuario, "sitio.pagina.borrador_descartado", "pagina_publica", slug)
+            self._db.commit()
+        return self.pagina_admin(usuario, slug)
+
+    def restaurar_pagina(self, usuario: Usuario, slug: str) -> PaginaSitioDetalle:
+        """Vuelve al texto base. Un borrador pendiente se conserva."""
+        exigir_admin(usuario)
+        self._exigir_slug(slug)
+        pagina = self._repo.pagina(slug)
+        if pagina is not None and pagina.contenido is not None:
+            if pagina.borrador is None:
+                self._db.delete(pagina)
+            else:
+                pagina.contenido = None
             registrar_evento_auditoria(self._db, usuario, "sitio.pagina.restaurada", "pagina_publica", slug)
             self._db.commit()
         return self.pagina_admin(usuario, slug)
 
+    @staticmethod
+    def _exigir_slug(slug: str) -> None:
+        if slug not in PUBLIC_CONTENT_PAGES:
+            raise NoEncontrado("Esa página no existe.", codigo="pagina_no_existe")
 
-def _contenido(pagina: models.ContenidoPagina | None) -> dict | None:
-    contenido = pagina.contenido if pagina else None
-    if isinstance(contenido, str):
+    def _fila(self, slug: str, usuario: Usuario) -> models.ContenidoPagina:
+        pagina = self._repo.pagina(slug)
+        if pagina is None:
+            pagina = models.ContenidoPagina(slug=slug)
+            self._db.add(pagina)
+        pagina.actualizado_por_id = usuario.id
+        return pagina
+
+
+def _preparar(slug: str, datos: CambioPaginaSitio) -> dict:
+    # Las direcciones del sitio son fijas: cada página vive en su archivo de Next.
+    contenido = {**datos.contenido, "route": PUBLIC_PAGE_ROUTES[slug]}
+    if len(json.dumps(contenido, ensure_ascii=False)) > MAX_CONTENIDO:
+        raise DatosInvalidos("La página es demasiado larga para guardarla.",
+                             campos={"contenido": "Acorte los textos más largos e intente de nuevo."})
+    return contenido
+
+
+def _json(valor) -> dict | None:
+    if isinstance(valor, str):
         # Filas guardadas como texto JSON en vez de objeto: se leen igual.
         try:
-            contenido = json.loads(contenido)
+            valor = json.loads(valor)
         except ValueError:
             return None
-    return contenido if isinstance(contenido, dict) else None
+    return valor if isinstance(valor, dict) else None
+
+
+def _contenido(pagina: models.ContenidoPagina | None) -> dict | None:
+    return _json(pagina.contenido) if pagina else None
 
 
 def _pagina_sitio(slug: str, pagina: models.ContenidoPagina | None, nombre: str | None) -> PaginaSitio:
     return PaginaSitio(
-        slug=slug, nombre=PUBLIC_CONTENT_PAGES[slug], ruta=PUBLIC_PAGE_ROUTES[slug], editada=pagina is not None,
+        slug=slug, nombre=PUBLIC_CONTENT_PAGES[slug], ruta=PUBLIC_PAGE_ROUTES[slug],
+        editada=pagina is not None and pagina.contenido is not None,
         actualizada_en=pagina.updated_at if pagina else None, actualizada_por=nombre,
+        con_borrador=pagina is not None and pagina.borrador is not None,
+        borrador_en=pagina.borrador_en if pagina else None,
     )

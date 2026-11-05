@@ -1,6 +1,7 @@
 import { cache } from "react";
 import { connection } from "next/server";
 import { API_URL } from "@/lib/api";
+import { contenidoVigente } from "@/lib/esquemaSitio";
 import { mezclarContenido } from "@/lib/mezclarContenido";
 import type { PublicPageSlug } from "@/lib/sitePageDefaults";
 
@@ -65,7 +66,7 @@ const leer = cache(async function leer<T>(ruta: string): Promise<T | null> {
 
 export async function cargarPagina<T>(slug: PublicPageSlug, base: T): Promise<T> {
   const pagina = await leer<{ contenido: unknown }>(`/sitio/paginas/${encodeURIComponent(slug)}`);
-  return mezclarContenido(base, pagina?.contenido ?? null);
+  return mezclarContenido(base, contenidoVigente(pagina?.contenido));
 }
 
 export async function cargarContacto(): Promise<ContactoFirma> {

@@ -16,7 +16,7 @@ export default async function PoliticaPrivacidad() {
       titulo={contenido.title}
       actualizada={contenido.updatedAt}
       secciones={contenido.sections}
-      valores={valoresPolitica(contacto)}
+      valores={valoresPolitica(contacto, { responsable: contenido.responsable, documento: contenido.documento })}
       otro={{ href: "/tratamiento-de-datos", label: "Política de tratamiento de datos personales" }}
     />
   );

@@ -122,10 +122,13 @@ class PaginaSitio(BaseModel):
     editada: bool = Field(description="False mientras la página use su texto base.")
     actualizada_en: FechaHora | None
     actualizada_por: str | None
+    con_borrador: bool = Field(False, description="True si hay cambios guardados sin publicar.")
+    borrador_en: FechaHora | None = None
 
 
 class PaginaSitioDetalle(PaginaSitio):
-    contenido: dict[str, Any] | None = Field(description="Lo guardado por la administración; null si usa el texto base.")
+    contenido: dict[str, Any] | None = Field(description="Lo publicado por la administración; null si usa el texto base.")
+    borrador: dict[str, Any] | None = Field(None, description="Cambios guardados sin publicar; null si no hay.")
 
 
 class CambioPaginaSitio(BaseModel):

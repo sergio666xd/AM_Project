@@ -15,6 +15,8 @@ FRASES = {
     "sitio.mensaje.nota": "anotó un mensaje del sitio web",
     "sitio.pagina.guardada": "editó una página del sitio web",
     "sitio.pagina.restaurada": "devolvió una página del sitio web a su texto base",
+    "sitio.pagina.borrador": "guardó un borrador de una página del sitio web",
+    "sitio.pagina.borrador_descartado": "descartó el borrador de una página del sitio web",
     "abogado.crear": "creó la cuenta de un abogado",
     "admin.usuario.crear": "creó una cuenta",
     "admin.usuario.actualizar": "editó una cuenta",
