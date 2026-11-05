@@ -321,7 +321,8 @@ class ServicioFinanzas:
     @staticmethod
     def _snapshot_cliente(cliente: Usuario) -> dict:
         return {"id": cliente.id, "nombre": cliente.nombre_completo, "email": cliente.email,
-                "documento": cliente.numero_documento, "direccion": cliente.direccion, "domicilio": cliente.domicilio}
+                "documento": cliente.numero_documento, "telefono": cliente.whatsapp_numero,
+                "direccion": cliente.direccion, "domicilio": cliente.domicilio}
 
     @staticmethod
     def _snapshot_abogado(abogado: Usuario) -> dict:
