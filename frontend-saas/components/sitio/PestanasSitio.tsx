@@ -42,8 +42,8 @@ export function PestanasSitio({ actual }: { actual: SeccionSitio | null }) {
               className={cx(
                 "relative flex min-h-12 shrink-0 items-center rounded-t-lg px-4 text-[15px] font-semibold transition-colors duration-150 sm:min-h-11",
                 activa
-                  ? "bg-sheet text-ink"
-                  : "text-ink-2 hover:bg-[color-mix(in_srgb,var(--sheet)_50%,transparent)] hover:text-ink",
+                  ? "tinta-hoja bg-sheet text-ink"
+                  : "text-ink-2 hover:bg-[var(--cover-chip)] hover:text-ink",
               )}
             >
               {activa && <span aria-hidden="true" className="absolute inset-x-3 top-0 h-[2px] rounded-b bg-gold" />}

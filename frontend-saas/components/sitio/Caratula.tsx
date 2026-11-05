@@ -8,7 +8,7 @@ export function Columna({ children, className }: { children: ReactNode; classNam
 }
 
 /**
- * La carpeta de la firma: carátula manila arriba, pestañas en su canto
+ * La carpeta de la firma: carátula azul arriba, pestañas en su canto
  * inferior y la hoja blanca unida debajo. La pestaña de la sección actual es
  * parte de esa hoja (canto dorado), así cada página se lee como otra sección
  * del mismo expediente.
@@ -26,7 +26,7 @@ export function Carpeta({
 }) {
   return (
     <Columna className="pt-5 sm:pt-8">
-      <div className="rounded-t-xl bg-manila">
+      <div className="caratula-azul rounded-t-xl">
         <div className="px-5 pt-5 pb-6 sm:px-8 sm:pt-8 sm:pb-9 lg:px-10 lg:pt-10">{caratula}</div>
         <PestanasSitio actual={actual} />
       </div>
@@ -65,7 +65,7 @@ export function Entrada({ children }: { children: ReactNode }) {
 /** Título de una hoja. */
 export function TituloHoja({ children, id, className }: { children: ReactNode; id?: string; className?: string }) {
   return (
-    <h2 id={id} className={cx("max-w-[30ch] font-display text-[26px] font-normal leading-[1.2] text-ink sm:text-[30px]", className)}>
+    <h2 id={id} className={cx("max-w-[30ch] font-display text-[26px] font-normal leading-[1.2] text-navy sm:text-[30px]", className)}>
       {children}
     </h2>
   );

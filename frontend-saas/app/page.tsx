@@ -2,7 +2,7 @@ import Link from "next/link";
 import { ArrowRight } from "lucide-react";
 import { clasesBoton } from "@/components/ui/Button";
 import { areaDeIcono } from "@/components/sitio/areas";
-import { Carpeta, Entrada, Ficha, RELLENO, TituloHoja, TituloPagina } from "@/components/sitio/Caratula";
+import { Carpeta, Entrada, RELLENO, TituloHoja, TituloPagina } from "@/components/sitio/Caratula";
 import { EtiquetaCaratula } from "@/components/sitio/Etiqueta";
 import { FormularioConsulta } from "@/components/sitio/FormularioConsulta";
 import { MarcoSitio } from "@/components/sitio/MarcoSitio";
@@ -22,22 +22,22 @@ export default async function Inicio() {
       <Carpeta
         actual="consulta"
         caratula={
-          <div className="grid grid-cols-[minmax(0,1fr)] gap-9 lg:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)] lg:items-start lg:gap-14">
-            <div>
-              <div className="mb-5 flex flex-wrap gap-2">
-                {contacto.ciudad && <EtiquetaCaratula>{contacto.ciudad}</EtiquetaCaratula>}
-                {/* En celular la entrada ya lo dice; así las etiquetas caben en una línea. */}
-                <EtiquetaCaratula className="max-sm:hidden">Atención en toda Colombia</EtiquetaCaratula>
-              </div>
-              <TituloPagina grande>{enLinea(inicio.heroTitle)}</TituloPagina>
-              <Entrada>{enLinea(inicio.heroDescription)}</Entrada>
-              {/* Invitar a escribir no es pedir los datos: el formulario queda al final, después del contexto. */}
-              <div className="mt-7 flex flex-col gap-3 sm:flex-row">
-                <a href="#consulta" className={clasesBoton("primary", "lg")}>{inicio.heroCta}</a>
-                <Link href="/servicios" className={clasesBoton("secondary", "lg")}>{inicio.heroSecondaryCta}</Link>
-              </div>
+          <div className="max-w-[860px] pb-2 sm:pb-4 lg:pt-4">
+            <div className="mb-6 flex flex-wrap gap-2">
+              {contacto.ciudad && <EtiquetaCaratula>{contacto.ciudad}</EtiquetaCaratula>}
+              <EtiquetaCaratula>Más de 10 años de experiencia</EtiquetaCaratula>
+              {/* En celular la entrada ya lo dice; así las etiquetas caben en dos líneas como mucho. */}
+              <EtiquetaCaratula className="max-sm:hidden">Atención en toda Colombia</EtiquetaCaratula>
             </div>
-            <Ficha filas={inicio.trust.map((fila) => ({ etiqueta: fila.label, valor: enLinea(fila.value) }))} />
+            <TituloPagina grande>{enLinea(inicio.heroTitle)}</TituloPagina>
+            <Entrada>{enLinea(inicio.heroDescription)}</Entrada>
+            {/* Invitar a escribir no es pedir los datos: el formulario queda al final, después del contexto. */}
+            <div className="mt-8 flex flex-col gap-3 sm:flex-row">
+              <a href="#consulta" className={clasesBoton("gold", "lg")}>{inicio.heroCta}</a>
+              <Link href="/servicios" className={`${clasesBoton("ghost", "lg")} text-ink shadow-[inset_0_0_0_1px_var(--cover-line)] hover:bg-[var(--cover-chip)] hover:text-ink`}>
+                {inicio.heroSecondaryCta}
+              </Link>
+            </div>
           </div>
         }
       >
@@ -90,7 +90,7 @@ export default async function Inicio() {
           </div>
         </div>
         </section>
-        <section aria-labelledby="pasos" className={`${RELLENO} grid grid-cols-[minmax(0,1fr)] gap-8 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.9fr)] lg:gap-14`}>
+        <section aria-labelledby="pasos" className={`${RELLENO} bg-navy-soft grid grid-cols-[minmax(0,1fr)] gap-8 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.9fr)] lg:gap-14`}>
           <TituloHoja id="pasos">{enLinea(inicio.stepsTitle)}</TituloHoja>
           <ol className="grid grid-cols-[minmax(0,1fr)] gap-x-10 gap-y-7 sm:grid-cols-2">
             {inicio.steps.map((paso, i) => (

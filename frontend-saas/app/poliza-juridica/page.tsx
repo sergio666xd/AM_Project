@@ -29,7 +29,7 @@ export default async function PolizaJuridica() {
               <TituloPagina>{enLinea(contenido.title)}</TituloPagina>
               <Entrada>{enLinea(contenido.intro)}</Entrada>
             </div>
-            <div className="self-end rounded-lg bg-[color-mix(in_srgb,var(--sheet)_55%,transparent)] p-5 sm:p-6">
+            <div className="self-end rounded-lg bg-[var(--cover-chip)] shadow-[inset_0_0_0_1px_var(--cover-line)] p-5 sm:p-6">
               <h2 className="font-display text-[22px] leading-[1.3] text-ink">{enLinea(contenido.asideTitle)}</h2>
               <p className="mt-2 text-[16px] leading-[1.6] text-ink-2">{enLinea(contenido.asideDescription)}</p>
             </div>

@@ -274,6 +274,56 @@
   --shadow-pop: 0 2px 6px rgb(0 0 0 / 0.35), 0 16px 40px -12px rgb(0 0 0 / 0.6);
 }
 
+/* ── Sitio público: carátula azul ──
+   El sitio lleva el azul del logo en la carátula de cada página. Dentro de
+   ella los tokens de tinta pasan a claros, así los componentes que ya usan
+   text-ink, text-ink-2 o text-navy se leen sobre el azul sin cambiarlos. */
+:root {
+  --cover: #002060;
+  --cover-2: #0d3279;
+  --on-cover: #f6f3ea;
+  --on-cover-2: #c6cfe5;
+  --cover-line: rgb(255 255 255 / 0.18);
+  --cover-chip: rgb(255 255 255 / 0.1);
+  --cover-accent: #e3d29a;
+  --sheet-ink: #18203a;
+}
+
+.dark {
+  --cover: #11204a;
+  --cover-2: #1b2f63;
+  --on-cover: #ece8dc;
+  --on-cover-2: #b3bdd8;
+  --cover-line: rgb(255 255 255 / 0.14);
+  --cover-chip: rgb(255 255 255 / 0.08);
+  --cover-accent: #dcc78a;
+  --sheet-ink: #ece8dc;
+}
+
+/* El fondo del sitio toma un gris azulado en lugar del manila de la app. */
+:root:not(.dark) .sitio-publico {
+  --ground: #eaeef6;
+  --manila: #e1e7f2;
+  --line: #dde3ee;
+  --line-strong: #c3ccdc;
+  --sheet-2: #f6f8fc;
+}
+
+.caratula-azul {
+  background: radial-gradient(120% 160% at 100% 0%, var(--cover-2) 0%, var(--cover) 58%);
+  color: var(--on-cover);
+  --ink: var(--on-cover);
+  --ink-2: var(--on-cover-2);
+  --ink-3: var(--on-cover-2);
+  --manila-line: var(--cover-line);
+  --navy: var(--cover-accent);
+}
+
+/* La pestaña activa es parte de la hoja blanca: vuelve a la tinta de la hoja. */
+.caratula-azul .tinta-hoja {
+  --ink: var(--sheet-ink);
+}
+
 /* Las pantallas de la app (todo lo que cuelga de /gestion-procesos marca
    [data-app] en su layout) toman el expediente foliado también en los tokens
    heredados, así las ~95 pantallas cambian de una vez. El sitio público

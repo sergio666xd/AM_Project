@@ -104,12 +104,11 @@ export const SITE_PAGE_DEFAULTS = {
       }
     ],
     teamTitle: "Nuestro equipo",
-    teamIntro: "Según el asunto, cada caso lo atiende el abogado o el grupo de abogados del equipo con la experiencia que requiere.",
     team: [
       {
         name: "Yeinny Alejandra Muñoz Marín",
         role: "Abogada",
-        license: "T.P. 375.092 del C.S. de la J.",
+        license: "T.P. 375.092",
         photo: "",
         profile: "",
         experience: ""

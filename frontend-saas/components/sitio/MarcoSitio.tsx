@@ -24,7 +24,7 @@ const ENLACES_LEGALES = [
 
 /**
  * Marco de todas las páginas públicas: encabezado blanco con el logo y el
- * acceso al portal de clientes, el escritorio manila y el pie azul.
+ * acceso al portal de clientes, el fondo gris azulado y el pie azul.
  * La administración tiene su propia dirección y no se enlaza desde aquí.
  */
 export async function MarcoSitio({ children }: { children: ReactNode }) {
@@ -32,7 +32,7 @@ export async function MarcoSitio({ children }: { children: ReactNode }) {
   const visible = contacto.mostrar_contacto;
 
   return (
-    <div data-app className="flex min-h-dvh flex-col bg-ground text-ink lectura">
+    <div data-app className="sitio-publico flex min-h-dvh flex-col bg-ground text-ink lectura">
       <JsonLd />
       <a href="#contenido" className="sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-4 focus:z-50 focus:rounded-md focus:bg-sheet focus:px-3 focus:py-2 focus:shadow-pop">
         Ir al contenido

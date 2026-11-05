@@ -1,6 +1,6 @@
 import Link from "next/link";
-import { ArrowRight } from "lucide-react";
-import { Carpeta, Ficha, RELLENO, TituloHoja, TituloPagina } from "@/components/sitio/Caratula";
+import { ArrowRight, ChevronDown } from "lucide-react";
+import { Carpeta, Columna, Ficha, RELLENO, TituloHoja, TituloPagina } from "@/components/sitio/Caratula";
 import { MarcoSitio } from "@/components/sitio/MarcoSitio";
 import { Texto, enLinea } from "@/components/sitio/Texto";
 import { generatePublicPageMetadata } from "@/lib/pageSeo";
@@ -57,46 +57,84 @@ export default async function QuienesSomos() {
               </div>
             </section>
           ))}
-          {contenido.team.length > 0 && (
-            <section aria-labelledby="equipo" className={RELLENO}>
-              <div className="grid grid-cols-[minmax(0,1fr)] gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.9fr)] lg:gap-14">
-                <div className="space-y-3">
-                  <TituloHoja id="equipo">{enLinea(contenido.teamTitle)}</TituloHoja>
-                  <p className="max-w-[44ch] text-[17px] leading-[1.6] text-ink-2">{enLinea(contenido.teamIntro)}</p>
-                </div>
-                <ul className="grid grid-cols-[minmax(0,1fr)] gap-6 sm:grid-cols-2">
-                  {contenido.team.map((persona) => <TarjetaEquipo key={persona.name} persona={persona} />)}
-                </ul>
-              </div>
-            </section>
-          )}
         </div>
       </Carpeta>
+
+      {/* El equipo va en su propio bloque, fuera de la hoja: solo el título y las tarjetas. */}
+      {contenido.team.length > 0 && (
+        <Columna className="mt-10 sm:mt-14">
+          <section aria-labelledby="equipo">
+            <TituloHoja id="equipo">{enLinea(contenido.teamTitle)}</TituloHoja>
+            <ul className="mt-6 grid grid-cols-[minmax(0,1fr)] items-start gap-5 sm:grid-cols-2 lg:grid-cols-3">
+              {contenido.team.map((persona) => <TarjetaEquipo key={persona.name} persona={persona} />)}
+            </ul>
+          </section>
+        </Columna>
+      )}
     </MarcoSitio>
   );
 }
 
 type Persona = { name: string; role: string; license: string; photo: string; profile: string; experience: string };
 
-/** Ficha de una persona del equipo. Lo que la administración deja vacío no se muestra. */
+/**
+ * Tarjeta de una persona del equipo. Cerrada muestra la foto, el nombre y el
+ * título; al abrirla, el perfil, la trayectoria y la tarjeta profesional.
+ * Lo que la administración deja vacío no se muestra.
+ */
 function TarjetaEquipo({ persona }: { persona: Persona }) {
-  const iniciales = persona.name.split(/\s+/).filter(Boolean).slice(0, 3).map((p) => p[0]).join("");
-  return (
-    <li className="rounded-lg border border-line bg-sheet p-5">
-      <div className="flex items-center gap-4">
+  const iniciales = persona.name.split(/\s+/).filter(Boolean).slice(0, 2).map((p) => p[0]).join("");
+  const hayDetalle = Boolean(persona.profile || persona.experience || persona.license);
+  const cabeza = (
+    <>
+      <div className="caratula-azul relative aspect-[4/3] w-full max-w-full overflow-hidden">
         {persona.photo ? (
           // eslint-disable-next-line @next/next/no-img-element
-          <img src={persona.photo} alt="" className="size-16 shrink-0 rounded-full object-cover" />
+          <img src={persona.photo} alt="" className="absolute inset-0 size-full object-cover" />
         ) : (
-          <span aria-hidden="true" className="flex size-16 shrink-0 items-center justify-center rounded-full bg-manila font-display text-[20px] text-ink-2">{iniciales}</span>
+          <span aria-hidden="true" className="absolute inset-0 flex items-center justify-center font-display text-[56px] text-[var(--on-cover-2)]">{iniciales}</span>
         )}
-        <div className="min-w-0">
-          <h3 className="font-display text-[20px] leading-[1.25] text-ink">{persona.name}</h3>
-          <p className="mt-1 text-[15px] text-ink-2">{[persona.role, persona.license].filter(Boolean).join(" · ")}</p>
-        </div>
       </div>
-      {persona.profile && <p className="mt-4 text-[16px] leading-[1.6] text-ink-2">{enLinea(persona.profile)}</p>}
-      {persona.experience && <Texto valor={persona.experience} className="mt-3 text-[16px]" />}
+      <div className="flex items-end justify-between gap-4 px-5 py-4">
+        <div className="min-w-0">
+          <h3 className="font-display text-[21px] leading-[1.25] text-ink">{persona.name}</h3>
+          {persona.role && <p className="mt-1 text-[15px] font-semibold text-navy">{persona.role}</p>}
+        </div>
+        {hayDetalle && (
+          <span className="flex shrink-0 items-center gap-1 text-[14px] font-semibold text-ink-2">
+            <span className="group-open:hidden">Ver perfil</span>
+            <span className="hidden group-open:inline">Cerrar</span>
+            <ChevronDown aria-hidden="true" size={18} strokeWidth={2} className="transition-transform duration-200 group-open:rotate-180" />
+          </span>
+        )}
+      </div>
+    </>
+  );
+
+  return (
+    <li className="overflow-hidden rounded-xl bg-sheet shadow-sheet">
+      {hayDetalle ? (
+        <details className="group">
+          <summary className="cursor-pointer list-none [&::-webkit-details-marker]:hidden">{cabeza}</summary>
+          <div className="space-y-4 border-t border-line px-5 pt-4 pb-5">
+            {persona.profile && (
+              <div>
+                <h4 className="text-[14px] font-semibold text-ink-2">Perfil profesional</h4>
+                <p className="mt-1.5 text-[16px] leading-[1.6] text-ink">{enLinea(persona.profile)}</p>
+              </div>
+            )}
+            {persona.experience && (
+              <div>
+                <h4 className="text-[14px] font-semibold text-ink-2">Trayectoria</h4>
+                <Texto valor={persona.experience} className="mt-1.5 text-[16px]" />
+              </div>
+            )}
+            {persona.license && <p className="folio-num text-[15px] text-ink-2">{persona.license}</p>}
+          </div>
+        </details>
+      ) : (
+        cabeza
+      )}
     </li>
   );
 }
