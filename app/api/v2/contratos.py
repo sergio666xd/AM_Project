@@ -10,6 +10,12 @@ from app.api.v2.dependencias import servicio_contratos
 from app.document_validation import MAX_DOCUMENT_BYTES
 from app.modulos.contratos.esquemas import (
     CambiosContrato,
+    CambiosDatosContrato,
+    ContextoContrato,
+    PlantillasDeContrato,
+    NuevoContratoPlantilla,
+    PlantillaDeContrato,
+    PlantillaContratoEntrada,
     ContratoCargado,
     ContratoDetalle,
     ContratosDelProceso,
@@ -99,6 +105,104 @@ def vista_previa_contrato(
 ):
     """El PDF con los datos del formulario, sin guardarlos. Exige los datos completos."""
     return _pdf(servicio.vista_previa(usuario, proceso_id, datos), "contrato-vista-previa.pdf")
+
+
+# ---- Plantillas de contrato ----------------------------------------------------------
+
+
+@router.get("/plantillas", response_model=PlantillasDeContrato, summary="Plantillas de contrato")
+def listar_plantillas_contrato(
+    usuario: models.Usuario = Depends(usuario_actual),
+    servicio: ServicioContratos = Depends(servicio_contratos),
+):
+    """Las plantillas vigentes, con cuántos contratos se han hecho con cada una."""
+    return servicio.plantillas(usuario)
+
+
+@router.post("/plantillas", response_model=PlantillaDeContrato, status_code=status.HTTP_201_CREATED, summary="Crear una plantilla")
+def crear_plantilla_contrato(
+    entrada: PlantillaContratoEntrada,
+    usuario: models.Usuario = Depends(usuario_actual),
+    servicio: ServicioContratos = Depends(servicio_contratos),
+):
+    """No se guarda si el texto usa códigos que no existen o listas mal cerradas."""
+    return servicio.crear_plantilla(usuario, entrada)
+
+
+@router.put("/plantillas/{plantilla_id}", response_model=PlantillaDeContrato, summary="Cambiar una plantilla")
+def editar_plantilla_contrato(
+    plantilla_id: int,
+    entrada: PlantillaContratoEntrada,
+    usuario: models.Usuario = Depends(usuario_actual),
+    servicio: ServicioContratos = Depends(servicio_contratos),
+):
+    """Los contratos ya hechos con ella no cambian: guardan su propia copia."""
+    return servicio.editar_plantilla(usuario, plantilla_id, entrada)
+
+
+@router.post("/plantillas/{plantilla_id}/duplicar", response_model=PlantillaDeContrato, status_code=status.HTTP_201_CREATED,
+             summary="Duplicar una plantilla")
+def duplicar_plantilla_contrato(
+    plantilla_id: int,
+    usuario: models.Usuario = Depends(usuario_actual),
+    servicio: ServicioContratos = Depends(servicio_contratos),
+):
+    return servicio.duplicar_plantilla(usuario, plantilla_id)
+
+
+@router.delete("/plantillas/{plantilla_id}", status_code=status.HTTP_204_NO_CONTENT, summary="Eliminar una plantilla")
+def eliminar_plantilla_contrato(
+    plantilla_id: int,
+    usuario: models.Usuario = Depends(usuario_actual),
+    servicio: ServicioContratos = Depends(servicio_contratos),
+):
+    """Deja de ofrecerse para contratos nuevos; los contratos hechos con ella conservan su copia."""
+    servicio.eliminar_plantilla(usuario, plantilla_id)
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+@router.get("/proceso/{proceso_id}/contexto", response_model=ContextoContrato, summary="Datos para un contrato con plantilla")
+def contexto_contrato(
+    proceso_id: int,
+    usuario: models.Usuario = Depends(usuario_actual),
+    servicio: ServicioContratos = Depends(servicio_contratos),
+):
+    """Los datos fijos (proceso, abogado responsable, fecha) y los clientes del proceso con su perfil."""
+    return servicio.contexto(usuario, proceso_id)
+
+
+@router.post("/proceso/{proceso_id}/con-plantilla", response_model=ContratoDetalle, status_code=status.HTTP_201_CREATED,
+             summary="Crear un contrato con plantilla")
+def crear_contrato_con_plantilla(
+    proceso_id: int,
+    entrada: NuevoContratoPlantilla,
+    usuario: models.Usuario = Depends(usuario_actual),
+    servicio: ServicioContratos = Depends(servicio_contratos),
+):
+    """Queda en borrador con una copia de la plantilla. Lo que el perfil de un cliente no tenía se guarda también allí."""
+    return servicio.crear_con_plantilla(usuario, proceso_id, entrada)
+
+
+@router.post("/proceso/{proceso_id}/con-plantilla/vista-previa", response_class=StreamingResponse, responses=PDF,
+             summary="Vista previa de un contrato con plantilla")
+def vista_previa_con_plantilla(
+    proceso_id: int,
+    entrada: NuevoContratoPlantilla,
+    usuario: models.Usuario = Depends(usuario_actual),
+    servicio: ServicioContratos = Depends(servicio_contratos),
+):
+    """El PDF sin guardar nada; lo que falta sale resaltado."""
+    return _pdf(servicio.vista_previa_plantilla(usuario, proceso_id, entrada), "contrato-vista-previa.pdf")
+
+
+@router.patch("/{contrato_id}/datos", response_model=ContratoDetalle, summary="Cambiar los datos de un borrador con plantilla")
+def editar_datos_contrato(
+    contrato_id: int,
+    cambios: CambiosDatosContrato,
+    usuario: models.Usuario = Depends(usuario_actual),
+    servicio: ServicioContratos = Depends(servicio_contratos),
+):
+    return servicio.editar_datos(usuario, contrato_id, cambios)
 
 
 @router.get("/{contrato_id}", response_model=ContratoDetalle, summary="Un contrato")

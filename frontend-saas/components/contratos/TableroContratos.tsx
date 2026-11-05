@@ -4,7 +4,9 @@ import { useCallback, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Download, ExternalLink, FilePen, FileText, RefreshCw } from "lucide-react";
 
+import { DocumentoBase, PlantillasContrato, type Plantilla } from "@/components/contratos/PlantillasContrato";
 import { Button } from "@/components/ui/Button";
+import { CaratulaTabs } from "@/components/ui/CaratulaTabs";
 import { DataTable, type DataTableColumn, type RowAction } from "@/components/ui/DataTable";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { SegmentedControl } from "@/components/ui/SegmentedControl";
@@ -16,6 +18,7 @@ import { fechaCorta } from "@/lib/fechas";
 import { useLoadEffect } from "@/lib/useLoadEffect";
 
 type Vista = "contratos" | "sin_contrato";
+type Pestana = "contratos" | "plantillas" | "base";
 type SinContrato = Esquemas["ProcesoSinContrato"];
 
 const GRUPOS: { value: GrupoContratos; label: string }[] = [
@@ -28,7 +31,7 @@ const VACIOS: Record<GrupoContratos, [string, string]> = {
   en_curso: ["Ningún contrato en curso", "Los borradores y los que esperan firma aparecen aquí."],
   firmados: ["Aún no hay contratos firmados", "Cuando se sube el escaneado firmado de un contrato, queda aquí."],
   cerrados: ["Ningún contrato terminado o anulado", "Los contratos terminados o anulados quedan aquí con su motivo."],
-  todos: ["Aún no hay contratos", "Se redactan desde la pestaña Contratos de cada expediente."],
+  todos: ["Aún no hay contratos", "Se redactan desde la pestaña Contratos de cada expediente, con una de las plantillas."],
 };
 const CAMPO_FILTRO =
   "h-10 min-w-0 rounded-lg bg-sheet px-3 text-[14px] text-ink shadow-[0_0_0_1px_var(--line-strong)] focus:outline-none focus:shadow-[0_0_0_2px_var(--navy)]";
@@ -54,6 +57,8 @@ export function TableroContratos({ enlace = (procesoId: number) => enlaceContrat
   textoAbrir?: string;
 }) {
   const router = useRouter();
+  const [pestana, setPestana] = useState<Pestana>("contratos");
+  const [plantillas, setPlantillas] = useState<Plantilla[] | null>(null);
   const [vista, setVista] = useState<Vista>("contratos");
   const [grupo, setGrupo] = useState<GrupoContratos>("en_curso");
   const [lista, setLista] = useState<Esquemas["ListaContratos"] | null>(null);
@@ -78,13 +83,20 @@ export function TableroContratos({ enlace = (procesoId: number) => enlaceContrat
   }, [grupo]);
   useLoadEffect(cargar);
 
+  const cargarPlantillas = useCallback(async () => {
+    const { data, error: fallo } = await api.GET("/api/v2/contratos/plantillas");
+    if (data) setPlantillas(data.items);
+    else setError(mensajeDeError(fallo));
+  }, []);
+  useLoadEffect(cargarPlantillas);
+
   const columnas: DataTableColumn<Contrato>[] = [
     {
       key: "proceso",
       header: "Proceso",
       mobile: "title",
       sortValue: (c) => c.proceso.nombre,
-      searchValue: (c) => `${c.proceso.nombre} ${c.cliente?.nombre ?? ""}`,
+      searchValue: (c) => `${c.proceso.nombre} ${c.cliente?.nombre ?? ""} ${c.personas.join(" ")}`,
       exportValue: (c) => c.proceso.nombre,
       render: (c) => (
         <span className="block min-w-0">
@@ -97,9 +109,9 @@ export function TableroContratos({ enlace = (procesoId: number) => enlaceContrat
       key: "cliente",
       header: "Cliente",
       mobile: "subtitle",
-      sortValue: (c) => c.cliente?.nombre,
-      exportValue: (c) => c.cliente?.nombre,
-      render: (c) => <span className="text-ink-2">{c.cliente?.nombre ?? "—"}</span>,
+      sortValue: (c) => c.personas[0] ?? c.cliente?.nombre,
+      exportValue: (c) => (c.personas.length ? c.personas.join("; ") : c.cliente?.nombre),
+      render: (c) => <span className="text-ink-2">{c.personas.length ? c.personas.join(", ") : c.cliente?.nombre ?? "—"}</span>,
     },
     {
       key: "estado",
@@ -191,7 +203,24 @@ export function TableroContratos({ enlace = (procesoId: number) => enlaceContrat
 
   return (
     <div>
-      <PageHeader title="Contratos" description="En qué va cada contrato de servicios y qué procesos aún no tienen uno." />
+      <PageHeader title="Contratos" description="En qué va cada contrato, qué procesos aún no tienen uno y las plantillas con que se redactan." />
+
+      <div className="mb-5 border-b border-line">
+        <CaratulaTabs<Pestana>
+          label="Secciones de contratos"
+          value={pestana}
+          onChange={setPestana}
+          tabs={[
+            { id: "contratos", label: "Contratos" },
+            { id: "plantillas", label: "Plantillas", count: plantillas?.length },
+            { id: "base", label: "Documento base" },
+          ]}
+        />
+      </div>
+
+      {pestana === "plantillas" && <PlantillasContrato plantillas={plantillas} onCambio={() => void cargarPlantillas()} />}
+      {pestana === "base" && <DocumentoBase plantilla={plantillas?.[0]} />}
+      {pestana === "contratos" && <>
 
       <SummaryStrip
         active={activo}
@@ -264,6 +293,7 @@ export function TableroContratos({ enlace = (procesoId: number) => enlaceContrat
           />
         )}
       </div>
+      </>}
     </div>
   );
 }

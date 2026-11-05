@@ -4,6 +4,9 @@ import { useCallback, useId, useRef, useState, type ChangeEvent, type FormEvent,
 import Link from "next/link";
 import { Ban, CalendarClock, CheckCircle2, Eye, FilePen, FilePlus2, FileSignature, Mail, Printer, RotateCcw, Save, Trash2, Upload, XCircle } from "lucide-react";
 
+import {
+  ElegirPlantilla, FormularioContratoPlantilla, VistaContrato, datosIniciales, type PlantillaElegible,
+} from "@/components/contratos/ContratoConPlantilla";
 import { FormularioContrato } from "@/components/contratos/FormularioContrato";
 import { CAMPO, ETIQUETA } from "@/components/expediente/CalculadoraTermino";
 import { Button } from "@/components/ui/Button";
@@ -22,7 +25,10 @@ import { useLoadEffect } from "@/lib/useLoadEffect";
 
 type Datos = Esquemas["ContratosDelProceso"];
 type Detalle = Esquemas["ContratoDetalle"];
-type Borrador = { clienteId: number; campos: Record<string, string> };
+type Contexto = Esquemas["ContextoContrato"];
+type DatosContrato = Esquemas["DatosContrato"];
+/** Un contrato nuevo: primero se elige la plantilla y luego se llenan sus datos. */
+type Borrador = { plantilla: PlantillaElegible | null; datos: DatosContrato | null };
 type Motivo = { tipo: "anular" | "terminar"; contrato: Detalle };
 
 const SOLICITUD = { "X-AM-Solicitud": "1" };
@@ -60,6 +66,9 @@ export function PanelContratos({ procesoId, contratoInicial, onCambio }: {
   const [elegido, setElegido] = useState<number | "nuevo" | null>(contratoInicial);
   const [borrador, setBorrador] = useState<Borrador | null>(null);
   const [cambios, setCambios] = useState<Record<string, string> | null>(null);
+  const [cambiosDatos, setCambiosDatos] = useState<DatosContrato | null>(null);
+  const [plantillas, setPlantillas] = useState<PlantillaElegible[] | null>(null);
+  const [contexto, setContexto] = useState<Contexto | null>(null);
   const [ocupado, setOcupado] = useState<string | null>(null);
   const [firma, setFirma] = useState<Detalle | null>(null);
   const [motivo, setMotivo] = useState<Motivo | null>(null);
@@ -79,34 +88,59 @@ export function PanelContratos({ procesoId, contratoInicial, onCambio }: {
   }, [procesoId]);
   useLoadEffect(cargar);
 
+  // Un borrador con plantilla se edita con los datos del proceso (abogado, fecha, clientes) a mano.
+  const borradorConPlantilla = datos?.items.some((c) => c.id === elegido && c.plantilla && c.estado === "BORRADOR" && c.puede_editar) ?? false;
+  const cargarContexto = useCallback(async () => {
+    if (!borradorConPlantilla || contexto) return;
+    await prepararContexto();
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- prepararContexto solo depende del proceso
+  }, [borradorConPlantilla, contexto, procesoId]);
+  useLoadEffect(cargarContexto);
+
   function reemplazar(contrato: Detalle) {
     setDatos((d) => d && { ...d, items: d.items.some((c) => c.id === contrato.id) ? d.items.map((c) => (c.id === contrato.id ? contrato : c)) : [contrato, ...d.items] });
     setElegido(contrato.id);
     setCambios(null);
+    setCambiosDatos(null);
     onCambio();
   }
 
-  async function nuevo(clienteId?: number) {
-    if (!datos) return;
-    const cliente = clienteId ?? datos.clientes[0]?.id;
-    if (!cliente) return;
-    setOcupado("plantilla");
-    const { data, error } = await api.GET("/api/v2/contratos/proceso/{proceso_id}/plantilla", { params: { path: { proceso_id: procesoId }, query: { cliente_id: cliente } } });
-    setOcupado(null);
-    if (!data) {
-      toast({ title: mensajeDeError(error), tone: "error" });
-      return;
+  /** Las plantillas vigentes y los datos del proceso (abogado, fecha, clientes con su perfil). */
+  async function prepararContexto(): Promise<{ plantillas: PlantillaElegible[]; contexto: Contexto } | null> {
+    const [lista, ctx] = await Promise.all([
+      plantillas ? Promise.resolve({ data: { items: plantillas }, error: undefined }) : api.GET("/api/v2/contratos/plantillas"),
+      api.GET("/api/v2/contratos/proceso/{proceso_id}/contexto", { params: { path: { proceso_id: procesoId } } }),
+    ]);
+    if (!lista.data || !ctx.data) {
+      toast({ title: mensajeDeError(lista.error ?? ctx.error), tone: "error" });
+      return null;
     }
-    // Lo que ya se escribió en el objeto y los honorarios se conserva al cambiar de cliente.
-    setBorrador((b) => ({ clienteId: cliente, campos: b ? { ...data.campos, objeto: b.campos.objeto ?? "", honorarios: b.campos.honorarios || data.campos.honorarios } : data.campos }));
+    const items = lista.data.items.map((x) => ({ ...x, campos: x.campos ?? [], firmas: { abogado: x.firmas?.abogado ?? "EL ABOGADO" } }));
+    setPlantillas(items);
+    setContexto(ctx.data);
+    return { plantillas: items, contexto: ctx.data };
+  }
+
+  function empezar(plantilla: PlantillaElegible, ctx: Contexto) {
+    setBorrador({ plantilla, datos: datosIniciales(plantilla, ctx.clientes) });
+  }
+
+  async function nuevo() {
+    setOcupado("plantilla");
+    const listo = await prepararContexto();
+    setOcupado(null);
+    if (!listo) return;
     setElegido("nuevo");
+    // Con una sola plantilla no hay nada que elegir.
+    if (listo.plantillas.length === 1) empezar(listo.plantillas[0], listo.contexto);
+    else setBorrador({ plantilla: null, datos: null });
   }
 
   async function crear() {
-    if (!borrador) return;
+    if (!borrador?.plantilla?.id || !borrador.datos) return;
     setOcupado("crear");
-    const { data, error } = await api.POST("/api/v2/contratos/proceso/{proceso_id}", {
-      params: { path: { proceso_id: procesoId } }, body: { cliente_id: borrador.clienteId, campos: borrador.campos },
+    const { data, error } = await api.POST("/api/v2/contratos/proceso/{proceso_id}/con-plantilla", {
+      params: { path: { proceso_id: procesoId } }, body: { plantilla_id: borrador.plantilla.id, datos: borrador.datos },
     });
     setOcupado(null);
     if (!data) {
@@ -116,6 +150,12 @@ export function PanelContratos({ procesoId, contratoInicial, onCambio }: {
     setBorrador(null);
     reemplazar(data);
     toast({ title: "Borrador guardado", description: "Cuando los datos estén completos, déjelo listo para firmar.", tone: "success" });
+  }
+
+  /** Guarda los cambios pendientes de un borrador con plantilla. Devuelve false si no se pudo. */
+  async function guardarDatos(contrato: Detalle): Promise<boolean> {
+    if (!cambiosDatos) return true;
+    return accion("guardar", () => api.PATCH("/api/v2/contratos/{contrato_id}/datos", { ...ruta(contrato.id), body: { datos: cambiosDatos } }), "Cambios guardados");
   }
 
   async function accion(clave: string, llamada: () => Promise<{ data?: Detalle; error?: unknown }>, exito: string) {
@@ -164,14 +204,15 @@ export function PanelContratos({ procesoId, contratoInicial, onCambio }: {
   const actual = typeof elegido === "number" ? datos.items.find((c) => c.id === elegido) ?? null : null;
   const sinClientes = datos.clientes.length === 0;
 
+
   if (!datos.items.length && elegido !== "nuevo") {
     return (
       <EmptyState
         icon={FileSignature}
         title="Este proceso aún no tiene contrato"
         description={sinClientes
-          ? "Dé acceso a un cliente en «Clientes y radicados» para redactarle el contrato de servicios."
-          : "Redacte el contrato de servicios con la plantilla de la firma: se llena con los datos del cliente y del abogado responsable."}
+          ? "Redacte el contrato con una plantilla de la firma. Las personas que firman pueden ser clientes del proceso o personas sin registrar."
+          : "Redacte el contrato con una plantilla de la firma: se llena con los datos de los clientes y del abogado responsable."}
         action={datos.puede_crear ? <Button icon={<FilePlus2 size={16} />} loading={ocupado === "plantilla"} onClick={() => void nuevo()}>Redactar contrato</Button> : undefined}
       />
     );
@@ -199,7 +240,7 @@ export function PanelContratos({ procesoId, contratoInicial, onCambio }: {
                 onClick={() => { setElegido(c.id); setCambios(null); }}
                 className={cx("block w-full min-w-48 rounded-lg px-3 py-2.5 text-left transition-colors", c.id === elegido ? "bg-navy-soft" : "hover:bg-sheet-2")}
               >
-                <span className="block truncate text-[14px] font-semibold text-ink">{c.cliente?.nombre ?? "Cliente"}</span>
+                <span className="block truncate text-[14px] font-semibold text-ink">{c.personas.length ? c.personas.join(", ") : c.cliente?.nombre ?? "Cliente"}</span>
                 <span className="mt-1 flex items-center gap-2 text-[12.5px] text-ink-3">
                   <Tag tone={ESTADO_CONTRATO[c.estado].tono} className="h-5 shrink-0">{ESTADO_CONTRATO[c.estado].nombre}</Tag>
                   <span className="truncate">Versión {c.version} · {fechaCorta(c.creado_en)}</span>
@@ -212,19 +253,40 @@ export function PanelContratos({ procesoId, contratoInicial, onCambio }: {
 
       <div className="min-w-0">
         {elegido === "nuevo" && borrador ? (
-          <NuevoContrato
-            datos={datos}
-            borrador={borrador}
-            ocupado={ocupado}
-            onCliente={(id) => void nuevo(id)}
-            onCampo={(clave, valor) => setBorrador((b) => b && { ...b, campos: { ...b.campos, [clave]: valor } })}
-            onGuardar={() => void crear()}
-            onVistaPrevia={async () => {
-              const error = await abrirPdf(`/api/v2/contratos/proceso/${procesoId}/vista-previa`, { cliente_id: borrador.clienteId, campos: borrador.campos });
-              if (error) toast({ title: error, tone: "error" });
-            }}
-            onCancelar={() => { setBorrador(null); setElegido(datos.items[0]?.id ?? null); }}
-          />
+          <article aria-label="Contrato nuevo">
+            <header className="border-b border-line px-4 py-3 sm:px-5">
+              <h3 className="font-semibold text-ink">Contrato nuevo{borrador.plantilla ? ` · ${borrador.plantilla.nombre}` : ""}</h3>
+              <p className="text-[13px] text-ink-3">{borrador.plantilla ? "Se guarda como borrador; la vista previa muestra en amarillo lo que falta." : "Elija la plantilla del contrato."}</p>
+            </header>
+            {!borrador.plantilla || !borrador.datos || !contexto ? (
+              <>
+                <ElegirPlantilla plantillas={plantillas ?? []} elegida={null} onElegir={(id) => { const p = plantillas?.find((x) => x.id === id); if (p && contexto) empezar(p, contexto); }} />
+                <div className="flex justify-end border-t border-line px-4 py-3 sm:px-5">
+                  <Button variant="ghost" onClick={() => { setBorrador(null); setElegido(datos.items[0]?.id ?? null); }}>Cancelar</Button>
+                </div>
+              </>
+            ) : (
+              <FormularioContratoPlantilla
+                plantilla={borrador.plantilla}
+                contexto={contexto}
+                datos={borrador.datos}
+                fijos={contexto.fijos}
+                onCambio={(d) => setBorrador((b) => b && { ...b, datos: d })}
+                pie={(faltan) => (
+                  <div className="sticky bottom-0 z-10 flex flex-wrap items-center justify-end gap-2 border-t border-line bg-sheet px-4 py-3 sm:px-5">
+                    {faltan > 0 && <span className="mr-auto text-[13px] text-ink-3">Faltan {faltan} {faltan === 1 ? "dato" : "datos"} para dejarlo listo</span>}
+                    <Button variant="ghost" onClick={() => { setBorrador(null); setElegido(datos.items[0]?.id ?? null); }}>Cancelar</Button>
+                    {(plantillas?.length ?? 0) > 1 && <Button variant="ghost" onClick={() => setBorrador({ plantilla: null, datos: null })}>Otra plantilla</Button>}
+                    <Button variant="secondary" icon={<Eye size={16} />} onClick={async () => {
+                      const error = await abrirPdf(`/api/v2/contratos/proceso/${procesoId}/con-plantilla/vista-previa`, { plantilla_id: borrador.plantilla!.id, datos: borrador.datos });
+                      if (error) toast({ title: error, tone: "error" });
+                    }}>PDF</Button>
+                    <Button icon={<Save size={16} />} loading={ocupado === "crear"} onClick={() => void crear()}>Guardar borrador</Button>
+                  </div>
+                )}
+              />
+            )}
+          </article>
         ) : actual ? (
           <DetalleContrato
             key={actual.id}
@@ -234,12 +296,21 @@ export function PanelContratos({ procesoId, contratoInicial, onCambio }: {
             ocupado={ocupado}
             onCampo={(clave, valor) => setCambios((c) => ({ ...(c ?? actual.campos), [clave]: valor }))}
             onGuardar={() => cambios && void accion("guardar", () => api.PATCH("/api/v2/contratos/{contrato_id}", { ...ruta(actual.id), body: { campos: cambios } }), "Cambios guardados")}
-            onDescartar={() => setCambios(null)}
+            onDescartar={() => { setCambios(null); setCambiosDatos(null); }}
+            contexto={contexto}
+            cambiosDatos={cambiosDatos}
+            onDatos={setCambiosDatos}
+            onGuardarDatos={() => void guardarDatos(actual)}
             onVistaPrevia={async () => {
+              if (actual.plantilla) {
+                if (await guardarDatos(actual)) window.open(`/api/v2/contratos/${actual.id}/pdf`, "_blank", "noopener");
+                return;
+              }
               const error = await abrirPdf(`/api/v2/contratos/proceso/${procesoId}/vista-previa`, { cliente_id: actual.cliente?.id, campos: cambios ?? actual.campos });
               if (error) toast({ title: error, tone: "error" });
             }}
             onListo={async () => {
+              if (!(await guardarDatos(actual))) return;
               if (cambios) {
                 const guardado = await accion("guardar", () => api.PATCH("/api/v2/contratos/{contrato_id}", { ...ruta(actual.id), body: { campos: cambios } }), "Cambios guardados");
                 if (!guardado) return;
@@ -322,9 +393,13 @@ function PasoSiguiente({ tono, icono, children, acciones }: { tono: "gold" | "ne
   );
 }
 
-function DetalleContrato({ contrato: c, procesoId, cambios, ocupado, onCampo, onGuardar, onDescartar, onVistaPrevia, onListo, onAgendar, onSubir, onReenviar, acciones }: {
+function DetalleContrato({ contrato: c, procesoId, cambios, ocupado, onCampo, onGuardar, onDescartar, onVistaPrevia, onListo, onAgendar, onSubir, onReenviar, acciones, contexto, cambiosDatos, onDatos, onGuardarDatos }: {
   contrato: Detalle;
   procesoId: number;
+  contexto: Contexto | null;
+  cambiosDatos: DatosContrato | null;
+  onDatos: (d: DatosContrato) => void;
+  onGuardarDatos: () => void;
   cambios: Record<string, string> | null;
   ocupado: string | null;
   onCampo: (clave: string, valor: string) => void;
@@ -338,7 +413,7 @@ function DetalleContrato({ contrato: c, procesoId, cambios, ocupado, onCampo, on
   acciones: RowAction<Detalle>[];
 }) {
   const editable = c.puede_editar && c.estado === "BORRADOR";
-  const cliente = c.cliente?.nombre ?? "el cliente";
+  const cliente = c.personas.length ? c.personas.join(", ") : c.cliente?.nombre ?? "el cliente";
   const pdf = `/api/v2/contratos/${c.id}/pdf`;
   const firmado = `/api/v2/contratos/${c.id}/firmado?descargar=false`;
   const agenda = `/gestion-procesos/abogado/procesos/${procesoId}/agenda`;
@@ -429,7 +504,47 @@ function DetalleContrato({ contrato: c, procesoId, cambios, ocupado, onCampo, on
 
       {paso}
 
-      {editable ? (
+      {c.plantilla && c.datos ? (
+        editable ? (
+          contexto ? (
+            <div className="mt-4 border-t border-line">
+              <FormularioContratoPlantilla
+                plantilla={{ ...c.plantilla, campos: c.plantilla.campos ?? [], firmas: { abogado: c.plantilla.firmas?.abogado ?? "EL ABOGADO" } }}
+                contexto={contexto}
+                datos={cambiosDatos ?? c.datos}
+                fijos={contexto.fijos}
+                onCambio={onDatos}
+                pie={(faltan) => (
+                  <div className="sticky bottom-0 z-10 flex flex-wrap items-center justify-end gap-2 border-t border-line bg-sheet px-4 py-3 sm:px-5">
+                    <span className="mr-auto text-[13px] text-ink-3">{[cambiosDatos && "Hay cambios sin guardar", faltan > 0 && `Faltan ${faltan} ${faltan === 1 ? "dato" : "datos"}`].filter(Boolean).join(" · ")}</span>
+                    {cambiosDatos && <Button variant="ghost" onClick={onDescartar}>Descartar</Button>}
+                    <Button variant="secondary" icon={<Save size={16} />} disabled={!cambiosDatos} loading={ocupado === "guardar"} onClick={onGuardarDatos}>Guardar cambios</Button>
+                  </div>
+                )}
+              />
+            </div>
+          ) : (
+            <div className="m-5 h-40 animate-pulse rounded-lg bg-manila" aria-busy="true" />
+          )
+        ) : (
+          <details className="group mt-4 border-t border-line" open>
+            <summary className="flex min-h-12 cursor-pointer list-none items-center justify-between px-4 text-[14px] font-semibold text-ink hover:bg-sheet-2 sm:px-5">
+              El contrato · {c.plantilla.nombre}
+              <span className="text-[13px] font-normal text-ink-3 group-open:hidden">Ver</span>
+              <span className="hidden text-[13px] font-normal text-ink-3 group-open:inline">Ocultar</span>
+            </summary>
+            <div className="bg-manila/60 p-3 sm:p-6">
+              <div className="mx-auto max-w-3xl">
+                <VistaContrato
+                  plantilla={{ ...c.plantilla, campos: c.plantilla.campos ?? [], firmas: { abogado: c.plantilla.firmas?.abogado ?? "EL ABOGADO" } }}
+                  datos={c.datos}
+                  fijos={c.datos.fijos ?? {}}
+                />
+              </div>
+            </div>
+          </details>
+        )
+      ) : editable ? (
         <div className="mt-4 border-t border-line">
           <FormularioContrato campos={cambios ?? c.campos} onCambio={onCampo} />
           <div className="sticky bottom-0 flex flex-wrap items-center justify-end gap-2 border-t border-line bg-sheet px-4 py-3 sm:px-5">
@@ -465,41 +580,6 @@ function DetalleContrato({ contrato: c, procesoId, cambios, ocupado, onCampo, on
           </ol>
         </details>
       )}
-    </article>
-  );
-}
-
-function NuevoContrato({ datos, borrador, ocupado, onCliente, onCampo, onGuardar, onVistaPrevia, onCancelar }: {
-  datos: Datos;
-  borrador: Borrador;
-  ocupado: string | null;
-  onCliente: (id: number) => void;
-  onCampo: (clave: string, valor: string) => void;
-  onGuardar: () => void;
-  onVistaPrevia: () => void;
-  onCancelar: () => void;
-}) {
-  const id = useId();
-  return (
-    <article aria-label="Contrato nuevo">
-      <header className="border-b border-line px-4 py-3 sm:px-5">
-        <h3 className="font-semibold text-ink">Contrato nuevo</h3>
-        <p className="text-[13px] text-ink-3">Se guarda como borrador. El texto y el diseño vienen de la plantilla de la firma.</p>
-      </header>
-      {datos.clientes.length > 1 && (
-        <div className="border-b border-line px-4 py-4 sm:px-5">
-          <label htmlFor={`${id}-cliente`} className={ETIQUETA}>Cliente que firma</label>
-          <select id={`${id}-cliente`} value={borrador.clienteId} disabled={ocupado === "plantilla"} onChange={(e) => onCliente(Number(e.target.value))} className={cx(CAMPO, "sm:max-w-sm")}>
-            {datos.clientes.map((c) => <option key={c.id} value={c.id}>{c.nombre}</option>)}
-          </select>
-        </div>
-      )}
-      <FormularioContrato campos={borrador.campos} onCambio={onCampo} />
-      <div className="sticky bottom-0 flex flex-wrap items-center justify-end gap-2 border-t border-line bg-sheet px-4 py-3 sm:px-5">
-        <Button variant="ghost" onClick={onCancelar}>Cancelar</Button>
-        <Button variant="secondary" icon={<Eye size={16} />} onClick={onVistaPrevia}>Vista previa</Button>
-        <Button icon={<Save size={16} />} loading={ocupado === "crear"} onClick={onGuardar}>Guardar borrador</Button>
-      </div>
     </article>
   );
 }

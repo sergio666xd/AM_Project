@@ -910,3 +910,10 @@
     --sidebar-width: 280px;
   }
 }
+
+/* Letra del documento base de los contratos (Georgia). Gelasio tiene sus mismas medidas
+   y la usa también el servidor al hacer el PDF cuando no tiene Georgia. */
+@font-face { font-family: "Gelasio CPS"; src: url("/contratos/Gelasio-Regular.ttf") format("truetype"); font-weight: 400; font-style: normal; font-display: swap; }
+@font-face { font-family: "Gelasio CPS"; src: url("/contratos/Gelasio-Bold.ttf") format("truetype"); font-weight: 700; font-style: normal; font-display: swap; }
+@font-face { font-family: "Gelasio CPS"; src: url("/contratos/Gelasio-Italic.ttf") format("truetype"); font-weight: 400; font-style: italic; font-display: swap; }
+@font-face { font-family: "Gelasio CPS"; src: url("/contratos/Gelasio-BoldItalic.ttf") format("truetype"); font-weight: 700; font-style: italic; font-display: swap; }

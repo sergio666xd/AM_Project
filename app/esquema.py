@@ -12,6 +12,7 @@ from sqlalchemy.exc import SQLAlchemyError
 from app import models, security
 from app.database import engine, get_db
 from app.migraciones import aplicar_migraciones, huella_versiones
+from app.modulos.contratos.plantilla_cps import sembrar as sembrar_plantilla_cps
 
 RUTA_MIGRACION_PLANTILLAS = Path(__file__).resolve().parents[1] / "migrations" / "2026_10_10_mensajes_configurables.sql"
 
@@ -182,6 +183,9 @@ def crear_datos_iniciales():
     preparar_esquema()
     db = next(get_db())
     try:
+        # Una base nueva se crea desde los modelos, sin pasar por la migración que siembra CPS.
+        with engine.begin() as conexion:
+            sembrar_plantilla_cps(conexion)
         if not db.query(models.ConfiguracionConsultas).filter_by(id=1).first():
             db.add(models.ConfiguracionConsultas(id=1, activa=False, dias_habilitados=[0, 1, 2, 3, 4]))
             db.commit()
