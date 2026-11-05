@@ -316,6 +316,24 @@
   --navy: var(--cover-accent);
 }
 
+/* Una hoja blanca puesta sobre la carátula (el formulario de Contacto)
+   vuelve a la tinta oscura de la hoja. */
+.caratula-azul .hoja-clara {
+  --ink: #18203a;
+  --ink-2: #454d63;
+  --ink-3: #636b80;
+  --navy: #002060;
+  --manila-line: #d8caa6;
+  color: var(--ink);
+}
+.dark .caratula-azul .hoja-clara {
+  --ink: #ece8dc;
+  --ink-2: #bdbccb;
+  --ink-3: #9a9db0;
+  --navy: #8fa8de;
+  --manila-line: #2e3449;
+}
+
 /* ── Sitio público: movimiento ──
    La carátula entra al cargar y su luz se desplaza despacio; las secciones y
    las listas aparecen al bajar (solo donde el navegador anima con el scroll,

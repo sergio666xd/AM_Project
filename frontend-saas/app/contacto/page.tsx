@@ -34,33 +34,31 @@ export default async function Contacto({ searchParams }: { searchParams: Promise
   return (
     <MarcoSitio>
       <Carpeta
-        id="consulta"
         caratula={
-          <div className="grid grid-cols-[minmax(0,1fr)] gap-9 lg:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)] lg:gap-14">
-            <div>
+          <div className="grid grid-cols-[minmax(0,1fr)] gap-8 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.35fr)] lg:items-start lg:gap-12">
+            <div className="lg:sticky lg:top-28">
               <TituloPagina>{enLinea(contenido.title)}</TituloPagina>
               <Entrada>{enLinea(contenido.intro)}</Entrada>
+              {/* En pantallas angostas la ficha baja a la hoja, debajo del formulario. */}
+              <div className="mt-9 max-lg:hidden">
+                <Ficha filas={filas} />
+              </div>
             </div>
-            {/* En celular la ficha baja a la hoja, para que la carátula tenga el mismo alto que las demás. */}
-            <div className="max-sm:hidden">
-              <Ficha filas={filas} />
+            {/* La página es el formulario: va en la carátula, sobre una hoja blanca. */}
+            <div id="consulta" className="hoja-clara scroll-mt-28 rounded-xl bg-sheet p-5 shadow-pop sm:p-8">
+              <FormularioConsulta
+                key={String(parametros.area ?? "")}
+                titulo={contenido.formTitle}
+                intro={contenido.formIntro}
+                areaInicial={areaDeConsulta(parametros.area)}
+                whatsapp={whatsapp}
+              />
             </div>
           </div>
         }
       >
-        <div className={`${RELLENO} sm:hidden`}>
+        <div className={`${RELLENO} lg:hidden`}>
           <Ficha filas={filas} />
-        </div>
-        <div className={RELLENO}>
-          <div className="max-w-[760px]">
-            <FormularioConsulta
-              key={String(parametros.area ?? "")}
-              titulo={contenido.formTitle}
-              intro={contenido.formIntro}
-              areaInicial={areaDeConsulta(parametros.area)}
-              whatsapp={whatsapp}
-            />
-          </div>
         </div>
 
         {contenido.faqs.length > 0 && (
