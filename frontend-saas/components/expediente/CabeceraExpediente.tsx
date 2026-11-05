@@ -1,11 +1,13 @@
 "use client";
 
 import { useCallback, useId, useState, type FormEvent } from "react";
-import { Archive, ArchiveRestore, Milestone } from "lucide-react";
+import { Archive, ArchiveRestore, ListOrdered, Milestone } from "lucide-react";
 
+import { erroresDeEtapas, filaDeEtapa, ListaEtapas, type FilaEtapa } from "@/components/etapas/ListaEtapas";
 import { CAMPO, ETIQUETA } from "@/components/expediente/CalculadoraTermino";
 import { Button } from "@/components/ui/Button";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
+import { Drawer } from "@/components/ui/Drawer";
 import { Etapas } from "@/components/ui/Etapas";
 import { Modal } from "@/components/ui/Modal";
 import { Radicado } from "@/components/ui/Radicado";
@@ -26,6 +28,7 @@ export function CabeceraExpediente({ procesoId, nombre, onCambio }: { procesoId:
   const { toast } = useToast();
   const [proceso, setProceso] = useState<Proceso | null>(null);
   const [cambiandoEtapa, setCambiandoEtapa] = useState(false);
+  const [ajustandoEtapas, setAjustandoEtapas] = useState(false);
   const [confirmando, setConfirmando] = useState<"archivar" | "reabrir" | null>(null);
 
   const cargar = useCallback(async () => {
@@ -97,7 +100,16 @@ export function CabeceraExpediente({ procesoId, nombre, onCambio }: { procesoId:
             )}
           </div>
           <Etapas etapas={proceso.linea_etapas.map((e) => e.nombre)} actual={indiceEtapa(proceso.linea_etapas, proceso.etapa)} />
-          <p className="mt-3 text-[12.5px] text-ink-3">Plantilla: {proceso.plantilla.nombre}</p>
+          <div className="mt-3 flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
+            <p className="text-[12.5px] text-ink-3">
+              {proceso.etapas_propias ? `Etapas propias de este proceso, a partir de «${proceso.plantilla.nombre}»` : `Plantilla: ${proceso.plantilla.nombre}`}
+            </p>
+            {!archivado && (
+              <Button size="sm" variant="ghost" className="-ml-2.5 sm:ml-0 sm:-mr-2.5" icon={<ListOrdered size={15} />} onClick={() => setAjustandoEtapas(true)}>
+                Ajustar etapas
+              </Button>
+            )}
+          </div>
         </section>
       )}
 
@@ -107,6 +119,13 @@ export function CabeceraExpediente({ procesoId, nombre, onCambio }: { procesoId:
           proceso={proceso}
           onClose={() => setCambiandoEtapa(false)}
           onHecho={(detalle) => { setProceso(detalle); onCambio?.(); }}
+        />
+      )}
+      {proceso && ajustandoEtapas && (
+        <AjustarEtapasDrawer
+          proceso={proceso}
+          onCerrar={() => setAjustandoEtapas(false)}
+          onHecho={(detalle) => { setProceso(detalle); setAjustandoEtapas(false); onCambio?.(); }}
         />
       )}
       <ConfirmDialog
@@ -197,7 +216,7 @@ function CambiarEtapaModal({
   return (
     <Modal open={abierto} onClose={cerrar} title="Etapa del proceso" description="El cliente ve la etapa en su portal; la nota es solo para la firma.">
       <form onSubmit={guardar} noValidate>
-        {activas.length > 1 && (
+        {activas.length > (proceso.etapas_propias ? 0 : 1) && (
           <div className="mb-4">
             <label htmlFor={`${id}-plantilla`} className={ETIQUETA}>Plantilla de etapas</label>
             <select
@@ -206,10 +225,18 @@ function CambiarEtapaModal({
               onChange={(e) => { setPlantillaId(Number(e.target.value)); setEtapa(null); }}
               className={CAMPO}
             >
-              {!activas.some((p) => p.id === proceso.plantilla.id) && <option value={proceso.plantilla.id}>{proceso.plantilla.nombre}</option>}
+              {proceso.etapas_propias
+                ? <option value={proceso.plantilla.id}>Etapas propias de este proceso</option>
+                : !activas.some((p) => p.id === proceso.plantilla.id) && <option value={proceso.plantilla.id}>{proceso.plantilla.nombre}</option>}
               {activas.map((p) => <option key={p.id} value={p.id}>{p.nombre}</option>)}
             </select>
-            {!misma && <p className="mt-1.5 text-[13px] text-ink-2">Al guardar, el proceso pasa a seguir esta plantilla y su línea de etapas cambia también en el portal del cliente.</p>}
+            {!misma && (
+              <p className="mt-1.5 text-[13px] text-ink-2">
+                {proceso.etapas_propias
+                  ? "Al guardar, las etapas propias de este proceso se reemplazan por las de esta plantilla, también en el portal del cliente. El historial se conserva."
+                  : "Al guardar, el proceso pasa a seguir esta plantilla y su línea de etapas cambia también en el portal del cliente."}
+              </p>
+            )}
           </div>
         )}
         <fieldset>
@@ -265,5 +292,82 @@ function CambiarEtapaModal({
         </div>
       </form>
     </Modal>
+  );
+}
+
+/** Ajusta las etapas de un solo proceso: la plantilla y los demás procesos no cambian. */
+function AjustarEtapasDrawer({ proceso, onCerrar, onHecho }: {
+  proceso: Proceso;
+  onCerrar: () => void;
+  onHecho: (detalle: Proceso) => void;
+}) {
+  const id = useId();
+  const { toast } = useToast();
+  const [filas, setFilas] = useState<FilaEtapa[]>(() => proceso.linea_etapas.map(filaDeEtapa));
+  const [errores, setErrores] = useState<Record<string, string>>({});
+  const [guardando, setGuardando] = useState(false);
+  const esActual = (f: FilaEtapa) => f.id !== null && f.id === proceso.etapa?.id;
+
+  async function guardar(e: FormEvent) {
+    e.preventDefault();
+    const faltan = erroresDeEtapas(filas);
+    if (Object.keys(faltan).length) {
+      setErrores(faltan);
+      return;
+    }
+    setGuardando(true);
+    setErrores({});
+    const { data, error } = await api.PUT("/api/v2/procesos/{proceso_id}/etapas", {
+      params: { path: { proceso_id: proceso.id } },
+      body: {
+        etapas: filas.filter((f) => f.activa).map((f) => ({ id: f.id, nombre: f.nombre, explicacion: f.explicacion.trim() || null, activa: true })),
+      },
+    });
+    setGuardando(false);
+    if (error || !data) {
+      const campos = error?.campos ?? {};
+      setErrores({ ...campos, general: campos.etapas ? "" : mensajeDeError(error) });
+      return;
+    }
+    toast({ title: "Etapas guardadas", description: "Solo cambian en este proceso.", tone: "success" });
+    onHecho(data);
+  }
+
+  return (
+    <Drawer
+      open
+      onClose={onCerrar}
+      title="Etapas de este proceso"
+      subtitle={
+        proceso.etapas_propias
+          ? "Estas etapas son solo de este proceso."
+          : `Hoy sigue la plantilla «${proceso.plantilla.nombre}». Lo que cambie aquí aplica solo a este proceso; la plantilla y los demás procesos siguen igual.`
+      }
+      footer={
+        <div className="flex justify-end gap-2">
+          <Button variant="secondary" onClick={onCerrar}>Cancelar</Button>
+          <Button type="submit" form={`${id}-form`} loading={guardando}>Guardar etapas</Button>
+        </div>
+      }
+    >
+      <form id={`${id}-form`} onSubmit={guardar} noValidate className="space-y-4">
+        <fieldset className="min-w-0">
+          <legend className={ETIQUETA}>Etapas, en orden</legend>
+          <p className="-mt-0.5 mb-3 text-[13px] text-ink-3">El cliente ve esta línea en su portal y lee la explicación de la etapa en que va su proceso.</p>
+          <ListaEtapas
+            idBase={id}
+            filas={filas}
+            setFilas={setFilas}
+            errores={errores}
+            fija={(f) => (esActual(f) ? "es la etapa actual" : null)}
+            detalle={(f) => (esActual(f) ? "Etapa actual. Para quitarla, cambie primero el proceso a otra etapa." : null)}
+          />
+        </fieldset>
+        {filas.some((f) => !f.activa) && (
+          <p className="text-[13px] text-ink-2">Las etapas que quite dejan de aparecer en la línea; si el proceso ya pasó por ellas, siguen en su historial.</p>
+        )}
+        {errores.general && <p role="alert" className="text-[13px] text-bad">{errores.general}</p>}
+      </form>
+    </Drawer>
   );
 }

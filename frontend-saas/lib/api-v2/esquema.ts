@@ -245,6 +245,29 @@ export interface paths {
         patch: operations["cambiar_etapa"];
         trace?: never;
     };
+    "/api/v2/procesos/{proceso_id}/etapas": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Ajustar las etapas del proceso
+         * @description Cambia las etapas solo de este proceso: agregar, renombrar, reordenar o quitar.
+         *
+         *     La primera vez el proceso deja de seguir su plantilla y pasa a tener etapas propias.
+         *     La etapa actual no se puede quitar.
+         */
+        put: operations["editar_etapas"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v2/procesos/{proceso_id}/relaciones": {
         parameters: {
             query?: never;
@@ -3913,7 +3936,7 @@ export interface components {
         CambiarEtapa: {
             /**
              * Etapa Id
-             * @description Una etapa activa de cualquier plantilla activa; el proceso pasa a seguir esa plantilla.
+             * @description Una etapa de la línea del proceso, o una etapa activa de otra plantilla activa: entonces el proceso pasa a seguir esa plantilla (si tenía etapas propias, se reemplazan por las de la plantilla).
              */
             etapa_id: number;
             /** Nota */
@@ -5028,6 +5051,14 @@ export interface components {
              */
             activa: boolean;
         };
+        /** DatosEtapasProceso */
+        DatosEtapasProceso: {
+            /**
+             * Etapas
+             * @description Todas las etapas del proceso, en orden, con los ids de `linea_etapas` (vacío para una nueva). Las que falten se borran si el proceso nunca estuvo en ellas; si estuvo, quedan solo en el historial.
+             */
+            etapas: components["schemas"]["DatosEtapa"][];
+        };
         /** DatosEvento */
         DatosEvento: {
             /** Proceso Id */
@@ -6091,6 +6122,18 @@ export interface components {
              * @description Cuándo llegó el proceso a esta etapa, si ya pasó por ella.
              */
             fecha: string | null;
+        };
+        /** EtapaDeLinea */
+        EtapaDeLinea: {
+            /** Id */
+            id: number;
+            /** Nombre */
+            nombre: string;
+            /**
+             * Explicacion
+             * @description Qué pasa en la etapa, en palabras sencillas. Lo lee el cliente.
+             */
+            explicacion: string | null;
         };
         /** EtapaDePlantilla */
         EtapaDePlantilla: {
@@ -7753,13 +7796,18 @@ export interface components {
              * @description Abogados que colaboran. Al cliente solo le llegan los marcados como visibles.
              */
             colaboradores: components["schemas"]["PersonaBreve"][];
-            /** @description Plantilla de etapas que sigue el proceso. */
+            /** @description Plantilla de etapas que sigue el proceso. Si tiene etapas propias, la plantilla de la que salieron. */
             plantilla: components["schemas"]["PlantillaBreve"];
             /**
-             * Linea Etapas
-             * @description Las etapas de esa plantilla, en orden.
+             * Etapas Propias
+             * @description Si el abogado ajustó las etapas de este proceso; los cambios de la plantilla ya no lo afectan.
              */
-            linea_etapas: components["schemas"]["EtapaBreve"][];
+            etapas_propias: boolean;
+            /**
+             * Linea Etapas
+             * @description Las etapas del proceso, en orden.
+             */
+            linea_etapas: components["schemas"]["EtapaDeLinea"][];
             /**
              * Etapas
              * @description Historial de cambios de etapa, del más antiguo al más reciente.
@@ -10215,6 +10263,95 @@ export interface operations {
         requestBody: {
             content: {
                 "application/json": components["schemas"]["CambiarEtapa"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProcesoDetalle"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+        };
+    };
+    editar_etapas: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                proceso_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DatosEtapasProceso"];
             };
         };
         responses: {

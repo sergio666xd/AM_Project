@@ -1646,6 +1646,119 @@
         }
       }
     },
+    "/api/v2/procesos/{proceso_id}/etapas": {
+      "put": {
+        "tags": [
+          "Procesos"
+        ],
+        "summary": "Ajustar las etapas del proceso",
+        "description": "Cambia las etapas solo de este proceso: agregar, renombrar, reordenar o quitar.\n\nLa primera vez el proceso deja de seguir su plantilla y pasa a tener etapas propias.\nLa etapa actual no se puede quitar.",
+        "operationId": "editar_etapas",
+        "parameters": [
+          {
+            "name": "proceso_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Proceso Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DatosEtapasProceso"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProcesoDetalle"
+                }
+              }
+            }
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            },
+            "description": "Too Many Requests"
+          }
+        }
+      }
+    },
     "/api/v2/procesos/{proceso_id}/relaciones": {
       "get": {
         "tags": [
@@ -24788,7 +24901,7 @@
           "etapa_id": {
             "type": "integer",
             "title": "Etapa Id",
-            "description": "Una etapa activa de cualquier plantilla activa; el proceso pasa a seguir esa plantilla."
+            "description": "Una etapa de la línea del proceso, o una etapa activa de otra plantilla activa: entonces el proceso pasa a seguir esa plantilla (si tenía etapas propias, se reemplazan por las de la plantilla)."
           },
           "nota": {
             "anyOf": [
@@ -28027,6 +28140,25 @@
         ],
         "title": "DatosEtapa"
       },
+      "DatosEtapasProceso": {
+        "properties": {
+          "etapas": {
+            "items": {
+              "$ref": "#/components/schemas/DatosEtapa"
+            },
+            "type": "array",
+            "maxItems": 30,
+            "minItems": 1,
+            "title": "Etapas",
+            "description": "Todas las etapas del proceso, en orden, con los ids de `linea_etapas` (vacío para una nueva). Las que falten se borran si el proceso nunca estuvo en ellas; si estuvo, quedan solo en el historial."
+          }
+        },
+        "type": "object",
+        "required": [
+          "etapas"
+        ],
+        "title": "DatosEtapasProceso"
+      },
       "DatosEvento": {
         "properties": {
           "proceso_id": {
@@ -30532,6 +30664,37 @@
           "fecha"
         ],
         "title": "EtapaCliente"
+      },
+      "EtapaDeLinea": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "nombre": {
+            "type": "string",
+            "title": "Nombre"
+          },
+          "explicacion": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Explicacion",
+            "description": "Qué pasa en la etapa, en palabras sencillas. Lo lee el cliente."
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "nombre",
+          "explicacion"
+        ],
+        "title": "EtapaDeLinea"
       },
       "EtapaDePlantilla": {
         "properties": {
@@ -34831,15 +34994,20 @@
           },
           "plantilla": {
             "$ref": "#/components/schemas/PlantillaBreve",
-            "description": "Plantilla de etapas que sigue el proceso."
+            "description": "Plantilla de etapas que sigue el proceso. Si tiene etapas propias, la plantilla de la que salieron."
+          },
+          "etapas_propias": {
+            "type": "boolean",
+            "title": "Etapas Propias",
+            "description": "Si el abogado ajustó las etapas de este proceso; los cambios de la plantilla ya no lo afectan."
           },
           "linea_etapas": {
             "items": {
-              "$ref": "#/components/schemas/EtapaBreve"
+              "$ref": "#/components/schemas/EtapaDeLinea"
             },
             "type": "array",
             "title": "Linea Etapas",
-            "description": "Las etapas de esa plantilla, en orden."
+            "description": "Las etapas del proceso, en orden."
           },
           "etapas": {
             "items": {
@@ -34864,6 +35032,7 @@
           "puede_administrar",
           "colaboradores",
           "plantilla",
+          "etapas_propias",
           "linea_etapas",
           "etapas"
         ],

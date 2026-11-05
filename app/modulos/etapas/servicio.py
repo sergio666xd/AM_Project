@@ -10,6 +10,7 @@ from sqlalchemy.orm import Session
 from app.audit import registrar_evento_auditoria
 from app.models import EtapaPlantilla, PlantillaEtapas
 from app.modulos.etapas.esquemas import (
+    DatosEtapa,
     DatosPlantillaEtapas,
     EtapaDePlantilla,
     ListaPlantillasEtapas,
@@ -22,6 +23,42 @@ from app.modulos.identidad.modelos import RolUsuario, Usuario
 from app.nucleo.errores import Conflicto, DatosInvalidos, NoEncontrado, SinPermiso
 
 EDITORES = {RolUsuario.ADMIN.value, RolUsuario.ABOGADO_ADMIN.value}
+
+
+def aplicar_etapas(repo: RepositorioEtapas, plantilla: PlantillaEtapas, etapas: list[DatosEtapa]) -> None:
+    """Deja la plantilla (o la línea propia de un proceso) con esas etapas, en ese orden.
+
+    Las que no vienen se borran si ningún proceso las usó; si alguno las usó, se
+    desactivan y pasan al final, para que el historial se siga leyendo.
+    """
+    if not any(e.activa for e in etapas):
+        raise DatosInvalidos("Hace falta al menos una etapa activa.", campos={"etapas": "Deje al menos una etapa activa."})
+    nombres = [e.nombre.casefold() for e in etapas]
+    repetido = next((e.nombre for e in etapas if nombres.count(e.nombre.casefold()) > 1), None)
+    if repetido:
+        raise DatosInvalidos(f"La etapa «{repetido}» está dos veces.", campos={"etapas": "Cada etapa debe tener un nombre distinto."})
+
+    existentes = {e.id: e for e in plantilla.etapas}
+    ajenas = [e.id for e in etapas if e.id is not None and e.id not in existentes]
+    if ajenas:
+        raise DatosInvalidos("Una de las etapas ya no está en la lista.", campos={"etapas": "Recargue la página e intente de nuevo."})
+    enviadas = {e.id for e in etapas if e.id is not None}
+    faltantes = [e for i, e in existentes.items() if i not in enviadas]
+    usadas = repo.etapas_usadas([e.id for e in faltantes])
+    orden = 0
+    for dato in etapas:
+        etapa = existentes.get(dato.id) if dato.id else None
+        if etapa is None:
+            etapa = EtapaPlantilla()
+            plantilla.etapas.append(etapa)
+        etapa.nombre, etapa.explicacion, etapa.activa, etapa.orden = dato.nombre, dato.explicacion, dato.activa, orden
+        orden += 1
+    for etapa in faltantes:
+        if etapa.id in usadas:
+            etapa.activa, etapa.orden = False, orden
+            orden += 1
+        else:
+            plantilla.etapas.remove(etapa)
 
 
 def _rol(usuario: Usuario) -> str:
@@ -85,38 +122,9 @@ class ServicioEtapas:
     # ---- Internos ----------------------------------------------------------
 
     def _aplicar(self, plantilla: PlantillaEtapas, datos: DatosPlantillaEtapas, actual: PlantillaEtapas) -> None:
-        if not any(e.activa for e in datos.etapas):
-            raise DatosInvalidos("La plantilla necesita al menos una etapa activa.", campos={"etapas": "Deje al menos una etapa activa."})
-        nombres = [e.nombre.casefold() for e in datos.etapas]
-        repetido = next((e.nombre for e in datos.etapas if nombres.count(e.nombre.casefold()) > 1), None)
-        if repetido:
-            raise DatosInvalidos(f"La etapa «{repetido}» está dos veces.", campos={"etapas": "Cada etapa debe tener un nombre distinto."})
         if datos.predeterminada and not datos.activa:
             raise DatosInvalidos("La plantilla predeterminada debe estar activa.", campos={"activa": "Actívela o no la marque como predeterminada."})
-
-        existentes = {e.id: e for e in plantilla.etapas}
-        ajenas = [e.id for e in datos.etapas if e.id is not None and e.id not in existentes]
-        if ajenas:
-            raise DatosInvalidos("Una de las etapas no pertenece a esta plantilla.", campos={"etapas": "Recargue la página e intente de nuevo."})
-        enviadas = {e.id for e in datos.etapas if e.id is not None}
-        faltantes = [e for i, e in existentes.items() if i not in enviadas]
-        usadas = self._repo.etapas_usadas([e.id for e in faltantes])
-        orden = 0
-        for dato in datos.etapas:
-            etapa = existentes.get(dato.id) if dato.id else None
-            if etapa is None:
-                etapa = EtapaPlantilla()
-                plantilla.etapas.append(etapa)
-            etapa.nombre, etapa.explicacion, etapa.activa, etapa.orden = dato.nombre, dato.explicacion, dato.activa, orden
-            orden += 1
-        # Las que se quitaron van al final: borradas si nadie las usó, desactivadas si sí.
-        for etapa in faltantes:
-            if etapa.id in usadas:
-                etapa.activa, etapa.orden = False, orden
-                orden += 1
-            else:
-                plantilla.etapas.remove(etapa)
-
+        aplicar_etapas(self._repo, plantilla, datos.etapas)
         if datos.predeterminada and plantilla is not actual:
             actual.predeterminada = False
             plantilla.predeterminada = True

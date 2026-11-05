@@ -15,6 +15,10 @@ class EtapaBreve(BaseModel):
     nombre: str
 
 
+class EtapaDeLinea(EtapaBreve):
+    explicacion: str | None = Field(description="Qué pasa en la etapa, en palabras sencillas. Lo lee el cliente.")
+
+
 class EtapaActual(EtapaBreve):
     posicion: int = Field(description="Lugar de la etapa en la línea del proceso, desde 1.")
     total: int = Field(description="Cuántas etapas tiene la línea del proceso.")
@@ -68,3 +72,13 @@ class DatosPlantillaEtapas(BaseModel):
     )
 
     _limpiar = field_validator("nombre", "descripcion")(_limpio)
+
+
+class DatosEtapasProceso(BaseModel):
+    etapas: list[DatosEtapa] = Field(
+        min_length=1, max_length=30,
+        description=(
+            "Todas las etapas del proceso, en orden, con los ids de `linea_etapas` (vacío para una nueva). "
+            "Las que falten se borran si el proceso nunca estuvo en ellas; si estuvo, quedan solo en el historial."
+        ),
+    )

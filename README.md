@@ -44,7 +44,7 @@ app/models.py        modelos SQLAlchemy; cada módulo los reexporta en su modelo
 alembic_migrations/  revisiones del esquema
 ```
 
-Módulos: `administracion` (resumen, usuarios, alertas e integraciones), `agenda`, `avisos` (la campana de cada rol), `bandeja` (lo urgente del día), `busqueda`, `clientes`, `contratos`, `cuenta` (datos propios y cambios con código), `documentos`, `etapas` (plantillas de etapas por tipo de proceso), `expedientes`, `finanzas` (cobros, pagos y estado de cuenta), `folios` (el expediente foliado), `glosario` (lenguaje claro), `identidad` (sesión y contraseñas), `judicial`, `mensajes`, `operacion` (consultas a la Rama Judicial), `portal_cliente`, `push`, `radicados`, `sistema` (actividad y auditoría), `sitio` (sitio público y formulario de contacto) y `tareas`.
+Módulos: `administracion` (resumen, usuarios, alertas e integraciones), `agenda`, `avisos` (la campana de cada rol), `bandeja` (lo urgente del día), `busqueda`, `clientes`, `contratos`, `cuenta` (datos propios y cambios con código), `documentos`, `etapas` (plantillas de etapas por tipo de proceso y etapas propias de un proceso), `expedientes`, `finanzas` (cobros, pagos y estado de cuenta), `folios` (el expediente foliado), `glosario` (lenguaje claro), `identidad` (sesión y contraseñas), `judicial`, `mensajes`, `operacion` (consultas a la Rama Judicial), `portal_cliente`, `push`, `radicados`, `sistema` (actividad y auditoría), `sitio` (sitio público y formulario de contacto) y `tareas`.
 
 ### Frontend (`frontend-saas/`)
 
