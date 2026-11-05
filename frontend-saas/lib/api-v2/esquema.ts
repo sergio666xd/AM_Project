@@ -1678,6 +1678,148 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v2/contratos/plantillas": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Plantillas de contrato
+         * @description Las plantillas vigentes, con cuántos contratos se han hecho con cada una.
+         */
+        get: operations["listar_plantillas_contrato"];
+        put?: never;
+        /**
+         * Crear una plantilla
+         * @description No se guarda si el texto usa códigos que no existen o listas mal cerradas.
+         */
+        post: operations["crear_plantilla_contrato"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v2/contratos/plantillas/{plantilla_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Cambiar una plantilla
+         * @description Los contratos ya hechos con ella no cambian: guardan su propia copia.
+         */
+        put: operations["editar_plantilla_contrato"];
+        post?: never;
+        /**
+         * Eliminar una plantilla
+         * @description Deja de ofrecerse para contratos nuevos; los contratos hechos con ella conservan su copia.
+         */
+        delete: operations["eliminar_plantilla_contrato"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v2/contratos/plantillas/{plantilla_id}/duplicar": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Duplicar una plantilla */
+        post: operations["duplicar_plantilla_contrato"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v2/contratos/proceso/{proceso_id}/contexto": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Datos para un contrato con plantilla
+         * @description Los datos fijos (proceso, abogado responsable, fecha) y los clientes del proceso con su perfil.
+         */
+        get: operations["contexto_contrato"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v2/contratos/proceso/{proceso_id}/con-plantilla": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Crear un contrato con plantilla
+         * @description Queda en borrador con una copia de la plantilla. Lo que el perfil de un cliente no tenía se guarda también allí.
+         */
+        post: operations["crear_contrato_con_plantilla"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v2/contratos/proceso/{proceso_id}/con-plantilla/vista-previa": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Vista previa de un contrato con plantilla
+         * @description El PDF sin guardar nada; lo que falta sale resaltado.
+         */
+        post: operations["vista_previa_con_plantilla"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v2/contratos/{contrato_id}/datos": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** Cambiar los datos de un borrador con plantilla */
+        patch: operations["editar_datos_contrato"];
+        trace?: never;
+    };
     "/api/v2/contratos/{contrato_id}": {
         parameters: {
             query?: never;
@@ -4203,6 +4345,10 @@ export interface components {
                 [key: string]: string;
             };
         };
+        /** CambiosDatosContrato */
+        CambiosDatosContrato: {
+            datos: components["schemas"]["DatosContrato"];
+        };
         /**
          * CambiosEvento
          * @description Solo se cambian los campos enviados.
@@ -4285,6 +4431,51 @@ export interface components {
             actuacion_id?: number | null;
             /** Cliente Id */
             cliente_id?: number | null;
+        };
+        /** CampoPlantilla */
+        CampoPlantilla: {
+            /**
+             * Clave
+             * @description El código con el que se usa en el texto.
+             */
+            clave: string;
+            /** Etiqueta */
+            etiqueta: string;
+            /**
+             * Tipo
+             * @enum {string}
+             */
+            tipo: "texto" | "parrafo" | "numero" | "pesos" | "porcentaje" | "fecha" | "opciones" | "lista";
+            /**
+             * Obligatorio
+             * @default true
+             */
+            obligatorio: boolean;
+            /** Ayuda */
+            ayuda?: string | null;
+            /**
+             * Inicial
+             * @description Texto con el que empieza el campo en el formulario.
+             */
+            inicial?: string | null;
+            /** Opciones */
+            opciones?: string[];
+            /**
+             * Singular
+             * @description Listas: cómo se llama cada persona en el formulario.
+             */
+            singular?: string | null;
+            /**
+             * Rotulo
+             * @description Listas: el rótulo fijo en el contrato, como EL CONTRATANTE.
+             */
+            rotulo?: string | null;
+            /**
+             * Firma
+             * @description Listas: cada persona firma al final, con huella.
+             * @default true
+             */
+            firma: boolean;
         };
         /** CanalesAviso */
         CanalesAviso: {
@@ -4772,6 +4963,21 @@ export interface components {
             /** Suspendidos */
             suspendidos: number;
         };
+        /** ContextoContrato */
+        ContextoContrato: {
+            /**
+             * Fijos
+             * @description Proceso, abogado responsable y fecha de hoy, por código.
+             */
+            fijos: {
+                [key: string]: string;
+            };
+            /**
+             * Clientes
+             * @description Los clientes del proceso con los datos de su perfil.
+             */
+            clientes: components["schemas"]["PersonaContrato"][];
+        };
         /** Contrato */
         Contrato: {
             /** Id */
@@ -4808,6 +5014,11 @@ export interface components {
             /** Motivo Cierre */
             motivo_cierre: string | null;
             documento_firmado: components["schemas"]["DocumentoFirmado"] | null;
+            /**
+             * Personas
+             * @description Nombres de las personas del contrato, en orden; vacío en los contratos CPS de campos fijos.
+             */
+            personas: string[];
         };
         /** ContratoCargado */
         ContratoCargado: {
@@ -4863,12 +5074,21 @@ export interface components {
             motivo_cierre: string | null;
             documento_firmado: components["schemas"]["DocumentoFirmado"] | null;
             /**
+             * Personas
+             * @description Nombres de las personas del contrato, en orden; vacío en los contratos CPS de campos fijos.
+             */
+            personas: string[];
+            /**
              * Campos
-             * @description Los datos que llenan la plantilla CPS.
+             * @description Los datos que llenan la plantilla CPS (contratos de campos fijos).
              */
             campos: {
                 [key: string]: string;
             };
+            /** @description La copia de la plantilla con la que se redactó; vacía en los contratos CPS de campos fijos. */
+            plantilla?: components["schemas"]["CopiaPlantillaContrato"] | null;
+            /** @description Personas, notificaciones, campos propios y datos fijos de un contrato con plantilla. */
+            datos?: components["schemas"]["DatosGuardados"] | null;
             /** Versiones */
             versiones: components["schemas"]["VersionContrato"][];
             /** @description La cita de firma vigente, si ya se agendó. */
@@ -4938,6 +5158,26 @@ export interface components {
              * Format: date-time
              */
             actualizada_en: string;
+        };
+        /** CopiaPlantillaContrato */
+        CopiaPlantillaContrato: {
+            /** Nombre */
+            nombre: string;
+            /** Descripcion */
+            descripcion?: string | null;
+            /**
+             * Cuerpo
+             * @description Markdown con códigos {{…}}.
+             */
+            cuerpo: string;
+            /** Campos */
+            campos?: components["schemas"]["CampoPlantilla"][];
+            firmas?: components["schemas"]["FirmasPlantilla"];
+            /**
+             * Id
+             * @description La plantilla de origen, si todavía existe.
+             */
+            id?: number | null;
         };
         /** CuentaBreve */
         CuentaBreve: {
@@ -5033,6 +5273,24 @@ export interface components {
             domicilio?: string | null;
             /** Direccion */
             direccion?: string | null;
+        };
+        /** DatosContrato */
+        DatosContrato: {
+            /**
+             * Valores
+             * @description Los campos propios de la plantilla, por código.
+             */
+            valores?: {
+                [key: string]: string;
+            };
+            /**
+             * Listas
+             * @description Las personas de cada lista, por código.
+             */
+            listas?: {
+                [key: string]: components["schemas"]["PersonaContrato"][];
+            };
+            notificaciones?: components["schemas"]["Notificaciones"];
         };
         /** DatosEtapa */
         DatosEtapa: {
@@ -5145,6 +5403,31 @@ export interface components {
             actualizado_en: string | null;
             /** Actualizado Por */
             actualizado_por: string | null;
+        };
+        /** DatosGuardados */
+        DatosGuardados: {
+            /**
+             * Valores
+             * @description Los campos propios de la plantilla, por código.
+             */
+            valores?: {
+                [key: string]: string;
+            };
+            /**
+             * Listas
+             * @description Las personas de cada lista, por código.
+             */
+            listas?: {
+                [key: string]: components["schemas"]["PersonaContrato"][];
+            };
+            notificaciones?: components["schemas"]["Notificaciones"];
+            /**
+             * Fijos
+             * @description Proceso, abogado y fecha tal como quedaron en el contrato.
+             */
+            fijos?: {
+                [key: string]: string;
+            };
         };
         /** DatosPlantilla */
         DatosPlantilla: {
@@ -6347,6 +6630,15 @@ export interface components {
              */
             estado: string;
         };
+        /** FirmasPlantilla */
+        FirmasPlantilla: {
+            /**
+             * Abogado
+             * @description El rótulo de la firma del abogado.
+             * @default EL ABOGADO
+             */
+            abogado: string;
+        };
         /** Folio */
         Folio: {
             /**
@@ -6835,6 +7127,19 @@ export interface components {
              */
             motivo: string;
         };
+        /** Notificaciones */
+        Notificaciones: {
+            /**
+             * Personas
+             * @description ref de las personas del contrato que se usan.
+             */
+            personas?: string[];
+            /**
+             * Otras
+             * @description Direcciones escritas a mano.
+             */
+            otras?: components["schemas"]["OtraNotificacion"][];
+        };
         /** NuevaSolicitud */
         NuevaSolicitud: {
             /** Proceso Id */
@@ -6924,6 +7229,12 @@ export interface components {
             campos: {
                 [key: string]: string;
             };
+        };
+        /** NuevoContratoPlantilla */
+        NuevoContratoPlantilla: {
+            /** Plantilla Id */
+            plantilla_id: number;
+            datos: components["schemas"]["DatosContrato"];
         };
         /** NuevoMensaje */
         NuevoMensaje: {
@@ -7023,6 +7334,31 @@ export interface components {
             padre_id?: number | null;
             /** Solicitud Id */
             solicitud_id?: number | null;
+        };
+        /** OtraNotificacion */
+        OtraNotificacion: {
+            /** Ref */
+            ref: string;
+            /**
+             * Nombre
+             * @default
+             */
+            nombre: string;
+            /**
+             * Direccion
+             * @default
+             */
+            direccion: string;
+            /**
+             * Correo
+             * @default
+             */
+            correo: string;
+            /**
+             * Telefono
+             * @default
+             */
+            telefono: string;
         };
         /** PaginaChats */
         PaginaChats: {
@@ -7545,6 +7881,56 @@ export interface components {
             /** Nombre */
             nombre: string;
         };
+        /** PersonaContrato */
+        PersonaContrato: {
+            /**
+             * Ref
+             * @description Identifica a la persona dentro del contrato (notificaciones).
+             */
+            ref: string;
+            /**
+             * Cliente Id
+             * @description Si es un cliente registrado del proceso.
+             */
+            cliente_id?: number | null;
+            /**
+             * Nombre
+             * @default
+             */
+            nombre: string;
+            /**
+             * Cedula
+             * @default
+             */
+            cedula: string;
+            /**
+             * Ciudad
+             * @default
+             */
+            ciudad: string;
+            /**
+             * Direccion
+             * @default
+             */
+            direccion: string;
+            /**
+             * Correo
+             * @default
+             */
+            correo: string;
+            /**
+             * Telefono
+             * @default
+             */
+            telefono: string;
+            /**
+             * Genero
+             * @description Para la concordancia: m o f.
+             * @default
+             * @enum {string}
+             */
+            genero: "m" | "f" | "";
+        };
         /** Plantilla */
         Plantilla: {
             /** Nombre */
@@ -7627,6 +8013,48 @@ export interface components {
                 [key: string]: string;
             };
         };
+        /** PlantillaContratoEntrada */
+        PlantillaContratoEntrada: {
+            /** Nombre */
+            nombre: string;
+            /** Descripcion */
+            descripcion?: string | null;
+            /**
+             * Cuerpo
+             * @description Markdown con códigos {{…}}.
+             */
+            cuerpo: string;
+            /** Campos */
+            campos?: components["schemas"]["CampoPlantilla"][];
+            firmas?: components["schemas"]["FirmasPlantilla"];
+        };
+        /** PlantillaDeContrato */
+        PlantillaDeContrato: {
+            /** Nombre */
+            nombre: string;
+            /** Descripcion */
+            descripcion?: string | null;
+            /**
+             * Cuerpo
+             * @description Markdown con códigos {{…}}.
+             */
+            cuerpo: string;
+            /** Campos */
+            campos?: components["schemas"]["CampoPlantilla"][];
+            firmas?: components["schemas"]["FirmasPlantilla"];
+            /** Id */
+            id: number;
+            /**
+             * Actualizada En
+             * Format: date-time
+             */
+            actualizada_en: string;
+            /**
+             * Usos
+             * @description Contratos hechos con esta plantilla.
+             */
+            usos: number;
+        };
         /** PlantillaDeEtapas */
         PlantillaDeEtapas: {
             /** Id */
@@ -7657,6 +8085,11 @@ export interface components {
              * Format: date-time
              */
             actualizada_en: string;
+        };
+        /** PlantillasDeContrato */
+        PlantillasDeContrato: {
+            /** Items */
+            items: components["schemas"]["PlantillaDeContrato"][];
         };
         /** Presencia */
         Presencia: {
@@ -18219,6 +18652,785 @@ export interface operations {
                 };
                 content: {
                     "application/pdf": unknown;
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+        };
+    };
+    listar_plantillas_contrato: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PlantillasDeContrato"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+        };
+    };
+    crear_plantilla_contrato: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PlantillaContratoEntrada"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PlantillaDeContrato"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+        };
+    };
+    editar_plantilla_contrato: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                plantilla_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PlantillaContratoEntrada"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PlantillaDeContrato"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+        };
+    };
+    eliminar_plantilla_contrato: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                plantilla_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+        };
+    };
+    duplicar_plantilla_contrato: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                plantilla_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PlantillaDeContrato"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+        };
+    };
+    contexto_contrato: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                proceso_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ContextoContrato"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+        };
+    };
+    crear_contrato_con_plantilla: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                proceso_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["NuevoContratoPlantilla"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ContratoDetalle"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+        };
+    };
+    vista_previa_con_plantilla: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                proceso_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["NuevoContratoPlantilla"];
+            };
+        };
+        responses: {
+            /** @description El contrato en PDF. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/pdf": unknown;
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+        };
+    };
+    editar_datos_contrato: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                contrato_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CambiosDatosContrato"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ContratoDetalle"];
                 };
             };
             /** @description Bad Request */

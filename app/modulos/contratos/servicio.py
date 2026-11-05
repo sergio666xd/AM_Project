@@ -21,7 +21,7 @@ import logging
 import os
 import re
 import uuid
-from datetime import timezone
+from datetime import datetime, timezone
 from typing import Iterator
 
 from botocore.exceptions import BotoCoreError, ClientError
@@ -43,8 +43,20 @@ from app.message_templates import render_direct_message
 from app.modulos.agenda.avisos import notificar_evento
 from app.modulos.bandeja.esquemas import ProcesoBreve
 from app.modulos.clientes.politicas import gestiona_contratos
+from app.modulos.contratos import motor
+from app.modulos.contratos.documento import render_pdf_plantilla
 from app.modulos.contratos.esquemas import (
     CambiosContrato,
+    CambiosDatosContrato,
+    ContextoContrato,
+    DatosContrato,
+    DatosGuardados,
+    PlantillasDeContrato,
+    NuevoContratoPlantilla,
+    PersonaContrato,
+    PlantillaDeContrato,
+    CopiaPlantillaContrato,
+    PlantillaContratoEntrada,
     Contrato,
     ContratoCargado,
     ContratoDetalle,
@@ -64,6 +76,7 @@ from app.modulos.contratos.esquemas import (
     VersionContrato,
 )
 from app.modulos.contratos.modelos import ContratoServicio
+from app.modulos.contratos.modelos import PlantillaContrato as PlantillaModelo
 from app.modulos.contratos.repositorio import RepositorioContratos
 from app.modulos.documentos.modelos import DocumentoProceso
 from app.modulos.expedientes.modelos import Proceso
@@ -71,7 +84,7 @@ from app.modulos.expedientes.politicas import filtro_procesos_visibles, puede_ad
 from app.modulos.identidad.modelos import Usuario
 from app.modulos.tareas.esquemas import PersonaBreve
 from app.nucleo.errores import Conflicto, DatosInvalidos, ErrorDominio, NoEncontrado, SinPermiso
-from app.timezone import utc_ahora
+from app.timezone import COLOMBIA, utc_ahora
 from app.workflow_service import user_portal_url
 
 logger = logging.getLogger(__name__)
@@ -103,6 +116,28 @@ def _leidos(campos: dict | None) -> dict[str, str]:
         return validate_contract_fields(conocidos, require_complete=False)
     except ValueError:
         return {k: str(v) for k, v in conocidos.items() if k in FIELD_LABELS}
+
+def _identificador(valor: str | None) -> str:
+    """Cédula o tarjeta con puntos de miles, como en CPS: 40328563 → 40.328.563. Otro formato queda igual."""
+    valor = (valor or "").strip()
+    digitos = valor.replace(".", "")
+    return f"{int(digitos):,}".replace(",", ".") if digitos.isdigit() else valor
+
+
+def _genero(valor: str | None) -> str:
+    return {"FEMENINO": "f", "MASCULINO": "m"}.get((valor or "").strip().upper(), "")
+
+
+def _es_con_plantilla(contrato: ContratoServicio) -> bool:
+    return isinstance(contrato.plantilla_copia, dict)
+
+
+def _personas(contrato: ContratoServicio) -> list[dict]:
+    if not _es_con_plantilla(contrato):
+        return []
+    listas = (contrato.campos_actual or {}).get("listas") or {}
+    return [p for c in contrato.plantilla_copia.get("campos") or [] if c.get("tipo") == "lista" for p in listas.get(c["clave"]) or []]
+
 
 VIGENTES = {"BORRADOR", "LISTO_PARA_FIRMA", "EN_FIRMA", "FIRMADO"}
 GRUPOS = {
@@ -142,6 +177,7 @@ class ServicioContratos:
             motivo_cierre=contrato.motivo_anulacion if contrato.estado == "ANULADO" else contrato.motivo_terminacion,
             documento_firmado=DocumentoFirmado(id=firmado.id, nombre_archivo=firmado.nombre_archivo, subido_en=firmado.created_at)
             if firmado else None,
+            personas=[p.get("nombre") or "Sin nombre" for p in _personas(contrato)],
         )
 
     def _sin_contrato(self, usuario: Usuario, contratos: list[ContratoServicio]) -> list[ProcesoSinContrato]:
@@ -237,7 +273,10 @@ class ServicioContratos:
     def _detalle_con(self, usuario, contrato, firmado, firma, entrega) -> ContratoDetalle:
         return ContratoDetalle(
             **self._vista(contrato, firmado).model_dump(),
-            campos=_leidos(contrato.campos_actual),
+            campos={} if _es_con_plantilla(contrato) else _leidos(contrato.campos_actual),
+            plantilla=CopiaPlantillaContrato.model_validate({**contrato.plantilla_copia, "id": contrato.plantilla_id})
+            if _es_con_plantilla(contrato) else None,
+            datos=DatosGuardados.model_validate(contrato.campos_actual or {}) if _es_con_plantilla(contrato) else None,
             versiones=[VersionContrato(version=v.version, estado=v.estado, creado_en=v.created_at) for v in contrato.versiones],
             firma=FirmaAgendada(evento_id=firma.id, inicio=firma.fecha_inicio, fin=firma.fecha_fin, estado=firma.estado) if firma else None,
             ultima_entrega=EntregaCopia(estado=entrega.estado, destinatario=entrega.destinatario, enviado_en=entrega.created_at,
@@ -250,7 +289,8 @@ class ServicioContratos:
         if contrato.versiones:
             numero = max(numero, max(v.version for v in contrato.versiones) + 1)
         contrato.version_actual = numero
-        contenido = json.dumps(contrato.campos_actual or {}, ensure_ascii=False, sort_keys=True)
+        guardado = {"plantilla": contrato.plantilla_copia, "datos": contrato.campos_actual} if _es_con_plantilla(contrato) else contrato.campos_actual
+        contenido = json.dumps(guardado or {}, ensure_ascii=False, sort_keys=True)
         self._db.add(models.ContratoServicioVersion(
             contrato_id=contrato.id, version=numero, estado=estado, contenido=contenido, campos=contrato.campos_actual or {},
             parte_cliente_snapshot=respaldo or contrato.parte_cliente_snapshot or {},
@@ -274,12 +314,11 @@ class ServicioContratos:
             items=[self._detalle_con(usuario, c, firmados.get(c.id), (firmas[c.id] or [None])[0], entregas.get(c.id))
                    for c in contratos],
             clientes=[PersonaBreve(id=c.id, nombre=c.nombre_completo) for c in clientes],
-            puede_crear=editable and bool(clientes),
+            puede_crear=editable,
         )
 
-    def plantilla(self, usuario: Usuario, proceso_id: int, cliente_id: int | None) -> PlantillaContrato:
-        """Los datos del abogado responsable (o los de la firma) y lo que la cuenta del cliente ya sabe."""
-        proceso = self._proceso(usuario, proceso_id)
+    def _perfil_abogado(self, proceso: Proceso) -> dict[str, str]:
+        """Los datos del abogado responsable, sobre los de la firma (CPS) para lo que su perfil no tenga."""
         config = self._db.get(models.ConfiguracionFirma, 1)
         parametros = config.parametros_generales if config and isinstance(config.parametros_generales, dict) else {}
         perfil = {**DEFAULT_ATTORNEY_PROFILE, **(parametros.get("contrato_abogado") if isinstance(parametros.get("contrato_abogado"), dict) else {})}
@@ -291,7 +330,12 @@ class ServicioContratos:
         }.items():
             if isinstance(valor, str) and valor.strip():
                 perfil[clave] = valor.strip() if clave == "correo" else valor.strip().upper()
-        campos = default_contract_fields(attorney_profile=perfil)
+        return perfil
+
+    def plantilla(self, usuario: Usuario, proceso_id: int, cliente_id: int | None) -> PlantillaContrato:
+        """Los datos del abogado responsable (o los de la firma) y lo que la cuenta del cliente ya sabe."""
+        proceso = self._proceso(usuario, proceso_id)
+        campos = default_contract_fields(attorney_profile=self._perfil_abogado(proceso))
         cliente = self._repo.cliente_del_proceso(proceso.id, cliente_id) if cliente_id else None
         if cliente_id and cliente is None:
             raise NoEncontrado("Ese cliente no está en el proceso.")
@@ -305,6 +349,213 @@ class ServicioContratos:
             if campos["genero_cliente"] not in {"MASCULINO", "FEMENINO"}:
                 campos["genero_cliente"] = ""
         return PlantillaContrato(campos=campos)
+
+    # ---- Plantillas ------------------------------------------------------------------
+
+    def _plantilla(self, plantilla_id: int) -> PlantillaModelo:
+        plantilla = self._db.get(PlantillaModelo, plantilla_id)
+        if plantilla is None or plantilla.eliminada_en is not None:
+            raise NoEncontrado("No encontramos esa plantilla; puede que la hayan eliminado.")
+        return plantilla
+
+    @staticmethod
+    def _revisada(entrada: PlantillaContratoEntrada) -> dict:
+        datos = entrada.model_dump(mode="json")
+        resultado = motor.revisar(datos["cuerpo"], datos["campos"])
+        if resultado.errores:
+            raise DatosInvalidos("Corrija la plantilla: " + " ".join(resultado.errores[:4]), codigo="plantilla_con_errores")
+        return datos
+
+    def _vista_plantilla(self, plantilla: PlantillaModelo, usos: int) -> PlantillaDeContrato:
+        return PlantillaDeContrato(
+            id=plantilla.id, nombre=plantilla.nombre, descripcion=plantilla.descripcion, cuerpo=plantilla.cuerpo,
+            campos=plantilla.campos or [], firmas=plantilla.firmas or {}, actualizada_en=plantilla.updated_at, usos=usos,
+        )
+
+    def plantillas(self, usuario: Usuario) -> PlantillasDeContrato:
+        self._permiso(usuario)
+        usos = self._repo.usos_de_plantillas()
+        return PlantillasDeContrato(items=[self._vista_plantilla(p, usos.get(p.id, 0)) for p in self._repo.plantillas()])
+
+    def crear_plantilla(self, usuario: Usuario, entrada: PlantillaContratoEntrada) -> PlantillaDeContrato:
+        self._permiso(usuario)
+        datos = self._revisada(entrada)
+        plantilla = PlantillaModelo(**datos, creado_por_id=usuario.id)
+        self._db.add(plantilla)
+        self._db.flush()
+        registrar_evento_auditoria(self._db, usuario, "plantilla_contrato.crear", "plantilla_contrato", plantilla.id, {"nombre": plantilla.nombre})
+        self._db.commit()
+        return self._vista_plantilla(plantilla, 0)
+
+    def editar_plantilla(self, usuario: Usuario, plantilla_id: int, entrada: PlantillaContratoEntrada) -> PlantillaDeContrato:
+        """Los contratos ya hechos no cambian: guardan su propia copia."""
+        self._permiso(usuario)
+        plantilla = self._plantilla(plantilla_id)
+        for clave, valor in self._revisada(entrada).items():
+            setattr(plantilla, clave, valor)
+        plantilla.updated_at = utc_ahora()
+        registrar_evento_auditoria(self._db, usuario, "plantilla_contrato.actualizar", "plantilla_contrato", plantilla.id, {"nombre": plantilla.nombre})
+        self._db.commit()
+        return self._vista_plantilla(plantilla, self._repo.usos_de_plantillas().get(plantilla.id, 0))
+
+    def duplicar_plantilla(self, usuario: Usuario, plantilla_id: int) -> PlantillaDeContrato:
+        self._permiso(usuario)
+        origen = self._plantilla(plantilla_id)
+        copia = PlantillaModelo(
+            nombre=f"{origen.nombre} (copia)"[:160], descripcion=origen.descripcion, cuerpo=origen.cuerpo,
+            campos=origen.campos, firmas=origen.firmas, creado_por_id=usuario.id,
+        )
+        self._db.add(copia)
+        self._db.flush()
+        registrar_evento_auditoria(self._db, usuario, "plantilla_contrato.duplicar", "plantilla_contrato", copia.id, {"origen_id": origen.id})
+        self._db.commit()
+        return self._vista_plantilla(copia, 0)
+
+    def eliminar_plantilla(self, usuario: Usuario, plantilla_id: int) -> None:
+        """Deja de ofrecerse para contratos nuevos; los contratos hechos con ella conservan su copia."""
+        self._permiso(usuario)
+        plantilla = self._plantilla(plantilla_id)
+        plantilla.eliminada_en = utc_ahora()
+        registrar_evento_auditoria(self._db, usuario, "plantilla_contrato.eliminar", "plantilla_contrato", plantilla.id, {"nombre": plantilla.nombre})
+        self._db.commit()
+
+    # ---- Contratos con plantilla ------------------------------------------------------
+
+    def _fijos(self, proceso: Proceso) -> dict[str, str]:
+        """Proceso, abogado responsable y fecha de hoy (en Colombia), por código."""
+        perfil = self._perfil_abogado(proceso)
+        radicado = next((v.radicado for v in proceso.radicados if v.radicado), None)
+        hoy = datetime.now(COLOMBIA).date()
+        config = self._db.get(models.ConfiguracionFirma, 1)
+        ciudad = ((config.ciudad if config else None) or "Sabaneta, Antioquia").split(",")[0].strip()
+        domicilio = perfil.get("domicilio") or ""
+        return {
+            "proceso.nombre": proceso.nombre,
+            "proceso.radicado": radicado.numero if radicado else "",
+            "proceso.despacho": (radicado.despacho_departamento or "") if radicado else "",
+            "abogado.nombre": perfil["nombre"].upper(),
+            "abogado.documento": _identificador(perfil.get("documento")),
+            "abogado.tarjeta": _identificador(perfil.get("tarjeta_profesional")),
+            "abogado.correo": perfil.get("correo") or "",
+            "abogado.telefono": perfil.get("telefono") or "",
+            "abogado.domicilio": domicilio.title() if domicilio.isupper() else domicilio,
+            "abogado.genero": _genero(perfil.get("genero")) or "f",
+            "fecha.hoy": motor.fecha_en_letras(hoy),
+            "fecha.dia": str(hoy.day),
+            "fecha.mes": motor.MESES[hoy.month - 1],
+            "fecha.anio": str(hoy.year),
+            "fecha.ciudad": ciudad,
+        }
+
+    @staticmethod
+    def _persona_de(cliente: Usuario) -> PersonaContrato:
+        return PersonaContrato(
+            ref=f"c{cliente.id}", cliente_id=cliente.id, nombre=cliente.nombre_completo, cedula=_identificador(cliente.numero_documento),
+            ciudad=cliente.domicilio or "", direccion=cliente.direccion or "", correo=cliente.email or "",
+            telefono=cliente.whatsapp_numero or "", genero=_genero(cliente.genero),
+        )
+
+    def contexto(self, usuario: Usuario, proceso_id: int) -> ContextoContrato:
+        """Lo que el formulario necesita: los datos fijos y los clientes del proceso con su perfil."""
+        proceso = self._proceso(usuario, proceso_id)
+        clientes = sorted((v.cliente for v in proceso.clientes if v.cliente), key=lambda c: c.nombre_completo.casefold())
+        return ContextoContrato(fijos=self._fijos(proceso), clientes=[self._persona_de(c) for c in clientes])
+
+    def _datos(self, proceso: Proceso, plantilla: dict, datos: DatosContrato) -> tuple[dict, Usuario | None]:
+        """Los datos que se guardan: solo los campos de la plantilla, con los clientes verificados y los fijos de hoy.
+
+        Devuelve también el primer cliente registrado: a él se le agenda la firma y se le envía la copia.
+        """
+        campos = plantilla.get("campos") or []
+        del_proceso = {v.cliente_id: v.cliente for v in proceso.clientes if v.cliente}
+        listas: dict[str, list[dict]] = {}
+        principal = None
+        for definicion in (c for c in campos if c["tipo"] == "lista"):
+            personas = []
+            for persona in datos.listas.get(definicion["clave"], []):
+                if persona.cliente_id is not None:
+                    cliente = del_proceso.get(persona.cliente_id)
+                    if cliente is None:
+                        raise DatosInvalidos("Una de las personas ya no es cliente del proceso.", codigo="cliente_no_es_del_proceso")
+                    principal = principal or cliente
+                personas.append(persona.model_dump())
+            listas[definicion["clave"]] = personas
+        propios = {c["clave"] for c in campos if c["tipo"] != "lista"}
+        refs = {p["ref"] for personas in listas.values() for p in personas}
+        guardado = {
+            "valores": {k: v for k, v in datos.valores.items() if k in propios},
+            "listas": listas,
+            "notificaciones": {
+                "personas": [r for r in datos.notificaciones.personas if r in refs],
+                "otras": [o.model_dump() for o in datos.notificaciones.otras],
+            },
+            "fijos": self._fijos(proceso),
+        }
+        return guardado, principal
+
+    def _completar_perfiles(self, proceso: Proceso, guardado: dict) -> None:
+        """Lo que el perfil de un cliente no tenía y se escribió en el contrato queda también en su perfil."""
+        del_proceso = {v.cliente_id: v.cliente for v in proceso.clientes if v.cliente}
+        for personas in guardado["listas"].values():
+            for persona in personas:
+                cliente = del_proceso.get(persona.get("cliente_id"))
+                if cliente is None:
+                    continue
+                for columna, valor in (("numero_documento", persona["cedula"]), ("domicilio", persona["ciudad"]),
+                                       ("direccion", persona["direccion"])):
+                    if valor and not (getattr(cliente, columna) or "").strip():
+                        setattr(cliente, columna, valor[:{"numero_documento": 40, "domicilio": 120, "direccion": 300}[columna]])
+                if persona["genero"] and not _genero(cliente.genero):
+                    cliente.genero = "FEMENINO" if persona["genero"] == "f" else "MASCULINO"
+
+    @staticmethod
+    def _respaldo(principal: Usuario | None, guardado: dict) -> dict:
+        if principal is not None:
+            return {"id": principal.id, "nombre": principal.nombre_completo, "email": principal.email}
+        primera = next((p for personas in guardado["listas"].values() for p in personas), None)
+        return {"nombre": primera["nombre"], "email": primera["correo"]} if primera else {}
+
+    def crear_con_plantilla(self, usuario: Usuario, proceso_id: int, entrada: NuevoContratoPlantilla) -> ContratoDetalle:
+        proceso = self._proceso(usuario, proceso_id)
+        self._para_cambiar(usuario, proceso)
+        origen = self._plantilla(entrada.plantilla_id)
+        copia = PlantillaContratoEntrada.model_validate(
+            {"nombre": origen.nombre, "descripcion": origen.descripcion, "cuerpo": origen.cuerpo, "campos": origen.campos, "firmas": origen.firmas},
+        ).model_dump(mode="json")
+        guardado, principal = self._datos(proceso, copia, entrada.datos)
+        respaldo = self._respaldo(principal, guardado)
+        contrato = ContratoServicio(
+            proceso_id=proceso.id, cliente_id=principal.id if principal else None, abogado_id=proceso.abogado_id, estado="BORRADOR",
+            version_actual=1, contenido_actual="", campos_actual=guardado, parte_cliente_snapshot=respaldo, creado_por_id=usuario.id,
+            plantilla_id=origen.id, plantilla_copia=copia,
+        )
+        self._db.add(contrato)
+        self._completar_perfiles(proceso, guardado)
+        self._db.flush()
+        self._version(usuario, contrato, "BORRADOR", respaldo)
+        return self._guardar(usuario, contrato, "contrato.crear", {"proceso_id": proceso.id, "plantilla_id": origen.id})
+
+    def editar_datos(self, usuario: Usuario, contrato_id: int, cambios: CambiosDatosContrato) -> ContratoDetalle:
+        contrato = self._contrato(usuario, contrato_id, para_cambiar=True)
+        if not _es_con_plantilla(contrato):
+            raise Conflicto("Este contrato es de campos fijos; edítelo con su formulario.", codigo="contrato_sin_plantilla")
+        if contrato.estado != "BORRADOR":
+            raise Conflicto("Solo se edita un contrato en borrador.", codigo="contrato_no_editable")
+        guardado, principal = self._datos(contrato.proceso, contrato.plantilla_copia, cambios.datos)
+        contrato.campos_actual = guardado
+        contrato.cliente_id = principal.id if principal else None
+        contrato.parte_cliente_snapshot = self._respaldo(principal, guardado)
+        self._completar_perfiles(contrato.proceso, guardado)
+        self._version(usuario, contrato, "BORRADOR")
+        return self._guardar(usuario, contrato, "contrato.actualizar", {"version": contrato.version_actual})
+
+    def vista_previa_plantilla(self, usuario: Usuario, proceso_id: int, entrada: NuevoContratoPlantilla) -> bytes:
+        """El PDF de un contrato sin guardar; lo que falta sale resaltado."""
+        proceso = self._proceso(usuario, proceso_id)
+        origen = self._plantilla(entrada.plantilla_id)
+        copia = {"nombre": origen.nombre, "cuerpo": origen.cuerpo, "campos": origen.campos, "firmas": origen.firmas}
+        guardado, _ = self._datos(proceso, copia, entrada.datos)
+        return render_pdf_plantilla(copia, guardado)
 
     def crear(self, usuario: Usuario, proceso_id: int, datos: NuevoContrato) -> ContratoDetalle:
         proceso = self._proceso(usuario, proceso_id)
@@ -327,6 +578,8 @@ class ServicioContratos:
 
     def editar(self, usuario: Usuario, contrato_id: int, datos: CambiosContrato) -> ContratoDetalle:
         contrato = self._contrato(usuario, contrato_id, para_cambiar=True)
+        if _es_con_plantilla(contrato):
+            raise Conflicto("Este contrato se hizo con una plantilla; edítelo con su formulario.", codigo="contrato_con_plantilla")
         if contrato.estado != "BORRADOR":
             raise Conflicto("Solo se edita un contrato en borrador.", codigo="contrato_no_editable")
         contrato.campos_actual = _validados(datos.campos)
@@ -341,6 +594,11 @@ class ServicioContratos:
 
     def pdf(self, usuario: Usuario, contrato_id: int) -> bytes:
         contrato = self._contrato(usuario, contrato_id)
+        if _es_con_plantilla(contrato):
+            # El borrador también se ve en PDF, para revisarlo; lo que falta sale resaltado.
+            if contrato.estado == "ANULADO":
+                raise Conflicto("Un contrato anulado ya no se imprime.", codigo="contrato_sin_pdf")
+            return render_pdf_plantilla(contrato.plantilla_copia, contrato.campos_actual or {})
         if contrato.estado in {"BORRADOR", "ANULADO"}:
             raise Conflicto("El PDF para imprimir sale cuando el contrato está listo para firmar.", codigo="contrato_sin_pdf")
         return self._pdf(contrato.campos_actual or {})
@@ -356,7 +614,14 @@ class ServicioContratos:
         contrato = self._contrato(usuario, contrato_id, para_cambiar=True)
         if contrato.estado != "BORRADOR":
             raise Conflicto("Solo un borrador pasa a listo para firmar.", codigo="transicion_no_permitida")
-        _validados(contrato.campos_actual or {}, completos=True)
+        if _es_con_plantilla(contrato):
+            # La fecha y los datos del abogado quedan los del día en que se deja listo.
+            contrato.campos_actual = {**(contrato.campos_actual or {}), "fijos": self._fijos(contrato.proceso)}
+            faltan = motor.faltantes(contrato.plantilla_copia, contrato.campos_actual)
+            if faltan:
+                raise DatosInvalidos(" ".join(faltan), codigo="contrato_incompleto")
+        else:
+            _validados(contrato.campos_actual or {}, completos=True)
         contrato.estado, contrato.emitido_en = "LISTO_PARA_FIRMA", utc_ahora()
         self._version(usuario, contrato, contrato.estado)
         return self._guardar(usuario, contrato, "contrato.estado", {"estado": contrato.estado})
@@ -401,7 +666,9 @@ class ServicioContratos:
             raise Conflicto("La firma ya está agendada; muévala desde la agenda del proceso.", codigo="firma_agendada")
         cliente = contrato.cliente
         if cliente is None:
-            raise Conflicto("El cliente de este contrato ya no tiene cuenta.", codigo="sin_cliente")
+            mensaje = ("Agregue al contrato un cliente registrado para agendarle la firma." if _es_con_plantilla(contrato)
+                       else "El cliente de este contrato ya no tiene cuenta.")
+            raise Conflicto(mensaje, codigo="sin_cliente")
         evento = models.EventoAgenda(
             titulo=f"Firma del contrato de servicios · {cliente.nombre_completo}", descripcion=datos.lugar, tipo="FIRMA_CONTRATO",
             estado="PROGRAMADO", fecha_inicio=_utc(datos.inicio), fecha_fin=_utc(datos.fin), responsable_id=usuario.id,

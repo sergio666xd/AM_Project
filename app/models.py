@@ -1159,6 +1159,27 @@ class SuscripcionCalendario(Base):
     ultimo_uso = Column(DateTime, nullable=True)
 
 
+class PlantillaContrato(Base):
+    """Texto de un contrato en Markdown con códigos, sobre el documento base CPS.
+
+    `campos` son los campos propios (y las listas de personas) que pide el formulario;
+    `firmas` guarda el rótulo del abogado. Una plantilla eliminada deja de ofrecerse,
+    pero los contratos hechos con ella conservan su copia.
+    """
+    __tablename__ = "plantillas_contrato"
+
+    id = Column(Integer, primary_key=True)
+    nombre = Column(String(160), nullable=False)
+    descripcion = Column(Text, nullable=True)
+    cuerpo = Column(Text, nullable=False)
+    campos = Column(JSON, nullable=False, default=list)
+    firmas = Column(JSON, nullable=False, default=dict)
+    creado_por_id = Column(Integer, ForeignKey("usuarios.id", ondelete="SET NULL"), nullable=True)
+    created_at = Column(DateTime, nullable=False, default=utc_ahora)
+    updated_at = Column(DateTime, nullable=False, default=utc_ahora, onupdate=utc_ahora)
+    eliminada_en = Column(DateTime, nullable=True)
+
+
 class ContratoServicio(Base):
     __tablename__ = "contratos_servicios"
     __table_args__ = (
@@ -1181,6 +1202,12 @@ class ContratoServicio(Base):
     anulado_en = Column(DateTime, nullable=True)
     motivo_anulacion = Column(Text, nullable=True)
     creado_por_id = Column(Integer, ForeignKey("usuarios.id", ondelete="SET NULL"), nullable=True)
+    # Contratos hechos con una plantilla: la plantilla de origen (puede borrarse después)
+    # y la copia con la que se redactó. Sin copia, es un contrato CPS de campos fijos.
+    plantilla_id = Column(
+        Integer, ForeignKey("plantillas_contrato.id", ondelete="SET NULL", name="fk_contratos_servicios_plantilla"), nullable=True, index=True,
+    )
+    plantilla_copia = Column(JSON, nullable=True)
     created_at = Column(DateTime, nullable=False, default=utc_ahora)
     updated_at = Column(DateTime, nullable=False, default=utc_ahora, onupdate=utc_ahora)
     proceso = relationship("Proceso", back_populates="contratos")

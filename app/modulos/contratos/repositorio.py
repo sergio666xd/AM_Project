@@ -1,8 +1,8 @@
-from sqlalchemy import ColumnElement, select
+from sqlalchemy import ColumnElement, func, select
 from sqlalchemy.orm import Session, selectinload
 
 from app.models import EntregaCorreoContrato, EventoAgenda
-from app.modulos.contratos.modelos import ContratoServicio
+from app.modulos.contratos.modelos import ContratoServicio, PlantillaContrato
 from app.modulos.documentos.modelos import DocumentoProceso
 from app.modulos.expedientes.modelos import Proceso, ProcesoCliente
 from app.modulos.identidad.modelos import RolUsuario, Usuario
@@ -11,6 +11,16 @@ from app.modulos.identidad.modelos import RolUsuario, Usuario
 class RepositorioContratos:
     def __init__(self, db: Session):
         self._db = db
+
+    def plantillas(self) -> list[PlantillaContrato]:
+        """Las plantillas vigentes, la más reciente primero."""
+        P = PlantillaContrato
+        return list(self._db.scalars(select(P).where(P.eliminada_en.is_(None)).order_by(P.updated_at.desc(), P.id.desc())).all())
+
+    def usos_de_plantillas(self) -> dict[int, int]:
+        C = ContratoServicio
+        filas = self._db.execute(select(C.plantilla_id, func.count()).where(C.plantilla_id.is_not(None)).group_by(C.plantilla_id)).all()
+        return {plantilla_id: total for plantilla_id, total in filas}
 
     def contratos(self, visibles: ColumnElement[bool]) -> list[ContratoServicio]:
         """Los contratos de los procesos que el usuario ve, también de los archivados."""
