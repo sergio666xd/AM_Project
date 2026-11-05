@@ -50,8 +50,8 @@ export default async function Contacto({ searchParams }: { searchParams: Promise
           <div className="max-w-[760px]">
             <FormularioConsulta
               key={String(parametros.area ?? "")}
-              titulo="Escríbanos su consulta"
-              intro="Cuéntenos en pocas palabras qué decisión tiene por delante. La firma lo lee y le responde por el medio que usted elija."
+              titulo={contenido.formTitle}
+              intro={contenido.formIntro}
               areaInicial={areaDeConsulta(parametros.area)}
               whatsapp={whatsapp}
             />

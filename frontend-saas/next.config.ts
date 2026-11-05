@@ -15,6 +15,10 @@ const backendDev = process.env.BACKEND_DEV_URL ?? "http://127.0.0.1:8000";
 
 const nextConfig: NextConfig = {
   allowedDevOrigins,
+  // "Áreas de práctica" pasó a llamarse "Servicios"; los enlaces viejos siguen funcionando.
+  async redirects() {
+    return [{ source: "/areas-de-practica", destination: "/servicios", permanent: true }];
+  },
   async rewrites() {
     if (process.env.NODE_ENV !== "development") return [];
     return [{ source: "/api/:ruta*", destination: `${backendDev}/api/:ruta*` }];

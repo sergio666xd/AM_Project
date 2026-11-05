@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { completarPolitica } from "@/lib/datosResponsable";
 import { Carpeta, RELLENO, TituloPagina } from "./Caratula";
 import { MarcoSitio } from "./MarcoSitio";
 import { Texto, enLinea } from "./Texto";
@@ -16,13 +17,17 @@ export function DocumentoLegal({
   actualizada,
   secciones,
   otro,
+  valores = {},
 }: {
   titulo: string;
   actualizada: string;
   secciones: readonly Seccion[];
   otro: { href: string; label: string };
+  /** Datos del responsable que completan los {{campos}} del texto. */
+  valores?: Record<string, string | null | undefined>;
 }) {
   const conAncla = secciones.map((seccion, i) => ({ ...seccion, id: ancla(seccion.title, i) }));
+  const cuerpo = (body: Seccion["body"]) => completarPolitica(typeof body === "string" ? body : body.join("\n\n"), valores);
   return (
     <MarcoSitio>
       <Carpeta
@@ -56,7 +61,7 @@ export function DocumentoLegal({
                   <span className="folio-num mr-2 text-ink-3">{i + 1}.</span>
                   {seccion.title}
                 </h2>
-                <Texto valor={typeof seccion.body === "string" ? seccion.body : seccion.body.join("\n\n")} className="mt-3" />
+                <Texto valor={cuerpo(seccion.body)} className="mt-3" />
               </section>
             ))}
           </div>

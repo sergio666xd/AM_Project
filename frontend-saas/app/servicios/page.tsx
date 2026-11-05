@@ -10,10 +10,10 @@ import { SITE_PAGE_DEFAULTS } from "@/lib/sitePageDefaults";
 import { cargarPagina } from "@/lib/sitioPublico";
 
 export function generateMetadata() {
-  return generatePublicPageMetadata("areas-de-practica", SITE_PAGE_DEFAULTS["areas-de-practica"], "/areas-de-practica");
+  return generatePublicPageMetadata("areas-de-practica", SITE_PAGE_DEFAULTS["areas-de-practica"], "/servicios");
 }
 
-export default async function AreasDePractica() {
+export default async function Servicios() {
   const contenido = await cargarPagina("areas-de-practica", SITE_PAGE_DEFAULTS["areas-de-practica"]);
   const areas = contenido.areas.map((area, i) => ({ ...area, ...areaDeIcono(area.icon, i) }));
 
@@ -27,7 +27,7 @@ export default async function AreasDePractica() {
               <TituloPagina>{enLinea(contenido.title)}</TituloPagina>
               <Entrada>{enLinea(contenido.description)}</Entrada>
             </div>
-            <nav aria-label="Áreas en esta página">
+            <nav aria-label="Servicios en esta página">
               <h2 className="mb-3 text-[14px] font-semibold text-ink-2">En esta página</h2>
               <ol className="divide-y divide-manila-line border-y border-manila-line">
                 {areas.map((area) => (

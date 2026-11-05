@@ -6,7 +6,7 @@ import { SITE_PAGE_DEFAULTS, type PublicPageSlug } from "@/lib/sitePageDefaults"
 // Solo rutas públicas: no incluir login, paneles administrativos ni dashboards.
 const publicPages = [
   { path: "/", slug: "inicio" as const, changeFrequency: "weekly" as const, priority: 1 },
-  { path: "/areas-de-practica", slug: "areas-de-practica" as const, changeFrequency: "monthly" as const, priority: 0.9 },
+  { path: "/servicios", slug: "areas-de-practica" as const, changeFrequency: "monthly" as const, priority: 0.9 },
   { path: "/quienes-somos", slug: "quienes-somos" as const, changeFrequency: "monthly" as const, priority: 0.8 },
   { path: "/filosofia", slug: "filosofia" as const, changeFrequency: "monthly" as const, priority: 0.7 },
   { path: "/contacto", slug: "contacto" as const, changeFrequency: "monthly" as const, priority: 0.8 },

@@ -33467,6 +33467,8 @@
             "type": "string",
             "enum": [
               "familia",
+              "civil",
+              "laboral",
               "empresas",
               "propiedad_horizontal",
               "publico",
@@ -34094,6 +34096,8 @@
             "type": "string",
             "enum": [
               "familia",
+              "civil",
+              "laboral",
               "empresas",
               "propiedad_horizontal",
               "publico",

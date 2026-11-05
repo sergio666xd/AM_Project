@@ -7031,7 +7031,7 @@ export interface components {
              * Area
              * @enum {string}
              */
-            area: "familia" | "empresas" | "propiedad_horizontal" | "publico" | "poliza" | "otro";
+            area: "familia" | "civil" | "laboral" | "empresas" | "propiedad_horizontal" | "publico" | "poliza" | "otro";
             /** Mensaje */
             mensaje: string;
             /**
@@ -7257,7 +7257,7 @@ export interface components {
              * Area
              * @enum {string}
              */
-            area: "familia" | "empresas" | "propiedad_horizontal" | "publico" | "poliza" | "otro";
+            area: "familia" | "civil" | "laboral" | "empresas" | "propiedad_horizontal" | "publico" | "poliza" | "otro";
             /** Mensaje */
             mensaje: string;
             /**

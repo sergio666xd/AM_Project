@@ -13,7 +13,9 @@ import { enlaceWhatsapp } from "@/lib/whatsapp";
 /** Cómo lo dice quien escribe; en la bandeja de la firma se lee con AREA_CONSULTA. */
 const AREAS: { id: AreaConsulta; label: string }[] = [
   { id: "familia", label: "Familia o herencia" },
-  { id: "empresas", label: "Empresa o contrato" },
+  { id: "civil", label: "Contrato, inmueble o deuda" },
+  { id: "laboral", label: "Laboral" },
+  { id: "empresas", label: "Empresa o sociedad" },
   { id: "propiedad_horizontal", label: "Propiedad horizontal" },
   { id: "publico", label: "Entidad pública" },
   { id: "poliza", label: "Póliza jurídica" },
@@ -149,7 +151,7 @@ export function FormularioConsulta({
           Recibimos su mensaje{enviado.primerNombre ? `, ${enviado.primerNombre}` : ""}.
         </h2>
         <div className="max-w-[56ch] space-y-3 text-[17px] leading-[1.6] text-ink-2">
-          <p>Ya le llegó a la firma, que lo lee y le responde {enviado.medio}.</p>
+          <p>Ya le llegó al equipo, que lo lee y le responde {enviado.medio} en máximo 2 días hábiles.</p>
           <p>No tiene que hacer nada más.{whatsapp ? ` Si quiere agregar algo, escríbanos por WhatsApp al ${telefonoLegible(whatsapp)}.` : ""}</p>
         </div>
         <Button variant="secondary" size="lg" onClick={() => {
@@ -259,7 +261,7 @@ export function FormularioConsulta({
             className="mt-[3px] size-5 shrink-0 accent-navy"
           />
           <span>
-            Autorizo a la firma a usar estos datos para responder mi consulta, según la{" "}
+            Autorizo el uso de estos datos para responder mi consulta, según la{" "}
             <Link href="/tratamiento-de-datos" className="text-navy underline">política de tratamiento de datos</Link>.
           </span>
         </label>

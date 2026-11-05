@@ -7,8 +7,8 @@ import { cx } from "@/lib/cx";
 export type SeccionSitio = "consulta" | "areas" | "poliza" | "firma" | "contacto";
 
 const SECCIONES: { id: SeccionSitio; label: string; href: string }[] = [
-  { id: "consulta", label: "Cuéntenos su caso", href: "/" },
-  { id: "areas", label: "Áreas de práctica", href: "/areas-de-practica" },
+  { id: "consulta", label: "Inicio", href: "/" },
+  { id: "areas", label: "Servicios", href: "/servicios" },
   { id: "poliza", label: "Póliza jurídica", href: "/poliza-juridica" },
   { id: "firma", label: "Quiénes somos", href: "/quienes-somos" },
   { id: "contacto", label: "Contacto", href: "/contacto" },

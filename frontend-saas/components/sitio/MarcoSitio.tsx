@@ -10,7 +10,7 @@ import { Columna } from "./Caratula";
 import { EnlacePortal } from "./EnlacePortal";
 
 const ENLACES_PIE = [
-  { href: "/areas-de-practica", label: "Áreas de práctica" },
+  { href: "/servicios", label: "Servicios" },
   { href: "/poliza-juridica", label: "Póliza jurídica" },
   { href: "/quienes-somos", label: "Quiénes somos" },
   { href: "/filosofia", label: "Nuestra filosofía" },
@@ -42,9 +42,15 @@ export async function MarcoSitio({ children }: { children: ReactNode }) {
           <Link href="/" aria-label="Inicio" className="-m-1 rounded-md p-1">
             <Logo className="h-10 w-auto sm:h-12" />
           </Link>
-          <EnlacePortal className={clasesBoton("secondary", "md")}>
-            Portal de clientes
-          </EnlacePortal>
+          <div className="flex items-center gap-2 sm:gap-3">
+            {/* Los visitantes nuevos van a la consulta; el portal es para quien ya es cliente. */}
+            <EnlacePortal className={clasesBoton("ghost", "md") + " max-sm:hidden"}>
+              Portal de clientes
+            </EnlacePortal>
+            <Link href="/#consulta" className={clasesBoton("primary", "md")}>
+              Recibir asesoría
+            </Link>
+          </div>
         </Columna>
       </header>
 
