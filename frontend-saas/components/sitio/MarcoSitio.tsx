@@ -8,6 +8,7 @@ import { cargarContacto } from "@/lib/sitioPublico";
 import { enlaceWhatsapp } from "@/lib/whatsapp";
 import { Columna } from "./Caratula";
 import { EnlacePortal } from "./EnlacePortal";
+import { MenuMovil, NavSitio } from "./NavSitio";
 
 const ENLACES_PIE = [
   { href: "/servicios", label: "Servicios" },
@@ -37,19 +38,22 @@ export async function MarcoSitio({ children }: { children: ReactNode }) {
       <a href="#contenido" className="sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-4 focus:z-50 focus:rounded-md focus:bg-sheet focus:px-3 focus:py-2 focus:shadow-pop">
         Ir al contenido
       </a>
-      <header className="border-b border-line bg-sheet">
-        <Columna className="flex min-h-[72px] items-center justify-between gap-4 py-3 sm:min-h-20">
-          <Link href="/" aria-label="Inicio" className="-m-1 rounded-md p-1">
+      {/* El menú va arriba desde el primer momento: en computador en línea, en celular detrás de la hamburguesa. */}
+      <header className="sticky top-0 z-30 border-b border-line bg-sheet/95 backdrop-blur supports-[backdrop-filter]:bg-sheet/85">
+        <Columna className="flex min-h-[72px] items-center justify-between gap-4 py-3 lg:min-h-20">
+          <Link href="/" aria-label="Inicio" className="-m-1 shrink-0 rounded-md p-1">
             <Logo className="h-10 w-auto sm:h-12" />
           </Link>
+          <NavSitio />
           <div className="flex items-center gap-2 sm:gap-3">
             {/* Los visitantes nuevos van a la consulta; el portal es para quien ya es cliente. */}
-            <EnlacePortal className={clasesBoton("ghost", "md") + " max-sm:hidden"}>
+            <EnlacePortal className={clasesBoton("ghost", "md") + " max-xl:hidden"}>
               Portal de clientes
             </EnlacePortal>
             <Link href="/#consulta" className={clasesBoton("primary", "md")}>
               Recibir asesoría
             </Link>
+            <MenuMovil />
           </div>
         </Columna>
       </header>

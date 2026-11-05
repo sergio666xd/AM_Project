@@ -22,7 +22,6 @@ export default async function PolizaJuridica() {
   return (
     <MarcoSitio>
       <Carpeta
-        actual="poliza"
         caratula={
           <div className="grid grid-cols-[minmax(0,1fr)] gap-9 lg:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)] lg:gap-14">
             <div>

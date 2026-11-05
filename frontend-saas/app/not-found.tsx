@@ -7,7 +7,6 @@ export default function PaginaNoEncontrada() {
   return (
     <MarcoSitio>
       <Carpeta
-        actual={null}
         caratula={
           <div>
             <TituloPagina>No encontramos esta página</TituloPagina>

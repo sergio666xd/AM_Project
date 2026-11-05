@@ -286,7 +286,6 @@
   --cover-line: rgb(255 255 255 / 0.18);
   --cover-chip: rgb(255 255 255 / 0.1);
   --cover-accent: #e3d29a;
-  --sheet-ink: #18203a;
 }
 
 .dark {
@@ -297,7 +296,6 @@
   --cover-line: rgb(255 255 255 / 0.14);
   --cover-chip: rgb(255 255 255 / 0.08);
   --cover-accent: #dcc78a;
-  --sheet-ink: #ece8dc;
 }
 
 /* El fondo del sitio toma un gris azulado en lugar del manila de la app. */
@@ -318,11 +316,6 @@
   --navy: var(--cover-accent);
 }
 
-/* La pestaña activa es parte de la hoja blanca: vuelve a la tinta de la hoja. */
-.caratula-azul .tinta-hoja {
-  --ink: var(--sheet-ink);
-}
-
 /* ── Sitio público: movimiento ──
    La carátula entra al cargar y su luz se desplaza despacio; las secciones y
    las listas aparecen al bajar (solo donde el navegador anima con el scroll,
@@ -334,9 +327,6 @@
 @keyframes sitio-luz {
   from { background-position: 100% 0%, 0 0; }
   to { background-position: 40% 70%, 0 0; }
-}
-@keyframes sitio-linea {
-  from { scale: 0 1; }
 }
 @keyframes sitio-brillo {
   from { translate: -120% 0; }
@@ -370,10 +360,6 @@
   .caratula-entrada > * > * > *:nth-child(3) { animation-delay: 0.16s; }
   .caratula-entrada > * > *:nth-child(n + 4),
   .caratula-entrada > * > * > *:nth-child(n + 4) { animation-delay: 0.24s; }
-
-  .pestana-activa::before {
-    animation: sitio-linea 0.6s 0.2s var(--ease-out-expo) both;
-  }
 
   @supports (animation-timeline: view()) {
     .sitio-publico main section,

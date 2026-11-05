@@ -31,7 +31,6 @@ export function DocumentoLegal({
   return (
     <MarcoSitio>
       <Carpeta
-        actual={null}
         caratula={
           <div>
             <TituloPagina>{enLinea(titulo)}</TituloPagina>

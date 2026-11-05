@@ -17,7 +17,6 @@ export default async function Filosofia() {
   return (
     <MarcoSitio>
       <Carpeta
-        actual="firma"
         caratula={
           <div>
             <Link href="/quienes-somos" className="mb-5 inline-flex items-center gap-1.5 text-[15px] font-semibold text-ink-2 hover:text-navy">

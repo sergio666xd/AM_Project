@@ -34,7 +34,6 @@ export default async function Contacto({ searchParams }: { searchParams: Promise
   return (
     <MarcoSitio>
       <Carpeta
-        actual="contacto"
         id="consulta"
         caratula={
           <div className="grid grid-cols-[minmax(0,1fr)] gap-9 lg:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)] lg:gap-14">

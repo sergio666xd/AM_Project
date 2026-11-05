@@ -20,7 +20,6 @@ export default async function Inicio() {
   return (
     <MarcoSitio>
       <Carpeta
-        actual="consulta"
         caratula={
           <div className="max-w-[860px] pb-2 sm:pb-4 lg:pt-4">
             <div className="mb-6 flex flex-wrap gap-2">

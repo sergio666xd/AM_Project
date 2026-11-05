@@ -1,6 +1,5 @@
 import type { ReactNode } from "react";
 import { cx } from "@/lib/cx";
-import { PestanasSitio, type SeccionSitio } from "./PestanasSitio";
 
 /** Columna del sitio: 1180 px con el mismo margen que el encabezado y el pie. */
 export function Columna({ children, className }: { children: ReactNode; className?: string }) {
@@ -8,18 +7,14 @@ export function Columna({ children, className }: { children: ReactNode; classNam
 }
 
 /**
- * La carpeta de la firma: carátula azul arriba, pestañas en su canto
- * inferior y la hoja blanca unida debajo. La pestaña de la sección actual es
- * parte de esa hoja (canto dorado), así cada página se lee como otra sección
- * del mismo expediente.
+ * La carpeta de la firma: carátula azul arriba y la hoja blanca unida debajo.
+ * El menú del sitio vive en el encabezado.
  */
 export function Carpeta({
-  actual,
   caratula,
   children,
   id,
 }: {
-  actual: SeccionSitio | null;
   caratula: ReactNode;
   children: ReactNode;
   id?: string;
@@ -29,7 +24,6 @@ export function Carpeta({
       <div className="caratula-azul rounded-t-xl">
         {/* Mismo alto en todas las páginas; lo que trae cada una queda centrado en el alto. */}
         <div className="caratula-entrada flex min-h-[460px] flex-col justify-center sm:min-h-[450px] px-5 pt-5 pb-6 sm:px-8 sm:pt-8 sm:pb-9 lg:px-10 lg:pt-10">{caratula}</div>
-        <PestanasSitio actual={actual} />
       </div>
       {/* Lo que sigue a la primera sección son más folios de la misma hoja, separados por una línea. */}
       <div id={id} className="scroll-mt-6 divide-y divide-line rounded-b-xl bg-sheet shadow-sheet">
