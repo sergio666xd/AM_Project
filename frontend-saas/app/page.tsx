@@ -33,7 +33,7 @@ export default async function Inicio() {
             <Entrada>{enLinea(inicio.heroDescription)}</Entrada>
             {/* Invitar a escribir no es pedir los datos: el formulario queda al final, después del contexto. */}
             <div className="mt-8 flex flex-col gap-3 sm:flex-row">
-              <a href="#consulta" className={clasesBoton("gold", "lg")}>{inicio.heroCta}</a>
+              <a href="#consulta" className={`${clasesBoton("gold", "lg")} boton-destello`}>{inicio.heroCta}</a>
               <Link href="/servicios" className={`${clasesBoton("ghost", "lg")} text-ink shadow-[inset_0_0_0_1px_var(--cover-line)] hover:bg-[var(--cover-chip)] hover:text-ink`}>
                 {inicio.heroSecondaryCta}
               </Link>
@@ -50,12 +50,12 @@ export default async function Inicio() {
               <ArrowRight aria-hidden="true" size={16} strokeWidth={2} />
             </Link>
           </div>
-          <ul className="divide-y divide-line border-y border-line">
+          <ul className="revelar-lista divide-y divide-line border-y border-line">
             {inicio.services.map((servicio, i) => (
               <li key={servicio.title}>
                 <Link
                   href={`/servicios#${areaDeIcono(servicio.icon, i).ancla}`}
-                  className="group grid grid-cols-[minmax(0,1fr)_auto] items-center gap-6 py-5 sm:py-6"
+                  className="group relative -mx-3 grid grid-cols-[minmax(0,1fr)_auto] items-center gap-6 rounded-lg px-3 py-5 transition-colors duration-200 before:absolute before:inset-y-4 before:left-0 before:w-[3px] before:origin-center before:scale-y-0 before:rounded-full before:bg-navy before:transition-transform before:duration-300 hover:bg-navy-soft hover:before:scale-y-100 sm:py-6"
                 >
                   <span>
                     <span className="block font-display text-[22px] leading-[1.25] text-ink group-hover:text-navy">{servicio.title}</span>
@@ -92,10 +92,10 @@ export default async function Inicio() {
         </section>
         <section aria-labelledby="pasos" className={`${RELLENO} bg-navy-soft grid grid-cols-[minmax(0,1fr)] gap-8 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.9fr)] lg:gap-14`}>
           <TituloHoja id="pasos">{enLinea(inicio.stepsTitle)}</TituloHoja>
-          <ol className="grid grid-cols-[minmax(0,1fr)] gap-x-10 gap-y-7 sm:grid-cols-2">
+          <ol className="revelar-lista grid grid-cols-[minmax(0,1fr)] gap-x-10 gap-y-7 sm:grid-cols-2">
             {inicio.steps.map((paso, i) => (
-              <li key={paso.title} className="grid grid-cols-[40px_minmax(0,1fr)] gap-4">
-                <span className="folio-num flex size-10 items-center justify-center rounded-full bg-sheet text-[18px] text-navy shadow-[0_0_0_1.5px_var(--navy)]">
+              <li key={paso.title} className="group grid grid-cols-[40px_minmax(0,1fr)] gap-4">
+                <span className="folio-num flex size-10 items-center justify-center rounded-full bg-sheet text-[18px] text-navy shadow-[0_0_0_1.5px_var(--navy)] transition-colors duration-300 group-hover:bg-navy group-hover:text-on-navy">
                   {i + 1}
                 </span>
                 <div className="pt-1.5">

@@ -46,7 +46,7 @@ export function PestanasSitio({ actual }: { actual: SeccionSitio | null }) {
                   : "text-ink-2 hover:bg-[var(--cover-chip)] hover:text-ink",
               )}
             >
-              {activa && <span aria-hidden="true" className="absolute inset-x-3 top-0 h-[2px] rounded-b bg-gold" />}
+              {activa && <span aria-hidden="true" className="pestana-activa absolute inset-x-3 top-0 h-[3px] rounded-b bg-gold" />}
               {seccion.label}
             </Link>
           );

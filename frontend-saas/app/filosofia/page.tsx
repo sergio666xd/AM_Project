@@ -45,7 +45,7 @@ export default async function Filosofia() {
               <p className="max-w-[44ch] text-[17px] leading-[1.6] text-ink-2">{enLinea(contenido.methodologyDescription)}</p>
             </div>
             {/* Las etapas del acompañamiento, como la línea de etapas de un expediente. */}
-            <ol className="space-y-7">
+            <ol className="revelar-lista space-y-7">
               {contenido.steps.map((paso, i) => (
                 <li key={paso.title} className="relative grid grid-cols-[40px_minmax(0,1fr)] gap-5 after:absolute after:top-10 after:-bottom-7 after:left-[19.5px] after:w-px after:bg-line-strong last:after:hidden">
                   <span className="folio-num relative z-[1] flex size-10 items-center justify-center rounded-full bg-sheet text-[18px] text-navy shadow-[0_0_0_1.5px_var(--navy)]">

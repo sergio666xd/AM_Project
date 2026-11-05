@@ -65,7 +65,7 @@ export default async function QuienesSomos() {
         <Columna className="mt-10 sm:mt-14">
           <section aria-labelledby="equipo">
             <TituloHoja id="equipo">{enLinea(contenido.teamTitle)}</TituloHoja>
-            <ul className="mt-6 grid grid-cols-[minmax(0,1fr)] items-start gap-5 min-[480px]:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
+            <ul className="revelar-lista mt-6 grid grid-cols-[minmax(0,1fr)] items-start gap-5 min-[480px]:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
               {contenido.team.map((persona) => <TarjetaEquipo key={persona.name} persona={persona} />)}
             </ul>
           </section>
@@ -90,9 +90,9 @@ function TarjetaEquipo({ persona }: { persona: Persona }) {
       <div className="caratula-azul relative aspect-[4/5] w-full max-w-full overflow-hidden">
         {persona.photo ? (
           // eslint-disable-next-line @next/next/no-img-element
-          <img src={persona.photo} alt="" className="absolute inset-0 size-full object-cover" />
+          <img src={persona.photo} alt="" className="absolute inset-0 size-full object-cover transition-transform duration-500 group-hover/tarjeta:scale-[1.04]" />
         ) : (
-          <span aria-hidden="true" className="absolute inset-0 flex items-center justify-center font-display text-[48px] text-[var(--on-cover-2)]">{iniciales}</span>
+          <span aria-hidden="true" className="absolute inset-0 flex items-center justify-center font-display text-[48px] text-[var(--on-cover-2)] transition-transform duration-500 group-hover/tarjeta:scale-110">{iniciales}</span>
         )}
       </div>
       <div className="flex flex-col gap-2 px-4 py-4">
@@ -112,7 +112,7 @@ function TarjetaEquipo({ persona }: { persona: Persona }) {
   );
 
   return (
-    <li className="w-full max-w-[320px] overflow-hidden rounded-xl bg-sheet shadow-sheet">
+    <li className="group/tarjeta w-full max-w-[320px] overflow-hidden rounded-xl bg-sheet shadow-sheet transition-[translate,box-shadow] duration-300 hover:-translate-y-1 hover:shadow-pop">
       {hayDetalle ? (
         <details className="group">
           <summary className="cursor-pointer list-none [&::-webkit-details-marker]:hidden">{cabeza}</summary>
