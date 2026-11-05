@@ -65,7 +65,7 @@ export default async function QuienesSomos() {
         <Columna className="mt-10 sm:mt-14">
           <section aria-labelledby="equipo">
             <TituloHoja id="equipo">{enLinea(contenido.teamTitle)}</TituloHoja>
-            <ul className="mt-6 grid grid-cols-[minmax(0,1fr)] items-start gap-5 sm:grid-cols-2 lg:grid-cols-3">
+            <ul className="mt-6 grid grid-cols-[minmax(0,1fr)] items-start gap-5 min-[480px]:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
               {contenido.team.map((persona) => <TarjetaEquipo key={persona.name} persona={persona} />)}
             </ul>
           </section>
@@ -87,17 +87,17 @@ function TarjetaEquipo({ persona }: { persona: Persona }) {
   const hayDetalle = Boolean(persona.profile || persona.experience || persona.license);
   const cabeza = (
     <>
-      <div className="caratula-azul relative aspect-[4/3] w-full max-w-full overflow-hidden">
+      <div className="caratula-azul relative aspect-[4/5] w-full max-w-full overflow-hidden">
         {persona.photo ? (
           // eslint-disable-next-line @next/next/no-img-element
           <img src={persona.photo} alt="" className="absolute inset-0 size-full object-cover" />
         ) : (
-          <span aria-hidden="true" className="absolute inset-0 flex items-center justify-center font-display text-[56px] text-[var(--on-cover-2)]">{iniciales}</span>
+          <span aria-hidden="true" className="absolute inset-0 flex items-center justify-center font-display text-[48px] text-[var(--on-cover-2)]">{iniciales}</span>
         )}
       </div>
-      <div className="flex items-end justify-between gap-4 px-5 py-4">
+      <div className="flex flex-col gap-2 px-4 py-4">
         <div className="min-w-0">
-          <h3 className="font-display text-[21px] leading-[1.25] text-ink">{persona.name}</h3>
+          <h3 className="font-display text-[19px] leading-[1.25] text-ink">{persona.name}</h3>
           {persona.role && <p className="mt-1 text-[15px] font-semibold text-navy">{persona.role}</p>}
         </div>
         {hayDetalle && (
@@ -112,11 +112,11 @@ function TarjetaEquipo({ persona }: { persona: Persona }) {
   );
 
   return (
-    <li className="overflow-hidden rounded-xl bg-sheet shadow-sheet">
+    <li className="w-full max-w-[320px] overflow-hidden rounded-xl bg-sheet shadow-sheet">
       {hayDetalle ? (
         <details className="group">
           <summary className="cursor-pointer list-none [&::-webkit-details-marker]:hidden">{cabeza}</summary>
-          <div className="space-y-4 border-t border-line px-5 pt-4 pb-5">
+          <div className="space-y-4 border-t border-line px-4 pt-4 pb-5">
             {persona.profile && (
               <div>
                 <h4 className="text-[14px] font-semibold text-ink-2">Perfil profesional</h4>
