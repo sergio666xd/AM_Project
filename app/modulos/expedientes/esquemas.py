@@ -3,7 +3,7 @@ from datetime import date
 from pydantic import BaseModel, Field, field_validator, model_validator
 
 from app.modulos.tareas.esquemas import ActuacionBreve
-from app.modulos.etapas.esquemas import EtapaActual, EtapaBreve, PlantillaBreve
+from app.modulos.etapas.esquemas import EtapaActual, EtapaBreve, EtapaDeLinea, PlantillaBreve
 from app.nucleo.paginacion import Pagina
 from app.nucleo.zona_horaria import FechaHora
 
@@ -48,13 +48,21 @@ class ProcesoDetalle(ProcesoResumen):
     colaboradores: list[PersonaBreve] = Field(
         description="Abogados que colaboran. Al cliente solo le llegan los marcados como visibles."
     )
-    plantilla: PlantillaBreve = Field(description="Plantilla de etapas que sigue el proceso.")
-    linea_etapas: list[EtapaBreve] = Field(description="Las etapas de esa plantilla, en orden.")
+    plantilla: PlantillaBreve = Field(
+        description="Plantilla de etapas que sigue el proceso. Si tiene etapas propias, la plantilla de la que salieron."
+    )
+    etapas_propias: bool = Field(description="Si el abogado ajustó las etapas de este proceso; los cambios de la plantilla ya no lo afectan.")
+    linea_etapas: list[EtapaDeLinea] = Field(description="Las etapas del proceso, en orden.")
     etapas: list[CambioEtapa] = Field(description="Historial de cambios de etapa, del más antiguo al más reciente.")
 
 
 class CambiarEtapa(BaseModel):
-    etapa_id: int = Field(description="Una etapa activa de cualquier plantilla activa; el proceso pasa a seguir esa plantilla.")
+    etapa_id: int = Field(
+        description=(
+            "Una etapa de la línea del proceso, o una etapa activa de otra plantilla activa: entonces el proceso pasa "
+            "a seguir esa plantilla (si tenía etapas propias, se reemplazan por las de la plantilla)."
+        )
+    )
     nota: str | None = Field(None, max_length=500)
 
 

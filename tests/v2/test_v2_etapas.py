@@ -137,3 +137,105 @@ def test_plantillas_de_etapas(iniciar, crear_usuario, crear_proceso, cliente_htt
 
     acciones = [e.accion for e in sesion_bd.query(models.EventoAuditoria).order_by(models.EventoAuditoria.id)]
     assert "etapas.plantilla.crear" in acciones and acciones[-1] == "etapas.plantilla.eliminar"
+
+
+def test_el_abogado_ajusta_las_etapas_de_un_proceso(iniciar, crear_usuario, crear_proceso, cliente_http, sesion_bd):
+    abogada = crear_usuario("ABOGADO_ADMIN", nombre="Alejandra Muñoz")
+    cliente = crear_usuario("CLIENTE")
+    proceso = crear_proceso(abogada, "Sucesión Restrepo", clientes=[cliente])
+    otro = crear_proceso(abogada, "Divorcio Ospina")
+    etapas = _generales(sesion_bd)
+    iniciar(abogada)
+    cliente_http.patch(f"/api/v2/procesos/{proceso.id}/etapa", json={"etapa_id": etapas["Demanda"]}, headers=CSRF)
+    cliente_http.patch(f"/api/v2/procesos/{proceso.id}/etapa", json={"etapa_id": etapas["Admisión"]}, headers=CSRF)
+
+    url = f"/api/v2/procesos/{proceso.id}/etapas"
+    antes = cliente_http.get(f"/api/v2/procesos/{proceso.id}").json()
+    assert antes["etapas_propias"] is False
+    linea = {e["nombre"]: e["id"] for e in antes["linea_etapas"]}
+    # Se renombra una, se agrega otra, se quita una que no usó y se reordena.
+    r = cliente_http.put(url, json={"etapas": [
+        {"id": linea["Demanda"], "nombre": "Demanda", "explicacion": "Presentamos la demanda."},
+        {"id": linea["Admisión"], "nombre": "Admisión"},
+        {"nombre": "Inventario de bienes", "explicacion": "Se hace la lista de los bienes de la herencia."},
+        {"id": linea["Sentencia"], "nombre": "Sentencia aprobatoria"},
+        {"id": linea["Audiencia"], "nombre": "Audiencia"},
+    ]}, headers=CSRF)
+    assert r.status_code == 200, r.text
+    detalle = r.json()
+    assert detalle["etapas_propias"] is True and detalle["plantilla"]["nombre"] == "General"
+    assert [e["nombre"] for e in detalle["linea_etapas"]] == [
+        "Demanda", "Admisión", "Inventario de bienes", "Sentencia aprobatoria", "Audiencia",
+    ]
+    assert detalle["linea_etapas"][2]["explicacion"] == "Se hace la lista de los bienes de la herencia."
+    # La etapa actual y el historial siguen, ahora con las etapas propias del proceso.
+    assert detalle["etapa"]["nombre"] == "Admisión" and detalle["etapa"]["posicion"] == 2 and detalle["etapa"]["total"] == 5
+    assert [c["etapa"]["nombre"] for c in detalle["etapas"]] == ["Demanda", "Admisión"]
+    propias = {e["nombre"]: e["id"] for e in detalle["linea_etapas"]}
+    assert propias["Admisión"] != linea["Admisión"]
+
+    # La plantilla no cambió y el otro proceso la sigue usando; la copia no aparece entre las plantillas.
+    assert [e["nombre"] for e in cliente_http.get(f"/api/v2/procesos/{otro.id}").json()["linea_etapas"]] == [
+        "Demanda", "Admisión", "Pruebas", "Audiencia", "Sentencia",
+    ]
+    plantillas = cliente_http.get("/api/v2/plantillas-etapas?todas=true").json()["items"]
+    assert [p["nombre"] for p in plantillas] == ["General"]
+
+    # Se avanza a la etapa nueva; una segunda edición ya trabaja sobre las etapas propias.
+    avance = cliente_http.patch(f"/api/v2/procesos/{proceso.id}/etapa", json={"etapa_id": propias["Inventario de bienes"]}, headers=CSRF)
+    assert avance.json()["etapa"]["nombre"] == "Inventario de bienes"
+    quitar = cliente_http.put(url, json={"etapas": [
+        {"id": propias["Admisión"], "nombre": "Admisión"},
+        {"id": propias["Inventario de bienes"], "nombre": "Inventario"},
+        {"id": propias["Sentencia aprobatoria"], "nombre": "Sentencia aprobatoria"},
+    ]}, headers=CSRF).json()
+    assert [e["nombre"] for e in quitar["linea_etapas"]] == ["Admisión", "Inventario", "Sentencia aprobatoria"]
+    # «Demanda» estuvo en el historial: queda guardada para leerlo, sin aparecer en la línea.
+    assert [c["etapa"]["nombre"] for c in quitar["etapas"]] == ["Demanda", "Admisión", "Inventario"]
+
+    # La etapa actual no se puede quitar.
+    sin_actual = cliente_http.put(url, json={"etapas": [{"id": propias["Admisión"], "nombre": "Admisión"}]}, headers=CSRF)
+    assert sin_actual.status_code == 422 and "etapas" in sin_actual.json()["campos"]
+
+    # El cliente ve la línea propia con sus explicaciones, pero no puede editarla.
+    iniciar(cliente)
+    visto = cliente_http.get(f"/api/v2/procesos/{proceso.id}").json()
+    assert [e["nombre"] for e in visto["linea_etapas"]] == ["Admisión", "Inventario", "Sentencia aprobatoria"]
+    assert cliente_http.put(url, json={"etapas": [{"nombre": "Otra"}]}, headers=CSRF).status_code == 403
+
+    acciones = [e.accion for e in sesion_bd.query(models.EventoAuditoria).order_by(models.EventoAuditoria.id)]
+    assert acciones.count("proceso.etapas.editar") == 2
+
+
+def test_elegir_otra_plantilla_reemplaza_las_etapas_propias(iniciar, crear_usuario, crear_proceso, cliente_http, sesion_bd):
+    abogada = crear_usuario("ABOGADO_ADMIN")
+    ajeno = crear_usuario("ABOGADO_ADMIN")
+    proceso = crear_proceso(abogada, "Ejecutivo Gómez")
+    ajeno_proceso = crear_proceso(ajeno, "Otro")
+    etapas = _generales(sesion_bd)
+    iniciar(abogada)
+    cliente_http.patch(f"/api/v2/procesos/{proceso.id}/etapa", json={"etapa_id": etapas["Demanda"]}, headers=CSRF)
+    propias = cliente_http.put(f"/api/v2/procesos/{proceso.id}/etapas", json={"etapas": [
+        {"id": etapas["Demanda"], "nombre": "Demanda"}, {"nombre": "Embargo"},
+    ]}, headers=CSRF).json()
+    assert [e["nombre"] for e in propias["linea_etapas"]] == ["Demanda", "Embargo"]
+
+    plantilla = cliente_http.post("/api/v2/plantillas-etapas", json={
+        "nombre": "Ejecutivo", "etapas": [{"nombre": "Mandamiento de pago"}, {"nombre": "Remate"}],
+    }, headers=CSRF).json()
+    mandamiento = plantilla["etapas"][0]["id"]
+    detalle = cliente_http.patch(f"/api/v2/procesos/{proceso.id}/etapa", json={"etapa_id": mandamiento}, headers=CSRF).json()
+    assert detalle["etapas_propias"] is True and detalle["plantilla"]["nombre"] == "Ejecutivo"
+    assert [e["nombre"] for e in detalle["linea_etapas"]] == ["Mandamiento de pago", "Remate"]
+    assert detalle["etapa"]["nombre"] == "Mandamiento de pago"
+    assert [c["etapa"]["nombre"] for c in detalle["etapas"]] == ["Demanda", "Mandamiento de pago"]
+    # La plantilla compartida no se tocó.
+    assert cliente_http.get("/api/v2/plantillas-etapas").json()["items"][1]["etapas"][0]["id"] == mandamiento
+
+    # Las etapas propias de un proceso no sirven para otro.
+    iniciar(ajeno)
+    propia = detalle["linea_etapas"][1]["id"]
+    r = cliente_http.patch(f"/api/v2/procesos/{ajeno_proceso.id}/etapa", json={"etapa_id": propia}, headers=CSRF)
+    assert r.status_code == 422
+    assert cliente_http.put(f"/api/v2/plantillas-etapas/{propias['plantilla']['id']}", json={
+        "nombre": "Otra plantilla", "etapas": [{"nombre": "Una etapa"}]}, headers=CSRF).status_code == 404

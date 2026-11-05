@@ -9,14 +9,16 @@ class RepositorioEtapas:
         self._db = db
 
     def plantillas(self, solo_activas: bool = False) -> list[PlantillaEtapas]:
-        consulta = select(PlantillaEtapas).options(selectinload(PlantillaEtapas.etapas))
+        consulta = select(PlantillaEtapas).where(PlantillaEtapas.proceso_id.is_(None)).options(selectinload(PlantillaEtapas.etapas))
         if solo_activas:
             consulta = consulta.where(PlantillaEtapas.activa.is_(True))
         return list(self._db.scalars(consulta.order_by(PlantillaEtapas.predeterminada.desc(), PlantillaEtapas.nombre)))
 
     def plantilla(self, plantilla_id: int) -> PlantillaEtapas | None:
         return self._db.scalar(
-            select(PlantillaEtapas).where(PlantillaEtapas.id == plantilla_id).options(selectinload(PlantillaEtapas.etapas))
+            select(PlantillaEtapas)
+            .where(PlantillaEtapas.id == plantilla_id, PlantillaEtapas.proceso_id.is_(None))
+            .options(selectinload(PlantillaEtapas.etapas))
         )
 
     def etapa(self, etapa_id: int) -> EtapaPlantilla | None:

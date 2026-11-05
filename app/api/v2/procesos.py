@@ -17,6 +17,7 @@ from app.modulos.expedientes.esquemas import (
     VincularCliente,
     VinculosProceso,
 )
+from app.modulos.etapas.esquemas import DatosEtapasProceso
 from app.modulos.expedientes.repositorio import FiltroProcesos
 from app.modulos.expedientes.servicio import ServicioProcesos
 from app.nucleo.paginacion import ParametrosPagina, parametros_pagina
@@ -100,6 +101,21 @@ def cambiar_etapa(
 ):
     """Fija la etapa actual y la anota en el historial (y en los folios del expediente)."""
     return servicio.cambiar_etapa(usuario, proceso_id, datos)
+
+
+@router.put("/{proceso_id}/etapas", response_model=ProcesoDetalle, summary="Ajustar las etapas del proceso")
+def editar_etapas(
+    proceso_id: int,
+    datos: DatosEtapasProceso,
+    usuario: models.Usuario = Depends(usuario_actual),
+    servicio: ServicioProcesos = Depends(servicio_procesos),
+):
+    """Cambia las etapas solo de este proceso: agregar, renombrar, reordenar o quitar.
+
+    La primera vez el proceso deja de seguir su plantilla y pasa a tener etapas propias.
+    La etapa actual no se puede quitar.
+    """
+    return servicio.editar_etapas(usuario, proceso_id, datos)
 
 
 @router.patch("/{proceso_id}", response_model=ProcesoDetalle, summary="Cambiar el nombre o la descripción")

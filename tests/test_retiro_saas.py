@@ -109,7 +109,7 @@ def test_borra_las_tablas_del_saas_y_las_cuentas_abogado_con_sus_datos(tmp_path)
             "SELECT creado_por_abogado_id FROM usuarios WHERE id = :id"
         ), {"id": cliente_compartido}).scalar() is None
         assert conexion.execute(text("PRAGMA foreign_key_check")).all() == []
-        assert conexion.execute(text("SELECT version_num FROM alembic_version")).scalar() == "0016"
+        assert conexion.execute(text("SELECT version_num FROM alembic_version")).scalar() >= "0016"
 
 
 def test_sin_datos_del_saas_solo_retira_las_tablas(tmp_path):

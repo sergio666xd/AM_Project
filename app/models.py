@@ -376,7 +376,7 @@ class Proceso(Base):
     # Plantilla de etapas del proceso (vacía: la predeterminada) y etapa actual; el historial va en EtapaProceso.
     plantilla_etapas_id = Column(Integer, ForeignKey("plantillas_etapas.id", ondelete="SET NULL"), nullable=True)
     etapa_id = Column(Integer, ForeignKey("etapas_plantilla.id", ondelete="SET NULL"), nullable=True)
-    plantilla_etapas = relationship("PlantillaEtapas")
+    plantilla_etapas = relationship("PlantillaEtapas", foreign_keys=[plantilla_etapas_id])
     etapa = relationship("EtapaPlantilla")
     abogado = relationship("Usuario", back_populates="procesos", foreign_keys=[abogado_id])
     colaboradores = relationship(
@@ -613,10 +613,19 @@ class NovedadRadicadoUsuario(Base):
 
 
 class PlantillaEtapas(Base):
-    """Etapas por las que pasa un tipo de proceso, en orden. La firma las arma y edita."""
+    """Etapas por las que pasa un tipo de proceso, en orden. La firma las arma y edita.
+
+    Con `proceso_id` es la línea propia de un proceso: una copia de la plantilla
+    que el abogado ajustó solo para ese proceso. No aparece entre las plantillas.
+    """
     __tablename__ = "plantillas_etapas"
+    __table_args__ = (UniqueConstraint("proceso_id", name="uq_plantillas_etapas_proceso"),)
 
     id = Column(Integer, primary_key=True)
+    proceso_id = Column(
+        Integer, ForeignKey("procesos.id", ondelete="CASCADE", use_alter=True, name="fk_plantillas_etapas_proceso"),
+        nullable=True,
+    )
     nombre = Column(String(120), nullable=False)
     descripcion = Column(Text, nullable=True)
     activa = Column(Boolean, nullable=False, default=True)

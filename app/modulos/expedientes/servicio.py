@@ -8,9 +8,10 @@ from app.modulos.clientes.politicas import filtro_clientes_visibles
 from app.modulos.clientes.repositorio import RepositorioClientes
 from app.modulos.expedientes import avisos
 from app.radicados import iniciar_consulta_nuevo_radicado, obtener_o_vincular_radicado, radicado_vinculado_a_usuario
-from app.modulos.etapas.esquemas import EtapaActual, EtapaBreve, PlantillaBreve
-from app.modulos.etapas.linea import linea, plantilla_de, plantilla_predeterminada
+from app.modulos.etapas.esquemas import DatosEtapasProceso, EtapaActual, EtapaBreve, EtapaDeLinea, PlantillaBreve
+from app.modulos.etapas.linea import cargar_plantilla, es_propia, linea, linea_propia, plantilla_de, plantilla_predeterminada
 from app.modulos.etapas.repositorio import RepositorioEtapas
+from app.modulos.etapas.servicio import aplicar_etapas
 from app.modulos.expedientes import politicas
 from app.modulos.expedientes.esquemas import (
     ActividadProceso,
@@ -132,7 +133,10 @@ class ServicioProcesos:
             **_datos_resumen(proceso, usuario),
             colaboradores=[_persona(vinculo.abogado) for vinculo in colaboradores],
             plantilla=PlantillaBreve(id=plantilla.id, nombre=plantilla.nombre),
-            linea_etapas=[EtapaBreve(id=e.id, nombre=e.nombre) for e in linea(plantilla, proceso.etapa)],
+            etapas_propias=es_propia(plantilla, proceso),
+            linea_etapas=[
+                EtapaDeLinea(id=e.id, nombre=e.nombre, explicacion=e.explicacion) for e in linea(plantilla, proceso.etapa)
+            ],
             etapas=[
                 CambioEtapa(etapa=EtapaBreve(id=cambio.etapa.id, nombre=cambio.etapa.nombre), fecha=cambio.fecha,
                             nota=None if cliente else cambio.nota, autor=autor)
@@ -162,10 +166,16 @@ class ServicioProcesos:
             raise SinPermiso("Solo el equipo de la firma puede cambiar la etapa del proceso.")
         proceso = self._proceso_visible(usuario, proceso_id)
         etapa = RepositorioEtapas(self._db).etapa(datos.etapa_id)
-        if etapa is None or not etapa.activa or not etapa.plantilla.activa:
+        ajena = etapa is not None and etapa.plantilla.proceso_id not in (None, proceso.id)
+        if etapa is None or ajena or not etapa.activa or not etapa.plantilla.activa:
             raise DatosInvalidos("Esa etapa ya no está disponible.", campos={"etapa_id": "Elija una etapa de la lista."})
         if proceso.etapa_id == etapa.id:
             raise Conflicto("El proceso ya está en esa etapa.", codigo="misma_etapa")
+        actual = plantilla_de(proceso, plantilla_predeterminada(self._db))
+        if etapa.plantilla_id != actual.id and es_propia(actual, proceso):
+            # Pasa a otra plantilla: sus etapas reemplazan las propias del proceso.
+            mapa = cargar_plantilla(self._db, proceso, actual, etapa.plantilla)
+            etapa = self._db.get(models.EtapaPlantilla, mapa[etapa.id])
         nota = (datos.nota or "").strip() or None
         proceso.etapa = etapa
         proceso.plantilla_etapas = etapa.plantilla
@@ -174,6 +184,25 @@ class ServicioProcesos:
         registrar_evento_auditoria(self._db, usuario, "proceso.etapa", "proceso", proceso.id,
                                    {"etapa": etapa.nombre, "plantilla": etapa.plantilla.nombre})
         self._db.commit()
+        return self.obtener(usuario, proceso_id)
+
+    def editar_etapas(self, usuario: Usuario, proceso_id: int, datos: DatosEtapasProceso) -> ProcesoDetalle:
+        """Ajusta las etapas solo de este proceso: agregar, renombrar, reordenar o quitar."""
+        if politicas.es_cliente(usuario):
+            raise SinPermiso("Solo el equipo de la firma puede cambiar las etapas del proceso.")
+        proceso = self._proceso_visible(usuario, proceso_id)
+        propia, mapa = linea_propia(self._db, proceso)
+        etapas = [e.model_copy(update={"id": mapa.get(e.id, e.id)}) if e.id is not None else e for e in datos.etapas]
+        if proceso.etapa_id is not None and proceso.etapa_id not in {e.id for e in etapas if e.activa}:
+            raise DatosInvalidos(
+                "La etapa actual del proceso no se puede quitar.",
+                campos={"etapas": "Cambie primero el proceso a otra etapa y después quite esta."},
+            )
+        aplicar_etapas(RepositorioEtapas(self._db), propia, etapas)
+        registrar_evento_auditoria(self._db, usuario, "proceso.etapas.editar", "proceso", proceso.id,
+                                   {"etapas": [e.nombre for e in etapas if e.activa]})
+        self._db.commit()
+        self._db.expire_all()
         return self.obtener(usuario, proceso_id)
 
     def archivar(self, usuario: Usuario, proceso_id: int) -> ProcesoDetalle:
