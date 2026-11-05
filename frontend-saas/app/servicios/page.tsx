@@ -27,7 +27,7 @@ export default async function Servicios() {
               <TituloPagina>{enLinea(contenido.title)}</TituloPagina>
               <Entrada>{enLinea(contenido.description)}</Entrada>
             </div>
-            <nav aria-label="Servicios en esta página">
+            <nav aria-label="Servicios en esta página" className="max-lg:hidden">
               <h2 className="mb-3 text-[14px] font-semibold text-ink-2">En esta página</h2>
               <ol className="divide-y divide-manila-line border-y border-manila-line">
                 {areas.map((area) => (

@@ -22,6 +22,15 @@ export default async function Contacto({ searchParams }: { searchParams: Promise
   const whatsapp = contacto.mostrar_contacto ? contacto.whatsapp : null;
   const correo = contacto.mostrar_contacto ? contacto.correo_contacto : null;
 
+  const filas = [
+    // El correo sale de la configuración de la firma, no del texto de la página, para no mostrar dos.
+    ...contenido.contactOptions
+      .filter((opcion) => opcion.icon !== "email")
+      .map((opcion) => ({ etiqueta: opcion.title, valor: enLinea(opcion.description) })),
+    ...(whatsapp ? [{ etiqueta: "WhatsApp", valor: telefonoLegible(whatsapp) }] : []),
+    ...(correo ? [{ etiqueta: "Correo", valor: <CorreoPartible correo={correo} /> }] : []),
+  ];
+
   return (
     <MarcoSitio>
       <Carpeta
@@ -33,19 +42,16 @@ export default async function Contacto({ searchParams }: { searchParams: Promise
               <TituloPagina>{enLinea(contenido.title)}</TituloPagina>
               <Entrada>{enLinea(contenido.intro)}</Entrada>
             </div>
-            <Ficha
-              filas={[
-                // El correo sale de la configuración de la firma, no del texto de la página, para no mostrar dos.
-                ...contenido.contactOptions
-                  .filter((opcion) => opcion.icon !== "email")
-                  .map((opcion) => ({ etiqueta: opcion.title, valor: enLinea(opcion.description) })),
-                ...(whatsapp ? [{ etiqueta: "WhatsApp", valor: telefonoLegible(whatsapp) }] : []),
-                ...(correo ? [{ etiqueta: "Correo", valor: <CorreoPartible correo={correo} /> }] : []),
-              ]}
-            />
+            {/* En celular la ficha baja a la hoja, para que la carátula tenga el mismo alto que las demás. */}
+            <div className="max-sm:hidden">
+              <Ficha filas={filas} />
+            </div>
           </div>
         }
       >
+        <div className={`${RELLENO} sm:hidden`}>
+          <Ficha filas={filas} />
+        </div>
         <div className={RELLENO}>
           <div className="max-w-[760px]">
             <FormularioConsulta

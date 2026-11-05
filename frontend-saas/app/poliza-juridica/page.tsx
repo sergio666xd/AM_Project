@@ -29,13 +29,18 @@ export default async function PolizaJuridica() {
               <TituloPagina>{enLinea(contenido.title)}</TituloPagina>
               <Entrada>{enLinea(contenido.intro)}</Entrada>
             </div>
-            <div className="self-end rounded-lg bg-[var(--cover-chip)] shadow-[inset_0_0_0_1px_var(--cover-line)] p-5 sm:p-6">
+            {/* En celular este recuadro baja a la hoja, para que la carátula tenga el mismo alto que las demás. */}
+            <div className="self-end rounded-lg bg-[var(--cover-chip)] shadow-[inset_0_0_0_1px_var(--cover-line)] p-5 max-sm:hidden sm:p-6">
               <h2 className="font-display text-[22px] leading-[1.3] text-ink">{enLinea(contenido.asideTitle)}</h2>
               <p className="mt-2 text-[16px] leading-[1.6] text-ink-2">{enLinea(contenido.asideDescription)}</p>
             </div>
           </div>
         }
       >
+        <div className={`${RELLENO} bg-navy-soft sm:hidden`}>
+          <h2 className="font-display text-[22px] leading-[1.3] text-navy">{enLinea(contenido.asideTitle)}</h2>
+          <p className="mt-2 text-[16px] leading-[1.6] text-ink-2">{enLinea(contenido.asideDescription)}</p>
+        </div>
         <div className={RELLENO}>
           <TituloHoja>{enLinea(contenido.coverageTitle)}</TituloHoja>
           <p className="mt-3 max-w-[60ch] text-[17px] leading-[1.6] text-ink-2">{enLinea(contenido.coverageDescription)}</p>

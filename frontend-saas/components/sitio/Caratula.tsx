@@ -27,7 +27,8 @@ export function Carpeta({
   return (
     <Columna className="pt-5 sm:pt-8">
       <div className="caratula-azul rounded-t-xl">
-        <div className="caratula-entrada px-5 pt-5 pb-6 sm:px-8 sm:pt-8 sm:pb-9 lg:px-10 lg:pt-10">{caratula}</div>
+        {/* Mismo alto en todas las páginas; lo que trae cada una queda centrado en el alto. */}
+        <div className="caratula-entrada flex min-h-[460px] flex-col justify-center sm:min-h-[450px] px-5 pt-5 pb-6 sm:px-8 sm:pt-8 sm:pb-9 lg:px-10 lg:pt-10">{caratula}</div>
         <PestanasSitio actual={actual} />
       </div>
       {/* Lo que sigue a la primera sección son más folios de la misma hoja, separados por una línea. */}
