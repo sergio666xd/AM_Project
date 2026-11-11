@@ -5721,6 +5721,16 @@ export interface components {
             /** Enviado En */
             enviado_en: string | null;
             /**
+             * Confirmacion
+             * @description Solo WhatsApp: lo que Meta confirmó por el webhook (entregado al teléfono o leído).
+             */
+            confirmacion?: ("entregado" | "leido") | null;
+            /**
+             * Confirmado En
+             * @description Cuándo llegó esa confirmación.
+             */
+            confirmado_en?: string | null;
+            /**
              * Cuerpo
              * @description El texto que se envió o se intentó enviar, sin marcas.
              */
@@ -6287,6 +6297,16 @@ export interface components {
             creado_en: string;
             /** Enviado En */
             enviado_en: string | null;
+            /**
+             * Confirmacion
+             * @description Solo WhatsApp: lo que Meta confirmó por el webhook (entregado al teléfono o leído).
+             */
+            confirmacion?: ("entregado" | "leido") | null;
+            /**
+             * Confirmado En
+             * @description Cuándo llegó esa confirmación.
+             */
+            confirmado_en?: string | null;
         };
         /** EnvioPrueba */
         EnvioPrueba: {

@@ -16,7 +16,7 @@ import { useToast } from "@/components/ui/ToastProvider";
 import { api, mensajeDeError, type Esquemas } from "@/lib/api-v2/cliente";
 import { cx } from "@/lib/cx";
 import { fechaConHora, fechaRelativa } from "@/lib/fechas";
-import { CANAL_ENVIO, ESTADO_ENVIO, type Envio } from "@/lib/operacion";
+import { CANAL_ENVIO, CONFIRMACION_ENVIO, ESTADO_ENVIO, type Envio } from "@/lib/operacion";
 import { useLoadEffect } from "@/lib/useLoadEffect";
 import { RUTA_USUARIOS } from "@/lib/usuariosAdmin";
 
@@ -32,6 +32,8 @@ const VACIOS: Record<Filtro, string> = {
   todos: "Aún no hay avisos.",
 };
 
+const etiquetaEstado = (e: Envio) =>
+  e.confirmacion ? { nombre: CONFIRMACION_ENVIO[e.confirmacion], tono: "ok" as const } : ESTADO_ENVIO[e.estado];
 const reintentable = (e: Envio) => (e.estado === "fallido" || e.estado === "agotado") && (e.canal === "EMAIL" || e.canal === "WHATSAPP");
 
 function destino(e: Envio) {
@@ -161,7 +163,7 @@ export function PanelEnvios() {
             {items.length ? (
               <ul className="divide-y divide-line">
                 {items.map((e) => {
-                  const estado = ESTADO_ENVIO[e.estado];
+                  const estado = etiquetaEstado(e);
                   return (
                     <li key={e.id}>
                       <button type="button" onClick={() => setAbierto(e.id)} className="flex w-full items-start gap-3 px-4 py-3 text-left transition-colors hover:bg-sheet-2">
@@ -207,7 +209,7 @@ export function PanelEnvios() {
       >
         {!detalle ? <LoadingState label="Cargando el aviso" rows={3} /> : (
           <div className="space-y-4">
-            <Tag tone={ESTADO_ENVIO[detalle.estado].tono}>{ESTADO_ENVIO[detalle.estado].nombre}</Tag>
+            <Tag tone={etiquetaEstado(detalle).tono}>{etiquetaEstado(detalle).nombre}</Tag>
             {detalle.error && (
               <div className="rounded-lg bg-bad-soft px-3 py-2.5 text-[13.5px] text-bad">
                 <p className="font-semibold">Qué respondió el proveedor</p>
@@ -220,6 +222,9 @@ export function PanelEnvios() {
               <dt className="text-ink-2">Creado</dt>
               <dd className="tabular-nums text-ink">{fechaConHora(detalle.creado_en)}</dd>
               {detalle.enviado_en && (<><dt className="text-ink-2">Enviado</dt><dd className="tabular-nums text-ink">{fechaConHora(detalle.enviado_en)}</dd></>)}
+              {detalle.confirmacion && detalle.confirmado_en && (
+                <><dt className="text-ink-2">{CONFIRMACION_ENVIO[detalle.confirmacion]}</dt><dd className="tabular-nums text-ink">{fechaConHora(detalle.confirmado_en)}</dd></>
+              )}
               <dt className="text-ink-2">Intentos</dt>
               <dd className="tabular-nums text-ink">{detalle.intentos} de 3</dd>
             </dl>
