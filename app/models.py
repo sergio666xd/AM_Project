@@ -761,6 +761,12 @@ class EntregaNotificacion(Base):
     created_at = Column(DateTime, nullable=False, default=utc_ahora)
     enviado_en = Column(DateTime, nullable=True)
     lease_hasta = Column(DateTime, nullable=True)
+    # WhatsApp Cloud API: clave y valores de la plantilla de Meta, el id del
+    # mensaje (wamid) y el último estado que informó el webhook.
+    datos_whatsapp = Column(JSON, nullable=True)
+    proveedor_mensaje_id = Column(String(128), nullable=True, index=True)
+    estado_proveedor = Column(String(20), nullable=True)
+    estado_proveedor_en = Column(DateTime, nullable=True)
 
     actuaciones = relationship(
         "EntregaNotificacionActuacion",
@@ -1437,3 +1443,22 @@ class SolicitudContacto(Base):
     atendida_en = Column(DateTime, nullable=True)
     created_at = Column(DateTime, nullable=False, default=utc_ahora)
     updated_at = Column(DateTime, nullable=False, default=utc_ahora, onupdate=utc_ahora)
+
+
+class MensajeWhatsappRecibido(Base):
+    """Mensaje que alguien escribió al WhatsApp del despacho (llega por el webhook de Meta)."""
+    __tablename__ = "mensajes_whatsapp_recibidos"
+    __table_args__ = (
+        UniqueConstraint("mensaje_id", name="uq_mensaje_whatsapp_recibido"),
+        Index("ix_mensaje_whatsapp_recibido_telefono", "telefono", "recibido_en"),
+    )
+
+    id = Column(Integer, primary_key=True)
+    mensaje_id = Column(String(128), nullable=False)
+    telefono = Column(String(32), nullable=False)
+    nombre_perfil = Column(String(150), nullable=True)
+    usuario_id = Column(Integer, ForeignKey("usuarios.id", ondelete="SET NULL"), nullable=True, index=True)
+    tipo = Column(String(32), nullable=False)
+    texto = Column(Text, nullable=True)
+    recibido_en = Column(DateTime, nullable=False)
+    created_at = Column(DateTime, nullable=False, default=utc_ahora)

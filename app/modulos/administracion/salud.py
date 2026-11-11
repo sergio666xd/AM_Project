@@ -90,9 +90,10 @@ def correo(db: Session, ajustes: dict) -> EstadoIntegracion:
 
 
 def whatsapp(db: Session, ajustes: dict) -> EstadoIntegracion:
-    url, token = str(ajustes["whatsapp_api_url"] or ""), ajustes["whatsapp_token"]
-    configurado = url.startswith(("https://", "http://")) and bool(token) and token != "TU_TOKEN_AQUI"
-    return _envios(db, "WHATSAPP", "WhatsApp", "whatsapp", configurado, "Falta la dirección o el token del proveedor.")
+    from app.whatsapp import whatsapp_configurado
+
+    return _envios(db, "WHATSAPP", "WhatsApp", "whatsapp", whatsapp_configurado(ajustes),
+                   "Faltan WHATSAPP_TOKEN y WHATSAPP_PHONE_NUMBER_ID de la Cloud API de Meta.")
 
 
 def push(db: Session) -> EstadoIntegracion:

@@ -97,7 +97,7 @@ Backend:
 | `ADMIN_EMAIL`, `ADMIN_PASSWORD` | Crean la primera cuenta ADMIN si no existe ninguna. |
 | `INTEGRATION_CREDENTIALS_KEY` | Cifra las credenciales de integraciones guardadas desde Administración. |
 | `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASSWORD`, `SMTP_FROM`, `SMTP_STARTTLS` | Correo. |
-| `WHATSAPP_API_URL`, `WHATSAPP_TOKEN` | WhatsApp. |
+| `WHATSAPP_TOKEN`, `WHATSAPP_PHONE_NUMBER_ID`, `WHATSAPP_WABA_ID`, `WHATSAPP_VERIFY_TOKEN`, `WHATSAPP_APP_SECRET` | WhatsApp Cloud API de Meta; ver [docs/whatsapp-cloud-api.md](docs/whatsapp-cloud-api.md). `WHATSAPP_API_URL` solo sirve al proveedor anterior. |
 | `WEB_PUSH_VAPID_PUBLIC_KEY`, `WEB_PUSH_VAPID_PRIVATE_KEY`, `WEB_PUSH_VAPID_SUBJECT` | Notificaciones del navegador. |
 | `WORKFLOW_SERVICE_TOKEN` | Protege la API interna; el mismo valor en el frontend. |
 | `WORKFLOW_FRONTEND_URL` | Opcional: dominio para iniciar workflows si no sirve `VERCEL_URL`. |

@@ -4,7 +4,7 @@ import logging
 
 from app.database import SessionLocal
 from app.email_service import enviar_correo
-from app.message_templates import render_message
+from app.message_templates import datos_whatsapp, render_message
 from app.whatsapp import enviar_mensaje_whatsapp
 
 logger = logging.getLogger(__name__)
@@ -29,7 +29,8 @@ def send_security_change_confirmation(
         for number in dict.fromkeys(value.strip() for value in whatsapp_numbers if value.strip()):
             try:
                 _, body = render_message(db, "CAMBIO_SEGURIDAD_CONFIRMADO", variables, canal="WHATSAPP")
-                if not enviar_mensaje_whatsapp(number, body):
+                plantilla = datos_whatsapp("CAMBIO_SEGURIDAD_CONFIRMADO", variables)
+                if not enviar_mensaje_whatsapp(number, body, plantilla=plantilla):
                     logger.warning("Security change confirmation WhatsApp was not sent")
             except Exception:
                 logger.exception("Security change confirmation WhatsApp failed")

@@ -9,7 +9,7 @@ from sqlalchemy.orm import Session
 
 from app import models
 from app.notification_policy import canales_habilitados, canales_recordatorio_seleccionados
-from app.message_templates import render_message
+from app.message_templates import datos_whatsapp, render_message
 from app.workflow_service import workflow_frontend_url, workflow_service_headers
 
 logger = logging.getLogger(__name__)
@@ -30,6 +30,7 @@ def crear_entrega_canal(
     cuerpo: str,
     recordatorio_id: int | None = None,
     recordatorio_version: int | None = None,
+    datos_plantilla_whatsapp: dict | None = None,
 ) -> int:
     clave = _delivery_key(tipo, origen, usuario.id, canal)
     entrega = db.query(models.EntregaNotificacion).filter_by(
@@ -45,6 +46,7 @@ def crear_entrega_canal(
             recordatorio_version=recordatorio_version,
             asunto=asunto,
             cuerpo=cuerpo,
+            datos_whatsapp=datos_plantilla_whatsapp,
             estado="PENDIENTE",
         )
         db.add(entrega)
@@ -52,6 +54,7 @@ def crear_entrega_canal(
     elif entrega.estado not in {"ENVIADA", "OMITIDA"} and entrega.intentos < 3:
         entrega.asunto = asunto
         entrega.cuerpo = cuerpo
+        entrega.datos_whatsapp = datos_plantilla_whatsapp
         entrega.recordatorio_id = recordatorio_id
         entrega.recordatorio_version = recordatorio_version
         entrega.estado = "PENDIENTE"
@@ -188,6 +191,9 @@ def emitir_notificacion_workflow(
             cuerpo_canal,
             recordatorio_id=recordatorio_id,
             recordatorio_version=recordatorio_version,
+            datos_plantilla_whatsapp=(
+                datos_whatsapp(plantilla_clave, variables or {}, enlace_url) if canal == "WHATSAPP" else None
+            ),
         ))
     for entrega_id, canal in zip(entrega_ids, canales):
         for actuacion_id in actuacion_ids or []:

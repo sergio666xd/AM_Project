@@ -6,7 +6,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.api import v2
+from app.api import v2, whatsapp_webhook
 from app.api.internos import workflows
 from app.audit import (
     establecer_contexto_solicitud_auditoria,
@@ -45,6 +45,7 @@ async def registrar_contexto_tecnico_auditoria(request: Request, call_next):
 
 app.include_router(v2.router)
 app.include_router(workflows.router)
+app.include_router(whatsapp_webhook.router)
 
 
 def get_cors_origins() -> list[str]:
