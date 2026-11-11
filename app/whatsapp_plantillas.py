@@ -4,7 +4,7 @@ Fuera de la ventana de 24 horas que abre un mensaje del usuario, Meta solo
 permite enviar plantillas aprobadas. Cada aviso de la aplicación (clave de
 `plantillas_mensaje`) tiene aquí su plantilla de Meta: el nombre con el que se
 registra, el texto exacto que se somete a aprobación y de qué dato sale cada
-variable `{{n}}`.
+variable `{{n}}`. El enlace de cada aviso va en un botón "Ir al sitio web".
 
 Este catálogo es la única fuente: `scripts/plantillas_whatsapp_meta.py` lo usa
 para crear las plantillas en Meta y `app.whatsapp` para llenarlas al enviar.
@@ -17,9 +17,13 @@ llevan saltos de línea ni tabulaciones (por eso las listas se unen en una líne
 
 from __future__ import annotations
 
+import logging
 import re
 from dataclasses import dataclass, field
 from typing import Any, Callable
+from urllib.parse import urlsplit
+
+logger = logging.getLogger(__name__)
 
 CATEGORIA_UTILIDAD = "UTILITY"
 CATEGORIA_AUTENTICACION = "AUTHENTICATION"
@@ -70,13 +74,20 @@ class PlantillaMeta:
     variables: tuple[Variable, ...] = ()
     categoria: str = CATEGORIA_UTILIDAD
     pie: str | None = PIE
+    # Texto del botón que abre el enlace del aviso (máximo 25 caracteres).
+    boton: str | None = None
     # Las de autenticación llevan el botón "Copiar código", que también recibe el código.
     boton_codigo: bool = False
     claves: tuple[str, ...] = field(default=())
 
 
 SALUDO = Variable(_saludo, "Ana", defecto="cordial saludo")
-ENLACE = Variable("enlace", f"{PORTAL_POR_DEFECTO}/procesos/12", defecto=PORTAL_POR_DEFECTO, largo=600)
+# El enlace de cada aviso va en un botón "Ir al sitio web". Meta exige que la
+# dirección del botón sea fija salvo el final: la base es el portal y la
+# variable es la ruta (ver `sufijo_boton`).
+BASE_BOTON = f"{PORTAL_POR_DEFECTO}/"
+EJEMPLO_BOTON = "procesos/12"
+SUFIJO_RAIZ = "?origen=whatsapp"
 
 
 def _cuerpo(*lineas: str, cierre: str = CIERRE) -> str:
@@ -87,6 +98,7 @@ def _cuerpo(*lineas: str, cierre: str = CIERRE) -> str:
 _CATALOGO: tuple[PlantillaMeta, ...] = (
     PlantillaMeta(
         nombre="am_actuacion_notificada",
+        boton="Ver la actuación",
         claves=("ACTUACION_NOTIFICADA",),
         cuerpo=_cuerpo(
             "👋 Hola, {{1}}.",
@@ -94,58 +106,57 @@ _CATALOGO: tuple[PlantillaMeta, ...] = (
             "📝 Actuación: {{3}}",
             "📅 Fecha: {{4}}",
             "Si esta novedad requiere algo de usted, se lo indicaremos.",
-            "🔗 Ver la actuación: {{5}}",
         ),
         variables=(
             SALUDO,
             Variable("proceso", "Sucesión familia Pérez"),
             Variable("actuacion", "Auto admite demanda"),
             Variable("fecha", "lunes 9 de noviembre de 2026", defecto="no informada"),
-            ENLACE,
         ),
     ),
     PlantillaMeta(
         nombre="am_novedades_juzgado",
+        boton="Véalas en el portal",
         claves=("ACTUACIONES_DIGEST",),
         cuerpo=_cuerpo(
             "👋 Hola, {{1}}.",
             "Hay novedades del juzgado en sus procesos: {{2}}",
-            "🔗 Véalas en el portal: {{3}}",
         ),
         variables=(
             SALUDO,
             Variable("novedades", "Sucesión familia Pérez (Auto admite demanda); Ejecutivo Banco XYZ (Fija fecha de audiencia)",
                      largo=LARGO_TEXTO_LARGO),
-            ENLACE,
         ),
     ),
     PlantillaMeta(
-        nombre="am_acceso_cliente",
+        # Meta rechaza (o exige categoría de autenticación) si una plantilla de utilidad
+        # habla de usuario, contraseña, acceso o de entrar a la cuenta: el aviso solo
+        # da la bienvenida y remite al correo, donde van los datos de ingreso.
+        nombre="am_bienvenida_cliente",
+        boton="Portal del despacho",
         claves=("CLIENTE_CREDENCIALES",),
         cuerpo=_cuerpo(
             "👋 Hola, {{1}}.",
-            "{{2}} creó su acceso al portal del despacho, donde puede ver cómo va su proceso.",
-            "Le enviamos el usuario y la contraseña temporal a su correo *{{3}}*. "
-            "Si no lo encuentra, revise la carpeta de correo no deseado.",
-            "🔗 Entrar al portal: {{4}}",
+            "{{2}} lo registró como cliente del despacho.",
+            "En el portal puede ver cómo va su proceso, sus documentos y sus citas.",
+            "Le enviamos los detalles a su correo *{{3}}*. Si no lo encuentra, revise la carpeta de correo no deseado.",
         ),
         variables=(
             SALUDO,
             Variable("actor", "Alejandra Muñoz Abogada y Asociados", defecto="El despacho"),
             Variable("correo", "ana.perez@correo.com"),
-            ENLACE,
         ),
     ),
     PlantillaMeta(
-        nombre="am_acceso_abogado",
+        nombre="am_bienvenida_abogado",
+        boton="Portal del despacho",
         claves=("ABOGADO_CREDENCIALES",),
         cuerpo=_cuerpo(
             "👋 Hola, {{1}}.",
-            "Se creó su cuenta de abogado en el portal del despacho.",
-            "Le enviamos a {{2}} su usuario y una contraseña temporal. Al entrar, cree una nueva.",
-            "🔗 Entrar al portal: {{3}}",
+            "Ya hace parte del equipo de abogados en el portal del despacho.",
+            "Le enviamos los detalles a su correo *{{2}}*.",
         ),
-        variables=(SALUDO, Variable("correo", "carlos.gomez@correo.com"), ENLACE),
+        variables=(SALUDO, Variable("correo", "carlos.gomez@correo.com")),
     ),
     PlantillaMeta(
         # Meta fija el texto de las plantillas de autenticación; solo se envía el código.
@@ -170,24 +181,24 @@ _CATALOGO: tuple[PlantillaMeta, ...] = (
     ),
     PlantillaMeta(
         nombre="am_mensaje_chat",
+        boton="Leer los mensajes",
         claves=("CHAT_MENSAJE",),
         cuerpo=_cuerpo(
             "👋 Hola, {{1}}.",
             "*{{2}}* le está escribiendo por el chat del portal.",
-            "🔗 Leer los mensajes: {{3}}",
             cierre=CIERRE_RESPONDER,
         ),
-        variables=(SALUDO, Variable("actor", "Alejandra Muñoz", defecto="El despacho"), ENLACE),
+        variables=(SALUDO, Variable("actor", "Alejandra Muñoz", defecto="El despacho")),
     ),
     PlantillaMeta(
         nombre="am_colaborador_agregado",
+        boton="Ver el proceso",
         claves=("COLABORADOR_AGREGADO",),
         cuerpo=_cuerpo(
             "👋 Hola, {{1}}.",
             "{{2}} le dio acceso al proceso *{{3}}*.",
             "👤 Responsable: {{4}}",
             "🔐 Su participación: {{5}}",
-            "🔗 Ver el proceso: {{6}}",
         ),
         variables=(
             SALUDO,
@@ -195,17 +206,16 @@ _CATALOGO: tuple[PlantillaMeta, ...] = (
             Variable("proceso", "Sucesión familia Pérez"),
             Variable("responsable", "Alejandra Muñoz"),
             Variable("permiso", "puede editar"),
-            ENLACE,
         ),
     ),
     PlantillaMeta(
         nombre="am_mensaje_proceso",
+        boton="Leer y responder",
         claves=("COMUNICACION_ABOGADO_CLIENTE", "COMUNICACION_CLIENTE_ABOGADO"),
         cuerpo=_cuerpo(
             "👋 Hola, {{1}}.",
             "*{{2}}* le escribió sobre el proceso *{{3}}*:",
             "💬 {{4}}",
-            "🔗 Leer y responder: {{5}}",
             cierre=CIERRE_RESPONDER,
         ),
         variables=(
@@ -214,28 +224,27 @@ _CATALOGO: tuple[PlantillaMeta, ...] = (
             Variable("proceso", "Sucesión familia Pérez"),
             Variable("mensaje", "Buenos días, ya radicamos la demanda. Le cuento cuando el juzgado responda.",
                      defecto="Tiene un mensaje nuevo.", largo=LARGO_TEXTO_LARGO),
-            ENLACE,
         ),
     ),
     PlantillaMeta(
         nombre="am_documento_recibido",
+        boton="Revisar el documento",
         claves=("DOCUMENTO_RECIBIDO",),
         cuerpo=_cuerpo(
             "👋 Hola, {{1}}.",
             "*{{2}}* entregó *{{3}}* para el proceso *{{4}}*.",
             "Revíselo y apruébelo o pida una corrección.",
-            "🔗 Revisar el documento: {{5}}",
         ),
         variables=(
             SALUDO,
             Variable("actor", "Ana Pérez", defecto="El cliente"),
             Variable("documento", "Cédula de ciudadanía", defecto="un documento"),
             Variable("proceso", "Sucesión familia Pérez"),
-            ENLACE,
         ),
     ),
     PlantillaMeta(
         nombre="am_documento_revisado",
+        boton="Ver mis documentos",
         claves=("DOCUMENTO_REVISION",),
         cuerpo=_cuerpo(
             "👋 Hola, {{1}}.",
@@ -243,18 +252,17 @@ _CATALOGO: tuple[PlantillaMeta, ...] = (
             "📌 Resultado: *{{3}}*",
             "💬 Comentario: {{4}}",
             "Si necesita corrección, súbalo de nuevo desde el portal.",
-            "🔗 Ver mis documentos: {{5}}",
         ),
         variables=(
             SALUDO,
             Variable("documento", "Cédula de ciudadanía", defecto="enviado"),
             Variable("estado", "aprobado"),
             Variable("comentario", "La foto se ve completa y legible.", defecto="sin comentarios"),
-            ENLACE,
         ),
     ),
     PlantillaMeta(
         nombre="am_actividad_agenda",
+        boton="Ver la actividad",
         claves=("EVENTO_AGENDA",),
         cuerpo=_cuerpo(
             "👋 Hola, {{1}}.",
@@ -262,7 +270,6 @@ _CATALOGO: tuple[PlantillaMeta, ...] = (
             "🗓️ Actividad: *{{4}}*",
             "🗓️ Cuándo: {{5}}",
             "📌 Estado: {{6}}",
-            "🔗 Ver la actividad: {{7}}",
         ),
         variables=(
             SALUDO,
@@ -271,23 +278,21 @@ _CATALOGO: tuple[PlantillaMeta, ...] = (
             Variable("actividad", "Audiencia inicial"),
             Variable("inicio", "viernes 20 de noviembre de 2026, 9:00 a. m.", defecto="por definir"),
             Variable("estado", "programada"),
-            ENLACE,
         ),
     ),
     PlantillaMeta(
         nombre="am_proceso_actualizado",
+        boton="Ver mi proceso",
         claves=("PROCESO_ACTUALIZACION",),
         cuerpo=_cuerpo(
             "👋 Hola, {{1}}.",
             "Hay una novedad en su proceso *{{2}}*: {{3}}.",
             "No tiene que hacer nada por ahora.",
-            "🔗 Ver mi proceso: {{4}}",
         ),
         variables=(
             SALUDO,
             Variable("proceso", "Sucesión familia Pérez"),
             Variable(_actor_accion, "Alejandra Muñoz avanzó el proceso a la etapa de pruebas", defecto="hubo cambios"),
-            ENLACE,
         ),
     ),
     PlantillaMeta(
@@ -303,62 +308,59 @@ _CATALOGO: tuple[PlantillaMeta, ...] = (
     ),
     PlantillaMeta(
         nombre="am_reactivacion_mensaje",
+        boton="Leer el mensaje",
         claves=("REACTIVACION_COMUNICACION",),
         cuerpo=_cuerpo(
             "👋 Hola, {{1}}.",
             "Su cuenta está activa de nuevo y tiene un mensaje pendiente sobre *{{2}}*.",
             "💬 Asunto: {{3}}",
-            "🔗 Leer el mensaje: {{4}}",
         ),
         variables=(
             SALUDO,
             Variable("proceso", "Sucesión familia Pérez"),
             Variable("asunto", "Documentos pendientes", defecto="mensaje del despacho"),
-            ENLACE,
         ),
     ),
     PlantillaMeta(
         nombre="am_reactivacion_actividad",
+        boton="Ver la actividad",
         claves=("REACTIVACION_EVENTO",),
         cuerpo=_cuerpo(
             "👋 Hola, {{1}}.",
             "Su cuenta está activa de nuevo. Le recordamos *{{2}}* de su proceso *{{3}}*.",
             "🗓️ Cuándo: {{4}}",
-            "🔗 Ver la actividad: {{5}}",
         ),
         variables=(
             SALUDO,
             Variable("actividad", "Audiencia inicial"),
             Variable("proceso", "Sucesión familia Pérez"),
             Variable("fecha", "viernes 20 de noviembre de 2026, 9:00 a. m.", defecto="por definir"),
-            ENLACE,
         ),
     ),
     PlantillaMeta(
         nombre="am_reactivacion_tarea",
+        boton="Ver la tarea",
         claves=("REACTIVACION_TAREA",),
         cuerpo=_cuerpo(
             "👋 Hola, {{1}}.",
             "Su cuenta está activa de nuevo y tiene una tarea pendiente: *{{2}}*.",
             "⏰ Fecha límite: {{3}}",
-            "🔗 Ver la tarea: {{4}}",
         ),
         variables=(
             SALUDO,
             Variable("tarea", "Firmar el poder"),
             Variable("fecha_limite", "viernes 20 de noviembre de 2026", defecto="sin fecha límite"),
-            ENLACE,
         ),
     ),
     PlantillaMeta(
         nombre="am_recordatorio_documentos",
+        boton="Subir los documentos",
         claves=("RECORDATORIO_DOCUMENTO",),
         cuerpo=_cuerpo(
             "👋 Hola, {{1}}.",
             "Le recordamos que la solicitud *{{2}}* {{3}}.",
             "📄 Faltan estos documentos: {{4}}",
             "📁 Proceso: {{5}}",
-            "🔗 Subir los documentos: {{6}}",
         ),
         variables=(
             SALUDO,
@@ -366,85 +368,80 @@ _CATALOGO: tuple[PlantillaMeta, ...] = (
             Variable("cuando", "vence mañana", defecto="sigue pendiente"),
             Variable("pendientes", "Cédula; Registro civil de nacimiento", largo=LARGO_TEXTO_LARGO),
             Variable("proceso", "Sucesión familia Pérez"),
-            ENLACE,
         ),
     ),
     PlantillaMeta(
         nombre="am_recordatorio_tarea",
+        boton="Ver la tarea",
         claves=("RECORDATORIO_TAREA",),
         cuerpo=_cuerpo(
             "👋 Hola, {{1}}.",
             "Le recordamos la tarea *{{2}}*.",
             "⏰ Fecha límite: {{3}}",
             "📁 Proceso: {{4}}",
-            "🔗 Ver la tarea: {{5}}",
         ),
         variables=(
             SALUDO,
             Variable("tarea", "Firmar el poder"),
             Variable("fecha_limite", "viernes 20 de noviembre de 2026, 5:00 p. m.", defecto="sin fecha límite"),
             Variable("proceso", "Sucesión familia Pérez", defecto="tarea general"),
-            ENLACE,
         ),
     ),
     PlantillaMeta(
         nombre="am_resumen_mensual",
+        boton="Ver el resumen",
         claves=("RESUMEN_MENSUAL",),
         cuerpo=_cuerpo(
             "👋 Hola, {{1}}.",
             "Este es el resumen de sus procesos de *{{2}}*: {{3}}",
-            "🔗 Véalo completo en el portal: {{4}}",
         ),
         variables=(
             SALUDO,
             Variable("mes", "octubre de 2026"),
             Variable("resumen", "2 procesos activos, 3 novedades del juzgado y 1 tarea pendiente.", largo=LARGO_TEXTO_LARGO),
-            ENLACE,
         ),
     ),
     PlantillaMeta(
         nombre="am_solicitud_documentos",
+        boton="Subir los documentos",
         claves=("SOLICITUD_DOCUMENTO",),
         cuerpo=_cuerpo(
             "👋 Hola, {{1}}.",
             "Necesitamos estos documentos para su proceso *{{2}}*: {{3}}",
             "⏰ Entregar antes del: {{4}}",
             "Súbalos en PDF o como foto legible.",
-            "🔗 Subir los documentos: {{5}}",
         ),
         variables=(
             SALUDO,
             Variable("proceso", "Sucesión familia Pérez"),
             Variable("documentos", "Cédula; Registro civil de nacimiento", largo=LARGO_TEXTO_LARGO),
             Variable("fecha_limite", "viernes 20 de noviembre de 2026", defecto="sin fecha límite"),
-            ENLACE,
         ),
     ),
     PlantillaMeta(
         nombre="am_tarea_asignada",
+        boton="Ver la tarea",
         claves=("SUBTAREA_ASIGNADA",),
         cuerpo=_cuerpo(
             "👋 Hola, {{1}}.",
             "{{2}} le asignó una tarea: *{{3}}*.",
             "Ábrala para ver qué debe hacer.",
-            "🔗 Ver la tarea: {{4}}",
         ),
         variables=(
             SALUDO,
             Variable("actor", "Alejandra Muñoz", defecto="El despacho"),
             Variable("subtarea", "Enviar foto de la cédula"),
-            ENLACE,
         ),
     ),
     PlantillaMeta(
         nombre="am_tarea_actualizada",
+        boton="Ver mis tareas",
         claves=("TAREA_ACCION",),
         cuerpo=_cuerpo(
             "👋 Hola, {{1}}.",
             "Hay un cambio en la tarea *{{2}}*: {{3}}.",
             "📌 Estado: {{4}}",
             "⏰ Fecha límite: {{5}}",
-            "🔗 Ver mis tareas: {{6}}",
         ),
         variables=(
             SALUDO,
@@ -452,7 +449,6 @@ _CATALOGO: tuple[PlantillaMeta, ...] = (
             Variable(_actor_accion, "Alejandra Muñoz actualizó la tarea", defecto="se actualizó"),
             Variable("estado", "en curso"),
             Variable("fecha_limite", "viernes 20 de noviembre de 2026", defecto="sin fecha límite"),
-            ENLACE,
         ),
     ),
 )
@@ -489,12 +485,36 @@ def parametros(plantilla: PlantillaMeta, valores: dict[str, Any]) -> list[str]:
     return [variable.valor(valores) for variable in plantilla.variables]
 
 
+def sufijo_boton(enlace: str | None) -> str:
+    """La parte variable del botón: la ruta del enlace dentro del portal.
+
+    Meta pega este texto al final de `BASE_BOTON`. Se quita el ancla (#...)
+    porque Meta la codifica y la página no la reconocería. Un enlace de otro
+    dominio (por ejemplo el de administración) conserva su ruta sobre el portal.
+    """
+    enlace = (enlace or "").strip()
+    if enlace.startswith(BASE_BOTON):
+        ruta = enlace[len(BASE_BOTON):]
+    else:
+        partes = urlsplit(enlace)
+        ruta = partes.path.lstrip("/") + (f"?{partes.query}" if partes.query else "")
+        if enlace and partes.netloc and f"{partes.scheme}://{partes.netloc}/" != BASE_BOTON:
+            logger.warning("El enlace de WhatsApp no es del portal; el botón abrirá la misma ruta en el portal.")
+    ruta = ruta.split("#", 1)[0].strip()
+    return ruta or SUFIJO_RAIZ
+
+
 def componentes(plantilla: PlantillaMeta, valores: dict[str, Any]) -> list[dict[str, Any]]:
     """Los `components` del envío de una plantilla por la Cloud API."""
     textos = parametros(plantilla, valores)
     resultado: list[dict[str, Any]] = []
     if textos:
         resultado.append({"type": "body", "parameters": [{"type": "text", "text": texto} for texto in textos]})
+    if plantilla.boton:
+        resultado.append({
+            "type": "button", "sub_type": "url", "index": "0",
+            "parameters": [{"type": "text", "text": sufijo_boton(_texto(valores, "enlace"))}],
+        })
     if plantilla.boton_codigo:
         resultado.append({
             "type": "button", "sub_type": "url", "index": "0",
@@ -523,4 +543,8 @@ def definicion_meta(plantilla: PlantillaMeta, idioma: str) -> dict[str, Any]:
     }]
     if plantilla.pie:
         componentes_meta.append({"type": "FOOTER", "text": plantilla.pie})
+    if plantilla.boton:
+        componentes_meta.append({"type": "BUTTONS", "buttons": [{
+            "type": "URL", "text": plantilla.boton, "url": f"{BASE_BOTON}{{{{1}}}}", "example": [f"{BASE_BOTON}{EJEMPLO_BOTON}"],
+        }]})
     return {"name": plantilla.nombre, "language": idioma, "category": plantilla.categoria, "components": componentes_meta}

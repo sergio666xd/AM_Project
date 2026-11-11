@@ -17,6 +17,7 @@ from app.whatsapp_plantillas import (
     definicion_meta,
     limpiar_parametro,
     parametros,
+    sufijo_boton,
 )
 
 RAIZ = Path(__file__).resolve().parents[2]
@@ -75,6 +76,9 @@ def test_templates_follow_meta_rules(plantilla):
         assert not re.search(r"}}\s*{{", plantilla.cuerpo)
     if plantilla.pie:
         assert len(plantilla.pie) <= 60
+    if plantilla.boton:
+        assert len(plantilla.boton) <= 25
+        assert "http" not in plantilla.cuerpo
     definicion = definicion_meta(plantilla, "es")
     assert definicion["name"] == plantilla.nombre and definicion["language"] == "es"
 
@@ -90,7 +94,7 @@ def test_parameters_are_single_line_short_and_never_empty():
     plantilla = PLANTILLAS_META["SOLICITUD_DOCUMENTO"]
     valores = parametros(plantilla, {"primer_nombre": "María", "proceso": "", "documentos": "Cédula\nRUT"})
     assert valores[0] == "María" and valores[1] == "-" and valores[2] == "Cédula; RUT"
-    assert valores[3] == "sin fecha límite" and valores[4].startswith("https://")
+    assert valores[3] == "sin fecha límite" and len(valores) == 4
     assert all(texto and "\n" not in texto for texto in valores)
 
 
@@ -102,6 +106,16 @@ def test_notice_data_keeps_readable_values_and_never_the_password():
     assert datos["valores"]["primer_nombre"] == "María"
     assert datos["valores"]["estado"] == "en curso"
     assert datos["valores"]["enlace"] == "https://panel.example.test/"
+
+
+def test_button_suffix_is_the_portal_route_without_anchor():
+    assert sufijo_boton("https://panel.alejandramunozabogada.com/procesos/12#documentos") == "procesos/12"
+    assert sufijo_boton("https://panel.alejandramunozabogada.com/chat/3/9?x=1") == "chat/3/9?x=1"
+    assert sufijo_boton("https://admin.alejandramunozabogada.com/operacion") == "operacion"
+    assert sufijo_boton("") == sufijo_boton("https://panel.alejandramunozabogada.com/") == "?origen=whatsapp"
+    definicion = definicion_meta(PLANTILLAS_META["RECORDATORIO_TAREA"], "es")
+    boton = definicion["components"][-1]["buttons"][0]
+    assert boton["type"] == "URL" and boton["url"] == "https://panel.alejandramunozabogada.com/{{1}}"
 
 
 def test_authentication_template_also_fills_the_copy_code_button():
@@ -121,7 +135,7 @@ def test_cloud_api_sends_the_approved_template_and_returns_the_message_id(cloud,
     )
     datos = datos_whatsapp("RECORDATORIO_TAREA", {"nombre": "Ana Pérez", "tarea": "Firmar el poder",
                                                   "fecha_limite": "20/11/2026 17:00", "proceso": "Sucesión"},
-                           "https://panel.example.test/tareas/7")
+                           "https://panel.alejandramunozabogada.com/tareas/7")
 
     assert whatsapp.enviar_mensaje_whatsapp("300 123 4567", "texto", plantilla=datos) == "wamid.ABC"
     url, kwargs = llamadas[0]
@@ -132,8 +146,9 @@ def test_cloud_api_sends_the_approved_template_and_returns_the_message_id(cloud,
     assert cuerpo["template"]["name"] == "am_recordatorio_tarea"
     assert cuerpo["template"]["language"] == {"code": "es"}
     textos = [p["text"] for p in cuerpo["template"]["components"][0]["parameters"]]
-    assert textos == ["Ana", "Firmar el poder", "viernes 20 de noviembre de 2026, 5:00 p. m.", "Sucesión",
-                      "https://panel.example.test/tareas/7"]
+    assert textos == ["Ana", "Firmar el poder", "viernes 20 de noviembre de 2026, 5:00 p. m.", "Sucesión"]
+    boton = cuerpo["template"]["components"][1]
+    assert boton["sub_type"] == "url" and boton["parameters"] == [{"type": "text", "text": "tareas/7"}]
 
 
 def test_cloud_api_errors_are_explained_without_the_token(cloud, monkeypatch):

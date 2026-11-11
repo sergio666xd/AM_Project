@@ -7,6 +7,7 @@ código ni en la línea de comandos: déjalo en el entorno o en tu `.env` local.
     python scripts/plantillas_whatsapp_meta.py               # muestra lo que se va a crear (no llama a Meta)
     python scripts/plantillas_whatsapp_meta.py --estado      # estado de aprobación de cada plantilla en Meta
     python scripts/plantillas_whatsapp_meta.py --crear       # crea en Meta las que falten (quedan en revisión)
+    python scripts/plantillas_whatsapp_meta.py --actualizar  # sube el texto actual de las que ya existen
     python scripts/plantillas_whatsapp_meta.py --probar 3001234567              # envía hello_world
     python scripts/plantillas_whatsapp_meta.py --probar 3001234567 --plantilla PRUEBA_INTEGRACION
 """
@@ -37,21 +38,29 @@ def _cabeceras(config: dict) -> dict:
     return {"Authorization": f"Bearer {config['token']}"}
 
 
-def _existentes(config: dict) -> dict[tuple[str, str], str]:
+def _existentes(config: dict) -> dict[tuple[str, str], dict]:
+    """Plantillas del catálogo que ya existen en Meta: id, estado y motivo de rechazo."""
     if not config["waba_id"]:
         sys.exit("Falta WHATSAPP_WABA_ID en el entorno.")
-    estados: dict[tuple[str, str], str] = {}
+    existentes: dict[tuple[str, str], dict] = {}
     url = graph_url(config, f"{config['waba_id']}/message_templates")
-    params: dict | None = {"fields": "name,language,status", "limit": 100}
+    params: dict | None = {"fields": "id,name,language,status,rejected_reason", "limit": 100}
     while url:
         respuesta = requests.get(url, headers=_cabeceras(config), params=params, timeout=15)
         if not respuesta.ok:
             sys.exit(descripcion_error_meta(respuesta))
         datos = respuesta.json()
         for plantilla in datos.get("data", []):
-            estados[(plantilla["name"], plantilla["language"])] = plantilla["status"]
+            existentes[(plantilla["name"], plantilla["language"])] = plantilla
         url, params = (datos.get("paging") or {}).get("next"), None
-    return estados
+    return existentes
+
+
+def _estado_legible(plantilla: dict | None) -> str:
+    if plantilla is None:
+        return "NO CREADA"
+    motivo = plantilla.get("rejected_reason")
+    return f"{plantilla['status']} (motivo: {motivo})" if motivo and motivo != "NONE" else plantilla["status"]
 
 
 def mostrar(config: dict) -> None:
@@ -62,14 +71,15 @@ def mostrar(config: dict) -> None:
 def estado(config: dict) -> None:
     existentes = _existentes(config)
     for plantilla in CATALOGO:
-        print(f"{plantilla.nombre:32} {existentes.get((plantilla.nombre, config['idioma']), 'NO CREADA')}")
+        print(f"{plantilla.nombre:32} {_estado_legible(existentes.get((plantilla.nombre, config['idioma'])))}")
 
 
 def crear(config: dict) -> None:
     existentes = _existentes(config)
     for plantilla in CATALOGO:
-        if (plantilla.nombre, config["idioma"]) in existentes:
-            print(f"{plantilla.nombre:32} ya existe ({existentes[(plantilla.nombre, config['idioma'])]})")
+        existente = existentes.get((plantilla.nombre, config["idioma"]))
+        if existente:
+            print(f"{plantilla.nombre:32} ya existe ({_estado_legible(existente)})")
             continue
         respuesta = requests.post(
             graph_url(config, f"{config['waba_id']}/message_templates"),
@@ -77,6 +87,33 @@ def crear(config: dict) -> None:
         )
         if respuesta.ok:
             print(f"{plantilla.nombre:32} creada: {respuesta.json().get('status', 'PENDING')}")
+        else:
+            print(f"{plantilla.nombre:32} ERROR {descripcion_error_meta(respuesta)} {respuesta.text[:300]}")
+
+
+def actualizar(config: dict) -> None:
+    """Envía a Meta el texto actual del catálogo para las plantillas que ya existen.
+
+    Meta no deja editar una plantilla mientras está en revisión (PENDING); esas
+    se saltan y hay que repetir el comando cuando las apruebe o rechace. Cada
+    edición vuelve a pasar por revisión.
+    """
+    existentes = _existentes(config)
+    for plantilla in CATALOGO:
+        existente = existentes.get((plantilla.nombre, config["idioma"]))
+        if existente is None:
+            print(f"{plantilla.nombre:32} no existe; use --crear")
+            continue
+        if existente["status"] in {"PENDING", "IN_APPEAL"}:
+            print(f"{plantilla.nombre:32} en revisión; repita cuando Meta responda")
+            continue
+        definicion = definicion_meta(plantilla, config["idioma"])
+        respuesta = requests.post(
+            graph_url(config, existente["id"]), headers=_cabeceras(config),
+            json={"category": definicion["category"], "components": definicion["components"]}, timeout=15,
+        )
+        if respuesta.ok:
+            print(f"{plantilla.nombre:32} actualizada; vuelve a revisión")
         else:
             print(f"{plantilla.nombre:32} ERROR {descripcion_error_meta(respuesta)} {respuesta.text[:300]}")
 
@@ -104,6 +141,7 @@ def main() -> None:
     grupo = parser.add_mutually_exclusive_group()
     grupo.add_argument("--estado", action="store_true", help="consulta el estado de aprobación en Meta")
     grupo.add_argument("--crear", action="store_true", help="crea en Meta las plantillas que falten")
+    grupo.add_argument("--actualizar", action="store_true", help="envía a Meta el texto actual de las que ya existen")
     grupo.add_argument("--probar", metavar="NUMERO", help="envía un mensaje de prueba a este número")
     parser.add_argument("--plantilla", metavar="CLAVE", help="con --probar: clave del aviso (p. ej. PRUEBA_INTEGRACION)")
     args = parser.parse_args()
@@ -112,6 +150,8 @@ def main() -> None:
         estado(config)
     elif args.crear:
         crear(config)
+    elif args.actualizar:
+        actualizar(config)
     elif args.probar:
         probar(config, args.probar, args.plantilla)
     else:
