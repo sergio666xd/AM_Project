@@ -10,6 +10,7 @@ import { LoadingState } from "@/components/ui/LoadingState";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { SegmentedControl } from "@/components/ui/SegmentedControl";
 import { Sheet, SheetHeader } from "@/components/ui/Sheet";
+import { Tag, type TonoTag } from "@/components/ui/Tag";
 import { useToast } from "@/components/ui/ToastProvider";
 import { api, mensajeDeError, type Esquemas } from "@/lib/api-v2/cliente";
 import { cx } from "@/lib/cx";
@@ -21,6 +22,19 @@ type Plantilla = Esquemas["PlantillaAviso"];
 type Textos = Esquemas["TextosPlantillaAviso"];
 type CampoTexto = keyof Textos;
 type Vista = "correo" | "whatsapp" | "navegador";
+type WhatsappMeta = Esquemas["WhatsappMeta"];
+
+const ESTADO_META: Record<WhatsappMeta["estado"], { texto: string; tono: TonoTag }> = {
+  aprobada: { texto: "Aprobada", tono: "ok" },
+  en_revision: { texto: "En revisión", tono: "gold" },
+  rechazada: { texto: "Rechazada", tono: "bad" },
+  en_riesgo: { texto: "En riesgo", tono: "warn" },
+  pausada: { texto: "Pausada", tono: "warn" },
+  deshabilitada: { texto: "Deshabilitada", tono: "bad" },
+  sin_dato: { texto: "Sin dato", tono: "neutral" },
+};
+
+const fechaMeta = new Intl.DateTimeFormat("es-CO", { dateStyle: "medium", timeStyle: "short", timeZone: "America/Bogota" });
 
 const AREA = cx(CAMPO, "min-h-0 py-2.5 font-mono text-[13.5px] leading-relaxed sm:text-[13px]");
 const MARCAS: [string, string][] = [
@@ -60,11 +74,16 @@ function Lista({ filas, actual, onElegir }: { filas: Fila[]; actual: string | nu
               aria-current={f.clave === actual ? "true" : undefined}
               onClick={() => onElegir(f.clave)}
               className={cx(
-                "flex min-h-11 w-full items-center rounded-lg px-3 py-2 text-left transition-colors",
+                "flex min-h-11 w-full items-center gap-1 rounded-lg px-3 py-2 text-left transition-colors",
                 f.clave === actual ? "bg-manila text-ink" : "text-ink-2 hover:bg-sheet-2 hover:text-ink",
               )}
             >
-              <span className={cx("text-[14px]", f.clave === actual && "font-semibold")}>{f.nombre}</span>
+              <span className={cx("min-w-0 flex-1 text-[14px]", f.clave === actual && "font-semibold")}>{f.nombre}</span>
+              {f.whatsapp_meta && f.whatsapp_meta.estado !== "aprobada" && f.whatsapp_meta.estado !== "sin_dato" && (
+                <Tag tone={ESTADO_META[f.whatsapp_meta.estado].tono} className="ml-2 shrink-0">
+                  <span className="sr-only">WhatsApp: </span>{ESTADO_META[f.whatsapp_meta.estado].texto}
+                </Tag>
+              )}
             </button>
           </li>
         ))}
@@ -78,6 +97,31 @@ function Lista({ filas, actual, onElegir }: { filas: Fila[]; actual: string | nu
 function conNegritas(texto: string) {
   return texto.split(/(\*[^*\n]+\*)/g).map((parte, i) =>
     /^\*[^*\n]+\*$/.test(parte) ? <strong key={i}>{parte.slice(1, -1)}</strong> : parte,
+  );
+}
+
+function EstadoEnMeta({ meta, consultando, onConsultar }: { meta: WhatsappMeta; consultando: boolean; onConsultar: () => void }) {
+  const estado = ESTADO_META[meta.estado];
+  return (
+    <Sheet aria-label="WhatsApp en Meta" className="mb-4 px-4 py-3">
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
+        <p className="text-[13.5px] text-ink-2">
+          Plantilla de WhatsApp en Meta: <span className="font-mono text-[13px] text-ink">{meta.plantilla}</span>
+        </p>
+        <Tag tone={estado.tono}>{estado.texto}</Tag>
+        {meta.actualizado_en && <span className="text-[12.5px] text-ink-3">Meta avisó el {fechaMeta.format(new Date(meta.actualizado_en))}</span>}
+        <Button size="sm" variant="ghost" className="ml-auto" icon={<RefreshCw size={14} />} loading={consultando} onClick={onConsultar}>
+          Consultar en Meta
+        </Button>
+      </div>
+      {meta.motivo && <p className="mt-1.5 text-[13px] text-bad">Motivo que dio Meta: {meta.motivo}</p>}
+      {meta.estado === "sin_dato" && (
+        <p className="mt-1.5 text-[13px] text-ink-3">Meta aún no ha avisado nada de esta plantilla. Toque «Consultar en Meta» para traer su estado.</p>
+      )}
+      <p className="mt-1.5 text-[13px] text-ink-3">
+        Por WhatsApp sale el texto aprobado en Meta para esta plantilla. El «Texto de WhatsApp» de abajo solo se usa si WhatsApp no está conectado a Meta.
+      </p>
+    </Sheet>
   );
 }
 
@@ -269,6 +313,8 @@ export function PanelPlantillas() {
   const [plantilla, setPlantilla] = useState<Plantilla | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [errorDetalle, setErrorDetalle] = useState<string | null>(null);
+  const [consultando, setConsultando] = useState(false);
+  const { toast } = useToast();
   const cambiosPendientes = useRef(false);
   const marcarCambios = useCallback((hay: boolean) => { cambiosPendientes.current = hay; }, []);
 
@@ -306,6 +352,20 @@ export function PanelPlantillas() {
     setPlantilla(null);
   }
 
+  async function consultarMeta() {
+    setConsultando(true);
+    const { data, error: fallo } = await api.POST("/api/v2/admin/plantillas/whatsapp-meta/sincronizar");
+    setConsultando(false);
+    if (fallo || !data) {
+      toast({ title: "No se pudo consultar a Meta", description: mensajeDeError(fallo), tone: "error" });
+      return;
+    }
+    setFilas(data);
+    const fila = data.find((f) => f.clave === plantilla?.clave);
+    if (fila) setPlantilla((p) => (p ? { ...p, whatsapp_meta: fila.whatsapp_meta } : p));
+    toast({ title: "Estado actualizado", description: "Se trajo de Meta el estado de las plantillas de WhatsApp.", tone: "success" });
+  }
+
   function guardada(p: Plantilla) {
     setPlantilla(p);
     setFilas((fs) => fs?.map((f) => (f.clave === p.clave ? { ...f, actualizada_en: p.actualizada_en } : f)) ?? fs);
@@ -338,7 +398,10 @@ export function PanelPlantillas() {
             ) : !plantilla ? (
               <LoadingState label="Cargando el aviso" rows={6} />
             ) : (
-              <Editor key={plantilla.clave + plantilla.actualizada_en} plantilla={plantilla} onGuardada={guardada} onCambios={marcarCambios} />
+              <>
+                {plantilla.whatsapp_meta && <EstadoEnMeta meta={plantilla.whatsapp_meta} consultando={consultando} onConsultar={() => void consultarMeta()} />}
+                <Editor key={plantilla.clave + plantilla.actualizada_en} plantilla={plantilla} onGuardada={guardada} onCambios={marcarCambios} />
+              </>
             )}
           </div>
         </div>

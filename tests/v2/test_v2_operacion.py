@@ -204,3 +204,62 @@ def test_plantillas_editar_y_vista_previa(iniciar, crear_usuario, crear_proceso,
     guardada = cliente_http.put("/api/v2/admin/plantillas/ACTUACIONES_DIGEST", json=textos, headers=H).json()
     assert guardada["cuerpo_email"].endswith("Vence: {{fecha}}") and "fecha" in guardada["variables"]
     assert sesion_bd.query(models.EventoAuditoria).filter_by(accion="admin.mensaje.plantilla.actualizar").count() == 1
+
+
+def test_plantillas_muestran_el_estado_de_whatsapp_en_meta(iniciar, crear_usuario, crear_proceso, cliente_http, sesion_bd, monkeypatch):
+    import hashlib
+    import hmac
+    import json
+
+    monkeypatch.setenv("WHATSAPP_APP_SECRET", "secreto")
+    monkeypatch.setenv("WHATSAPP_PHONE_NUMBER_ID", "634864400531550")
+    monkeypatch.setenv("WHATSAPP_WABA_ID", "634496380588828")
+    monkeypatch.delenv("WHATSAPP_IDIOMA_PLANTILLAS", raising=False)
+    e = _escenario(crear_usuario, crear_proceso, sesion_bd)
+    iniciar(e["admin"])
+
+    def estados():
+        return {f["clave"]: f["whatsapp_meta"] for f in cliente_http.get("/api/v2/admin/plantillas").json()}
+
+    assert estados()["ACTUACIONES_DIGEST"] == {"plantilla": "am_novedades_juzgado", "estado": "sin_dato", "motivo": None, "actualizado_en": None}
+
+    def webhook(valor, momento, cuenta="634496380588828"):
+        cuerpo = json.dumps({"entry": [{"id": cuenta, "time": momento, "changes": [
+            {"field": "message_template_status_update", "value": valor}]}]}).encode()
+        firma = "sha256=" + hmac.new(b"secreto", cuerpo, hashlib.sha256).hexdigest()
+        r = cliente_http.post("/api/whatsapp/webhook", content=cuerpo, headers={"X-Hub-Signature-256": firma, "Content-Type": "application/json"})
+        assert r.status_code == 200
+
+    rechazo = {"event": "REJECTED", "message_template_id": 1, "message_template_name": "am_novedades_juzgado",
+               "message_template_language": "es", "reason": "INVALID_FORMAT"}
+    webhook(rechazo, 1762880000)
+    meta = estados()["ACTUACIONES_DIGEST"]
+    assert (meta["estado"], meta["motivo"]) == ("rechazada", "INVALID_FORMAT") and meta["actualizado_en"]
+    webhook({**rechazo, "event": "APPROVED", "reason": "NONE"}, 1762880100)
+    # Un aviso viejo que llega tarde, de otra cuenta o en otro idioma no cambia nada.
+    webhook(rechazo, 1762880050)
+    webhook(rechazo, 1762880200, cuenta="999")
+    webhook({**rechazo, "message_template_language": "en_US"}, 1762880200)
+    assert estados()["ACTUACIONES_DIGEST"]["estado"] == "aprobada" and estados()["ACTUACIONES_DIGEST"]["motivo"] is None
+    detalle = cliente_http.get("/api/v2/admin/plantillas/ACTUACIONES_DIGEST").json()
+    assert detalle["whatsapp_meta"]["estado"] == "aprobada"
+
+    # Consultar en Meta: trae lo de las que se revisaron antes de configurar el webhook.
+    from app.modulos.operacion import plantillas as servicio
+
+    monkeypatch.setattr(servicio, "consultar_plantillas_meta", lambda config: [
+        {"name": "am_prueba_envio", "language": "es", "status": "PAUSED", "rejected_reason": "NONE"},
+        {"name": "am_novedades_juzgado", "language": "es", "status": "APPROVED"},
+        {"name": "hello_world", "language": "en_US", "status": "APPROVED"},
+    ])
+    filas = cliente_http.post("/api/v2/admin/plantillas/whatsapp-meta/sincronizar", headers=H).json()
+    assert {f["clave"]: f["whatsapp_meta"]["estado"] for f in filas} == {"ACTUACIONES_DIGEST": "aprobada", "PRUEBA_INTEGRACION": "pausada"}
+
+    from app.whatsapp import ErrorWhatsapp
+
+    def falla(config):
+        raise ErrorWhatsapp("WhatsApp API respondió HTTP 401 (código 190).")
+
+    monkeypatch.setattr(servicio, "consultar_plantillas_meta", falla)
+    r = cliente_http.post("/api/v2/admin/plantillas/whatsapp-meta/sincronizar", headers=H)
+    assert r.status_code == 502 and "190" in r.text

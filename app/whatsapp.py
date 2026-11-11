@@ -235,6 +235,27 @@ def verificar_numero_cloud(config: dict[str, str] | None = None) -> dict:
     return respuesta.json()
 
 
+def plantillas_cloud(config: dict[str, str] | None = None) -> list[dict]:
+    """Las plantillas de la cuenta en Meta con su estado y motivo de rechazo."""
+    config = config or cloud_config()
+    if not config["token"] or not config["waba_id"]:
+        raise ErrorWhatsapp("Faltan WHATSAPP_TOKEN o WHATSAPP_WABA_ID para consultar las plantillas en Meta.")
+    plantillas: list[dict] = []
+    url: str | None = graph_url(config, f"{config['waba_id']}/message_templates")
+    params: dict | None = {"fields": "name,language,status,rejected_reason", "limit": 100}
+    while url:
+        try:
+            respuesta = requests.get(url, headers=_cabeceras(config), params=params, timeout=15)
+        except requests.RequestException as exc:
+            raise ErrorWhatsapp(f"No fue posible conectar con la API de WhatsApp ({type(exc).__name__}).") from exc
+        if not respuesta.ok:
+            raise ErrorWhatsapp(descripcion_error_meta(respuesta))
+        datos = respuesta.json()
+        plantillas.extend(datos.get("data") or [])
+        url, params = (datos.get("paging") or {}).get("next"), None
+    return plantillas
+
+
 # ---- Envío -------------------------------------------------------------------------
 
 

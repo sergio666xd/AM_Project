@@ -1462,3 +1462,16 @@ class MensajeWhatsappRecibido(Base):
     texto = Column(Text, nullable=True)
     recibido_en = Column(DateTime, nullable=False)
     created_at = Column(DateTime, nullable=False, default=utc_ahora)
+
+
+class PlantillaWhatsappMeta(Base):
+    """Último estado que Meta informó de una plantilla de WhatsApp (webhook `message_template_status_update`)."""
+    __tablename__ = "plantillas_whatsapp_meta"
+    __table_args__ = (UniqueConstraint("nombre", "idioma", name="uq_plantilla_whatsapp_meta"),)
+
+    id = Column(Integer, primary_key=True)
+    nombre = Column(String(512), nullable=False)
+    idioma = Column(String(16), nullable=False)
+    estado = Column(String(32), nullable=False)
+    motivo = Column(Text, nullable=True)
+    actualizado_en = Column(DateTime, nullable=False, default=utc_ahora)

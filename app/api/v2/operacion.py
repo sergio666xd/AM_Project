@@ -182,6 +182,16 @@ def listar_plantillas_avisos(
     return servicio.listar(usuario)
 
 
+@router.post("/plantillas/whatsapp-meta/sincronizar", response_model=list[PlantillaAvisoFila],
+             summary="Consultar en Meta el estado de las plantillas de WhatsApp")
+def sincronizar_plantillas_whatsapp_meta(
+    usuario: models.Usuario = Depends(usuario_actual),
+    servicio: ServicioPlantillas = Depends(servicio_plantillas),
+):
+    """Normalmente lo avisa el webhook; esto sirve para las que se aprobaron antes de configurarlo."""
+    return servicio.sincronizar_whatsapp_meta(usuario)
+
+
 @router.get("/plantillas/{clave}", response_model=PlantillaAviso, summary="Una plantilla")
 def detalle_plantilla_aviso(
     clave: str,
