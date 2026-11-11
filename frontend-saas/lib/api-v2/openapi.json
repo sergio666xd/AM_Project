@@ -30485,6 +30485,35 @@
             ],
             "title": "Enviado En"
           },
+          "confirmacion": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "entregado",
+                  "leido"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Confirmacion",
+            "description": "Solo WhatsApp: lo que Meta confirmó por el webhook (entregado al teléfono o leído)."
+          },
+          "confirmado_en": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Confirmado En",
+            "description": "Cuándo llegó esa confirmación."
+          },
           "cuerpo": {
             "type": "string",
             "title": "Cuerpo",
@@ -31779,6 +31808,35 @@
               }
             ],
             "title": "Enviado En"
+          },
+          "confirmacion": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "entregado",
+                  "leido"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Confirmacion",
+            "description": "Solo WhatsApp: lo que Meta confirmó por el webhook (entregado al teléfono o leído)."
+          },
+          "confirmado_en": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Confirmado En",
+            "description": "Cuándo llegó esa confirmación."
           }
         },
         "type": "object",

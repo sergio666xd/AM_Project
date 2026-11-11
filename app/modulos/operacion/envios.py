@@ -65,6 +65,14 @@ def estado_de(entrega: models.EntregaNotificacion) -> str:
     return {"PENDIENTE": "pendiente", "ENVIANDO": "enviando", "ENVIADA": "enviado"}.get(entrega.estado, "omitido")
 
 
+def _confirmacion(entrega: models.EntregaNotificacion) -> dict:
+    """Entregado o leído según el webhook de WhatsApp; un fallo posterior ya se ve como error."""
+    confirmacion = {"delivered": "entregado", "read": "leido"}.get(entrega.estado_proveedor or "")
+    if confirmacion is None or entrega.estado != "ENVIADA":
+        return {"confirmacion": None, "confirmado_en": None}
+    return {"confirmacion": confirmacion, "confirmado_en": entrega.estado_proveedor_en}
+
+
 def envio(entrega: models.EntregaNotificacion, usuario: Usuario, *, con_cuerpo: bool = False) -> Envio:
     canal = entrega.canal if entrega.canal in CANALES else None
     datos = dict(
@@ -73,6 +81,7 @@ def envio(entrega: models.EntregaNotificacion, usuario: Usuario, *, con_cuerpo: 
         contacto=usuario.email if canal == "EMAIL" else (usuario.whatsapp_numero or None) if canal == "WHATSAPP" else None,
         intentos=entrega.intentos, error=(entrega.error or "").strip()[:500] or None,
         creado_en=entrega.created_at, enviado_en=entrega.enviado_en,
+        **_confirmacion(entrega),
     )
     if con_cuerpo:
         return DetalleEnvio(**datos, cuerpo=texto_plano(entrega.cuerpo or ""))
