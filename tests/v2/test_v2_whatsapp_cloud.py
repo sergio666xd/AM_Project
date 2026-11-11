@@ -259,3 +259,23 @@ def test_webhook_ignores_events_for_another_phone_number(cloud, cliente_http, se
     }}]}]}).encode()
     assert cliente_http.post("/api/whatsapp/webhook", content=cuerpo, headers=_firmar(cuerpo)).status_code == 200
     assert sesion_bd.query(models.MensajeWhatsappRecibido).count() == 0
+
+
+def test_admin_sees_whatsapp_delivery_confirmation(cloud, cliente_http, sesion_bd, crear_usuario, iniciar):
+    admin = crear_usuario("ADMIN")
+    cliente = crear_usuario("CLIENTE")
+    entrega = models.EntregaNotificacion(
+        clave_idempotencia="confirmacion-wa", usuario_id=cliente.id, tipo="TAREAS", canal="WHATSAPP",
+        asunto="Tarea", cuerpo="b", estado="ENVIADA", intentos=1, proveedor_mensaje_id="wamid.2",
+        estado_proveedor="accepted",
+    )
+    sesion_bd.add(entrega)
+    sesion_bd.commit()
+    iniciar(admin)
+
+    assert cliente_http.get("/api/v2/admin/envios").json()["items"][0]["confirmacion"] is None
+    cuerpo = _evento({"statuses": [{"id": "wamid.2", "status": "read", "timestamp": "1762880000"}]})
+    assert cliente_http.post("/api/whatsapp/webhook", content=cuerpo, headers=_firmar(cuerpo)).status_code == 200
+    item = cliente_http.get("/api/v2/admin/envios").json()["items"][0]
+    assert item["confirmacion"] == "leido" and item["confirmado_en"]
+    assert cliente_http.get(f"/api/v2/admin/envios/{entrega.id}").json()["confirmacion"] == "leido"

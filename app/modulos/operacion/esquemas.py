@@ -98,6 +98,10 @@ class Envio(BaseModel):
     error: str | None
     creado_en: FechaHora
     enviado_en: FechaHora | None
+    confirmacion: Literal["entregado", "leido"] | None = Field(
+        None, description="Solo WhatsApp: lo que Meta confirmó por el webhook (entregado al teléfono o leído).",
+    )
+    confirmado_en: FechaHora | None = Field(None, description="Cuándo llegó esa confirmación.")
 
 
 class DetalleEnvio(Envio):

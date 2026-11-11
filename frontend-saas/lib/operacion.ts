@@ -28,6 +28,12 @@ export const ESTADO_ENVIO: Record<Envio["estado"], { nombre: string; tono: TonoT
   omitido: { nombre: "No se envió", tono: "neutral" },
 };
 
+/** Lo que Meta confirmó de un WhatsApp ya enviado; reemplaza a «Enviado» en la etiqueta. */
+export const CONFIRMACION_ENVIO: Record<NonNullable<Envio["confirmacion"]>, string> = {
+  entregado: "Entregado",
+  leido: "Leído",
+};
+
 export const CANAL_ENVIO: Record<NonNullable<Envio["canal"]>, string> = {
   EMAIL: "Correo",
   WHATSAPP: "WhatsApp",
