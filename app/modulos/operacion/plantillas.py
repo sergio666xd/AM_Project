@@ -9,16 +9,20 @@ import re
 
 from sqlalchemy.orm import Session
 
+from app import models
+
 from app.audit import registrar_evento_auditoria
 from app.email_service import vista_previa_html
 from app.integration_settings import get_firm_settings
 from app.message_templates import render_borrador
 from app.modulos.administracion.politicas import exigir_admin
 from app.modulos.identidad.modelos import Usuario
-from app.modulos.operacion.esquemas import PlantillaAviso, PlantillaAvisoFila, TextosPlantillaAviso, VistaPrevia
+from app.modulos.operacion.esquemas import EstadoPlantillaMeta, PlantillaAviso, PlantillaAvisoFila, TextosPlantillaAviso, VistaPrevia, WhatsappMeta
 from app.modulos.operacion.repositorio import RepositorioOperacion
-from app.whatsapp import formatear_mensaje_whatsapp
+from app.whatsapp import cloud_config, formatear_mensaje_whatsapp
+from app.whatsapp_plantillas import plantilla_para
 from app.nucleo.errores import DatosInvalidos, NoEncontrado
+from app.timezone import utc_ahora
 
 TOKEN = re.compile(r"{{\s*([a-zA-Z0-9_.-]+)\s*}}")
 # Texto del botón cuando la plantilla no pone el suyo con {{enlace}}.
@@ -33,6 +37,21 @@ ETIQUETAS_ENLACE = {
     "COLABORADOR_AGREGADO": "Ver el proceso", "ACTUACION_NOTIFICADA": "Ver la actuación",
 }
 OBLIGAN_PUSH = {"ACTUACIONES_DIGEST"}
+# Eventos del webhook `message_template_status_update` de Meta.
+ESTADOS_META: dict[str, EstadoPlantillaMeta] = {
+    "APPROVED": "aprobada", "REINSTATED": "aprobada", "UNPAUSED": "aprobada",
+    "PENDING": "en_revision", "IN_APPEAL": "en_revision",
+    "REJECTED": "rechazada", "FLAGGED": "en_riesgo", "PAUSED": "pausada",
+    "DISABLED": "deshabilitada", "PENDING_DELETION": "deshabilitada", "DELETED": "deshabilitada",
+    "ARCHIVED": "deshabilitada", "LIMIT_EXCEEDED": "deshabilitada",
+}
+
+
+def consultar_plantillas_meta(config: dict) -> list[dict]:
+    """Llamada externa a Meta (las pruebas la sustituyen)."""
+    from app.whatsapp import plantillas_cloud
+
+    return plantillas_cloud(config)
 
 
 def _ejemplo(plantilla) -> dict[str, str]:
@@ -43,10 +62,22 @@ def _texto(valor: str | None) -> str:
     return (valor or "").replace("\\n", "\n")
 
 
-def _fila(plantilla) -> PlantillaAvisoFila:
+def _whatsapp_meta(clave: str, estados: dict) -> WhatsappMeta | None:
+    meta = plantilla_para(clave)
+    if meta is None:
+        return None
+    fila = estados.get(meta.nombre)
+    if fila is None:
+        return WhatsappMeta(plantilla=meta.nombre, estado="sin_dato")
+    return WhatsappMeta(
+        plantilla=meta.nombre, estado=ESTADOS_META.get(fila.estado, "sin_dato"), motivo=fila.motivo, actualizado_en=fila.actualizado_en,
+    )
+
+
+def _fila(plantilla, estados: dict) -> PlantillaAvisoFila:
     return PlantillaAvisoFila(
         clave=plantilla.clave, nombre=plantilla.nombre, tiene_push=plantilla.titulo_push is not None or plantilla.clave in OBLIGAN_PUSH,
-        actualizada_en=plantilla.updated_at,
+        actualizada_en=plantilla.updated_at, whatsapp_meta=_whatsapp_meta(plantilla.clave, estados),
     )
 
 
@@ -63,14 +94,44 @@ class ServicioPlantillas:
 
     def listar(self, admin: Usuario) -> list[PlantillaAvisoFila]:
         exigir_admin(admin)
-        return [_fila(p) for p in self._repo.plantillas()]
+        estados = self._repo.estados_whatsapp_meta(cloud_config()["idioma"])
+        return [_fila(p, estados) for p in self._repo.plantillas()]
+
+    def sincronizar_whatsapp_meta(self, admin: Usuario) -> list[PlantillaAvisoFila]:
+        """Pide a Meta el estado actual de las plantillas (por si el webhook no avisó)."""
+        exigir_admin(admin)
+        from app.modulos.operacion.integraciones import ProveedorNoDisponible
+        from app.whatsapp import ErrorWhatsapp
+
+        config = cloud_config()
+        try:
+            remotas = consultar_plantillas_meta(config)
+        except ErrorWhatsapp as exc:
+            raise ProveedorNoDisponible(str(exc)) from exc
+        estados = self._repo.estados_whatsapp_meta(config["idioma"])
+        ahora = utc_ahora()
+        for remota in remotas:
+            nombre, idioma, estado = str(remota.get("name") or ""), str(remota.get("language") or ""), str(remota.get("status") or "")
+            if idioma != config["idioma"] or not nombre or not estado:
+                continue
+            motivo = remota.get("rejected_reason")
+            motivo = None if not motivo or motivo == "NONE" else str(motivo)
+            fila = estados.get(nombre)
+            if fila is None:
+                fila = models.PlantillaWhatsappMeta(nombre=nombre[:512], idioma=idioma[:16])
+                self._db.add(fila)
+                estados[nombre] = fila
+            fila.estado, fila.motivo, fila.actualizado_en = estado.upper()[:32], motivo, ahora
+        registrar_evento_auditoria(self._db, admin, "admin.mensaje.plantilla.whatsapp_meta", "plantilla_mensaje", "whatsapp")
+        self._db.commit()
+        return [_fila(p, estados) for p in self._repo.plantillas()]
 
     def _detalle(self, plantilla) -> PlantillaAviso:
         textos = [plantilla.asunto_email, plantilla.cuerpo_email, plantilla.cuerpo_whatsapp, plantilla.titulo_push, plantilla.cuerpo_push]
         ejemplo = _ejemplo(plantilla)
         variables = list(dict.fromkeys([*ejemplo, *(m for t in textos for m in TOKEN.findall(t or ""))]))
         return PlantillaAviso(
-            **_fila(plantilla).model_dump(),
+            **_fila(plantilla, self._repo.estados_whatsapp_meta(cloud_config()["idioma"])).model_dump(),
             asunto=_texto(plantilla.asunto_email), cuerpo_email=_texto(plantilla.cuerpo_email),
             cuerpo_whatsapp=_texto(plantilla.cuerpo_whatsapp), titulo_push=plantilla.titulo_push, cuerpo_push=plantilla.cuerpo_push,
             variables=[v for v in variables if v != "enlace"], ejemplo=ejemplo,

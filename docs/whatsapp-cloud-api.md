@@ -69,7 +69,13 @@ Meta quede funcionando.
 3. **Webhook.** En Meta for Developers > la app > WhatsApp > Configuración:
    - URL de devolución de llamada: `https://www.alejandramunozabogada.com/api/whatsapp/webhook`
    - Token de verificación: el valor de `WHATSAPP_VERIFY_TOKEN`.
-   - Suscribirse al campo `messages`.
+   - Suscribirse a los campos `messages` (estado de los avisos enviados) y
+     `message_template_status_update` (resultado de la revisión de cada plantilla).
+
+   Con el segundo, Admin > Plantillas muestra junto a cada aviso si su plantilla
+   de WhatsApp está aprobada, en revisión, rechazada (con el motivo de Meta) o
+   pausada. El botón «Consultar en Meta» trae el estado de una vez, útil para
+   las plantillas revisadas antes de suscribir el campo.
 4. **Probar.**
 
    ```bash

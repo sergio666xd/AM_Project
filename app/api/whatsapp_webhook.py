@@ -2,7 +2,9 @@
 
 Meta lo llama con GET una sola vez para verificarlo (`hub.verify_token`) y con
 POST por cada novedad: el estado de los mensajes enviados (enviado, entregado,
-leído, fallido) y los mensajes que las personas escriben al número del despacho.
+leído, fallido), los mensajes que las personas escriben al número del despacho
+(campo `messages`) y el resultado de la revisión de cada plantilla (campo
+`message_template_status_update`).
 
 Cada POST se valida con la firma `X-Hub-Signature-256` (HMAC SHA-256 del cuerpo
 con el secreto de la app de Meta). La ruta queda fuera del contrato de la API v2.
@@ -115,9 +117,36 @@ def registrar_mensaje(db: Session, mensaje: dict, contactos: list[dict]) -> None
     ))
 
 
-def procesar_evento(db: Session, evento: dict, phone_number_id: str) -> None:
+def registrar_estado_plantilla(db: Session, valor: dict, momento: datetime) -> None:
+    """Guarda lo que Meta decidió de una plantilla: APPROVED, REJECTED, PAUSED, DISABLED..."""
+    nombre = str(valor.get("message_template_name") or "")[:512]
+    idioma = str(valor.get("message_template_language") or "")[:16]
+    estado = str(valor.get("event") or "").upper()[:32]
+    if not nombre or not idioma or not estado:
+        return
+    motivo = valor.get("reason")
+    detalle = (valor.get("other_info") or {}).get("description")
+    motivo = " ".join(str(parte) for parte in (motivo, detalle) if parte and parte != "NONE") or None
+    fila = db.query(models.PlantillaWhatsappMeta).filter_by(nombre=nombre, idioma=idioma).first()
+    if fila is None:
+        db.add(models.PlantillaWhatsappMeta(nombre=nombre, idioma=idioma, estado=estado, motivo=motivo, actualizado_en=momento))
+        db.flush()
+        return
+    if fila.actualizado_en and momento < fila.actualizado_en:
+        # Llegó tarde un aviso anterior al que ya se guardó.
+        return
+    fila.estado, fila.motivo, fila.actualizado_en = estado, motivo, momento
+
+
+def procesar_evento(db: Session, evento: dict, phone_number_id: str, waba_id: str = "") -> None:
     for entrada in evento.get("entry") or []:
         for cambio in entrada.get("changes") or []:
+            if cambio.get("field") == "message_template_status_update":
+                if waba_id and str(entrada.get("id") or "") not in {"", waba_id}:
+                    continue
+                momento = _momento(entrada["time"]) if entrada.get("time") else utc_ahora()
+                registrar_estado_plantilla(db, cambio.get("value") or {}, momento)
+                continue
             if cambio.get("field") != "messages":
                 continue
             valor = cambio.get("value") or {}
@@ -156,7 +185,7 @@ async def recibir_webhook(request: Request, db: Session = Depends(get_db)):
     except ValueError:
         return JSONResponse({"detalle": "Cuerpo inválido."}, status_code=400)
     try:
-        procesar_evento(db, evento, config["phone_number_id"])
+        procesar_evento(db, evento, config["phone_number_id"], config["waba_id"])
     except Exception:
         # Meta reintenta durante días si no recibe 200; un evento que no se puede
         # guardar se registra en el log y no se vuelve a pedir.

@@ -125,6 +125,11 @@ class RepositorioOperacion:
         P = models.PlantillaMensaje
         return list(self._db.scalars(select(P).where(P.activo.is_(True)).order_by(P.nombre)))
 
+    def estados_whatsapp_meta(self, idioma: str) -> dict[str, models.PlantillaWhatsappMeta]:
+        """Último estado que Meta informó de cada plantilla de WhatsApp, por nombre."""
+        P = models.PlantillaWhatsappMeta
+        return {fila.nombre: fila for fila in self._db.scalars(select(P).where(P.idioma == idioma))}
+
     def plantilla(self, clave: str) -> models.PlantillaMensaje | None:
         P = models.PlantillaMensaje
         return self._db.scalars(select(P).where(P.clave == clave, P.activo.is_(True))).first()

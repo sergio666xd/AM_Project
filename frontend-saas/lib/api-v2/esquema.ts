@@ -3246,6 +3246,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v2/admin/plantillas/whatsapp-meta/sincronizar": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Consultar en Meta el estado de las plantillas de WhatsApp
+         * @description Normalmente lo avisa el webhook; esto sirve para las que se aprobaron antes de configurarlo.
+         */
+        post: operations["sincronizar_plantillas_whatsapp_meta"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v2/admin/plantillas/{clave}": {
         parameters: {
             query?: never;
@@ -8006,6 +8026,8 @@ export interface components {
             tiene_push: boolean;
             /** Actualizada En */
             actualizada_en: string | null;
+            /** @description Sin valor si el aviso no sale por WhatsApp con plantilla de Meta. */
+            whatsapp_meta?: components["schemas"]["WhatsappMeta"] | null;
             /** Asunto */
             asunto: string;
             /** Cuerpo Email */
@@ -8039,6 +8061,8 @@ export interface components {
             tiene_push: boolean;
             /** Actualizada En */
             actualizada_en: string | null;
+            /** @description Sin valor si el aviso no sale por WhatsApp con plantilla de Meta. */
+            whatsapp_meta?: components["schemas"]["WhatsappMeta"] | null;
         };
         /** PlantillaBreve */
         PlantillaBreve: {
@@ -9436,6 +9460,27 @@ export interface components {
             titulo_push: string | null;
             /** Cuerpo Push */
             cuerpo_push: string | null;
+        };
+        /** WhatsappMeta */
+        WhatsappMeta: {
+            /**
+             * Plantilla
+             * @description Nombre de la plantilla aprobada en Meta con que sale este aviso por WhatsApp.
+             */
+            plantilla: string;
+            /**
+             * Estado
+             * @description Lo último que Meta informó; `sin_dato` si aún no ha avisado nada.
+             * @enum {string}
+             */
+            estado: "aprobada" | "en_revision" | "rechazada" | "en_riesgo" | "pausada" | "deshabilitada" | "sin_dato";
+            /**
+             * Motivo
+             * @description Por qué Meta la rechazó o pausó, si lo dijo.
+             */
+            motivo?: string | null;
+            /** Actualizado En */
+            actualizado_en?: string | null;
         };
     };
     responses: never;
@@ -27137,6 +27182,89 @@ export interface operations {
         };
     };
     listar_plantillas_avisos: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PlantillaAvisoFila"][];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+        };
+    };
+    sincronizar_plantillas_whatsapp_meta: {
         parameters: {
             query?: never;
             header?: never;

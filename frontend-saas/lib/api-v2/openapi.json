@@ -21872,6 +21872,102 @@
         }
       }
     },
+    "/api/v2/admin/plantillas/whatsapp-meta/sincronizar": {
+      "post": {
+        "tags": [
+          "Operación"
+        ],
+        "summary": "Consultar en Meta el estado de las plantillas de WhatsApp",
+        "description": "Normalmente lo avisa el webhook; esto sirve para las que se aprobaron antes de configurarlo.",
+        "operationId": "sincronizar_plantillas_whatsapp_meta",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/PlantillaAvisoFila"
+                  },
+                  "type": "array",
+                  "title": "Response Sincronizar Plantillas Whatsapp Meta"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too Many Requests",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v2/admin/plantillas/{clave}": {
       "get": {
         "tags": [
@@ -36077,6 +36173,17 @@
             ],
             "title": "Actualizada En"
           },
+          "whatsapp_meta": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/WhatsappMeta"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Sin valor si el aviso no sale por WhatsApp con plantilla de Meta."
+          },
           "asunto": {
             "type": "string",
             "title": "Asunto"
@@ -36169,6 +36276,17 @@
               }
             ],
             "title": "Actualizada En"
+          },
+          "whatsapp_meta": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/WhatsappMeta"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Sin valor si el aviso no sale por WhatsApp con plantilla de Meta."
           }
         },
         "type": "object",
@@ -39771,6 +39889,59 @@
           "cuerpo_push"
         ],
         "title": "VistaPrevia"
+      },
+      "WhatsappMeta": {
+        "properties": {
+          "plantilla": {
+            "type": "string",
+            "title": "Plantilla",
+            "description": "Nombre de la plantilla aprobada en Meta con que sale este aviso por WhatsApp."
+          },
+          "estado": {
+            "type": "string",
+            "enum": [
+              "aprobada",
+              "en_revision",
+              "rechazada",
+              "en_riesgo",
+              "pausada",
+              "deshabilitada",
+              "sin_dato"
+            ],
+            "title": "Estado",
+            "description": "Lo último que Meta informó; `sin_dato` si aún no ha avisado nada."
+          },
+          "motivo": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Motivo",
+            "description": "Por qué Meta la rechazó o pausó, si lo dijo."
+          },
+          "actualizado_en": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Actualizado En"
+          }
+        },
+        "type": "object",
+        "required": [
+          "plantilla",
+          "estado"
+        ],
+        "title": "WhatsappMeta"
       }
     }
   }

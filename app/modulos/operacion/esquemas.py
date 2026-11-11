@@ -189,11 +189,22 @@ class PruebaEnviada(BaseModel):
 # ---- Plantillas ----------------------------------------------------------------
 
 
+EstadoPlantillaMeta = Literal["aprobada", "en_revision", "rechazada", "en_riesgo", "pausada", "deshabilitada", "sin_dato"]
+
+
+class WhatsappMeta(BaseModel):
+    plantilla: str = Field(description="Nombre de la plantilla aprobada en Meta con que sale este aviso por WhatsApp.")
+    estado: EstadoPlantillaMeta = Field(description="Lo último que Meta informó; `sin_dato` si aún no ha avisado nada.")
+    motivo: str | None = Field(None, description="Por qué Meta la rechazó o pausó, si lo dijo.")
+    actualizado_en: FechaHora | None = None
+
+
 class PlantillaAvisoFila(BaseModel):
     clave: str
     nombre: str
     tiene_push: bool
     actualizada_en: FechaHora | None
+    whatsapp_meta: WhatsappMeta | None = Field(None, description="Sin valor si el aviso no sale por WhatsApp con plantilla de Meta.")
 
 
 class TextosPlantillaAviso(BaseModel):
