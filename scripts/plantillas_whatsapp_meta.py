@@ -38,18 +38,23 @@ def _cabeceras(config: dict) -> dict:
 
 
 def _existentes(config: dict) -> dict[tuple[str, str], str]:
+    """Estado de cada plantilla en Meta; si fue rechazada, con el motivo que da Meta."""
     if not config["waba_id"]:
         sys.exit("Falta WHATSAPP_WABA_ID en el entorno.")
     estados: dict[tuple[str, str], str] = {}
     url = graph_url(config, f"{config['waba_id']}/message_templates")
-    params: dict | None = {"fields": "name,language,status", "limit": 100}
+    params: dict | None = {"fields": "name,language,status,rejected_reason", "limit": 100}
     while url:
         respuesta = requests.get(url, headers=_cabeceras(config), params=params, timeout=15)
         if not respuesta.ok:
             sys.exit(descripcion_error_meta(respuesta))
         datos = respuesta.json()
         for plantilla in datos.get("data", []):
-            estados[(plantilla["name"], plantilla["language"])] = plantilla["status"]
+            motivo = plantilla.get("rejected_reason")
+            estado_meta = plantilla["status"]
+            if motivo and motivo != "NONE":
+                estado_meta = f"{estado_meta} (motivo: {motivo})"
+            estados[(plantilla["name"], plantilla["language"])] = estado_meta
         url, params = (datos.get("paging") or {}).get("next"), None
     return estados
 
