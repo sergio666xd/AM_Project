@@ -227,3 +227,18 @@ def render_borrador(
 ) -> str:
     """Un texto aún sin guardar, como saldría con estos valores (vista previa del editor de plantillas)."""
     return _cuerpo_con_enlace(source or "", preparar_valores(values, canal), link_label, link_url)
+
+
+def datos_whatsapp(key: str, values: dict[str, Any], link_url: str | None = None) -> dict[str, Any]:
+    """Lo que necesita la plantilla de Meta del aviso: su clave y los valores ya legibles.
+
+    Se guarda con la entrega para que el envío por la Cloud API llene la
+    plantilla aprobada con los mismos datos que el texto del aviso.
+    """
+    valores = {
+        clave: valor for clave, valor in preparar_valores(values, "WHATSAPP").items()
+        if isinstance(valor, (str, int, float)) and clave != "password"
+    }
+    if link_url:
+        valores["enlace"] = link_url
+    return {"clave": key, "valores": valores}

@@ -175,12 +175,15 @@ class ServicioCuenta:
     # ── Códigos de seguridad ────────────────────────────────────────────
 
     def _enviar_codigo(self, usuario: Usuario, canal: str, codigo: str) -> bool:
-        asunto, mensaje = render_message(self._db, "CODIGO_SEGURIDAD", {"nombre": usuario.nombre_completo, "codigo": codigo}, canal=canal)
+        variables = {"nombre": usuario.nombre_completo, "codigo": codigo}
+        asunto, mensaje = render_message(self._db, "CODIGO_SEGURIDAD", variables, canal=canal)
         if canal == "EMAIL":
             return enviar_correo(usuario.email, asunto, mensaje)
+        from app.message_templates import datos_whatsapp
         from app.whatsapp import enviar_mensaje_whatsapp
 
-        return bool(usuario.whatsapp_numero and enviar_mensaje_whatsapp(usuario.whatsapp_numero, mensaje))
+        plantilla = datos_whatsapp("CODIGO_SEGURIDAD", variables)
+        return bool(usuario.whatsapp_numero and enviar_mensaje_whatsapp(usuario.whatsapp_numero, mensaje, plantilla=plantilla))
 
     def _vista(self, usuario: Usuario, codigo: models.CodigoSeguridadUsuario) -> CodigoSeguridad:
         return CodigoSeguridad(

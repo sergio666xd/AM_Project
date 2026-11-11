@@ -16,7 +16,7 @@ from sqlalchemy.orm import Session
 
 from app.audit import registrar_evento_auditoria
 from app.integration_settings import encrypt_secret, get_integration_settings
-from app.message_templates import render_message
+from app.message_templates import datos_whatsapp, render_message
 from app.modulos.administracion import salud
 from app.modulos.administracion.politicas import exigir_admin
 from app.modulos.identidad.modelos import Usuario
@@ -41,10 +41,9 @@ class ProveedorNoDisponible(ErrorDominio):
 
 
 def _whatsapp_listo(config: dict) -> bool:
-    return bool(
-        str(config["whatsapp_api_url"] or "").startswith(("https://", "http://"))
-        and config["whatsapp_token"] and config["whatsapp_token"] != "TU_TOKEN_AQUI"
-    )
+    from app.whatsapp import whatsapp_configurado
+
+    return whatsapp_configurado(config)
 
 
 # ---- Llamadas externas (las pruebas las sustituyen) -------------------------------
@@ -102,10 +101,26 @@ def enviar_correo_prueba(destino: str, asunto: str, cuerpo: str) -> bool:
     return enviar_correo(destino, asunto, cuerpo)
 
 
-def enviar_whatsapp_prueba(destino: str, cuerpo: str) -> bool:
+def enviar_whatsapp_prueba(destino: str, cuerpo: str, plantilla: dict | None = None) -> bool:
     from app.whatsapp import enviar_mensaje_whatsapp
 
-    return enviar_mensaje_whatsapp(destino, cuerpo)
+    return bool(enviar_mensaje_whatsapp(destino, cuerpo, plantilla=plantilla))
+
+
+def conectar_whatsapp_cloud() -> ResultadoPrueba:
+    """Consulta el número en Meta; no envía mensajes."""
+    from app.whatsapp import ErrorWhatsapp, verificar_numero_cloud
+
+    try:
+        numero = verificar_numero_cloud()
+    except ErrorWhatsapp as exc:
+        return ResultadoPrueba(estado="falla", mensaje=str(exc))
+    nombre = numero.get("verified_name") or "sin nombre verificado"
+    calidad = {"GREEN": "alta", "YELLOW": "media", "RED": "baja"}.get(str(numero.get("quality_rating") or ""), "sin calificar")
+    return ResultadoPrueba(
+        estado="ok",
+        mensaje=f"Meta respondió: número {numero.get('display_phone_number') or ''} ({nombre}), calidad {calidad}. No se envió ningún mensaje.",
+    )
 
 
 class ServicioIntegraciones:
@@ -178,6 +193,10 @@ class ServicioIntegraciones:
             if not config["smtp_host"] or not config["smtp_from"]:
                 return ResultadoPrueba(estado="sin_configurar", mensaje="Faltan el servidor y el remitente.")
             return conectar_correo(config)
+        from app.whatsapp import cloud_activo
+
+        if cloud_activo():
+            return conectar_whatsapp_cloud()
         if not _whatsapp_listo(config):
             return ResultadoPrueba(estado="sin_configurar", mensaje="Faltan la dirección o el token del proveedor.")
         return ResultadoPrueba(estado="ok", mensaje="Está configurado. Esta prueba no envía mensajes; use el envío de prueba.")
@@ -196,7 +215,10 @@ class ServicioIntegraciones:
         self._db.commit()
         asunto, cuerpo = render_message(self._db, "PRUEBA_INTEGRACION", {"nombre": admin.nombre_completo}, canal=datos.canal)
         try:
-            enviado = enviar_correo_prueba(destino, asunto, cuerpo) if datos.canal == "EMAIL" else enviar_whatsapp_prueba(destino, cuerpo)
+            enviado = (
+                enviar_correo_prueba(destino, asunto, cuerpo) if datos.canal == "EMAIL"
+                else enviar_whatsapp_prueba(destino, cuerpo, datos_whatsapp("PRUEBA_INTEGRACION", {"nombre": admin.nombre_completo}))
+            )
         except Exception as exc:  # noqa: BLE001 - cualquier fallo del proveedor se informa igual
             raise ProveedorNoDisponible("El proveedor no pudo enviar el mensaje de prueba.") from exc
         if not enviado:

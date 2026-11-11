@@ -23,7 +23,7 @@ from app.notification_policy import (
     clientes_notificables_para_radicado,
 )
 from app.notification_service import emitir_notificacion_workflow
-from app.message_templates import fecha_texto, radicado_legible, render_message, render_push_message
+from app.message_templates import datos_whatsapp, fecha_texto, radicado_legible, render_message, render_push_message
 from app.timezone import format_colombia_datetime
 from app.rama_judicial_api import ejecutar_consulta_api_radicado
 from app.reminder_workflow import (
@@ -226,6 +226,19 @@ def _cuerpo_novedades(secciones: list[dict]) -> str:
             lineas.append(f"Abrir enlace: Ver las novedades de {nombre[:50]} | {seccion['detalle_url']}")
         bloques.append("\n".join(lineas))
     return "\n\n".join(bloques)
+
+
+def _linea_novedades(secciones: list[dict]) -> str:
+    """Las novedades en una sola línea, como las pide la plantilla de WhatsApp de Meta."""
+    partes = []
+    for seccion in secciones:
+        actuaciones = sorted(seccion["actuaciones"].values(), key=lambda item: (item.get("orden", 0), item.get("id", 0)))
+        nombre = seccion["proceso"] or radicado_legible(seccion["radicado"])
+        reciente = (actuaciones[0].get("actuacion") if actuaciones else None) or "nueva actuación"
+        if len(actuaciones) > 1:
+            reciente += f" y {len(actuaciones) - 1} más"
+        partes.append(f"{nombre} ({reciente})")
+    return "; ".join(partes)
 
 
 def _url_preferencias(usuario: models.Usuario) -> str | None:
@@ -510,6 +523,14 @@ def preparar_notificaciones_actuaciones(
                                        "novedades": _cuerpo_novedades(secciones_pendientes)},
             canal=canal,
         )
+        datos_plantilla = (
+            datos_whatsapp(
+                "ACTUACIONES_DIGEST",
+                {"nombre": usuario.nombre_completo, "novedades": _linea_novedades(secciones_pendientes)},
+                secciones_pendientes[0].get("detalle_url") if secciones_pendientes else None,
+            )
+            if canal == "WHATSAPP" else None
+        )
         event_digest = hashlib.sha256(
             ",".join(map(str, actuacion_ids)).encode("ascii")
         ).hexdigest()
@@ -523,6 +544,7 @@ def preparar_notificaciones_actuaciones(
                 canal=canal,
                 asunto=subject,
                 cuerpo=body,
+                datos_whatsapp=datos_plantilla,
                 estado="PENDIENTE",
             )
             db.add(entrega)
@@ -532,6 +554,7 @@ def preparar_notificaciones_actuaciones(
                 continue
             entrega.asunto = subject
             entrega.cuerpo = body
+            entrega.datos_whatsapp = datos_plantilla
             if entrega.estado != "ENVIADA":
                 entrega.estado = "PENDIENTE"
                 entrega.error = None
@@ -838,7 +861,14 @@ def enviar_entrega_notificacion_workflow(
         if entrega.canal == "EMAIL":
             enviado = enviar_correo(usuario.email, entrega.asunto, entrega.cuerpo, preferencias_url=_url_preferencias(usuario))
         else:
-            enviado = enviar_mensaje_whatsapp(usuario.whatsapp_numero, entrega.cuerpo, raise_on_error=True)
+            enviado = enviar_mensaje_whatsapp(
+                usuario.whatsapp_numero, entrega.cuerpo, raise_on_error=True, plantilla=entrega.datos_whatsapp,
+            )
+            if isinstance(enviado, str):
+                # Id del mensaje en Meta: el webhook lo usa para marcar entregado, leído o fallido.
+                entrega.proveedor_mensaje_id = enviado
+                entrega.estado_proveedor = "accepted"
+                entrega.estado_proveedor_en = utc_ahora()
         if not enviado:
             raise RuntimeError("El proveedor no confirmó la entrega.")
     except Exception as exc:
