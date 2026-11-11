@@ -95,9 +95,9 @@ administrador de WhatsApp y esperar la aprobación) **antes** de desplegar el
 cambio. Si el número de variables cambia y Meta aún tiene la versión anterior,
 los envíos fallan con el código 132000.
 
-Meta rechaza en automático las plantillas de utilidad que mencionan usuario,
-contraseña u otros datos de acceso; por eso los avisos de acceso solo remiten
-al correo. `--estado` muestra el motivo de cada rechazo.
+Meta rechaza las plantillas de utilidad que hablan de usuario, contraseña,
+acceso o de entrar a la cuenta (pide que sean de autenticación); por eso los
+avisos de bienvenida no mencionan nada de eso y solo remiten al correo. `--estado` muestra el motivo de cada rechazo.
 
 Las plantillas del editor de Admin > Operación > Plantillas siguen siendo las
 del correo y de las notificaciones del navegador. Para WhatsApp por Meta mandan
@@ -152,9 +152,10 @@ Alejandra Muñoz | Abogada y Asociados
 
 ```text
 👋 Hola, {{1}}.
-{{2}} le dio acceso al portal del despacho, donde puede ver cómo va su proceso.
-Le enviamos un correo a *{{3}}* con las indicaciones para entrar. Si no lo encuentra, revise la carpeta de correo no deseado.
-🔗 Ir al portal: {{4}}
+{{2}} lo registró como cliente del despacho.
+En el portal puede ver cómo va su proceso, sus documentos y sus citas.
+Le enviamos los detalles a su correo *{{3}}*. Si no lo encuentra, revise la carpeta de correo no deseado.
+🔗 Portal del despacho: {{4}}
 
 Si tiene dudas, escríbanos por el chat del portal.
 ---
@@ -169,9 +170,9 @@ Alejandra Muñoz | Abogada y Asociados
 
 ```text
 👋 Hola, {{1}}.
-Ya tiene acceso como abogado al portal del despacho.
-Le enviamos un correo a *{{2}}* con las indicaciones para entrar.
-🔗 Ir al portal: {{3}}
+Ya hace parte del equipo de abogados en el portal del despacho.
+Le enviamos los detalles a su correo *{{2}}*.
+🔗 Portal del despacho: {{3}}
 
 Si tiene dudas, escríbanos por el chat del portal.
 ---

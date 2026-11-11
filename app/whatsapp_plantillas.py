@@ -120,16 +120,17 @@ _CATALOGO: tuple[PlantillaMeta, ...] = (
         ),
     ),
     PlantillaMeta(
-        # Meta rechaza en automático las plantillas que mencionan usuario o contraseña:
-        # el aviso solo dice que revise el correo, donde van los datos de ingreso.
+        # Meta rechaza (o exige categoría de autenticación) si una plantilla de utilidad
+        # habla de usuario, contraseña, acceso o de entrar a la cuenta: el aviso solo
+        # da la bienvenida y remite al correo, donde van los datos de ingreso.
         nombre="am_bienvenida_cliente",
         claves=("CLIENTE_CREDENCIALES",),
         cuerpo=_cuerpo(
             "👋 Hola, {{1}}.",
-            "{{2}} le dio acceso al portal del despacho, donde puede ver cómo va su proceso.",
-            "Le enviamos un correo a *{{3}}* con las indicaciones para entrar. "
-            "Si no lo encuentra, revise la carpeta de correo no deseado.",
-            "🔗 Ir al portal: {{4}}",
+            "{{2}} lo registró como cliente del despacho.",
+            "En el portal puede ver cómo va su proceso, sus documentos y sus citas.",
+            "Le enviamos los detalles a su correo *{{3}}*. Si no lo encuentra, revise la carpeta de correo no deseado.",
+            "🔗 Portal del despacho: {{4}}",
         ),
         variables=(
             SALUDO,
@@ -143,9 +144,9 @@ _CATALOGO: tuple[PlantillaMeta, ...] = (
         claves=("ABOGADO_CREDENCIALES",),
         cuerpo=_cuerpo(
             "👋 Hola, {{1}}.",
-            "Ya tiene acceso como abogado al portal del despacho.",
-            "Le enviamos un correo a *{{2}}* con las indicaciones para entrar.",
-            "🔗 Ir al portal: {{3}}",
+            "Ya hace parte del equipo de abogados en el portal del despacho.",
+            "Le enviamos los detalles a su correo *{{2}}*.",
+            "🔗 Portal del despacho: {{3}}",
         ),
         variables=(SALUDO, Variable("correo", "carlos.gomez@correo.com"), ENLACE),
     ),
