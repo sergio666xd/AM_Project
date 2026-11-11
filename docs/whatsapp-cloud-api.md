@@ -57,7 +57,11 @@ Meta quede funcionando.
    python scripts/plantillas_whatsapp_meta.py            # ver lo que se va a crear, sin llamar a Meta
    python scripts/plantillas_whatsapp_meta.py --crear    # crear en Meta las que falten
    python scripts/plantillas_whatsapp_meta.py --estado   # ver si ya están aprobadas
+   python scripts/plantillas_whatsapp_meta.py --actualizar  # subir el texto actual de las que ya existen
    ```
+
+   `--actualizar` sirve cuando cambia un texto del catálogo. Meta no deja editar
+   una plantilla en revisión: esas se saltan y se repite el comando después.
 
    Meta suele aprobar las de utilidad en minutos u horas. Si rechaza una, el
    motivo aparece en el administrador de WhatsApp > Plantillas de mensajes.
@@ -105,7 +109,10 @@ los textos de abajo.
 
 ## Plantillas que hay que aprobar
 
-Todas en idioma `es`. El pie va como «Pie de página» en Meta. Los avisos de
+Todas en idioma `es`. El pie va como «Pie de página» en Meta. Las que tienen
+botón llevan un botón «Ir al sitio web» de tipo dinámico con la dirección
+`https://panel.alejandramunozabogada.com/{{1}}`: la aplicación completa el final con la ruta del aviso
+(por ejemplo `tareas/7`). Los avisos de
 correo que no salen por WhatsApp (contratos, cuentas de cobro, recibos,
 recuperar contraseña, formulario del sitio) no necesitan plantilla.
 
@@ -113,7 +120,8 @@ recuperar contraseña, formulario del sitio) no necesitan plantilla.
 
 - Avisos: `ACTUACION_NOTIFICADA`
 - Categoría: Utilidad
-- Variables: {{1}} saludo, {{2}} proceso, {{3}} actuacion, {{4}} fecha, {{5}} enlace
+- Variables: {{1}} saludo, {{2}} proceso, {{3}} actuacion, {{4}} fecha
+- Botón: «Ver la actuación» → `https://panel.alejandramunozabogada.com/{{1}}`
 
 ```text
 👋 Hola, {{1}}.
@@ -121,7 +129,6 @@ Hay una novedad del juzgado en su proceso *{{2}}*.
 📝 Actuación: {{3}}
 📅 Fecha: {{4}}
 Si esta novedad requiere algo de usted, se lo indicaremos.
-🔗 Ver la actuación: {{5}}
 
 Si tiene dudas, escríbanos por el chat del portal.
 ---
@@ -132,12 +139,12 @@ Alejandra Muñoz | Abogada y Asociados
 
 - Avisos: `ACTUACIONES_DIGEST`
 - Categoría: Utilidad
-- Variables: {{1}} saludo, {{2}} novedades, {{3}} enlace
+- Variables: {{1}} saludo, {{2}} novedades
+- Botón: «Véalas en el portal» → `https://panel.alejandramunozabogada.com/{{1}}`
 
 ```text
 👋 Hola, {{1}}.
 Hay novedades del juzgado en sus procesos: {{2}}
-🔗 Véalas en el portal: {{3}}
 
 Si tiene dudas, escríbanos por el chat del portal.
 ---
@@ -148,14 +155,14 @@ Alejandra Muñoz | Abogada y Asociados
 
 - Avisos: `CLIENTE_CREDENCIALES`
 - Categoría: Utilidad
-- Variables: {{1}} saludo, {{2}} actor, {{3}} correo, {{4}} enlace
+- Variables: {{1}} saludo, {{2}} actor, {{3}} correo
+- Botón: «Portal del despacho» → `https://panel.alejandramunozabogada.com/{{1}}`
 
 ```text
 👋 Hola, {{1}}.
 {{2}} lo registró como cliente del despacho.
 En el portal puede ver cómo va su proceso, sus documentos y sus citas.
 Le enviamos los detalles a su correo *{{3}}*. Si no lo encuentra, revise la carpeta de correo no deseado.
-🔗 Portal del despacho: {{4}}
 
 Si tiene dudas, escríbanos por el chat del portal.
 ---
@@ -166,13 +173,13 @@ Alejandra Muñoz | Abogada y Asociados
 
 - Avisos: `ABOGADO_CREDENCIALES`
 - Categoría: Utilidad
-- Variables: {{1}} saludo, {{2}} correo, {{3}} enlace
+- Variables: {{1}} saludo, {{2}} correo
+- Botón: «Portal del despacho» → `https://panel.alejandramunozabogada.com/{{1}}`
 
 ```text
 👋 Hola, {{1}}.
 Ya hace parte del equipo de abogados en el portal del despacho.
 Le enviamos los detalles a su correo *{{2}}*.
-🔗 Portal del despacho: {{3}}
 
 Si tiene dudas, escríbanos por el chat del portal.
 ---
@@ -205,12 +212,12 @@ Alejandra Muñoz | Abogada y Asociados
 
 - Avisos: `CHAT_MENSAJE`
 - Categoría: Utilidad
-- Variables: {{1}} saludo, {{2}} actor, {{3}} enlace
+- Variables: {{1}} saludo, {{2}} actor
+- Botón: «Leer los mensajes» → `https://panel.alejandramunozabogada.com/{{1}}`
 
 ```text
 👋 Hola, {{1}}.
 *{{2}}* le está escribiendo por el chat del portal.
-🔗 Leer los mensajes: {{3}}
 
 Responda desde el portal para que su mensaje quede en el expediente.
 ---
@@ -221,14 +228,14 @@ Alejandra Muñoz | Abogada y Asociados
 
 - Avisos: `COLABORADOR_AGREGADO`
 - Categoría: Utilidad
-- Variables: {{1}} saludo, {{2}} actor, {{3}} proceso, {{4}} responsable, {{5}} permiso, {{6}} enlace
+- Variables: {{1}} saludo, {{2}} actor, {{3}} proceso, {{4}} responsable, {{5}} permiso
+- Botón: «Ver el proceso» → `https://panel.alejandramunozabogada.com/{{1}}`
 
 ```text
 👋 Hola, {{1}}.
 {{2}} le dio acceso al proceso *{{3}}*.
 👤 Responsable: {{4}}
 🔐 Su participación: {{5}}
-🔗 Ver el proceso: {{6}}
 
 Si tiene dudas, escríbanos por el chat del portal.
 ---
@@ -239,13 +246,13 @@ Alejandra Muñoz | Abogada y Asociados
 
 - Avisos: `COMUNICACION_ABOGADO_CLIENTE`, `COMUNICACION_CLIENTE_ABOGADO`
 - Categoría: Utilidad
-- Variables: {{1}} saludo, {{2}} actor, {{3}} proceso, {{4}} mensaje, {{5}} enlace
+- Variables: {{1}} saludo, {{2}} actor, {{3}} proceso, {{4}} mensaje
+- Botón: «Leer y responder» → `https://panel.alejandramunozabogada.com/{{1}}`
 
 ```text
 👋 Hola, {{1}}.
 *{{2}}* le escribió sobre el proceso *{{3}}*:
 💬 {{4}}
-🔗 Leer y responder: {{5}}
 
 Responda desde el portal para que su mensaje quede en el expediente.
 ---
@@ -256,13 +263,13 @@ Alejandra Muñoz | Abogada y Asociados
 
 - Avisos: `DOCUMENTO_RECIBIDO`
 - Categoría: Utilidad
-- Variables: {{1}} saludo, {{2}} actor, {{3}} documento, {{4}} proceso, {{5}} enlace
+- Variables: {{1}} saludo, {{2}} actor, {{3}} documento, {{4}} proceso
+- Botón: «Revisar el documento» → `https://panel.alejandramunozabogada.com/{{1}}`
 
 ```text
 👋 Hola, {{1}}.
 *{{2}}* entregó *{{3}}* para el proceso *{{4}}*.
 Revíselo y apruébelo o pida una corrección.
-🔗 Revisar el documento: {{5}}
 
 Si tiene dudas, escríbanos por el chat del portal.
 ---
@@ -273,7 +280,8 @@ Alejandra Muñoz | Abogada y Asociados
 
 - Avisos: `DOCUMENTO_REVISION`
 - Categoría: Utilidad
-- Variables: {{1}} saludo, {{2}} documento, {{3}} estado, {{4}} comentario, {{5}} enlace
+- Variables: {{1}} saludo, {{2}} documento, {{3}} estado, {{4}} comentario
+- Botón: «Ver mis documentos» → `https://panel.alejandramunozabogada.com/{{1}}`
 
 ```text
 👋 Hola, {{1}}.
@@ -281,7 +289,6 @@ Revisamos su documento *{{2}}*.
 📌 Resultado: *{{3}}*
 💬 Comentario: {{4}}
 Si necesita corrección, súbalo de nuevo desde el portal.
-🔗 Ver mis documentos: {{5}}
 
 Si tiene dudas, escríbanos por el chat del portal.
 ---
@@ -292,7 +299,8 @@ Alejandra Muñoz | Abogada y Asociados
 
 - Avisos: `EVENTO_AGENDA`
 - Categoría: Utilidad
-- Variables: {{1}} saludo, {{2}} proceso, {{3}} actor_accion, {{4}} actividad, {{5}} inicio, {{6}} estado, {{7}} enlace
+- Variables: {{1}} saludo, {{2}} proceso, {{3}} actor_accion, {{4}} actividad, {{5}} inicio, {{6}} estado
+- Botón: «Ver la actividad» → `https://panel.alejandramunozabogada.com/{{1}}`
 
 ```text
 👋 Hola, {{1}}.
@@ -300,7 +308,6 @@ Hay un cambio en una actividad de su proceso *{{2}}*: {{3}}.
 🗓️ Actividad: *{{4}}*
 🗓️ Cuándo: {{5}}
 📌 Estado: {{6}}
-🔗 Ver la actividad: {{7}}
 
 Si tiene dudas, escríbanos por el chat del portal.
 ---
@@ -311,13 +318,13 @@ Alejandra Muñoz | Abogada y Asociados
 
 - Avisos: `PROCESO_ACTUALIZACION`
 - Categoría: Utilidad
-- Variables: {{1}} saludo, {{2}} proceso, {{3}} actor_accion, {{4}} enlace
+- Variables: {{1}} saludo, {{2}} proceso, {{3}} actor_accion
+- Botón: «Ver mi proceso» → `https://panel.alejandramunozabogada.com/{{1}}`
 
 ```text
 👋 Hola, {{1}}.
 Hay una novedad en su proceso *{{2}}*: {{3}}.
 No tiene que hacer nada por ahora.
-🔗 Ver mi proceso: {{4}}
 
 Si tiene dudas, escríbanos por el chat del portal.
 ---
@@ -342,13 +349,13 @@ Alejandra Muñoz | Abogada y Asociados
 
 - Avisos: `REACTIVACION_COMUNICACION`
 - Categoría: Utilidad
-- Variables: {{1}} saludo, {{2}} proceso, {{3}} asunto, {{4}} enlace
+- Variables: {{1}} saludo, {{2}} proceso, {{3}} asunto
+- Botón: «Leer el mensaje» → `https://panel.alejandramunozabogada.com/{{1}}`
 
 ```text
 👋 Hola, {{1}}.
 Su cuenta está activa de nuevo y tiene un mensaje pendiente sobre *{{2}}*.
 💬 Asunto: {{3}}
-🔗 Leer el mensaje: {{4}}
 
 Si tiene dudas, escríbanos por el chat del portal.
 ---
@@ -359,13 +366,13 @@ Alejandra Muñoz | Abogada y Asociados
 
 - Avisos: `REACTIVACION_EVENTO`
 - Categoría: Utilidad
-- Variables: {{1}} saludo, {{2}} actividad, {{3}} proceso, {{4}} fecha, {{5}} enlace
+- Variables: {{1}} saludo, {{2}} actividad, {{3}} proceso, {{4}} fecha
+- Botón: «Ver la actividad» → `https://panel.alejandramunozabogada.com/{{1}}`
 
 ```text
 👋 Hola, {{1}}.
 Su cuenta está activa de nuevo. Le recordamos *{{2}}* de su proceso *{{3}}*.
 🗓️ Cuándo: {{4}}
-🔗 Ver la actividad: {{5}}
 
 Si tiene dudas, escríbanos por el chat del portal.
 ---
@@ -376,13 +383,13 @@ Alejandra Muñoz | Abogada y Asociados
 
 - Avisos: `REACTIVACION_TAREA`
 - Categoría: Utilidad
-- Variables: {{1}} saludo, {{2}} tarea, {{3}} fecha_limite, {{4}} enlace
+- Variables: {{1}} saludo, {{2}} tarea, {{3}} fecha_limite
+- Botón: «Ver la tarea» → `https://panel.alejandramunozabogada.com/{{1}}`
 
 ```text
 👋 Hola, {{1}}.
 Su cuenta está activa de nuevo y tiene una tarea pendiente: *{{2}}*.
 ⏰ Fecha límite: {{3}}
-🔗 Ver la tarea: {{4}}
 
 Si tiene dudas, escríbanos por el chat del portal.
 ---
@@ -393,14 +400,14 @@ Alejandra Muñoz | Abogada y Asociados
 
 - Avisos: `RECORDATORIO_DOCUMENTO`
 - Categoría: Utilidad
-- Variables: {{1}} saludo, {{2}} solicitud, {{3}} cuando, {{4}} pendientes, {{5}} proceso, {{6}} enlace
+- Variables: {{1}} saludo, {{2}} solicitud, {{3}} cuando, {{4}} pendientes, {{5}} proceso
+- Botón: «Subir los documentos» → `https://panel.alejandramunozabogada.com/{{1}}`
 
 ```text
 👋 Hola, {{1}}.
 Le recordamos que la solicitud *{{2}}* {{3}}.
 📄 Faltan estos documentos: {{4}}
 📁 Proceso: {{5}}
-🔗 Subir los documentos: {{6}}
 
 Si tiene dudas, escríbanos por el chat del portal.
 ---
@@ -411,14 +418,14 @@ Alejandra Muñoz | Abogada y Asociados
 
 - Avisos: `RECORDATORIO_TAREA`
 - Categoría: Utilidad
-- Variables: {{1}} saludo, {{2}} tarea, {{3}} fecha_limite, {{4}} proceso, {{5}} enlace
+- Variables: {{1}} saludo, {{2}} tarea, {{3}} fecha_limite, {{4}} proceso
+- Botón: «Ver la tarea» → `https://panel.alejandramunozabogada.com/{{1}}`
 
 ```text
 👋 Hola, {{1}}.
 Le recordamos la tarea *{{2}}*.
 ⏰ Fecha límite: {{3}}
 📁 Proceso: {{4}}
-🔗 Ver la tarea: {{5}}
 
 Si tiene dudas, escríbanos por el chat del portal.
 ---
@@ -429,12 +436,12 @@ Alejandra Muñoz | Abogada y Asociados
 
 - Avisos: `RESUMEN_MENSUAL`
 - Categoría: Utilidad
-- Variables: {{1}} saludo, {{2}} mes, {{3}} resumen, {{4}} enlace
+- Variables: {{1}} saludo, {{2}} mes, {{3}} resumen
+- Botón: «Ver el resumen» → `https://panel.alejandramunozabogada.com/{{1}}`
 
 ```text
 👋 Hola, {{1}}.
 Este es el resumen de sus procesos de *{{2}}*: {{3}}
-🔗 Véalo completo en el portal: {{4}}
 
 Si tiene dudas, escríbanos por el chat del portal.
 ---
@@ -445,14 +452,14 @@ Alejandra Muñoz | Abogada y Asociados
 
 - Avisos: `SOLICITUD_DOCUMENTO`
 - Categoría: Utilidad
-- Variables: {{1}} saludo, {{2}} proceso, {{3}} documentos, {{4}} fecha_limite, {{5}} enlace
+- Variables: {{1}} saludo, {{2}} proceso, {{3}} documentos, {{4}} fecha_limite
+- Botón: «Subir los documentos» → `https://panel.alejandramunozabogada.com/{{1}}`
 
 ```text
 👋 Hola, {{1}}.
 Necesitamos estos documentos para su proceso *{{2}}*: {{3}}
 ⏰ Entregar antes del: {{4}}
 Súbalos en PDF o como foto legible.
-🔗 Subir los documentos: {{5}}
 
 Si tiene dudas, escríbanos por el chat del portal.
 ---
@@ -463,13 +470,13 @@ Alejandra Muñoz | Abogada y Asociados
 
 - Avisos: `SUBTAREA_ASIGNADA`
 - Categoría: Utilidad
-- Variables: {{1}} saludo, {{2}} actor, {{3}} subtarea, {{4}} enlace
+- Variables: {{1}} saludo, {{2}} actor, {{3}} subtarea
+- Botón: «Ver la tarea» → `https://panel.alejandramunozabogada.com/{{1}}`
 
 ```text
 👋 Hola, {{1}}.
 {{2}} le asignó una tarea: *{{3}}*.
 Ábrala para ver qué debe hacer.
-🔗 Ver la tarea: {{4}}
 
 Si tiene dudas, escríbanos por el chat del portal.
 ---
@@ -480,14 +487,14 @@ Alejandra Muñoz | Abogada y Asociados
 
 - Avisos: `TAREA_ACCION`
 - Categoría: Utilidad
-- Variables: {{1}} saludo, {{2}} tarea, {{3}} actor_accion, {{4}} estado, {{5}} fecha_limite, {{6}} enlace
+- Variables: {{1}} saludo, {{2}} tarea, {{3}} actor_accion, {{4}} estado, {{5}} fecha_limite
+- Botón: «Ver mis tareas» → `https://panel.alejandramunozabogada.com/{{1}}`
 
 ```text
 👋 Hola, {{1}}.
 Hay un cambio en la tarea *{{2}}*: {{3}}.
 📌 Estado: {{4}}
 ⏰ Fecha límite: {{5}}
-🔗 Ver mis tareas: {{6}}
 
 Si tiene dudas, escríbanos por el chat del portal.
 ---
