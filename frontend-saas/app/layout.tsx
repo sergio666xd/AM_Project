@@ -26,6 +26,10 @@ export const metadata: Metadata = {
     statusBarStyle: "default",
     title: "AM Panel",
   },
+  // Verificación del dominio en el Business Manager de Meta (WhatsApp Cloud API).
+  verification: {
+    other: { "facebook-domain-verification": "5h015e1zev6r3qbzp1xt8hm2uaavca" },
+  },
 };
 
 export const viewport: Viewport = {
