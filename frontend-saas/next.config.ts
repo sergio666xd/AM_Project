@@ -1,5 +1,6 @@
 import type { NextConfig } from "next";
 import { withWorkflow } from "@workflow/next";
+import paquete from "./package.json";
 
 // Orígenes extra que pueden abrir `next dev`, como la IP del equipo en la red
 // local para probar desde el celular. Separados por comas.
@@ -15,6 +16,8 @@ const backendDev = process.env.BACKEND_DEV_URL ?? "http://127.0.0.1:8000";
 
 const nextConfig: NextConfig = {
   allowedDevOrigins,
+  // Versión de la app (VERSION en la raíz, copiada aquí por scripts/version.py).
+  env: { NEXT_PUBLIC_APP_VERSION: paquete.version },
   // "Áreas de práctica" pasó a llamarse "Servicios"; los enlaces viejos siguen funcionando.
   async redirects() {
     return [{ source: "/areas-de-practica", destination: "/servicios", permanent: true }];

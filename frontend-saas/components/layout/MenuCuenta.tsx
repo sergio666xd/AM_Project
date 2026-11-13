@@ -7,6 +7,7 @@ import { Initials } from "@/components/ui/Initials";
 import { useSession } from "@/context/SessionContext";
 import { cx } from "@/lib/cx";
 import { useTema } from "@/lib/useTema";
+import { VERSION_APP } from "@/lib/version";
 
 export type EnlaceCuenta = { label: string; href: string; icon: LucideIcon };
 
@@ -18,7 +19,8 @@ const ROLES: Record<string, string> = {
 };
 
 /**
- * Menú de la cuenta: perfil, configuración, tema y cierre de sesión. En el
+ * Menú de la cuenta: perfil, configuración, tema, cierre de sesión y, al pie,
+ * la versión de la app. En el
  * riel azul muestra nombre y rol; en el encabezado claro, solo las iniciales.
  */
 export function MenuCuenta({ areaHref, enlaces, enRiel = false }: { areaHref: string; enlaces?: EnlaceCuenta[]; enRiel?: boolean }) {
@@ -115,6 +117,7 @@ export function MenuCuenta({ areaHref, enlaces, enRiel = false }: { areaHref: st
           >
             <MonitorSmartphone aria-hidden="true" size={16} strokeWidth={1.75} /> Cerrar sesión en todos los dispositivos
           </button>
+          {VERSION_APP && <p className="px-2.5 pb-1 pt-1.5 text-[11.5px] tabular-nums text-ink-3">Versión {VERSION_APP}</p>}
         </div>
       )}
     </div>
