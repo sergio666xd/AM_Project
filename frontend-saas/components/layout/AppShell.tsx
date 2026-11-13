@@ -99,7 +99,7 @@ function EncabezadoCliente({ nav, areaHref }: { nav: ReturnType<typeof navegacio
             <span className="font-display text-[19px] leading-none text-ink">Su portal</span>
             <VersionApp className="text-ink-3" />
           </span>
-          <VersionApp className="hidden self-end pb-1.5 text-ink-3 sm:block" />
+          <VersionApp className="hidden text-ink-3 sm:block" />
         </Link>
         <nav className="ml-4 hidden items-center gap-1 lg:flex" aria-label="Principal">
           {nav.todos.slice(0, 5).map((item) => {
