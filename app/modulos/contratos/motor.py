@@ -59,6 +59,11 @@ def fecha_en_letras(dia: date) -> str:
     return f"{dia.day} de {MESES[dia.month - 1]} de {dia.year}"
 
 
+def fijos_de_fecha(dia: date) -> dict[str, str]:
+    """Los códigos de fecha del contrato para ese día."""
+    return {"fecha.hoy": fecha_en_letras(dia), "fecha.dia": str(dia.day), "fecha.mes": MESES[dia.month - 1], "fecha.anio": str(dia.year)}
+
+
 def pesos(valor: int) -> str:
     return "$" + f"{valor:,}".replace(",", ".")
 

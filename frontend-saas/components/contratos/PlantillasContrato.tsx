@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
   ArrowLeft, Bold, Braces, CalendarDays, CheckCircle2, Copy, FileSignature, FileText, Heading1, Heading2, Info, Italic, List, ListOrdered,
-  Minus, Pencil, Plus, Scale, Trash2, UserRound,
+  Minus, PanelRightClose, PanelRightOpen, Pencil, Plus, Scale, Trash2, UserRound, ZoomIn, ZoomOut,
 } from "lucide-react";
 
 import { Hoja } from "@/components/contratos/Hoja";
@@ -33,6 +33,7 @@ const NUEVA: Borrador = {
   id: null, nombre: "", descripcion: "", campos: [LISTA_INICIAL], firmas: { abogado: "EL ABOGADO" },
   cuerpo: "# Título del contrato\n\nEntre {{#contratantes}}{{.nombre}}, {{.: identificado | identificada}} con cédula de ciudadanía No. {{.cedula}}{{/contratantes}}, {{contratantes: quien | quienes}} en adelante se {{contratantes: denominará | denominarán}} EL CONTRATANTE, y {{abogado.nombre}}, quien en adelante se denominará EL ABOGADO, se celebra el presente contrato:\n\n## Primera. Objeto\n\n",
 };
+const ZOOM_MIN = 50, ZOOM_MAX = 200, ZOOM_PASO = 10;
 const ABOGADO_EJEMPLO = { nombre: "«Nombre del abogado»", documento: "«Cédula»", tarjeta: "«Tarjeta»" };
 
 const slug = (s: string) => s.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/[^a-z0-9]+/g, "_").replace(/^_|_$/g, "").replace(/^(\d)/, "c_$1").slice(0, 40);
@@ -176,6 +177,8 @@ function EditorPlantilla({ inicial, onCancelar, onGuardada }: { inicial: Borrado
   const { toast } = useToast();
   const [p, setP] = useState<Borrador>(inicial);
   const [modo, setModo] = useState<"editar" | "ver">("editar");
+  const [panel, setPanel] = useState(true);
+  const [zoom, setZoom] = useState(100);
   const [campoEdit, setCampoEdit] = useState<{ campo: Campo; index: number; soloCrear?: boolean } | null>(null);
   const [insertar, setInsertar] = useState(false);
   const [guardando, setGuardando] = useState(false);
@@ -324,14 +327,20 @@ function EditorPlantilla({ inicial, onCancelar, onGuardada }: { inicial: Borrado
         <input value={p.descripcion} onChange={(e) => set("descripcion", e.target.value)} placeholder="Para qué casos sirve (opcional)" aria-label="Descripción" maxLength={500} className={CAMPO} />
       </div>
 
-      <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_21rem]">
+      <div className={cx("grid gap-5", panel ? "lg:grid-cols-[minmax(0,1fr)_21rem]" : "lg:grid-cols-1")}>
         <Sheet className="flex min-w-0 flex-col overflow-hidden">
           <div className="flex flex-wrap items-center gap-1 border-b border-line bg-sheet-2 px-2 py-1.5">
             {herramientas.map(([Icono, l, marca]) => <IconButton key={l} icon={Icono} label={l} iconSize={17} className="size-9" onMouseDown={noPierdaFoco} onClick={() => usar(marca)} />)}
             <span aria-hidden className="mx-1 h-6 w-px bg-line" />
             <Button size="sm" variant="secondary" icon={<Braces size={15} />} className="lg:hidden" onClick={() => { recordar(); setInsertar(true); }}>Insertar campo</Button>
-            <div className="ml-auto">
+            <div className="ml-auto flex flex-wrap items-center gap-1">
+              <div className="flex items-center" role="group" aria-label="Zoom">
+                <IconButton icon={ZoomOut} label="Alejar" iconSize={17} className="size-9 disabled:pointer-events-none disabled:opacity-40" disabled={zoom <= ZOOM_MIN} onClick={() => setZoom((z) => Math.max(ZOOM_MIN, z - ZOOM_PASO))} />
+                <button type="button" onClick={() => setZoom(100)} title="Volver al 100 %" className="min-h-9 min-w-12 rounded-md px-1 text-center font-mono text-[12.5px] tabular-nums text-ink-2 hover:bg-manila/60">{zoom} %</button>
+                <IconButton icon={ZoomIn} label="Acercar" iconSize={17} className="size-9 disabled:pointer-events-none disabled:opacity-40" disabled={zoom >= ZOOM_MAX} onClick={() => setZoom((z) => Math.min(ZOOM_MAX, z + ZOOM_PASO))} />
+              </div>
               <SegmentedControl label="Modo" value={modo} onChange={setModo} options={[{ value: "editar", label: "Escribir" }, { value: "ver", label: "Vista previa" }]} />
+              <IconButton icon={panel ? PanelRightClose : PanelRightOpen} label={panel ? "Ocultar el panel de campos" : "Mostrar el panel de campos"} iconSize={17} className="hidden size-9 lg:inline-flex" onClick={() => setPanel((v) => !v)} />
             </div>
           </div>
           {modo === "editar" ? (
@@ -344,17 +353,20 @@ function EditorPlantilla({ inicial, onCancelar, onGuardada }: { inicial: Borrado
               onClick={recordar}
               spellCheck
               aria-label="Texto de la plantilla"
-              className="block min-h-[560px] w-full flex-1 resize-y bg-sheet px-4 py-4 font-mono text-[13.5px] leading-relaxed text-ink focus:outline-none sm:px-5"
+              style={{ fontSize: `${(13.5 * zoom) / 100}px` }}
+              className="block min-h-[560px] w-full flex-1 resize-y bg-sheet px-4 py-4 font-mono leading-relaxed text-ink focus:outline-none sm:px-5"
             />
           ) : (
-            <div className="flex-1 bg-manila/60 p-3 sm:p-6"><PreviaPlantilla plantilla={p} /></div>
+            <div className="flex-1 overflow-x-auto bg-manila/60 p-3 sm:p-6">
+              <div className="mx-auto" style={{ width: `${zoom}%`, maxWidth: zoom > 100 ? "none" : undefined }}><PreviaPlantilla plantilla={p} /></div>
+            </div>
           )}
           <div className="flex flex-wrap gap-x-4 gap-y-1 border-t border-line bg-sheet-2 px-4 py-2.5 font-mono text-[12.5px] text-ink-3">
             <span>**negrita**</span><span>*cursiva*</span><span># Título</span><span>## Cláusula</span><span>- lista</span><span>{"{{campo}}"}</span><span>{"{{#lista}}{{.nombre}}{{/lista}}"}</span><span>{"{{lista: quien | quienes}}"}</span>
           </div>
         </Sheet>
 
-        <div className="space-y-4">
+        <div className={cx("space-y-4", !panel && (errores.length || desconocidos.length ? "lg:order-first" : "lg:hidden"))}>
           {errores.length > 0 && (
             <Alert kind="error" title="Corrija esto para poder guardar">{errores.slice(0, 4).join(" ")}</Alert>
           )}
@@ -365,7 +377,7 @@ function EditorPlantilla({ inicial, onCancelar, onGuardada }: { inicial: Borrado
               ))}
             </div>
           )}
-          <Sheet className="hidden p-4 lg:block">{panelCampos(false)}</Sheet>
+          {panel && <Sheet className="hidden p-4 lg:block">{panelCampos(false)}</Sheet>}
           <Sheet className="p-4 lg:hidden">
             <label htmlFor="rotulo-abogado-movil" className={ETIQUETA}>Rótulo del abogado en las firmas</label>
             <input id="rotulo-abogado-movil" value={p.firmas.abogado} onChange={(e) => set("firmas", { abogado: e.target.value.toUpperCase() })} className={cx(CAMPO, "uppercase")} />
