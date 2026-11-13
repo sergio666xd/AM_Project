@@ -13291,7 +13291,7 @@
           "Contratos"
         ],
         "summary": "Reabrir la firma",
-        "description": "Vuelve a en firma para subir otro escaneado; la cita queda programada otra vez.",
+        "description": "Vuelve a en firma para subir otro escaneado. Con `fecha`, el contrato y la cita pasan a ese día.",
         "operationId": "reabrir_firma_contrato",
         "parameters": [
           {
@@ -13304,6 +13304,23 @@
             }
           }
         ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "anyOf": [
+                  {
+                    "$ref": "#/components/schemas/ReaperturaFirma"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Datos"
+              }
+            }
+          }
+        },
         "responses": {
           "200": {
             "description": "Successful Response",
@@ -37648,6 +37665,25 @@
           "novedades"
         ],
         "title": "RadicadoFila"
+      },
+      "ReaperturaFirma": {
+        "properties": {
+          "fecha": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fecha",
+            "description": "Fecha nueva del contrato y de la cita; vacía, conserva la que tiene."
+          }
+        },
+        "type": "object",
+        "title": "ReaperturaFirma"
       },
       "Recordatorio": {
         "properties": {

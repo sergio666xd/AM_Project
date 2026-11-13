@@ -1948,7 +1948,7 @@ export interface paths {
         put?: never;
         /**
          * Reabrir la firma
-         * @description Vuelve a en firma para subir otro escaneado; la cita queda programada otra vez.
+         * @description Vuelve a en firma para subir otro escaneado. Con `fecha`, el contrato y la cita pasan a ese día.
          */
         post: operations["reabrir_firma_contrato"];
         delete?: never;
@@ -8562,6 +8562,14 @@ export interface components {
              * @description Actuaciones nuevas que usted aún no revisa.
              */
             novedades: number;
+        };
+        /** ReaperturaFirma */
+        ReaperturaFirma: {
+            /**
+             * Fecha
+             * @description Fecha nueva del contrato y de la cita; vacía, conserva la que tiene.
+             */
+            fecha?: string | null;
         };
         /** Recordatorio */
         Recordatorio: {
@@ -20464,7 +20472,11 @@ export interface operations {
             };
             cookie?: never;
         };
-        requestBody?: never;
+        requestBody?: {
+            content: {
+                "application/json": components["schemas"]["ReaperturaFirma"] | null;
+            };
+        };
         responses: {
             /** @description Successful Response */
             200: {

@@ -20,6 +20,7 @@ from app.modulos.contratos.esquemas import (
     ContratoDetalle,
     ContratosDelProceso,
     CitaDeFirma,
+    ReaperturaFirma,
     GrupoContratos,
     ListaContratos,
     ListaSinContrato,
@@ -291,11 +292,12 @@ def reenviar_copia_contrato(
 @router.post("/{contrato_id}/reabrir-firma", response_model=ContratoDetalle, summary="Reabrir la firma")
 def reabrir_firma_contrato(
     contrato_id: int,
+    datos: ReaperturaFirma | None = None,
     usuario: models.Usuario = Depends(usuario_actual),
     servicio: ServicioContratos = Depends(servicio_contratos),
 ):
-    """Vuelve a en firma para subir otro escaneado; la cita queda programada otra vez."""
-    return servicio.reabrir_firma(usuario, contrato_id)
+    """Vuelve a en firma para subir otro escaneado. Con `fecha`, el contrato y la cita pasan a ese día."""
+    return servicio.reabrir_firma(usuario, contrato_id, datos)
 
 
 @router.post("/{contrato_id}/anular", response_model=ContratoDetalle, summary="Anular un contrato sin firmar")

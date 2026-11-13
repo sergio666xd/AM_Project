@@ -21,7 +21,7 @@ import logging
 import os
 import re
 import uuid
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 from typing import Iterator
 
 from botocore.exceptions import BotoCoreError, ClientError
@@ -53,6 +53,7 @@ from app.modulos.contratos.esquemas import (
     DatosGuardados,
     PlantillasDeContrato,
     NuevoContratoPlantilla,
+    ReaperturaFirma,
     PersonaContrato,
     PlantillaDeContrato,
     CopiaPlantillaContrato,
@@ -100,6 +101,16 @@ class AlmacenamientoNoDisponible(ErrorDominio):
 
 def _utc(momento):
     return momento.astimezone(timezone.utc).replace(tzinfo=None) if momento is not None else None
+
+
+def _en_colombia(momento: datetime) -> datetime:
+    """La base guarda la hora en UTC sin zona."""
+    return momento.replace(tzinfo=timezone.utc).astimezone(COLOMBIA)
+
+
+def _mover_al_dia(momento: datetime | None, dia: date) -> datetime | None:
+    """El mismo momento del día (hora de Colombia), en otra fecha."""
+    return _utc(datetime.combine(dia, _en_colombia(momento).time(), tzinfo=COLOMBIA)) if momento is not None else None
 
 
 def _validados(campos: dict[str, str], *, completos: bool = False) -> dict[str, str]:
@@ -440,10 +451,7 @@ class ServicioContratos:
             "abogado.telefono": perfil.get("telefono") or "",
             "abogado.domicilio": domicilio.title() if domicilio.isupper() else domicilio,
             "abogado.genero": _genero(perfil.get("genero")) or "f",
-            "fecha.hoy": motor.fecha_en_letras(hoy),
-            "fecha.dia": str(hoy.day),
-            "fecha.mes": motor.MESES[hoy.month - 1],
-            "fecha.anio": str(hoy.year),
+            **motor.fijos_de_fecha(hoy),
             "fecha.ciudad": ciudad,
         }
 
@@ -644,18 +652,47 @@ class ServicioContratos:
         self._version(usuario, contrato, contrato.estado)
         return self._guardar(usuario, contrato, "contrato.estado", {"estado": contrato.estado, "motivo": datos.motivo})
 
-    def reabrir_firma(self, usuario: Usuario, contrato_id: int) -> ContratoDetalle:
+    def reabrir_firma(self, usuario: Usuario, contrato_id: int, datos: ReaperturaFirma | None = None) -> ContratoDetalle:
+        """Vuelve a «Firma agendada» para subir otro escaneado; con fecha nueva, el contrato y la cita pasan a ese día."""
         contrato = self._contrato(usuario, contrato_id, para_cambiar=True)
         if contrato.estado != "FIRMADO":
             raise Conflicto("Solo se reabre la firma de un contrato firmado.", codigo="transicion_no_permitida")
         firmas = self._repo.firmas([contrato.id], para_cambiar=True)[contrato.id]
         if not firmas:
             raise Conflicto("No hay una cita de firma para reabrir.", codigo="sin_firma")
+        fecha = datos.fecha if datos and _es_con_plantilla(contrato) else None
         for evento in firmas:
             evento.estado = "PROGRAMADO"
+            if fecha:
+                evento.fecha_inicio, evento.fecha_fin = _mover_al_dia(evento.fecha_inicio, fecha), _mover_al_dia(evento.fecha_fin, fecha)
+        if fecha:
+            self._fechar(contrato, fecha)
         contrato.estado, contrato.firmado_en = "EN_FIRMA", None
         self._version(usuario, contrato, contrato.estado)
-        return self._guardar(usuario, contrato, "contrato.estado", {"estado": contrato.estado})
+        return self._guardar(usuario, contrato, "contrato.estado", {"estado": contrato.estado, "fecha": fecha.isoformat() if fecha else None})
+
+    @staticmethod
+    def _fechar(contrato: ContratoServicio, dia: date) -> bool:
+        """Un contrato con plantilla lleva la fecha del día en que se firma. Dice si cambió."""
+        if not _es_con_plantilla(contrato):
+            return False
+        campos = dict(contrato.campos_actual or {})
+        fijos = dict(campos.get("fijos") or {})
+        nuevos = {**fijos, **motor.fijos_de_fecha(dia)}
+        if nuevos == fijos:
+            return False
+        contrato.campos_actual = {**campos, "fijos": nuevos}
+        return True
+
+    def firma_movida(self, usuario: Usuario, evento: models.EventoAgenda) -> None:
+        """La agenda movió la cita de firma: el contrato aún sin firmar toma el día nuevo. No confirma la transacción."""
+        contrato = self._db.get(ContratoServicio, evento.contrato_id) if evento.contrato_id else None
+        if contrato is None or contrato.estado != "EN_FIRMA" or evento.estado == "CANCELADO":
+            return
+        dia = _en_colombia(evento.fecha_inicio).date()
+        if self._fechar(contrato, dia):
+            self._version(usuario, contrato, contrato.estado)
+            registrar_evento_auditoria(self._db, usuario, "contrato.fecha", "contrato_servicio", contrato.id, {"fecha": dia.isoformat()})
 
     def agendar_firma(self, usuario: Usuario, contrato_id: int, datos: CitaDeFirma) -> ContratoDetalle:
         """Crea la cita de firma con el cliente del contrato, le avisa y deja el contrato en firma."""
@@ -675,8 +712,12 @@ class ServicioContratos:
             proceso_id=contrato.proceso_id, cliente_id=cliente.id, contrato_id=contrato.id, creado_por_id=usuario.id,
         )
         self._db.add(evento)
+        # El contrato lleva la fecha del día de la firma, no la del día en que quedó listo.
+        cambio = self._fechar(contrato, _en_colombia(evento.fecha_inicio).date())
         if contrato.estado == "LISTO_PARA_FIRMA":
             contrato.estado = "EN_FIRMA"
+            self._version(usuario, contrato, contrato.estado)
+        elif cambio:
             self._version(usuario, contrato, contrato.estado)
         self._db.flush()
         detalle = self._guardar(usuario, contrato, "contrato.firma.agendar", {"evento_id": evento.id})

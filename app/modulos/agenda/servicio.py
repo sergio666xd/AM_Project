@@ -216,6 +216,12 @@ class ServicioAgenda:
             if campo in cambios:
                 setattr(evento, campo, cambios[campo])
         registrar_evento_auditoria(self._db, usuario, "proceso.evento_agenda.actualizar", "proceso", proceso.id)
+        if firma and evento.contrato_id is not None and "inicio" in cambios:
+            # El contrato con plantilla lleva la fecha del día de la firma: si la cita se mueve, la fecha también.
+            from app.modulos.contratos.repositorio import RepositorioContratos
+            from app.modulos.contratos.servicio import ServicioContratos
+
+            ServicioContratos(self._db, RepositorioContratos(self._db)).firma_movida(usuario, evento)
         self._db.commit()
         self._db.refresh(evento)
         accion = "canceló" if cambios.get("estado") == "CANCELADO" else "actualizó"
