@@ -115,12 +115,13 @@ _CATALOGO: tuple[PlantillaMeta, ...] = (
         ),
     ),
     PlantillaMeta(
-        nombre="am_novedades_juzgado",
-        boton="Véalas en el portal",
+        nombre="am_actuaciones_registradas",
+        boton="Ver las actuaciones",
         claves=("ACTUACIONES_DIGEST",),
         cuerpo=_cuerpo(
             "👋 Hola, {{1}}.",
-            "Hay novedades del juzgado en sus procesos: {{2}}",
+            "El juzgado registró actuaciones nuevas en sus procesos con el despacho:",
+            "📝 {{2}}",
         ),
         variables=(
             SALUDO,

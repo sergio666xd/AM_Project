@@ -221,7 +221,7 @@ def test_plantillas_muestran_el_estado_de_whatsapp_en_meta(iniciar, crear_usuari
     def estados():
         return {f["clave"]: f["whatsapp_meta"] for f in cliente_http.get("/api/v2/admin/plantillas").json()}
 
-    assert estados()["ACTUACIONES_DIGEST"] == {"plantilla": "am_novedades_juzgado", "estado": "sin_dato", "motivo": None, "actualizado_en": None}
+    assert estados()["ACTUACIONES_DIGEST"] == {"plantilla": "am_actuaciones_registradas", "estado": "sin_dato", "motivo": None, "actualizado_en": None}
 
     def webhook(valor, momento, cuenta="634496380588828"):
         cuerpo = json.dumps({"entry": [{"id": cuenta, "time": momento, "changes": [
@@ -230,7 +230,7 @@ def test_plantillas_muestran_el_estado_de_whatsapp_en_meta(iniciar, crear_usuari
         r = cliente_http.post("/api/whatsapp/webhook", content=cuerpo, headers={"X-Hub-Signature-256": firma, "Content-Type": "application/json"})
         assert r.status_code == 200
 
-    rechazo = {"event": "REJECTED", "message_template_id": 1, "message_template_name": "am_novedades_juzgado",
+    rechazo = {"event": "REJECTED", "message_template_id": 1, "message_template_name": "am_actuaciones_registradas",
                "message_template_language": "es", "reason": "INVALID_FORMAT"}
     webhook(rechazo, 1762880000)
     meta = estados()["ACTUACIONES_DIGEST"]
@@ -249,7 +249,7 @@ def test_plantillas_muestran_el_estado_de_whatsapp_en_meta(iniciar, crear_usuari
 
     monkeypatch.setattr(servicio, "consultar_plantillas_meta", lambda config: [
         {"name": "am_prueba_envio", "language": "es", "status": "PAUSED", "rejected_reason": "NONE"},
-        {"name": "am_novedades_juzgado", "language": "es", "status": "APPROVED"},
+        {"name": "am_actuaciones_registradas", "language": "es", "status": "APPROVED"},
         {"name": "hello_world", "language": "en_US", "status": "APPROVED"},
     ])
     filas = cliente_http.post("/api/v2/admin/plantillas/whatsapp-meta/sincronizar", headers=H).json()

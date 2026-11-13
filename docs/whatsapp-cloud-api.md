@@ -148,16 +148,17 @@ Si tiene dudas, escríbanos por el chat del portal.
 Alejandra Muñoz | Abogada y Asociados
 ```
 
-### `am_novedades_juzgado`
+### `am_actuaciones_registradas`
 
 - Avisos: `ACTUACIONES_DIGEST`
 - Categoría: Utilidad
 - Variables: {{1}} saludo, {{2}} novedades
-- Botón: «Véalas en el portal» → `https://panel.alejandramunozabogada.com/{{1}}`
+- Botón: «Ver las actuaciones» → `https://panel.alejandramunozabogada.com/{{1}}`
 
 ```text
 👋 Hola, {{1}}.
-Hay novedades del juzgado en sus procesos: {{2}}
+El juzgado registró actuaciones nuevas en sus procesos con el despacho:
+📝 {{2}}
 
 Si tiene dudas, escríbanos por el chat del portal.
 ---
