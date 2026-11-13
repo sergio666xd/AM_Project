@@ -270,7 +270,9 @@ def test_integraciones_muestran_que_whatsapp_sale_por_meta(iniciar, crear_usuari
         monkeypatch.delenv(nombre, raising=False)
     e = _escenario(crear_usuario, crear_proceso, sesion_bd)
     iniciar(e["admin"])
-    assert cliente_http.get("/api/v2/admin/integraciones").json()["whatsapp"]["proveedor"] == "ninguno"
+    panel = cliente_http.get("/api/v2/admin/integraciones").json()
+    assert panel["whatsapp"]["proveedor"] == "ninguno"
+    assert next(e for e in panel["estados"] if e["clave"] == "whatsapp")["nombre"] == "WhatsApp"
 
     monkeypatch.setenv("WHATSAPP_TOKEN", "token-de-meta")
     monkeypatch.setenv("WHATSAPP_PHONE_NUMBER_ID", "634864400531550")
@@ -280,3 +282,5 @@ def test_integraciones_muestran_que_whatsapp_sale_por_meta(iniciar, crear_usuari
     assert whatsapp["proveedor"] == "meta" and whatsapp["configurado"] is True
     assert whatsapp["meta"] == {"numero_id": "634864400531550", "cuenta_id": "634496380588828", "falta_para_webhook": ["WHATSAPP_APP_SECRET"]}
     assert "token-de-meta" not in cliente_http.get("/api/v2/admin/integraciones").text
+    estados = cliente_http.get("/api/v2/admin/integraciones").json()["estados"]
+    assert next(e for e in estados if e["clave"] == "whatsapp")["nombre"] == "WhatsApp (Cloud API de Meta)"

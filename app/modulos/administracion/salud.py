@@ -90,9 +90,11 @@ def correo(db: Session, ajustes: dict) -> EstadoIntegracion:
 
 
 def whatsapp(db: Session, ajustes: dict) -> EstadoIntegracion:
-    from app.whatsapp import whatsapp_configurado
+    from app.whatsapp import cloud_activo, whatsapp_configurado
 
-    return _envios(db, "WHATSAPP", "WhatsApp", "whatsapp", whatsapp_configurado(ajustes),
+    proveedor = "Cloud API de Meta" if cloud_activo() else "UltraMsg" if whatsapp_configurado(ajustes) else None
+    nombre = f"WhatsApp ({proveedor})" if proveedor else "WhatsApp"
+    return _envios(db, "WHATSAPP", nombre, "whatsapp", whatsapp_configurado(ajustes),
                    "Faltan WHATSAPP_TOKEN y WHATSAPP_PHONE_NUMBER_ID de la Cloud API de Meta.")
 
 
