@@ -1,0 +1,42 @@
+name: Release
+
+# Cuando cambia VERSION en main se crea la etiqueta vX.Y.Z y la release de
+# GitHub con la sección de esa versión en CHANGELOG.md.
+on:
+  push:
+    branches: [main]
+    paths: [VERSION]
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    name: Etiqueta y release
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - name: Versión y notas
+        id: version
+        run: |
+          version="$(tr -d '[:space:]' < VERSION)"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          awk -v v="$version" '
+            $0 ~ "^## " v " " { dentro = 1; next }
+            dentro && /^## / { exit }
+            dentro { print }
+          ' CHANGELOG.md > notas.md
+          if [ ! -s notas.md ]; then
+            echo "::error::CHANGELOG.md no tiene la sección '## $version'."
+            exit 1
+          fi
+      - name: Crear la release si no existe
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          if gh release view "v$VERSION" > /dev/null 2>&1; then
+            echo "La release v$VERSION ya existe."
+            exit 0
+          fi
+          gh release create "v$VERSION" --target "$GITHUB_SHA" --title "v$VERSION" --notes-file notas.md

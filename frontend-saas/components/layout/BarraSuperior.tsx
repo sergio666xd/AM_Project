@@ -10,6 +10,7 @@ import Breadcrumbs from "./Breadcrumbs";
 import { ABRIR_BUSQUEDA } from "./BusquedaGlobal";
 import { Campana } from "./Campana";
 import { MenuCuenta, type EnlaceCuenta } from "./MenuCuenta";
+import { VersionApp } from "./VersionApp";
 
 /**
  * Barra superior de los paneles internos: migas en escritorio, búsqueda
@@ -41,6 +42,7 @@ export function BarraSuperior({
         <Logo variante="emblema" className="size-9 dark:hidden" />
         <Logo variante="emblema-inverso" className="hidden size-9 dark:block" />
       </Link>
+      <VersionApp className="text-ink-3 lg:hidden" />
       <div className="hidden min-w-0 flex-1 lg:block">
         <Breadcrumbs />
       </div>

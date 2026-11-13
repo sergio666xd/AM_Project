@@ -3,7 +3,8 @@
 Cada actualización que se publica en `main` sube la versión con
 `python scripts/version.py patch|minor|major -m "nota"`. La versión vive en
 el archivo `VERSION` y el script la copia a `frontend-saas/package.json` y a
-`pyproject.toml`; los paneles la muestran en el menú de la cuenta.
+`pyproject.toml`; los paneles la muestran junto al logo. Al llegar a `main`, la
+acción `Release` crea la etiqueta `vX.Y.Z` y la release de GitHub con su sección.
 
 - **major**: cambios que rompen algo (se retira una API, cambia un flujo completo).
 - **minor**: funciones nuevas.
@@ -11,6 +12,12 @@ el archivo `VERSION` y el script la copia a `frontend-saas/package.json` y a
 
 Las versiones anteriores a 2.3.0 se reconstruyeron a partir de los PR
 fusionados en `main`, agrupados por día de publicación.
+
+## 2.3.1 · 2026-11-13
+
+- La versión aparece junto al logo de los paneles en lugar del menú de la cuenta.
+- Cada versión nueva en `main` crea su etiqueta y su release en GitHub.
+- Integraciones: el estado de WhatsApp dice si sale por Meta o por UltraMsg (#66).
 
 ## 2.3.0 · 2026-11-13
 

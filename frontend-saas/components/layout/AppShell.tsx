@@ -17,6 +17,7 @@ import { Campana } from "./Campana";
 import { MenuCuenta } from "./MenuCuenta";
 import { MobileTabBar } from "./MobileTabBar";
 import Sidebar from "./Sidebar";
+import { VersionApp } from "./VersionApp";
 import { estaActiva, navegacion, rutaAreaCuenta, type Variante } from "./navegacion";
 
 interface AppShellProps {
@@ -94,7 +95,11 @@ function EncabezadoCliente({ nav, areaHref }: { nav: ReturnType<typeof navegacio
           <Logo variante="horizontal-inversa" className="hidden h-12 w-auto dark:sm:block" />
           <Logo variante="emblema" className="size-10 sm:hidden dark:hidden" />
           <Logo variante="emblema-inverso" className="hidden size-10 dark:block dark:sm:hidden" />
-          <span className="font-display text-[19px] text-ink sm:hidden">Su portal</span>
+          <span className="flex flex-col gap-1 sm:hidden">
+            <span className="font-display text-[19px] leading-none text-ink">Su portal</span>
+            <VersionApp className="text-ink-3" />
+          </span>
+          <VersionApp className="hidden self-end pb-1.5 text-ink-3 sm:block" />
         </Link>
         <nav className="ml-4 hidden items-center gap-1 lg:flex" aria-label="Principal">
           {nav.todos.slice(0, 5).map((item) => {
