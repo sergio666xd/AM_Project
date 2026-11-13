@@ -109,6 +109,13 @@ Meta rechaza las plantillas de utilidad que hablan de usuario, contraseña,
 acceso o de entrar a la cuenta (pide que sean de autenticación); por eso los
 avisos de bienvenida no mencionan nada de eso y solo remiten al correo. `--estado` muestra el motivo de cada rechazo.
 
+Meta también puede pasar por su cuenta una plantilla de utilidad a marketing
+si el texto suena a invitación («su cuenta está activa de nuevo», resúmenes
+genéricos). Las de marketing cuestan más y Meta limita cuántas recibe cada
+persona. Por eso los textos dicen el hecho concreto (qué cambió, en qué
+proceso). Una plantilla aprobada no puede volver a utilidad editándola: se crea
+otra con otro nombre y la anterior se borra en el administrador de WhatsApp.
+
 Las plantillas del editor de Admin > Operación > Plantillas siguen siendo las
 del correo y de las notificaciones del navegador. Para WhatsApp por Meta mandan
 los textos de abajo.
@@ -230,7 +237,7 @@ Responda desde el portal para que su mensaje quede en el expediente.
 Alejandra Muñoz | Abogada y Asociados
 ```
 
-### `am_colaborador_agregado`
+### `am_asignacion_proceso`
 
 - Avisos: `COLABORADOR_AGREGADO`
 - Categoría: Utilidad
@@ -239,9 +246,9 @@ Alejandra Muñoz | Abogada y Asociados
 
 ```text
 👋 Hola, {{1}}.
-{{2}} le dio acceso al proceso *{{3}}*.
+{{2}} registró su participación en el proceso *{{3}}*.
 👤 Responsable: {{4}}
-🔐 Su participación: {{5}}
+📌 Su participación: {{5}}
 
 Si tiene dudas, escríbanos por el chat del portal.
 ---
@@ -320,7 +327,7 @@ Si tiene dudas, escríbanos por el chat del portal.
 Alejandra Muñoz | Abogada y Asociados
 ```
 
-### `am_proceso_actualizado`
+### `am_cambio_proceso`
 
 - Avisos: `PROCESO_ACTUALIZACION`
 - Categoría: Utilidad
@@ -329,7 +336,8 @@ Alejandra Muñoz | Abogada y Asociados
 
 ```text
 👋 Hola, {{1}}.
-Hay una novedad en su proceso *{{2}}*: {{3}}.
+Se registró un cambio en su proceso *{{2}}*.
+📝 Detalle: {{3}}.
 No tiene que hacer nada por ahora.
 
 Si tiene dudas, escríbanos por el chat del portal.
@@ -351,7 +359,7 @@ Si lo recibió, el canal de WhatsApp funciona bien. No tiene que hacer nada.
 Alejandra Muñoz | Abogada y Asociados
 ```
 
-### `am_reactivacion_mensaje`
+### `am_mensaje_sin_leer`
 
 - Avisos: `REACTIVACION_COMUNICACION`
 - Categoría: Utilidad
@@ -360,7 +368,7 @@ Alejandra Muñoz | Abogada y Asociados
 
 ```text
 👋 Hola, {{1}}.
-Su cuenta está activa de nuevo y tiene un mensaje pendiente sobre *{{2}}*.
+Tiene un mensaje sin leer del despacho en su proceso *{{2}}*.
 💬 Asunto: {{3}}
 
 Si tiene dudas, escríbanos por el chat del portal.
@@ -368,7 +376,7 @@ Si tiene dudas, escríbanos por el chat del portal.
 Alejandra Muñoz | Abogada y Asociados
 ```
 
-### `am_reactivacion_actividad`
+### `am_actividad_programada`
 
 - Avisos: `REACTIVACION_EVENTO`
 - Categoría: Utilidad
@@ -377,7 +385,7 @@ Alejandra Muñoz | Abogada y Asociados
 
 ```text
 👋 Hola, {{1}}.
-Su cuenta está activa de nuevo. Le recordamos *{{2}}* de su proceso *{{3}}*.
+Tiene programada la actividad *{{2}}* en su proceso *{{3}}*.
 🗓️ Cuándo: {{4}}
 
 Si tiene dudas, escríbanos por el chat del portal.
@@ -438,7 +446,7 @@ Si tiene dudas, escríbanos por el chat del portal.
 Alejandra Muñoz | Abogada y Asociados
 ```
 
-### `am_resumen_mensual`
+### `am_estado_procesos`
 
 - Avisos: `RESUMEN_MENSUAL`
 - Categoría: Utilidad
@@ -447,7 +455,8 @@ Alejandra Muñoz | Abogada y Asociados
 
 ```text
 👋 Hola, {{1}}.
-Este es el resumen de sus procesos de *{{2}}*: {{3}}
+Este es el estado de sus procesos con el despacho al cierre de *{{2}}*:
+📋 {{3}}
 
 Si tiene dudas, escríbanos por el chat del portal.
 ---

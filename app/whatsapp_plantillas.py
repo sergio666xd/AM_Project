@@ -191,14 +191,14 @@ _CATALOGO: tuple[PlantillaMeta, ...] = (
         variables=(SALUDO, Variable("actor", "Alejandra Muñoz", defecto="El despacho")),
     ),
     PlantillaMeta(
-        nombre="am_colaborador_agregado",
+        nombre="am_asignacion_proceso",
         boton="Ver el proceso",
         claves=("COLABORADOR_AGREGADO",),
         cuerpo=_cuerpo(
             "👋 Hola, {{1}}.",
-            "{{2}} le dio acceso al proceso *{{3}}*.",
+            "{{2}} registró su participación en el proceso *{{3}}*.",
             "👤 Responsable: {{4}}",
-            "🔐 Su participación: {{5}}",
+            "📌 Su participación: {{5}}",
         ),
         variables=(
             SALUDO,
@@ -281,12 +281,13 @@ _CATALOGO: tuple[PlantillaMeta, ...] = (
         ),
     ),
     PlantillaMeta(
-        nombre="am_proceso_actualizado",
+        nombre="am_cambio_proceso",
         boton="Ver mi proceso",
         claves=("PROCESO_ACTUALIZACION",),
         cuerpo=_cuerpo(
             "👋 Hola, {{1}}.",
-            "Hay una novedad en su proceso *{{2}}*: {{3}}.",
+            "Se registró un cambio en su proceso *{{2}}*.",
+            "📝 Detalle: {{3}}.",
             "No tiene que hacer nada por ahora.",
         ),
         variables=(
@@ -307,12 +308,12 @@ _CATALOGO: tuple[PlantillaMeta, ...] = (
         variables=(SALUDO,),
     ),
     PlantillaMeta(
-        nombre="am_reactivacion_mensaje",
+        nombre="am_mensaje_sin_leer",
         boton="Leer el mensaje",
         claves=("REACTIVACION_COMUNICACION",),
         cuerpo=_cuerpo(
             "👋 Hola, {{1}}.",
-            "Su cuenta está activa de nuevo y tiene un mensaje pendiente sobre *{{2}}*.",
+            "Tiene un mensaje sin leer del despacho en su proceso *{{2}}*.",
             "💬 Asunto: {{3}}",
         ),
         variables=(
@@ -322,12 +323,12 @@ _CATALOGO: tuple[PlantillaMeta, ...] = (
         ),
     ),
     PlantillaMeta(
-        nombre="am_reactivacion_actividad",
+        nombre="am_actividad_programada",
         boton="Ver la actividad",
         claves=("REACTIVACION_EVENTO",),
         cuerpo=_cuerpo(
             "👋 Hola, {{1}}.",
-            "Su cuenta está activa de nuevo. Le recordamos *{{2}}* de su proceso *{{3}}*.",
+            "Tiene programada la actividad *{{2}}* en su proceso *{{3}}*.",
             "🗓️ Cuándo: {{4}}",
         ),
         variables=(
@@ -388,12 +389,13 @@ _CATALOGO: tuple[PlantillaMeta, ...] = (
         ),
     ),
     PlantillaMeta(
-        nombre="am_resumen_mensual",
+        nombre="am_estado_procesos",
         boton="Ver el resumen",
         claves=("RESUMEN_MENSUAL",),
         cuerpo=_cuerpo(
             "👋 Hola, {{1}}.",
-            "Este es el resumen de sus procesos de *{{2}}*: {{3}}",
+            "Este es el estado de sus procesos con el despacho al cierre de *{{2}}*:",
+            "📋 {{3}}",
         ),
         variables=(
             SALUDO,
