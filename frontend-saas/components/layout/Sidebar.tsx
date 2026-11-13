@@ -7,10 +7,11 @@ import { Logo } from "@/components/ui/Logo";
 import { cx } from "@/lib/cx";
 import { usePortalPathname } from "@/lib/usePortalPathname";
 import { MenuCuenta, type EnlaceCuenta } from "./MenuCuenta";
+import { VersionApp } from "./VersionApp";
 import { estaActiva, itemActivo, type GrupoNav, type ItemNav } from "./navegacion";
 
 /**
- * Riel azul de escritorio (lg en adelante): logo invertido, secciones por
+ * Riel azul de escritorio (lg en adelante): logo invertido con la versión, secciones por
  * grupo y la cuenta al pie. La sección activa lleva el icono en dorado, sin
  * franja lateral. En celular la reemplaza la barra inferior.
  */
@@ -31,9 +32,10 @@ export default function Sidebar({
 
   return (
     <aside className="fixed inset-y-0 left-0 z-30 hidden w-[248px] flex-col border-r border-transparent bg-rail text-[#f4f1e8] lg:flex dark:border-line">
-      <Link href={inicio} className="mx-3 mb-3 mt-4 block rounded-lg px-2 py-2" aria-label="Ir al inicio">
+      <Link href={inicio} className="mx-3 mt-4 block rounded-lg px-2 pt-2" aria-label="Ir al inicio">
         <Logo variante="horizontal-inversa" className="h-auto w-[196px]" />
       </Link>
+      <VersionApp className="mb-4 ml-[83px] mt-0.5 block text-[#9fb0d4]" />
       <nav className="flex-1 overflow-y-auto px-3 pb-4" aria-label="Principal">
         {grupos.map((grupo, i) => (
           <Grupo key={grupo.titulo ?? i} grupo={grupo} primero={i === 0} activo={activo} ruta={ruta} inicio={inicio} />
