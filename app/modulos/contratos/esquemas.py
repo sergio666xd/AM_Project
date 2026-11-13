@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import date, datetime
 from typing import Literal
 
 from pydantic import BaseModel, Field, field_validator, model_validator
@@ -137,6 +137,10 @@ class MotivoContrato(BaseModel):
         if len(valor) < 3:
             raise ValueError("Escriba el motivo.")
         return valor
+
+
+class ReaperturaFirma(BaseModel):
+    fecha: date | None = Field(None, description="Fecha nueva del contrato y de la cita; vacía, conserva la que tiene.")
 
 
 class CitaDeFirma(BaseModel):

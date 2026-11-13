@@ -135,3 +135,53 @@ def test_pdf_real_sobre_el_documento_base():
                                            "fijos": {"abogado.nombre": "YEINNY", "abogado.genero": "f"}})
     paginas = PdfReader(BytesIO(pdf)).pages
     assert len(paginas) >= 3 and "Página 1 de" in paginas[0].extract_text()
+
+
+def test_la_fecha_del_contrato_es_la_del_dia_de_la_firma(iniciar, crear_usuario, crear_proceso, cliente_http, sesion_bd, monkeypatch):
+    from tests.v2.test_v2_contratos_redaccion import _entorno
+
+    _entorno(monkeypatch)
+    monkeypatch.setattr("app.modulos.contratos.servicio.render_pdf_plantilla", lambda plantilla, datos: PDF)
+    abogada = crear_usuario("ABOGADO_ADMIN")
+    luis = crear_usuario("CLIENTE", nombre="Luis Arango")
+    proceso = crear_proceso(abogada, "Pertenencia", clientes=[luis])
+    iniciar(abogada)
+    cps = _cps(cliente_http)
+    persona = {"ref": f"c{luis.id}", "cliente_id": luis.id, "nombre": "Luis Arango", "cedula": "1", "ciudad": "Envigado", "genero": "m",
+               "direccion": "Calle 1", "correo": "luis@correo.co", "telefono": "3001112233"}
+    datos = {"valores": {"objeto": "x", "honorarios": "y"}, "listas": {"contratantes": [persona]},
+             "notificaciones": {"personas": [persona["ref"]], "otras": []}}
+    cid = cliente_http.post(f"/api/v2/contratos/proceso/{proceso.id}/con-plantilla", headers=H,
+                            json={"plantilla_id": cps["id"], "datos": datos}).json()["id"]
+    listo = cliente_http.post(f"/api/v2/contratos/{cid}/listo", headers=H)
+    assert listo.status_code == 200, listo.text
+
+    def fecha():
+        fijos = cliente_http.get(f"/api/v2/contratos/{cid}").json()["datos"]["fijos"]
+        return fijos["fecha.hoy"], fijos["fecha.dia"], fijos["fecha.mes"], fijos["fecha.anio"]
+
+    # Al agendar, el contrato toma el día de la firma (hora de Colombia: las 10 p. m. del 20 siguen siendo el 20).
+    r = cliente_http.post(f"/api/v2/contratos/{cid}/firma", headers=H, json={"inicio": "2099-11-20T22:00:00-05:00"})
+    assert r.status_code == 201, r.text
+    assert fecha() == ("20 de noviembre de 2099", "20", "noviembre", "2099")
+
+    # Reagendada desde la agenda, la fecha la sigue.
+    evento = sesion_bd.query(models.EventoAgenda).filter_by(contrato_id=cid).one()
+    r = cliente_http.patch(f"/api/v2/agenda/eventos/{evento.id}", headers=H, json={"inicio": "2099-11-22T09:00:00-05:00"})
+    assert r.status_code == 200, r.text
+    assert fecha()[0] == "22 de noviembre de 2099"
+
+    archivo = {"archivo": ("firmado.pdf", PDF, "application/pdf")}
+    assert cliente_http.post(f"/api/v2/contratos/{cid}/firmado", headers=H, files=archivo).status_code == 201
+    # Firmado, mover la cita ya no cambia el contrato.
+    cliente_http.patch(f"/api/v2/agenda/eventos/{evento.id}", headers=H, json={"inicio": "2099-11-23T09:00:00-05:00"})
+    assert fecha()[0] == "22 de noviembre de 2099"
+
+    # Reemplazar el escaneado con la misma fecha, o con otra: la cita pasa a ese día a la misma hora.
+    assert cliente_http.post(f"/api/v2/contratos/{cid}/reabrir-firma", headers=H).json()["estado"] == "EN_FIRMA"
+    assert fecha()[0] == "22 de noviembre de 2099"
+    cliente_http.post(f"/api/v2/contratos/{cid}/firmado", headers=H, files=archivo)
+    r = cliente_http.post(f"/api/v2/contratos/{cid}/reabrir-firma", headers=H, json={"fecha": "2099-11-25"})
+    assert r.status_code == 200, r.text
+    assert fecha()[0] == "25 de noviembre de 2099"
+    assert r.json()["firma"]["inicio"].startswith("2099-11-25T09:00")  # A la misma hora.

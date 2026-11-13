@@ -335,7 +335,7 @@ export function PanelContratos({ procesoId, contratoInicial, onCambio }: {
         <AgendarFirmaModal
           contrato={firma}
           onClose={() => setFirma(null)}
-          onListo={(c) => { reemplazar(c); toast({ title: "Firma agendada", description: "Le avisamos al cliente y quedó en la agenda del proceso.", tone: "success" }); }}
+          onListo={reemplazar}
         />
       )}
       {motivo && (
@@ -345,20 +345,7 @@ export function PanelContratos({ procesoId, contratoInicial, onCambio }: {
           onListo={(c) => { reemplazar(c); toast({ title: motivo.tipo === "anular" ? "Contrato anulado" : "Contrato terminado", tone: "success" }); }}
         />
       )}
-      <ConfirmDialog
-        open={reabrir !== null}
-        onClose={() => setReabrir(null)}
-        onConfirm={async () => {
-          if (!reabrir) return;
-          const { data, error } = await api.POST("/api/v2/contratos/{contrato_id}/reabrir-firma", ruta(reabrir.id));
-          if (!data) throw new Error(mensajeDeError(error));
-          reemplazar(data);
-          toast({ title: "Firma reabierta", description: "Suba el escaneado nuevo cuando lo tenga.", tone: "success" });
-        }}
-        title="¿Reemplazar el escaneado firmado?"
-        description="El contrato vuelve a «Firma agendada» para subir otro PDF. El escaneado actual se conserva en los documentos del proceso."
-        confirmLabel="Reabrir la firma"
-      />
+      {reabrir && <ReemplazarEscaneadoModal contrato={reabrir} onClose={() => setReabrir(null)} onListo={reemplazar} />}
       <ConfirmDialog
         open={eliminar !== null}
         onClose={() => setEliminar(null)}
@@ -584,6 +571,36 @@ function DetalleContrato({ contrato: c, procesoId, cambios, ocupado, onCampo, on
   );
 }
 
+/** La fecha que lleva un contrato con plantilla, en letras ("20 de noviembre de 2026"). */
+function fechaDelContrato(c: Detalle): string | null {
+  return c.plantilla ? c.datos?.fijos?.["fecha.hoy"] || null : null;
+}
+
+/** El contrato listo para imprimir: vista previa del PDF y los botones para abrirlo o imprimirlo. */
+function ParaImprimir({ contrato, children, onClose }: { contrato: Detalle; children: ReactNode; onClose: () => void }) {
+  const marco = useRef<HTMLIFrameElement>(null);
+  const pdf = `/api/v2/contratos/${contrato.id}/pdf`;
+  function imprimir() {
+    try {
+      marco.current?.contentWindow?.focus();
+      marco.current?.contentWindow?.print();
+    } catch {
+      window.open(pdf, "_blank", "noopener");
+    }
+  }
+  return (
+    <div className="space-y-4">
+      {children}
+      <iframe ref={marco} src={pdf} title="Vista previa del contrato" className="hidden h-[55vh] w-full rounded-lg bg-white shadow-[0_0_0_1px_var(--line-strong)] sm:block" />
+      <div className="flex flex-col-reverse gap-2 pt-1 sm:flex-row sm:justify-end">
+        <Button type="button" variant="ghost" onClick={onClose}>Cerrar</Button>
+        <Button type="button" variant="secondary" icon={<Eye size={16} />} onClick={() => window.open(pdf, "_blank", "noopener")}>Vista previa</Button>
+        <Button type="button" icon={<Printer size={16} />} onClick={imprimir}>Imprimir</Button>
+      </div>
+    </div>
+  );
+}
+
 function AgendarFirmaModal({ contrato, onClose, onListo }: { contrato: Detalle; onClose: () => void; onListo: (c: Detalle) => void }) {
   const id = useId();
   const [dia, setDia] = useState(hoyISO());
@@ -592,6 +609,7 @@ function AgendarFirmaModal({ contrato, onClose, onListo }: { contrato: Detalle; 
   const [lugar, setLugar] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [guardando, setGuardando] = useState(false);
+  const [agendado, setAgendado] = useState<Detalle | null>(null);
 
   async function guardar(e: FormEvent) {
     e.preventDefault();
@@ -605,7 +623,22 @@ function AgendarFirmaModal({ contrato, onClose, onListo }: { contrato: Detalle; 
     setGuardando(false);
     if (!data) return setError(mensajeDeError(fallo));
     onListo(data);
-    onClose();
+    setAgendado(data);
+  }
+
+  if (agendado) {
+    const fecha = fechaDelContrato(agendado);
+    return (
+      <Modal open onClose={onClose} size="xl" title="Firma agendada" description={`Le avisamos a ${agendado.cliente?.nombre ?? "el cliente"} y quedó en la agenda del proceso.`}>
+        <ParaImprimir contrato={agendado} onClose={onClose}>
+          <p className="text-[14px] text-ink-2">
+            {fecha
+              ? <>El contrato quedó con fecha del <strong className="text-ink">{fecha}</strong>, el día de la firma. Si la cita se mueve en la agenda, la fecha del contrato se mueve con ella.</>
+              : <>Revíselo e imprímalo para el día de la firma.</>}
+          </p>
+        </ParaImprimir>
+      </Modal>
+    );
   }
 
   return (
@@ -629,10 +662,93 @@ function AgendarFirmaModal({ contrato, onClose, onListo }: { contrato: Detalle; 
           <label htmlFor={`${id}-lugar`} className={ETIQUETA}>Dónde (opcional)</label>
           <input id={`${id}-lugar`} value={lugar} maxLength={500} onChange={(e) => setLugar(e.target.value)} placeholder="Ej.: en la oficina de la firma" className={CAMPO} />
         </div>
+        {contrato.plantilla && <p className="text-[13px] text-ink-3">El contrato tomará la fecha de este día.</p>}
         {error && <p role="alert" className="text-[13px] text-bad">{error}</p>}
         <div className="flex flex-col-reverse gap-2 pt-1 sm:flex-row sm:justify-end">
           <Button type="button" variant="ghost" onClick={onClose}>Cancelar</Button>
           <Button type="submit" loading={guardando} icon={<CalendarClock size={16} />}>Agendar</Button>
+        </div>
+      </form>
+    </Modal>
+  );
+}
+
+/** Reabre la firma para subir otro escaneado; en un contrato con plantilla pregunta si conserva la fecha. */
+function ReemplazarEscaneadoModal({ contrato, onClose, onListo }: { contrato: Detalle; onClose: () => void; onListo: (c: Detalle) => void }) {
+  const id = useId();
+  const { toast } = useToast();
+  const actual = fechaDelContrato(contrato);
+  const [cambiar, setCambiar] = useState(false);
+  const [dia, setDia] = useState(hoyISO());
+  const [error, setError] = useState<string | null>(null);
+  const [guardando, setGuardando] = useState(false);
+  const [reabierto, setReabierto] = useState<Detalle | null>(null);
+
+  async function guardar(e: FormEvent) {
+    e.preventDefault();
+    if (cambiar && !dia) return setError("Indique la fecha nueva.");
+    setGuardando(true);
+    const { data, error: fallo } = await api.POST("/api/v2/contratos/{contrato_id}/reabrir-firma", {
+      params: { path: { contrato_id: contrato.id } },
+      body: { fecha: cambiar ? dia : null },
+    });
+    setGuardando(false);
+    if (!data) return setError(mensajeDeError(fallo));
+    onListo(data);
+    if (cambiar) return setReabierto(data);
+    toast({ title: "Firma reabierta", description: "Suba el escaneado correcto cuando lo tenga.", tone: "success" });
+    onClose();
+  }
+
+  if (reabierto) {
+    return (
+      <Modal open onClose={onClose} size="xl" title="Contrato con fecha nueva" description="La cita de firma pasó a ese día, a la misma hora.">
+        <ParaImprimir contrato={reabierto} onClose={onClose}>
+          <p className="text-[14px] text-ink-2">
+            El contrato ahora tiene fecha del <strong className="text-ink">{fechaDelContrato(reabierto)}</strong>. Imprímalo para firmarlo de nuevo y luego suba el escaneado.
+          </p>
+        </ParaImprimir>
+      </Modal>
+    );
+  }
+
+  const opcion = (activa: boolean) => cx(
+    "flex cursor-pointer items-start gap-2.5 rounded-lg px-3 py-2.5 shadow-[0_0_0_1px_var(--line-strong)] has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-navy/30",
+    activa ? "bg-navy-soft shadow-[0_0_0_1.5px_var(--navy)]" : "bg-sheet hover:bg-manila/60",
+  );
+
+  return (
+    <Modal open onClose={onClose} title="Reemplazar el escaneado firmado" description="El contrato vuelve a «Firma agendada» para subir otro PDF. El escaneado actual se conserva en los documentos del proceso.">
+      <form onSubmit={guardar} noValidate className="space-y-4">
+        {actual && (
+          <fieldset className="space-y-2">
+            <legend className={ETIQUETA}>Fecha del contrato</legend>
+            <label className={opcion(!cambiar)}>
+              <input type="radio" name={`${id}-fecha`} checked={!cambiar} onChange={() => setCambiar(false)} className="mt-1 size-4 accent-[var(--navy)]" />
+              <span>
+                <span className="block font-semibold text-ink">Mantener el {actual}</span>
+                <span className="block text-[13px] text-ink-3">Por ejemplo, si se subió un archivo equivocado.</span>
+              </span>
+            </label>
+            <label className={opcion(cambiar)}>
+              <input type="radio" name={`${id}-fecha`} checked={cambiar} onChange={() => setCambiar(true)} className="mt-1 size-4 accent-[var(--navy)]" />
+              <span>
+                <span className="block font-semibold text-ink">Cambiar la fecha</span>
+                <span className="block text-[13px] text-ink-3">Si se va a firmar de nuevo otro día. La cita pasa a ese día.</span>
+              </span>
+            </label>
+            {cambiar && (
+              <div className="pl-1 pt-1">
+                <label htmlFor={`${id}-dia`} className={ETIQUETA}>Fecha nueva</label>
+                <input id={`${id}-dia`} type="date" value={dia} onChange={(e) => setDia(e.target.value)} className={cx(CAMPO, "sm:max-w-56")} />
+              </div>
+            )}
+          </fieldset>
+        )}
+        {error && <p role="alert" className="text-[13px] text-bad">{error}</p>}
+        <div className="flex flex-col-reverse gap-2 pt-1 sm:flex-row sm:justify-end">
+          <Button type="button" variant="ghost" onClick={onClose}>Cancelar</Button>
+          <Button type="submit" loading={guardando} icon={<RotateCcw size={16} />}>Reabrir la firma</Button>
         </div>
       </form>
     </Modal>
