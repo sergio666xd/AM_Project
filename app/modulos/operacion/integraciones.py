@@ -25,6 +25,7 @@ from app.modulos.operacion.esquemas import (
     CambioWhatsapp,
     ClavePrueba,
     ConfiguracionCorreo,
+    ConexionMeta,
     ConfiguracionWhatsapp,
     EnvioPrueba,
     PanelIntegraciones,
@@ -123,6 +124,20 @@ def conectar_whatsapp_cloud() -> ResultadoPrueba:
     )
 
 
+def _configuracion_whatsapp(config: dict) -> ConfiguracionWhatsapp:
+    from app.whatsapp import cloud_activo, cloud_config
+
+    anterior = {"url": config["whatsapp_api_url"] or "", "tiene_token": bool(config["whatsapp_token"])}
+    nube = cloud_config()
+    if cloud_activo(nube):
+        faltan = [nombre for nombre, clave in (("WHATSAPP_VERIFY_TOKEN", "verify_token"), ("WHATSAPP_APP_SECRET", "app_secret"))
+                  if not nube[clave]]
+        meta = ConexionMeta(numero_id=nube["phone_number_id"], cuenta_id=nube["waba_id"] or None, falta_para_webhook=faltan)
+        return ConfiguracionWhatsapp(proveedor="meta", meta=meta, configurado=True, **anterior)
+    listo = _whatsapp_listo(config)
+    return ConfiguracionWhatsapp(proveedor="anterior" if listo else "ninguno", configurado=listo, **anterior)
+
+
 class ServicioIntegraciones:
     def __init__(self, db: Session, repositorio: RepositorioOperacion):
         self._db = db
@@ -137,9 +152,7 @@ class ServicioIntegraciones:
                 starttls=bool(config["smtp_starttls"]), usuario=config["smtp_user"] or "",
                 tiene_clave=bool(config["smtp_password"]), configurado=bool(config["smtp_host"] and config["smtp_from"]),
             ),
-            whatsapp=ConfiguracionWhatsapp(
-                url=config["whatsapp_api_url"] or "", tiene_token=bool(config["whatsapp_token"]), configurado=_whatsapp_listo(config),
-            ),
+            whatsapp=_configuracion_whatsapp(config),
         )
 
     def panel(self, admin: Usuario) -> PanelIntegraciones:

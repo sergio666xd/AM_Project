@@ -4804,6 +4804,24 @@ export interface components {
             /** Verificado */
             verificado: boolean;
         };
+        /** ConexionMeta */
+        ConexionMeta: {
+            /**
+             * Numero Id
+             * @description Identificador del número en Meta (WHATSAPP_PHONE_NUMBER_ID).
+             */
+            numero_id: string;
+            /**
+             * Cuenta Id
+             * @description Cuenta de WhatsApp Business (WHATSAPP_WABA_ID).
+             */
+            cuenta_id: string | null;
+            /**
+             * Falta Para Webhook
+             * @description Variables que faltan para recibir el webhook; vacía si está listo.
+             */
+            falta_para_webhook: string[];
+        };
         /** ConfiguracionConsultas */
         ConfiguracionConsultas: {
             /**
@@ -4868,6 +4886,13 @@ export interface components {
         };
         /** ConfiguracionWhatsapp */
         ConfiguracionWhatsapp: {
+            /**
+             * Proveedor
+             * @description Por dónde salen hoy los WhatsApp: la API de Meta (variables de entorno) o el proveedor anterior (dirección y token de aquí).
+             * @enum {string}
+             */
+            proveedor: "meta" | "anterior" | "ninguno";
+            meta?: components["schemas"]["ConexionMeta"] | null;
             /** Url */
             url: string;
             /** Tiene Token */
