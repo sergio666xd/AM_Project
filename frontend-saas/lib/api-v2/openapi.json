@@ -36316,6 +36316,17 @@
             ],
             "description": "Sin valor si el aviso no sale por WhatsApp con plantilla de Meta."
           },
+          "whatsapp_publicado": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/WhatsappPublicado"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "La plantilla de Meta con que sale este aviso por WhatsApp."
+          },
           "asunto": {
             "type": "string",
             "title": "Asunto"
@@ -39800,6 +39811,30 @@
         ],
         "title": "UsuarioSesion"
       },
+      "VariableMeta": {
+        "properties": {
+          "numero": {
+            "type": "integer",
+            "title": "Numero"
+          },
+          "dato": {
+            "type": "string",
+            "title": "Dato",
+            "description": "De dónde sale el valor, por ejemplo `proceso` o `saludo`."
+          },
+          "ejemplo": {
+            "type": "string",
+            "title": "Ejemplo"
+          }
+        },
+        "type": "object",
+        "required": [
+          "numero",
+          "dato",
+          "ejemplo"
+        ],
+        "title": "VariableMeta"
+      },
       "Version": {
         "properties": {
           "id": {
@@ -40093,6 +40128,85 @@
           "estado"
         ],
         "title": "WhatsappMeta"
+      },
+      "WhatsappPublicado": {
+        "properties": {
+          "activo": {
+            "type": "boolean",
+            "title": "Activo",
+            "description": "True si WhatsApp sale hoy por Meta; entonces este texto reemplaza a `cuerpo_whatsapp`."
+          },
+          "plantilla": {
+            "type": "string",
+            "title": "Plantilla"
+          },
+          "categoria": {
+            "type": "string",
+            "enum": [
+              "utilidad",
+              "autenticacion"
+            ],
+            "title": "Categoria"
+          },
+          "cuerpo": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cuerpo",
+            "description": "El texto registrado en Meta con {{1}}, {{2}}…; sin valor en las de autenticación, cuyo texto pone Meta."
+          },
+          "vista_previa": {
+            "type": "string",
+            "title": "Vista Previa",
+            "description": "El mensaje con los valores de ejemplo, como le llega a la persona."
+          },
+          "pie": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pie"
+          },
+          "boton": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Boton"
+          },
+          "variables": {
+            "items": {
+              "$ref": "#/components/schemas/VariableMeta"
+            },
+            "type": "array",
+            "title": "Variables"
+          }
+        },
+        "type": "object",
+        "required": [
+          "activo",
+          "plantilla",
+          "categoria",
+          "cuerpo",
+          "vista_previa",
+          "pie",
+          "boton",
+          "variables"
+        ],
+        "title": "WhatsappPublicado"
       }
     }
   }

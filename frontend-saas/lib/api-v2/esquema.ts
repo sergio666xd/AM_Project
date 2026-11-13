@@ -8073,6 +8073,8 @@ export interface components {
             actualizada_en: string | null;
             /** @description Sin valor si el aviso no sale por WhatsApp con plantilla de Meta. */
             whatsapp_meta?: components["schemas"]["WhatsappMeta"] | null;
+            /** @description La plantilla de Meta con que sale este aviso por WhatsApp. */
+            whatsapp_publicado?: components["schemas"]["WhatsappPublicado"] | null;
             /** Asunto */
             asunto: string;
             /** Cuerpo Email */
@@ -9415,6 +9417,18 @@ export interface components {
             /** Ultimo Acceso */
             ultimo_acceso?: string | null;
         };
+        /** VariableMeta */
+        VariableMeta: {
+            /** Numero */
+            numero: number;
+            /**
+             * Dato
+             * @description De dónde sale el valor, por ejemplo `proceso` o `saludo`.
+             */
+            dato: string;
+            /** Ejemplo */
+            ejemplo: string;
+        };
         /** Version */
         Version: {
             /** Id */
@@ -9534,6 +9548,37 @@ export interface components {
             motivo?: string | null;
             /** Actualizado En */
             actualizado_en?: string | null;
+        };
+        /** WhatsappPublicado */
+        WhatsappPublicado: {
+            /**
+             * Activo
+             * @description True si WhatsApp sale hoy por Meta; entonces este texto reemplaza a `cuerpo_whatsapp`.
+             */
+            activo: boolean;
+            /** Plantilla */
+            plantilla: string;
+            /**
+             * Categoria
+             * @enum {string}
+             */
+            categoria: "utilidad" | "autenticacion";
+            /**
+             * Cuerpo
+             * @description El texto registrado en Meta con {{1}}, {{2}}…; sin valor en las de autenticación, cuyo texto pone Meta.
+             */
+            cuerpo: string | null;
+            /**
+             * Vista Previa
+             * @description El mensaje con los valores de ejemplo, como le llega a la persona.
+             */
+            vista_previa: string;
+            /** Pie */
+            pie: string | null;
+            /** Boton */
+            boton: string | null;
+            /** Variables */
+            variables: components["schemas"]["VariableMeta"][];
         };
     };
     responses: never;
