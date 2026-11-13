@@ -166,7 +166,7 @@ def test_integraciones_configurar_probar_y_enviar(iniciar, crear_usuario, crear_
 
     assert cliente_http.put("/api/v2/admin/integraciones/whatsapp", json={"url": "ftp://x"}, headers=H).status_code == 422
     panel = cliente_http.put("/api/v2/admin/integraciones/whatsapp", json={"url": "https://api.proveedor.co/send", "token": "abc"}, headers=H).json()
-    assert panel["whatsapp"] == {"url": "https://api.proveedor.co/send", "tiene_token": True, "configurado": True}
+    assert panel["whatsapp"] == {"proveedor": "anterior", "meta": None, "url": "https://api.proveedor.co/send", "tiene_token": True, "configurado": True}
     panel = cliente_http.put("/api/v2/admin/integraciones/whatsapp", json={"url": "https://api.proveedor.co/send", "borrar_token": True}, headers=H).json()
     assert panel["whatsapp"]["tiene_token"] is False
 
@@ -263,3 +263,20 @@ def test_plantillas_muestran_el_estado_de_whatsapp_en_meta(iniciar, crear_usuari
     monkeypatch.setattr(servicio, "consultar_plantillas_meta", falla)
     r = cliente_http.post("/api/v2/admin/plantillas/whatsapp-meta/sincronizar", headers=H)
     assert r.status_code == 502 and "190" in r.text
+
+
+def test_integraciones_muestran_que_whatsapp_sale_por_meta(iniciar, crear_usuario, crear_proceso, cliente_http, sesion_bd, monkeypatch):
+    for nombre in ("WHATSAPP_TOKEN", "WHATSAPP_PHONE_NUMBER_ID", "WHATSAPP_WABA_ID", "WHATSAPP_VERIFY_TOKEN", "WHATSAPP_APP_SECRET"):
+        monkeypatch.delenv(nombre, raising=False)
+    e = _escenario(crear_usuario, crear_proceso, sesion_bd)
+    iniciar(e["admin"])
+    assert cliente_http.get("/api/v2/admin/integraciones").json()["whatsapp"]["proveedor"] == "ninguno"
+
+    monkeypatch.setenv("WHATSAPP_TOKEN", "token-de-meta")
+    monkeypatch.setenv("WHATSAPP_PHONE_NUMBER_ID", "634864400531550")
+    monkeypatch.setenv("WHATSAPP_WABA_ID", "634496380588828")
+    monkeypatch.setenv("WHATSAPP_VERIFY_TOKEN", "verificacion")
+    whatsapp = cliente_http.get("/api/v2/admin/integraciones").json()["whatsapp"]
+    assert whatsapp["proveedor"] == "meta" and whatsapp["configurado"] is True
+    assert whatsapp["meta"] == {"numero_id": "634864400531550", "cuenta_id": "634496380588828", "falta_para_webhook": ["WHATSAPP_APP_SECRET"]}
+    assert "token-de-meta" not in cliente_http.get("/api/v2/admin/integraciones").text

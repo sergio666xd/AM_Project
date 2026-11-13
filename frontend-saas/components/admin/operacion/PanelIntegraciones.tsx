@@ -117,7 +117,41 @@ function FormularioCorreo({ panel, onGuardado }: { panel: Panel; onGuardado: (p:
   );
 }
 
-function FormularioWhatsapp({ panel, onGuardado }: { panel: Panel; onGuardado: (p: Panel) => void }) {
+function WhatsappMeta({ meta, children }: { meta: NonNullable<Panel["whatsapp"]["meta"]>; children: ReactNode }) {
+  const id = useId();
+  const datos: [string, ReactNode][] = [
+    ["Proveedor", <Tag key="p" tone="ok">API de WhatsApp de Meta</Tag>],
+    ["Número (ID en Meta)", <span key="n" className="font-mono text-[13px]">{meta.numero_id}</span>],
+    ["Cuenta de WhatsApp Business", meta.cuenta_id ? <span key="c" className="font-mono text-[13px]">{meta.cuenta_id}</span> : <span key="c" className="text-warn">Falta WHATSAPP_WABA_ID</span>],
+    ["Webhook (entregas y estado de plantillas)", meta.falta_para_webhook.length
+      ? <span key="w" className="text-warn">Falta {meta.falta_para_webhook.join(" y ")}</span>
+      : <Tag key="w" tone="ok">Listo para recibir</Tag>],
+  ];
+  return (
+    <Sheet aria-labelledby={`${id}-t`}>
+      <SheetHeader title={<span id={`${id}-t`}>WhatsApp</span>} />
+      <div className="px-4 py-4">
+        <p className="text-[13px] text-ink-2">
+          Todos los WhatsApp salen por Meta con las plantillas aprobadas. Estos datos vienen de las variables de entorno del servidor y se cambian allá, no aquí.
+        </p>
+        <dl className="mt-3 grid gap-x-4 gap-y-2 text-[14px] sm:grid-cols-[auto_1fr]">
+          {datos.map(([etiqueta, valor]) => (
+            <div key={etiqueta} className="contents">
+              <dt className="text-ink-2">{etiqueta}</dt>
+              <dd className="text-ink">{valor}</dd>
+            </div>
+          ))}
+        </dl>
+        <details className="mt-4 rounded-lg bg-sheet-2 px-3 py-2 text-[13px] text-ink-2 shadow-[inset_0_0_0_1px_var(--line)]">
+          <summary className="cursor-pointer select-none font-semibold text-ink">Proveedor anterior (no se usa mientras Meta esté configurado)</summary>
+          <div className="mt-3">{children}</div>
+        </details>
+      </div>
+    </Sheet>
+  );
+}
+
+function FormularioWhatsapp({ panel, onGuardado, titulo = "WhatsApp" }: { panel: Panel; onGuardado: (p: Panel) => void; titulo?: string }) {
   const id = useId();
   const { toast } = useToast();
   const w = panel.whatsapp;
@@ -143,7 +177,7 @@ function FormularioWhatsapp({ panel, onGuardado }: { panel: Panel; onGuardado: (
   }
 
   return (
-    <Formulario titulo="WhatsApp" id={`${id}-t`} descripcion="La dirección y el token que entrega el proveedor de mensajes de WhatsApp." onGuardar={guardar} guardando={guardando} error={errores.general}>
+    <Formulario titulo={titulo} id={`${id}-t`} descripcion="La dirección y el token que entrega el proveedor de mensajes de WhatsApp." onGuardar={guardar} guardando={guardando} error={errores.general}>
       <Campo id={`${id}-u`} etiqueta="Dirección del proveedor" error={errores.url} className="sm:col-span-2">
         <input id={`${id}-u`} type="url" value={url} placeholder="https://" onChange={(e) => setUrl(e.target.value)} className={CAMPO} />
       </Campo>
@@ -295,7 +329,13 @@ export function PanelIntegraciones() {
             </ul>
           </Sheet>
           <FormularioCorreo key={`c-${panel.correo.servidor}-${panel.correo.tiene_clave}`} panel={panel} onGuardado={setPanel} />
-          <FormularioWhatsapp key={`w-${panel.whatsapp.url}-${panel.whatsapp.tiene_token}`} panel={panel} onGuardado={setPanel} />
+          {panel.whatsapp.meta ? (
+            <WhatsappMeta meta={panel.whatsapp.meta}>
+              <FormularioWhatsapp key={`w-${panel.whatsapp.url}-${panel.whatsapp.tiene_token}`} titulo="UltraMsg" panel={panel} onGuardado={setPanel} />
+            </WhatsappMeta>
+          ) : (
+            <FormularioWhatsapp key={`w-${panel.whatsapp.url}-${panel.whatsapp.tiene_token}`} panel={panel} onGuardado={setPanel} />
+          )}
         </div>
         <aside className="lg:sticky lg:top-20">
           <EnvioPrueba />
