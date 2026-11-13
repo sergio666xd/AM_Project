@@ -62,6 +62,9 @@ def registrar_estado(db: Session, estado: dict) -> None:
     nuevo = str(estado.get("status") or "").lower()
     if not mensaje_id or nuevo not in _ORDEN_ESTADOS:
         return
+    if nuevo == "failed":
+        # Queda en los logs aunque el mensaje no sea de una entrega (pruebas del script).
+        logger.warning("WhatsApp %s no entregado: %s", mensaje_id, _error_estado(estado))
     entrega = db.query(models.EntregaNotificacion).filter_by(proveedor_mensaje_id=mensaje_id).first()
     if entrega is None:
         # Mensajes de prueba o enviados por fuera de las entregas (códigos, confirmaciones).
