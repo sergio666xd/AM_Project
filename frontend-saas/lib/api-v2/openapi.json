@@ -28141,6 +28141,42 @@
         ],
         "title": "CodigoSeguridad"
       },
+      "ConexionMeta": {
+        "properties": {
+          "numero_id": {
+            "type": "string",
+            "title": "Numero Id",
+            "description": "Identificador del número en Meta (WHATSAPP_PHONE_NUMBER_ID)."
+          },
+          "cuenta_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cuenta Id",
+            "description": "Cuenta de WhatsApp Business (WHATSAPP_WABA_ID)."
+          },
+          "falta_para_webhook": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Falta Para Webhook",
+            "description": "Variables que faltan para recibir el webhook; vacía si está listo."
+          }
+        },
+        "type": "object",
+        "required": [
+          "numero_id",
+          "cuenta_id",
+          "falta_para_webhook"
+        ],
+        "title": "ConexionMeta"
+      },
       "ConfiguracionConsultas": {
         "properties": {
           "activa": {
@@ -28305,6 +28341,26 @@
       },
       "ConfiguracionWhatsapp": {
         "properties": {
+          "proveedor": {
+            "type": "string",
+            "enum": [
+              "meta",
+              "anterior",
+              "ninguno"
+            ],
+            "title": "Proveedor",
+            "description": "Por dónde salen hoy los WhatsApp: la API de Meta (variables de entorno) o el proveedor anterior (dirección y token de aquí)."
+          },
+          "meta": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ConexionMeta"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "url": {
             "type": "string",
             "title": "Url"
@@ -28320,6 +28376,7 @@
         },
         "type": "object",
         "required": [
+          "proveedor",
           "url",
           "tiene_token",
           "configurado"

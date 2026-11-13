@@ -140,7 +140,17 @@ class ConfiguracionCorreo(BaseModel):
     configurado: bool
 
 
+class ConexionMeta(BaseModel):
+    numero_id: str = Field(description="Identificador del número en Meta (WHATSAPP_PHONE_NUMBER_ID).")
+    cuenta_id: str | None = Field(description="Cuenta de WhatsApp Business (WHATSAPP_WABA_ID).")
+    falta_para_webhook: list[str] = Field(description="Variables que faltan para recibir el webhook; vacía si está listo.")
+
+
 class ConfiguracionWhatsapp(BaseModel):
+    proveedor: Literal["meta", "anterior", "ninguno"] = Field(
+        description="Por dónde salen hoy los WhatsApp: la API de Meta (variables de entorno) o el proveedor anterior (dirección y token de aquí).",
+    )
+    meta: ConexionMeta | None = None
     url: str
     tiene_token: bool
     configurado: bool
