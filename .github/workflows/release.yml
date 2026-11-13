@@ -1,11 +1,13 @@
 name: Release
 
 # Cuando cambia VERSION en main se crea la etiqueta vX.Y.Z y la release de
-# GitHub con la sección de esa versión en CHANGELOG.md.
+# GitHub con la sección de esa versión en CHANGELOG.md. También crea las
+# releases de .github/releases-anteriores.txt que todavía no existan.
 on:
   push:
     branches: [main]
-    paths: [VERSION]
+    paths: [VERSION, .github/releases-anteriores.txt]
+  workflow_dispatch:
 
 permissions:
   contents: write
@@ -14,29 +16,36 @@ jobs:
   release:
     name: Etiqueta y release
     runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ github.token }}
     steps:
       - uses: actions/checkout@v5
-      - name: Versión y notas
-        id: version
+      - name: Función para leer las notas del changelog
         run: |
-          version="$(tr -d '[:space:]' < VERSION)"
-          echo "version=$version" >> "$GITHUB_OUTPUT"
-          awk -v v="$version" '
-            $0 ~ "^## " v " " { dentro = 1; next }
+          cat > notas.sh <<'SH'
+          # Uso: notas.sh X.Y.Z > archivo. Sale con error si no hay sección.
+          awk -v v="$1" '
+            index($0, "## " v " ") == 1 { dentro = 1; next }
             dentro && /^## / { exit }
             dentro { print }
-          ' CHANGELOG.md > notas.md
-          if [ ! -s notas.md ]; then
-            echo "::error::CHANGELOG.md no tiene la sección '## $version'."
-            exit 1
-          fi
-      - name: Crear la release si no existe
-        env:
-          GH_TOKEN: ${{ github.token }}
-          VERSION: ${{ steps.version.outputs.version }}
+          ' CHANGELOG.md | tee /tmp/notas.md
+          test -s /tmp/notas.md || { echo "::error::CHANGELOG.md no tiene la sección '## $1'." >&2; exit 1; }
+          SH
+          chmod +x notas.sh
+      - name: Releases anteriores
         run: |
-          if gh release view "v$VERSION" > /dev/null 2>&1; then
-            echo "La release v$VERSION ya existe."
+          grep -v '^#' .github/releases-anteriores.txt | while read -r version commit; do
+            [ -n "$version" ] || continue
+            if gh release view "v$version" > /dev/null 2>&1; then continue; fi
+            ./notas.sh "$version" > notas.md
+            gh release create "v$version" --target "$commit" --title "v$version" --notes-file notas.md --latest=false
+          done
+      - name: Release de la versión actual
+        run: |
+          version="$(tr -d '[:space:]' < VERSION)"
+          if gh release view "v$version" > /dev/null 2>&1; then
+            echo "La release v$version ya existe."
             exit 0
           fi
-          gh release create "v$VERSION" --target "$GITHUB_SHA" --title "v$VERSION" --notes-file notas.md
+          ./notas.sh "$version" > notas.md
+          gh release create "v$version" --target "$GITHUB_SHA" --title "v$version" --notes-file notas.md --latest
