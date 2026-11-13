@@ -229,7 +229,25 @@ class TextosPlantillaAviso(BaseModel):
     cuerpo_push: str | None = Field(None, max_length=5000)
 
 
+class VariableMeta(BaseModel):
+    numero: int
+    dato: str = Field(description="De dónde sale el valor, por ejemplo `proceso` o `saludo`.")
+    ejemplo: str
+
+
+class WhatsappPublicado(BaseModel):
+    activo: bool = Field(description="True si WhatsApp sale hoy por Meta; entonces este texto reemplaza a `cuerpo_whatsapp`.")
+    plantilla: str
+    categoria: Literal["utilidad", "autenticacion"]
+    cuerpo: str | None = Field(description="El texto registrado en Meta con {{1}}, {{2}}…; sin valor en las de autenticación, cuyo texto pone Meta.")
+    vista_previa: str = Field(description="El mensaje con los valores de ejemplo, como le llega a la persona.")
+    pie: str | None
+    boton: str | None
+    variables: list[VariableMeta]
+
+
 class PlantillaAviso(PlantillaAvisoFila):
+    whatsapp_publicado: WhatsappPublicado | None = Field(None, description="La plantilla de Meta con que sale este aviso por WhatsApp.")
     asunto: str
     cuerpo_email: str
     cuerpo_whatsapp: str

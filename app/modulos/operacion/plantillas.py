@@ -17,10 +17,12 @@ from app.integration_settings import get_firm_settings
 from app.message_templates import render_borrador
 from app.modulos.administracion.politicas import exigir_admin
 from app.modulos.identidad.modelos import Usuario
-from app.modulos.operacion.esquemas import EstadoPlantillaMeta, PlantillaAviso, PlantillaAvisoFila, TextosPlantillaAviso, VistaPrevia, WhatsappMeta
+from app.modulos.operacion.esquemas import (
+    EstadoPlantillaMeta, PlantillaAviso, PlantillaAvisoFila, TextosPlantillaAviso, VariableMeta, VistaPrevia, WhatsappMeta, WhatsappPublicado,
+)
 from app.modulos.operacion.repositorio import RepositorioOperacion
-from app.whatsapp import cloud_config, formatear_mensaje_whatsapp
-from app.whatsapp_plantillas import plantilla_para
+from app.whatsapp import cloud_activo, cloud_config, formatear_mensaje_whatsapp
+from app.whatsapp_plantillas import CATEGORIA_AUTENTICACION, plantilla_para
 from app.nucleo.errores import DatosInvalidos, NoEncontrado
 from app.timezone import utc_ahora
 
@@ -71,6 +73,29 @@ def _whatsapp_meta(clave: str, estados: dict) -> WhatsappMeta | None:
         return WhatsappMeta(plantilla=meta.nombre, estado="sin_dato")
     return WhatsappMeta(
         plantilla=meta.nombre, estado=ESTADOS_META.get(fila.estado, "sin_dato"), motivo=fila.motivo, actualizado_en=fila.actualizado_en,
+    )
+
+
+def _nombre_dato(variable) -> str:
+    return variable.origen if isinstance(variable.origen, str) else variable.origen.__name__.lstrip("_")
+
+
+def _whatsapp_publicado(clave: str) -> WhatsappPublicado | None:
+    meta = plantilla_para(clave)
+    if meta is None:
+        return None
+    autenticacion = meta.categoria == CATEGORIA_AUTENTICACION
+    if autenticacion:
+        cuerpo, vista = None, f"*{meta.variables[0].ejemplo}* es su código de verificación. Por su seguridad, no lo comparta."
+    else:
+        cuerpo = vista = meta.cuerpo
+        for numero, variable in enumerate(meta.variables, 1):
+            vista = vista.replace(f"{{{{{numero}}}}}", variable.ejemplo)
+    return WhatsappPublicado(
+        activo=cloud_activo(), plantilla=meta.nombre, categoria="autenticacion" if autenticacion else "utilidad",
+        cuerpo=cuerpo, vista_previa=vista, pie=None if autenticacion else meta.pie,
+        boton="Copiar código" if meta.boton_codigo else meta.boton,
+        variables=[VariableMeta(numero=i, dato=_nombre_dato(v), ejemplo=v.ejemplo) for i, v in enumerate(meta.variables, 1)],
     )
 
 
@@ -135,6 +160,7 @@ class ServicioPlantillas:
             asunto=_texto(plantilla.asunto_email), cuerpo_email=_texto(plantilla.cuerpo_email),
             cuerpo_whatsapp=_texto(plantilla.cuerpo_whatsapp), titulo_push=plantilla.titulo_push, cuerpo_push=plantilla.cuerpo_push,
             variables=[v for v in variables if v != "enlace"], ejemplo=ejemplo,
+            whatsapp_publicado=_whatsapp_publicado(plantilla.clave),
         )
 
     def detalle(self, admin: Usuario, clave: str) -> PlantillaAviso:

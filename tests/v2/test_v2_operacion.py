@@ -243,6 +243,13 @@ def test_plantillas_muestran_el_estado_de_whatsapp_en_meta(iniciar, crear_usuari
     assert estados()["ACTUACIONES_DIGEST"]["estado"] == "aprobada" and estados()["ACTUACIONES_DIGEST"]["motivo"] is None
     detalle = cliente_http.get("/api/v2/admin/plantillas/ACTUACIONES_DIGEST").json()
     assert detalle["whatsapp_meta"]["estado"] == "aprobada"
+    publicado = detalle["whatsapp_publicado"]
+    assert publicado["activo"] is False and publicado["plantilla"] == "am_actuaciones_registradas" and publicado["categoria"] == "utilidad"
+    assert "{{2}}" in publicado["cuerpo"] and "{{2}}" not in publicado["vista_previa"] and "Sucesión familia Pérez" in publicado["vista_previa"]
+    assert publicado["boton"] == "Ver las actuaciones" and [v["dato"] for v in publicado["variables"]] == ["saludo", "novedades"]
+    monkeypatch.setenv("WHATSAPP_TOKEN", "t")
+    assert cliente_http.get("/api/v2/admin/plantillas/ACTUACIONES_DIGEST").json()["whatsapp_publicado"]["activo"] is True
+    monkeypatch.delenv("WHATSAPP_TOKEN")
 
     # Consultar en Meta: trae lo de las que se revisaron antes de configurar el webhook.
     from app.modulos.operacion import plantillas as servicio

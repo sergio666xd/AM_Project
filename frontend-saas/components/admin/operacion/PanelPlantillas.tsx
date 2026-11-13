@@ -100,7 +100,7 @@ function conNegritas(texto: string) {
   );
 }
 
-function EstadoEnMeta({ meta, consultando, onConsultar }: { meta: WhatsappMeta; consultando: boolean; onConsultar: () => void }) {
+function EstadoEnMeta({ meta, porMeta, consultando, onConsultar }: { meta: WhatsappMeta; porMeta: boolean; consultando: boolean; onConsultar: () => void }) {
   const estado = ESTADO_META[meta.estado];
   return (
     <Sheet aria-label="WhatsApp en Meta" className="mb-4 px-4 py-3">
@@ -118,10 +118,60 @@ function EstadoEnMeta({ meta, consultando, onConsultar }: { meta: WhatsappMeta; 
       {meta.estado === "sin_dato" && (
         <p className="mt-1.5 text-[13px] text-ink-3">Meta aún no ha avisado nada de esta plantilla. Toque «Consultar en Meta» para traer su estado.</p>
       )}
-      <p className="mt-1.5 text-[13px] text-ink-3">
-        Por WhatsApp sale el texto aprobado en Meta para esta plantilla. El «Texto de WhatsApp» de abajo solo se usa si WhatsApp no está conectado a Meta.
-      </p>
+      {!porMeta && (
+        <p className="mt-1.5 text-[13px] text-ink-3">
+          WhatsApp aún no está conectado a Meta en este servidor: por ahora sale el «Texto de WhatsApp» de abajo.
+        </p>
+      )}
     </Sheet>
+  );
+}
+
+type Publicado = NonNullable<Plantilla["whatsapp_publicado"]>;
+
+function TextoMeta({ publicado }: { publicado: Publicado }) {
+  return (
+    <div className="rounded-lg bg-sheet-2 px-3 py-3 shadow-[inset_0_0_0_1px_var(--line)]">
+      <p className="text-[13px] font-semibold text-ink">
+        Texto de WhatsApp aprobado en Meta <span className="font-mono text-[12.5px] font-normal text-ink-2">({publicado.plantilla})</span>
+      </p>
+      <p className="mt-0.5 text-[13px] text-ink-3">
+        Es el que reciben las personas. No se edita aquí: un cambio se hace en el catálogo de plantillas y Meta lo vuelve a aprobar.
+      </p>
+      {publicado.cuerpo ? (
+        <pre className="mt-2 whitespace-pre-wrap break-words font-mono text-[13px] leading-relaxed text-ink">{publicado.cuerpo}</pre>
+      ) : (
+        <p className="mt-2 text-[13.5px] text-ink">Meta pone el texto de las plantillas de autenticación; solo se envía el código.</p>
+      )}
+      {publicado.pie && <p className="mt-1 font-mono text-[12.5px] text-ink-3">Pie: {publicado.pie}</p>}
+      {publicado.boton && <p className="font-mono text-[12.5px] text-ink-3">Botón: {publicado.boton}</p>}
+      {publicado.variables.length > 0 && (
+        <dl className="mt-2 grid grid-cols-[auto_1fr] gap-x-3 gap-y-0.5 text-[12.5px] text-ink-2">
+          {publicado.variables.map((v) => (
+            <div key={v.numero} className="contents">
+              <dt className="font-mono text-ink">{`{{${v.numero}}}`}</dt>
+              <dd>{v.dato}</dd>
+            </div>
+          ))}
+        </dl>
+      )}
+    </div>
+  );
+}
+
+function BurbujaMeta({ publicado }: { publicado: Publicado }) {
+  return (
+    <div className="rounded-lg bg-[#e5ddd5] p-4 dark:bg-[#0b141a]">
+      <div className="ml-auto max-w-[85%] overflow-hidden rounded-lg rounded-tr-sm bg-[#d9fdd3] text-[14px] leading-relaxed text-[#111b21] shadow-sm dark:bg-[#005c4b] dark:text-[#e9edef]">
+        <p className="whitespace-pre-wrap break-words px-3 py-2">
+          {conNegritas(publicado.vista_previa)}
+          {publicado.pie && <span className="mt-1 block text-[12.5px] opacity-70">{publicado.pie}</span>}
+        </p>
+        {publicado.boton && (
+          <p className="border-t border-black/10 px-3 py-2 text-center font-semibold text-[#027eb5] dark:border-white/10 dark:text-[#53bdeb]">{publicado.boton}</p>
+        )}
+      </div>
+    </div>
   );
 }
 
@@ -157,6 +207,7 @@ function Editor({ plantilla, onGuardada, onCambios }: { plantilla: Plantilla; on
   const [errorPrevia, setErrorPrevia] = useState<string | null>(null);
   const ultimoCampo = useRef<{ campo: CampoTexto; el: HTMLInputElement | HTMLTextAreaElement } | null>(null);
   const tienePush = plantilla.tiene_push;
+  const publicado = plantilla.whatsapp_publicado?.activo ? plantilla.whatsapp_publicado : null;
   const cambios = !iguales(form, textos(plantilla));
 
   useEffect(() => onCambios(cambios), [cambios, onCambios]);
@@ -254,7 +305,7 @@ function Editor({ plantilla, onGuardada, onCambios }: { plantilla: Plantilla; on
               ))}
             </dl>
           </details>
-          {campo("cuerpo_whatsapp", "Texto de WhatsApp", 7, "Corto: lo esencial y el enlace. Use *texto* para negrita.")}
+          {publicado ? <TextoMeta publicado={publicado} /> : campo("cuerpo_whatsapp", "Texto de WhatsApp", 7, "Corto: lo esencial y el enlace. Use *texto* para negrita.")}
           {tienePush && (
             <>
               {campo("titulo_push", "Título del aviso en el navegador")}
@@ -296,7 +347,7 @@ function Editor({ plantilla, onGuardada, onCambios }: { plantilla: Plantilla; on
               <iframe title="Vista previa del correo" sandbox="" srcDoc={previa.html} className="h-[640px] w-full rounded-lg bg-[#f6f2e8] shadow-[inset_0_0_0_1px_var(--line)]" />
             </div>
           ) : vista === "whatsapp" ? (
-            <BurbujaWhatsapp texto={previa.whatsapp} />
+            publicado ? <BurbujaMeta publicado={publicado} /> : <BurbujaWhatsapp texto={previa.whatsapp} />
           ) : (
             <AvisoNavegador titulo={previa.titulo_push} cuerpo={previa.cuerpo_push} />
           )}
@@ -399,7 +450,7 @@ export function PanelPlantillas() {
               <LoadingState label="Cargando el aviso" rows={6} />
             ) : (
               <>
-                {plantilla.whatsapp_meta && <EstadoEnMeta meta={plantilla.whatsapp_meta} consultando={consultando} onConsultar={() => void consultarMeta()} />}
+                {plantilla.whatsapp_meta && <EstadoEnMeta meta={plantilla.whatsapp_meta} porMeta={!!plantilla.whatsapp_publicado?.activo} consultando={consultando} onConsultar={() => void consultarMeta()} />}
                 <Editor key={plantilla.clave + plantilla.actualizada_en} plantilla={plantilla} onGuardada={guardada} onCambios={marcarCambios} />
               </>
             )}
