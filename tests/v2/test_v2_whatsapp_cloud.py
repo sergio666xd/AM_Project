@@ -279,3 +279,11 @@ def test_admin_sees_whatsapp_delivery_confirmation(cloud, cliente_http, sesion_b
     item = cliente_http.get("/api/v2/admin/envios").json()["items"][0]
     assert item["confirmacion"] == "leido" and item["confirmado_en"]
     assert cliente_http.get(f"/api/v2/admin/envios/{entrega.id}").json()["confirmacion"] == "leido"
+
+
+def test_webhook_logs_failures_even_for_messages_outside_deliveries(cloud, cliente_http, caplog):
+    cuerpo = _evento({"statuses": [{"id": "wamid.SCRIPT", "status": "failed", "timestamp": "1762880000",
+                                    "errors": [{"code": 131042, "title": "Business eligibility payment issue"}]}]})
+    with caplog.at_level("WARNING", logger="app.api.whatsapp_webhook"):
+        assert cliente_http.post("/api/whatsapp/webhook", content=cuerpo, headers=_firmar(cuerpo)).status_code == 200
+    assert "wamid.SCRIPT" in caplog.text and "131042" in caplog.text
